@@ -1,4 +1,4 @@
-﻿# Conhecimento dos mods
+# Conhecimento dos mods
 
 Indice interno de84componentes do instalador. Revisao de30/10/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
 
@@ -99,3 +99,11 @@ Busque nome ou ID em mods.json ou nesta lista. Cada ficha tem funcao, uso, depen
 | [NETGVNNER - FL00R SHXT POSE PACK](Mods/mod-35353.md) | 1 | not-required | Disponivel para teste |
 | [Unlimited Attribute Reset](Mods/mod-36378.md) | 1.0.1 | not-required | Disponivel para teste |
 | [No-Clip (Fly Through Walls)](Mods/mod-35886.md) | 1.0.1 | not-required | Disponivel para teste |
+
+## Candidatos consultados
+
+Fora dos84componentes ativos e do executável.
+
+| Mod | Versão | Situação |
+| --- | --- | --- |
+| [Night City FPV](Candidatos/mod-31642.md) | 1.31.4 | Conferir dependências, REDmod e coop antes de integrar |
