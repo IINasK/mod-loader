@@ -95,3 +95,14 @@ Busque nome ou ID em mods.json ou nesta lista. Cada ficha tem funcao, uso, depen
 | [Nola x Veegee · Rough Outfit (FemV vanilla)](Mods/mod-15606.md) | 1.2 | not-required | Disponivel |
 | [Nola x Veegee · Lethal Outfit (FemV vanilla)](Mods/mod-15867.md) | 1.2 | not-required | Disponivel |
 | [Nola x Veegee feminine store](Mods/mod-11964.md) | 1.2 | not-required | Disponivel |
+
+## Candidatos consultados
+
+Consultas separadas dos80componentes ativos. Não foram instalados nem acrescentados ao executável.
+
+| Mod | Versão | Situação |
+| --- | --- | --- |
+| [EXtra - Pose Pack](Candidatos/mod-35772.md) | 1.0 | Auditoria; consultar limites na ficha |
+| [NETGVNNER - FL00R SHXT POSE PACK](Candidatos/mod-35353.md) | 1 | Auditoria; consultar limites na ficha |
+| [Unlimited Attribute Reset](Candidatos/mod-36378.md) | 1.0.1 | Auditoria; consultar limites na ficha |
+| [No-Clip (Fly Through Walls)](Candidatos/mod-35886.md) | 1.0.1 | Requisitos atendidos; testar rede e sobreposição com ITP antes de incluir |
