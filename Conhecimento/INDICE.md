@@ -1,11 +1,11 @@
 # Conhecimento dos mods
 
-Indice interno de76componentes do instalador. Revisao de29/10/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
+Indice interno de80componentes do instalador. Revisao de30/10/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
 
 ## Perfis Phantom Liberty
 
-- Com Phantom Liberty:76registros,74visiveis; BMW e Yamaha continuamretidos.
-- Sem Phantom Liberty:71registros elegiveis,69visiveis. ITP eNightCityAlive exigemDLC; Allies,Cyberpsycho eEconomyPunk ficaram fora desse perfil por evidencia insuficiente para a receita exata.
+- Com Phantom Liberty:80registros,78visiveis; BMW e Yamaha continuamretidos.
+- Sem Phantom Liberty:75registros elegiveis,73visiveis. ITP eNightCityAlive exigemDLC; Allies,Cyberpsycho eEconomyPunk ficaram fora desse perfil por evidencia insuficiente para a receita exata.
 - A base NightCoop nao exige DLC segundo aFAQoficial; o anfitriao pode reiniciar sem a expansao pelo fluxo oferecido pelo proprio mod. Nao apagar arquivos de expansao nem converter saves automaticamente.
 - Esta separacao e documental/estatica. Nao foi executado um jogo semDLC para validar aparencia, gameplay ou rede. Confirmacoescoop anteriores do usuario continuam atribuidas a ele.
 
@@ -91,3 +91,7 @@ Busque nome ou ID em mods.json ou nesta lista. Cada ficha tem funcao, uso, depen
 | [Mecha Robotic Eyes PART 2 CCXL](Mods/face-35807-168171.md) | 1 | not-required | Disponivel |
 | [RadioExt](Mods/RadioExt.md) | 2.92 | not-required | Disponivel |
 | [Spot On Radio](Mods/SpotOnRadio.md) | 1.5 | not-required | Disponivel |
+| [Nola x Veegee · Vintage Outfit (FemV vanilla)](Mods/mod-11963.md) | 1.3 | not-required | Disponivel |
+| [Nola x Veegee · Rough Outfit (FemV vanilla)](Mods/mod-15606.md) | 1.2 | not-required | Disponivel |
+| [Nola x Veegee · Lethal Outfit (FemV vanilla)](Mods/mod-15867.md) | 1.2 | not-required | Disponivel |
+| [Nola x Veegee feminine store](Mods/mod-11964.md) | 1.2 | not-required | Disponivel |

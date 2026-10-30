@@ -13027,6 +13027,238 @@
       "PhantomLibertyStatus": "not-required",
       "PhantomLibertyNotes": "Somente scripts,painel,metadata e plugin de áudio; não usa assetsDLC. Requisitos específicos1.5 sãoRED4ext1.31.0,CET1.38.1,RadioExt2.92 eSpotifyPremium paraConnect.",
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/34305"
+    },
+    {
+      "Id": "mod-11963",
+      "Name": "Nola x Veegee · Vintage Outfit (FemV vanilla)",
+      "Version": "1.3",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "redscript",
+        "CET",
+        "mod-6945"
+      ],
+      "Warning": "Somente V feminina. Suporte ao corpo padrão declarado; refit automático, sem instalar mod de corpo.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "NolaXVeegee_Vintage_Outfit_FemV-11963-1-3-1759346281.zip",
+          "Sha256": "038d433440716629618759dda8fe019d40c7befbfd02bd69e82a1c457d981d51",
+          "Size": 67116015,
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/11963?tab=files&file_id=123335",
+          "ModId": 11963,
+          "FileId": 123335
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/nolaxveegee_vintage_outfit.xl",
+          "Path": "archive/pc/mod/nolaxveegee_vintage_outfit.xl",
+          "Size": 171,
+          "Sha256": "2bf7aaf909cbd2adaeec12b74860eeb35ad3cd176f95a4503236c5262c916e0f"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/NolaXVeegee_Vintage_Outfit_FemV.archive",
+          "Path": "archive/pc/mod/NolaXVeegee_Vintage_Outfit_FemV.archive",
+          "Size": 71659520,
+          "Sha256": "5dc401a274da008cbf339a4e6cafa9cf5cf65d6307fc42796e0cc410fe80bc86"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/nolaxveegee/nolaxveegee_vintage_outfit.yaml",
+          "Path": "r6/tweaks/nolaxveegee/nolaxveegee_vintage_outfit.yaml",
+          "Size": 4216,
+          "Sha256": "6fd1549a7d79b6659bb7a4ed5731260212730a432a76d0e3ec24006b86e104d5"
+        }
+      ],
+      "BlockedReason": "",
+      "ThirdPerson": "FemV · corpo padrão",
+      "ThirdPersonNotes": "Suporte vanilla declarado pelo autor. A inspeção dos arquivos não comprova gameplay ou sincronização em coop; confirmação anterior não estendida a estes quatro componentes.",
+      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/11963",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Roupas próprias para a V feminina padrão e loja Virtual Atelier, documentadas para o jogo base; sem requisito de expansão ou referências EP1 nos textos auditados. Inferência documental e estática, sem execução em jogo sem DLC; recursos internos dos archives não foram integralmente decodificados.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/11963"
+    },
+    {
+      "Id": "mod-15606",
+      "Name": "Nola x Veegee · Rough Outfit (FemV vanilla)",
+      "Version": "1.2",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "redscript",
+        "CET",
+        "mod-6945"
+      ],
+      "Warning": "Somente V feminina. Suporte ao corpo padrão declarado; refit automático, sem instalar mod de corpo.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "NolaxVeegee_Rough_outfit_FemV-15606-1-2-1759347748.zip",
+          "Sha256": "6bf915ebee1332997c5b3e2f6dced718088253e6f56712dadecf8b957338d4bc",
+          "Size": 160155970,
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/15606?tab=files&file_id=123337",
+          "ModId": 15606,
+          "FileId": 123337
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/NolaxVeegee_Rough_outfit_FemV.archive",
+          "Path": "archive/pc/mod/NolaxVeegee_Rough_outfit_FemV.archive",
+          "Size": 161107968,
+          "Sha256": "bdb628338a9776de95c67aeb20c881de38707c80d1889f828a1a103dcdd3fcb0"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/NolaxVeegee_Rough_outfit_FemV.xl",
+          "Path": "archive/pc/mod/NolaxVeegee_Rough_outfit_FemV.xl",
+          "Size": 167,
+          "Sha256": "f10c9640cadc731a5f672f09bcddf57fc7e54378714b6062a451ff99c967e51d"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/nola_dreamer/NolaxVeegee_Rough_outfit_FemV.yaml",
+          "Path": "r6/tweaks/nola_dreamer/NolaxVeegee_Rough_outfit_FemV.yaml",
+          "Size": 6769,
+          "Sha256": "228925bd0a0d5d2e5148e548f9b269c06f0524f1c188d465883452a9df6b1605"
+        }
+      ],
+      "BlockedReason": "",
+      "ThirdPerson": "FemV · corpo padrão",
+      "ThirdPersonNotes": "Suporte vanilla declarado pelo autor. A inspeção dos arquivos não comprova gameplay ou sincronização em coop; confirmação anterior não estendida a estes quatro componentes.",
+      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/15606",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Roupas próprias para a V feminina padrão e loja Virtual Atelier, documentadas para o jogo base; sem requisito de expansão ou referências EP1 nos textos auditados. Inferência documental e estática, sem execução em jogo sem DLC; recursos internos dos archives não foram integralmente decodificados.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/15606"
+    },
+    {
+      "Id": "mod-15867",
+      "Name": "Nola x Veegee · Lethal Outfit (FemV vanilla)",
+      "Version": "1.2",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "redscript",
+        "CET",
+        "mod-6945"
+      ],
+      "Warning": "Somente V feminina. Suporte ao corpo padrão declarado; refit automático, sem instalar mod de corpo.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "NolaXVeegeeXAquelyras_lethal_outfit_FemV-15867-1-2-1759344219.zip",
+          "Sha256": "a27a2389a37aadb91c7326058f39c348f2575ae3e9b1121461bd2d07b414f5a4",
+          "Size": 142312044,
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/15867?tab=files&file_id=123333",
+          "ModId": 15867,
+          "FileId": 123333
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/NolaXVeegeeXAquelyras_lethal_outfit.xl",
+          "Path": "archive/pc/mod/NolaXVeegeeXAquelyras_lethal_outfit.xl",
+          "Size": 181,
+          "Sha256": "95bfba39762028136a8130f9d38898013894ebec58e033fcadd141017a1e1bc5"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/NolaXVeegeeXAquelyras_lethal_outfit_FemV.archive",
+          "Path": "archive/pc/mod/NolaXVeegeeXAquelyras_lethal_outfit_FemV.archive",
+          "Size": 144420864,
+          "Sha256": "23685801c4dd6e97596cfefd8992a18c1106e54eb954af43f39bb92bd7a20458"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/nola_dreamer/NolaXVeegeeXAquelyras_lethal_outfit.yaml",
+          "Path": "r6/tweaks/nola_dreamer/NolaXVeegeeXAquelyras_lethal_outfit.yaml",
+          "Size": 6764,
+          "Sha256": "6cb88b616f10a3fd279b1f1ddbd08f18646036d8f92c73ef4f212a2572ff4f0b"
+        }
+      ],
+      "BlockedReason": "",
+      "ThirdPerson": "FemV · corpo padrão",
+      "ThirdPersonNotes": "Suporte vanilla declarado pelo autor. A inspeção dos arquivos não comprova gameplay ou sincronização em coop; confirmação anterior não estendida a estes quatro componentes.",
+      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/15867",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Roupas próprias para a V feminina padrão e loja Virtual Atelier, documentadas para o jogo base; sem requisito de expansão ou referências EP1 nos textos auditados. Inferência documental e estática, sem execução em jogo sem DLC; recursos internos dos archives não foram integralmente decodificados.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/15867"
+    },
+    {
+      "Id": "mod-11964",
+      "Name": "Nola x Veegee feminine store",
+      "Version": "1.2",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "mod-2987",
+        "mod-11963",
+        "mod-15606",
+        "mod-15867"
+      ],
+      "Warning": "Loja de V feminina; inclui somente os conjuntos instalados. Computador > Atelier > Nola x Veegee store.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "NolaXVeegee_feminine_store-11964-1-2-1721415112.zip",
+          "Sha256": "9c775727352c236e77e3d369d608e94037ed5caa7dd7ca50a7de0e82ef83806c",
+          "Size": 66058,
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/11964?tab=files&file_id=82877",
+          "ModId": 11964,
+          "FileId": 82877
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/nola_veegee_feminine_store.reds",
+          "Path": "r6/scripts/nola_veegee_feminine_store.reds",
+          "Size": 10048,
+          "Sha256": "57cc34b4688685dddd85f6c3d61f7cf6d0fba79934395382748a91a7677c030c"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/NolaXVeegee_feminine_store.archive",
+          "Path": "archive/pc/mod/NolaXVeegee_feminine_store.archive",
+          "Size": 69632,
+          "Sha256": "906ad2634f6f5d79066da09d7a1d3aa8ff67cdbeb31049300581b030ec8cc370"
+        }
+      ],
+      "BlockedReason": "",
+      "ThirdPerson": "FemV · corpo padrão",
+      "ThirdPersonNotes": "Suporte vanilla declarado pelo autor. A inspeção dos arquivos não comprova gameplay ou sincronização em coop; confirmação anterior não estendida a estes quatro componentes.",
+      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/11964",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Roupas próprias para a V feminina padrão e loja Virtual Atelier, documentadas para o jogo base; sem requisito de expansão ou referências EP1 nos textos auditados. Inferência documental e estática, sem execução em jogo sem DLC; recursos internos dos archives não foram integralmente decodificados.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/11964"
     }
   ],
   "Excluded": [
