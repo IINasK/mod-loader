@@ -14,7 +14,9 @@ Gerenciador Windows de um catálogo fixado de mods para Cyberpunk2077 2.5, com d
 
 Os perfis Com/Sem Phantom Liberty usam a auditoria das dependências diretas e transitivas. Evidência documental/estática não substitui teste em um jogo semDLC. O FAQ do NightCoop permite jogar sem a expansão; saves que dependem dela não abrem nesse modo. Trocar a lista do instalador não apaga arquivos existentes nem desliga a expansão por conta própria.
 
-Na versão1.0.22 há83mods visíveis comDLC e76semDLC. Night City FPV1.31.4 foi acrescentado para teste com as dependências existentes; scripts compilados isoladamente, RED4ext1.31.0 preservado. JSONs pessoais do FPV são semeados só se ausentes e preservados ao remover; código e ZIP continuam verificados por hash. EXtra e FL00R SHXT (poses), Unlimited Attribute Reset e No-Clip foram integrados para teste, sem atualização do RED4ext nem troca de corpo. A loja Nola x Veegee e os conjuntos Vintage, Rough e Lethal foram incluídos com suporte declarado ao corpo padrão feminino. ImmersiveThirdPerson eNightCityAlive exigem a expansão. NightCityAllies, CyberpsychoEncounters, EconomyPunkStandard, EXtra e Night City FPV ficam fora da opção semDLC até evidência suficiente para essas receitas; continuam na lista comDLC. A seleção usa também as dependências, não somente o requisito direto do mod.
+Na versão1.0.23 há83mods visíveis comDLC e76semDLC. Night City FPV1.31.4 foi acrescentado para teste com as dependências existentes; scripts compilados isoladamente, RED4ext1.31.0 preservado. JSONs pessoais do FPV são semeados só se ausentes e preservados ao remover; código e ZIP continuam verificados por hash. EXtra e FL00R SHXT (poses), Unlimited Attribute Reset e No-Clip foram integrados para teste, sem atualização do RED4ext nem troca de corpo. A loja Nola x Veegee e os conjuntos Vintage, Rough e Lethal foram incluídos com suporte declarado ao corpo padrão feminino. ImmersiveThirdPerson eNightCityAlive exigem a expansão. NightCityAllies, CyberpsychoEncounters, EconomyPunkStandard, EXtra e Night City FPV ficam fora da opção semDLC até evidência suficiente para essas receitas; continuam na lista comDLC. A seleção usa também as dependências, não somente o requisito direto do mod.
+
+Os [padrões de configuração1.0.23](Conhecimento/Configuracoes/padroes-1.0.23.md) incluem os ajustes de direção e câmera salvos, com preservação das configurações existentes de cada jogador.
 
 ## Compilar
 
@@ -24,7 +26,7 @@ No Windows com .NETFramework4.x e PowerShell:
 ./Build.ps1
 ```
 
-A compilação usa o catálogo versionado e produz um único executável na raiz. Nenhum mod, save, token, cookie ou preset pessoal é empacotado. O catálogo embutido e o hash são recompilados juntos.
+A compilação usa o catálogo versionado e produz um único executável na raiz. Nenhum mod, save, token, cookie ou credencial é empacotado. O catálogo inclui oito padrões de preferências sanitizados, autorizados pelo usuário para compartilhamento; são aplicados somente quando a configuração correspondente não existe. O catálogo embutido e o hash são recompilados juntos.
 
 Os scripts históricos de remontagem do catálogo a partir dos pacotes baixados são ferramentas locais de auditoria: não são necessários para compilar o catálogo aprovado e não autorizam redistribuir arquivos de terceiros.
 

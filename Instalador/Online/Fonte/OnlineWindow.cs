@@ -508,7 +508,7 @@ public sealed partial class OnlineWindow:Form {
             OnlineDiagnostics.Record("ui.plan.enqueue",m.Id,"Plano conferido enviado para a lista.",new{Game=automaticGame,State=scan.State,Correct=scan.Correct,Missing=scan.Missing,Different=scan.Different,Cached=cached});
             string note=m.Warning;
             string localNote=DensityNote(m,GameRoot(),note);
-            Post(()=>{var row=Row(m.Id);if(row==null)return;row.Cells["Installed"].Value=scan.State;row.Cells["Installed"].ToolTipText=scan.Detail;ApplyBrowserNote(row,localNote);row.Cells["State"].Value=scan.IsCorrect?"Já instalado":cached?"Pronto para instalar":"A baixar";row.Cells["Progress"].Value=scan.IsCorrect||cached?100:0;row.Cells["State"].Style.ForeColor=Color.Black;row.Cells["State"].ToolTipText="";});
+            Post(()=>{var row=Row(m.Id);if(row==null)return;row.Cells["Installed"].Value=scan.State;row.Cells["Installed"].ToolTipText=scan.Detail;ApplyBrowserNote(row,localNote);row.Cells["State"].Value=scan.IsCorrect?(plan.MissingMods.Any(x=>x.Id==m.Id)?"Aplicar padrão":"Já instalado"):cached?"Pronto para instalar":"A baixar";row.Cells["Progress"].Value=scan.IsCorrect||cached?100:0;row.Cells["State"].Style.ForeColor=Color.Black;row.Cells["State"].ToolTipText="";});
         }
     }
     async Task ProcessAutomaticQueue(string root){
@@ -552,7 +552,7 @@ public sealed partial class OnlineWindow:Form {
             if(ids.Count==0)throw new IOException("Marque os mods que deseja instalar.");string root=GameRoot();AutoInstallPlan plan=null;bool missingCache=false;
             bool checkedOk=await Run(()=>{
                 plan=AutoInstallPlan.Build(catalog,ids,root,cache,nexus.Premium);ShowPlan(plan);
-                missingCache=plan.MissingMods.SelectMany(m=>m.Assets).Any(a=>!plan.CachedAssets[a.Sha256]);
+                missingCache=plan.MissingMods.Where(m=>!plan.Scans[m.Id].IsCorrect).SelectMany(m=>m.Assets).Any(a=>!plan.CachedAssets[a.Sha256]);
                 return "Seleção e dependências conferidas.";
             });
             if(!checkedOk)return;if(plan.Complete){ClearAutomaticQueue();status.Text="Os itens selecionados já estão corretos. Nada foi alterado.";return;}

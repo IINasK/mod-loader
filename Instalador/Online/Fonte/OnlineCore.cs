@@ -9,7 +9,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 
-public sealed class FixedCatalog { public int Schema; public string Id,GameVersion,GameFileVersion; public List<FixedMod> Packages; public string[] Excluded; }
+public sealed class FixedCatalog { public int Schema; public string Id,GameVersion,GameFileVersion; public List<FixedMod> Packages; public List<FixedDefault> Defaults; public string[] Excluded; }
 public sealed class FixedMod {
     public string Id,Name,Version,Profile,GameVersion,Warning,ThirdPerson,ThirdPersonNotes,ThirdPersonSource,BlockedReason;
     public string PhantomLibertyStatus,PhantomLibertyNotes,PhantomLibertySource;
@@ -67,6 +67,7 @@ public static class FixedData {
             }
         }
         foreach(var m in c.Packages) foreach(string d in m.Dependencies) if(!ids.Contains(d)) throw new IOException("Dependência desconhecida: "+d);
+        ModDefaults.Validate(c);
         NightCityDensity.Validate(c);
         Expand(c,c.Packages.Select(x=>x.Id));
         string[] basePaths={"bin/x64/winmm.dll","red4ext/RED4ext.dll","red4ext/LICENSE.txt","red4ext/THIRD_PARTY_LICENSES.txt","red4ext/plugins/NightCoop/NightCoop.dll"};
@@ -279,7 +280,12 @@ public sealed partial class FixedInstaller {
         Directory.CreateDirectory(Data);
         using(var mutex=new FileStream(Safe.In(Data,"operacao.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None)) {
             EnsureNoIncomplete();
-            var pending=mods.Where(m=>!FixedData.Scan(m,game).IsCorrect).ToList();if(pending.Count==0)return "Todos os mods selecionados já estão corretos. Nada foi alterado.";
+            var pending=mods.Where(m=>!FixedData.Scan(m,game).IsCorrect).ToList();
+            if(pending.Count==0){
+                if(!mods.Any(m=>ModDefaults.Needs(catalog,m.Id,game)))return "Todos os mods selecionados já estão corretos. Nada foi alterado.";
+                Closed();ModDefaults.Apply(catalog,mods,game,Safe.In(Data,"defaults-backups/"+Guid.NewGuid().ToString("N")),report);
+                return "Configurações iniciais aplicadas. Os ajustes existentes foram preservados.";
+            }
             long bytes=pending.SelectMany(x=>x.Files).Sum(x=>x.Size);
             if(new DriveInfo(Path.GetPathRoot(game)).AvailableFreeSpace<bytes*2+100L*1024*1024||new DriveInfo(Path.GetPathRoot(cache.Root)).AvailableFreeSpace<bytes+100L*1024*1024)throw new IOException("Espaço insuficiente para preparação e backup.");
             string id=Guid.NewGuid().ToString("N"),stage=Safe.In(cache.Root,"preparacao/"+id);Directory.CreateDirectory(stage);
@@ -304,6 +310,7 @@ public sealed partial class FixedInstaller {
                     OnlineDiagnostics.Record("install.file.applied",m.Id,"Arquivo copiado e registrado.",new{Game=game,Receipt=id,Path=f.Path,Sha256=f.Sha256});
                     written++;if(failAfter>=0&&written>=failAfter)throw new IOException("Falha de teste após a cópia.");report("Instalado: "+m.Name);
                 }
+                Closed();ModDefaults.Apply(catalog,mods,game,Safe.In(Data,"defaults-backups/"+id),report);
                 receipt.Status="instalado";Save(ledger,receipt);OnlineDiagnostics.Record("install.complete",null,"Instalação concluída pelo motor.",new{Game=game,Receipt=id,Mods=pending.Select(m=>m.Id).ToArray(),Files=written});return "Instalação concluída. Mods que já estavam corretos foram preservados. Pronto para jogar.";
             }catch(Exception ex) {
                 OnlineDiagnostics.Record("install.failed",null,"Falha na instalação; fluxo de desfazer será acionado.",new{Game=game,Receipt=id,ErrorType=ex.GetType().Name});

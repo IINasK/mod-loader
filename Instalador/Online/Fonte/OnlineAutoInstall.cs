@@ -30,7 +30,7 @@ public sealed class AutoInstallPlan {
         foreach(var mod in mods) {
             var scan=FixedData.Scan(mod,game);plan.Scans.Add(mod.Id,scan);
             if(scan.IsConflict)throw new IOException(mod.Name+": "+scan.State+". Resolva o conflito; nenhum arquivo será sobrescrito.");
-            if(!scan.IsCorrect)plan.MissingMods.Add(mod);
+            if(!scan.IsCorrect||ModDefaults.Needs(catalog,mod.Id,game))plan.MissingMods.Add(mod);
         }
         var available=new Dictionary<string,bool>(StringComparer.Ordinal);
         foreach(var mod in mods) {
@@ -49,7 +49,7 @@ public sealed class AutoInstallPlan {
             }
             bool ready=ownReady&&mod.Dependencies.All(id=>available[id]);
             available.Add(mod.Id,ready);
-            if(ready&&!plan.Scans[mod.Id].IsCorrect)plan.ReadyMods.Add(mod);
+            if(ready&&plan.MissingMods.Any(m=>m.Id==mod.Id))plan.ReadyMods.Add(mod);
         }
         OnlineDiagnostics.Record("plan.created",null,"Plano baseado nos arquivos reais do jogo.",new{Game=game,Mods=mods.Select(m=>m.Id).ToArray(),NeedInstall=plan.MissingMods.Select(m=>m.Id).ToArray(),Ready=plan.ReadyMods.Select(m=>m.Id).ToArray(),Manual=plan.ManualMod==null?null:plan.ManualMod.Id,Complete=plan.Complete});return plan;
     }

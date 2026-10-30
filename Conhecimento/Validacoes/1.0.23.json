@@ -1,0 +1,45 @@
+{
+  "Version": "1.0.23",
+  "CheckedOn": "2026-10-30",
+  "CatalogCount": 85,
+  "VisibleWithPL": 83,
+  "VisibleWithoutPL": 76,
+  "PreservedPreviousRecords": 85,
+  "CatalogSha256": "7b5c906b75bd40323c3e9ea46ffc086b43624a2008c55d558d6158694eedfce9",
+  "ExecutableSha256": "d510bb723c62f1d3b68cc89605edfc80381a8a846283ac42f8cfef844d1329f7",
+  "Tests": {
+    "Regression": 822,
+    "Defaults": 36,
+    "DefaultsQueue": 11,
+    "EditionUI": 25,
+    "Total": 894
+  },
+  "Defaults": {
+    "Count": 8,
+    "MissingOnly": true,
+    "ExistingConfigurationsPreserved": true,
+    "SelectedModsOnly": true,
+    "ConfigOnlyWithoutDownloadTested": true,
+    "RollbackTested": true,
+    "CredentialsCopied": false,
+    "ITPOrBodySettingsCopied": false,
+    "Steering": {
+      "Normal": 75,
+      "Sport": 50,
+      "Gentle": 65,
+      "Smoothing": false,
+      "SpeedSensitive": true
+    }
+  },
+  "RealGameModified": false,
+  "GameReadOnlyCapture": true,
+  "GameRuntimeTested": false,
+  "RED4extUpdated": false,
+  "OtherDependenciesUpdated": false,
+  "BodyChanged": false,
+  "Limits": [
+    "Defaults seed absent files or sections; existing configurations are deliberately preserved",
+    "Snapshot of saved preferences, not automatic synchronization",
+    "Driving behavior was not retested in the real game"
+  ]
+}

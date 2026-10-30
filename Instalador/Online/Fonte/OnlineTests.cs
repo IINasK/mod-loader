@@ -123,6 +123,8 @@ public static class OnlineTests {
         OnlineFacialInstallTests.Run(parent);
         OnlineGameEditionTests.Run(parent);
         OnlineUserDataTests.Run(parent);
+        OnlineDefaultsTests.Run(parent);
+        OnlineDefaultsQueueTests.Run(parent);
         Safe.WriteJson(Path.Combine(root,"resultado.json"),new{Passed=passed.Count,Tests=passed,FixtureOnly=true,RealGameTouched=false});File.WriteAllText(Path.Combine(parent,"ultimo-teste.txt"),root);Console.WriteLine(passed.Count+" testes aprovados em "+root);
     }
     public static void VerifySources(FixedCatalog catalog,string seedsFile,string resultFile) {
