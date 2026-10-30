@@ -2,7 +2,7 @@
 $online=Split-Path -Parent $PSScriptRoot
 $project=Split-Path -Parent (Split-Path -Parent $online)
 $program=Join-Path $online 'Programa'
-$version='1.0.20'
+$version='1.0.21'
 $source=Join-Path $program 'Cyberpunk Coop.exe'
 $destination=Join-Path $project ('Cyberpunk Coop '+$version+'.exe')
 $assembly=[Reflection.Assembly]::Load([IO.File]::ReadAllBytes($source))

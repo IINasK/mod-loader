@@ -1,0 +1,45 @@
+{
+  "Version": "1.0.21",
+  "CheckedOn": "2026-10-30",
+  "CatalogCount": 84,
+  "VisibleWithPL": 82,
+  "VisibleWithoutPL": 76,
+  "Added": [
+    "mod-35772",
+    "mod-35353",
+    "mod-36378",
+    "mod-35886"
+  ],
+  "PreservedPreviousRecords": 80,
+  "NewInstallPaths": 8,
+  "CatalogSha256": "468efa83f1f30ceda319683e0c8a16e5517ca9fe9d9fdc092e1fecdc4d9ac012",
+  "ExecutableSha256": "19b8479a57f56dc6336d42282dca52e54790672fd320c19608661ed2fd726f70",
+  "Tests": {
+    "Regression": 805,
+    "OriginalArchivesQueue": 31,
+    "EditionUI": 25,
+    "Total": 861
+  },
+  "Validated": [
+    "All80previous records identical",
+    "Four official ZIP hashes and8file hashes",
+    "Browser download partial never marked installed",
+    "Existing monitor/importer/installer queue: one page at a time",
+    "Removal,undo,preserve user edits,foreign files and synthetic saves",
+    "WithPL andWithoutPL selection and counters",
+    "Single EXE embeds only metadata; no external catalog required"
+  ],
+  "RealGameModified": false,
+  "RED4extUpdated": false,
+  "BodyChanged": false,
+  "ModCodeExecuted": false,
+  "BrowserInTests": "Simulated; no real download tabs opened by the test harness",
+  "RuntimeCoopValidated": false,
+  "RuntimeWithoutDLCValidated": false,
+  "ExtraPoseWithoutDLC": "Unverified; exposed only inWithPL profile",
+  "Limits": [
+    "NoClip overlaps ITP locomotion wrappers; host/guest movement still needs gameplay test",
+    "Attribute reset changes progression and save facts; removal does not undo saved choices",
+    "Pose rig,clipping and TweakXL category resolution need in-game validation"
+  ]
+}

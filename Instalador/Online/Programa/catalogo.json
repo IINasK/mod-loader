@@ -13259,6 +13259,206 @@
       "PhantomLibertyStatus": "not-required",
       "PhantomLibertyNotes": "Roupas próprias para a V feminina padrão e loja Virtual Atelier, documentadas para o jogo base; sem requisito de expansão ou referências EP1 nos textos auditados. Inferência documental e estática, sem execução em jogo sem DLC; recursos internos dos archives não foram integralmente decodificados.",
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/11964"
+    },
+    {
+      "Id": "mod-35772",
+      "Name": "EXtra - Pose Pack",
+      "Version": "1.0",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL"
+      ],
+      "Warning": "Modo foto: poses femininas, categoria EXtra. Mantém o corpo padrão.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "EXtra Pose Pack - PM 35772 1.0 2026-10-24T17-11Z 6ZNKZccN9.zip",
+          "Sha256": "db6189906b66c40f3d7afb813b02092b054b32eb8b302973b77173992bfa96e0",
+          "Size": 55148,
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/35772?tab=files&file_id=168073",
+          "ModId": 35772,
+          "FileId": 168073
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/BV - EXtra Pose Pack.archive",
+          "Path": "archive/pc/mod/BV - EXtra Pose Pack.archive",
+          "Size": 61440,
+          "Sha256": "c36e4946a081842646e0242605015b765718de43db973c5194dedd9b1e637669"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/BV - EXtra.xl",
+          "Path": "archive/pc/mod/BV - EXtra.xl",
+          "Size": 1321,
+          "Sha256": "7ed1b2dd2e22b9766e7c57cac731d6425baba1bf4f86516192b384c5b83fbe3a"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/extra_pose_pack/BV - EXtra.yaml",
+          "Path": "r6/tweaks/extra_pose_pack/BV - EXtra.yaml",
+          "Size": 5836,
+          "Sha256": "8dbd6f437a97dd86dcbabb77861def1ca8f23f6e4478badcdaa41514082b1d28"
+        }
+      ],
+      "BlockedReason": "",
+      "ThirdPerson": "Conjunto feminino de animações; não altera corpo padrão",
+      "ThirdPersonNotes": "Acrescenta 15 poses femininas ao modo foto, com categoria própria e suporte também a uma lista de NPCs femininas.\r\n\r\nAbrir o modo foto e procurar a categoria EXtra nas poses; não altera a caminhada ou a direção durante gameplay.\r\n\r\nA receita usa o conjunto de animações feminino; não tratar como suporte universal a V masculina.\r\n\r\nCandidato tecnicamente compatível com a base para avaliação no perfil Com Phantom Liberty. Uso sem DLC exige conferir as referências EP1 opcionais; não confundir referências a NPCs com prova de DLC obrigatório.\r\n\r\n- ArchiveXL/TweakXL são inferidos das configurações .xl/.yaml; a página não apresenta requisitos mínimos numéricos.\r\n- O .xl lista Alex, Aurore, Lina e Stella em caminhos EP1; o YAML também inclui listas de personagens da expansão. O pacote também inclui V feminina e NPCs do jogo base. Não foi comprovado se os alvos ausentes são ignorados sem DLC.\r\n- Sem conflito de destinos encontrado, mas os registros PhotoModePoses.xtra_01 a xtra_15 devem ser confrontados com futuros pacotes de poses.\r\n- Sincronização das poses no NightCoop, câmera ITP e ajuste de roupas em cada pose não foram testados. Não altera corpo/rig por instalação.\r\n\r\nSincronização em coop não demonstrada. Nenhum arquivo do jogo, corpo, loader ou save foi alterado.",
+      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/35772?tab=description\nhttps://www.nexusmods.com/cyberpunk2077/mods/35772?tab=files",
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertyNotes": "Referências EP1 no .xl: uso sem DLC não demonstrado. Disponível no perfil Com Phantom Liberty; não é prova de que o pacote inteiro exige a expansão.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/35772?tab=description\nhttps://www.nexusmods.com/cyberpunk2077/mods/35772?tab=files"
+    },
+    {
+      "Id": "mod-35353",
+      "Name": "NETGVNNER - FL00R SHXT POSE PACK",
+      "Version": "1",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL"
+      ],
+      "Warning": "Modo foto: poses femininas. Variantes ANGEL/EBB podem não ajustar no corpo padrão; preferir as demais. Poses com arma precisam de pistola no inventário.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "NETGVNNER - FL00R SHXT 35353 1 2026-10-26T13-04Z k8Iw8mmuE.zip",
+          "Sha256": "d49b5902c8ab73ab11a67953b6518ffe21c0793e4d70f947ba3ea3babfca7bd3",
+          "Size": 151429,
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/35353?tab=files&file_id=168808",
+          "ModId": 35353,
+          "FileId": 168808
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/NETGVNNER/NETGVNNER_FL00R_SHXT.yaml",
+          "Path": "r6/tweaks/NETGVNNER/NETGVNNER_FL00R_SHXT.yaml",
+          "Size": 19480,
+          "Sha256": "b2dde4e87317e91b131f889b35e1bfcdd9a53571157777c93e8f27ffe9e08a69"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/NETGVNNER_FL00R_SHXT.archive",
+          "Path": "archive/pc/mod/NETGVNNER_FL00R_SHXT.archive",
+          "Size": 155648,
+          "Sha256": "222d2b33dd6c223efe63bea26ab1ef53d1fb4be00488543f45920231d44c1bda"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/NETGVNNER_FL00R_SHXT.xl",
+          "Path": "archive/pc/mod/NETGVNNER_FL00R_SHXT.xl",
+          "Size": 180,
+          "Sha256": "ec6268bfc88bd6ceb9beb3944ba35d116a0a63ec4897756c42dd856ba38c4f05"
+        }
+      ],
+      "BlockedReason": "",
+      "ThirdPerson": "Conjunto feminino de animações; não altera corpo padrão",
+      "ThirdPersonNotes": "Pacote de 36 poses femininas de chão para o modo foto. O YAML contém 56 registros únicos:36 poses-base e20 variações, incluindo opções para corpos específicos.\r\n\r\nAbrir o modo foto > poses > categoria NETGVNNER - FL00R SHXT.\r\n\r\nAs poses foram pensadas para sapatos de plataforma; salto fino ou solado baixo pode alterar o contato com o chão.\r\n\r\nPara as poses armadas aparecerem, o autor pede uma pistola no inventário.\r\n\r\nMantendo o corpo padrão, começar pelas variações sem marcação ANGEL/EBB; os nomes das variações não obrigam a instalar esses corpos.\r\n\r\nCandidato compatível pelas dependências declaradas e pelo escopo dos arquivos. Sem referência EP1 nos textos conferidos; ausência de DLC é inferência estática, não teste runtime.\r\n\r\n- ArchiveXL e TweakXL são explicitamente declarados pelo autor; versões mínimas não informadas.\r\n- O arquivo informa que foi gerado com Easy Photomode Poses; esse programa de criação não é uma dependência runtime demonstrada.\r\n- O autor alerta deformações/clipping com rigs corporais.\r\n- Nenhum conflito de destino encontrado com o catálogo ou com EXtra; ambos acrescentam animações à entidade feminina de modo foto. Compatibilidade interna de archives e sincronização coop não foram executadas.\r\n- O YAML usa CategoryName com inicial maiúscula. Não foi verificada a aceitação dessa propriedade pelo TweakXL1.12.0 em runtime; observar seu log num futuro teste, sem alterar o arquivo do autor.\r\n- O autor proíbe modificar, converter e redistribuir o pacote; esta ficha contém somente metadados e resumo.\r\n\r\nSincronização em coop não demonstrada. Nenhum arquivo do jogo, corpo, loader ou save foi alterado.",
+      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/35353?tab=description\nhttps://www.nexusmods.com/cyberpunk2077/mods/35353?tab=files",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Sem exigência de expansão nas fontes e textos auditados; classificação documental/estática, sem teste de jogo sem DLC.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/35353?tab=description\nhttps://www.nexusmods.com/cyberpunk2077/mods/35353?tab=files"
+    },
+    {
+      "Id": "mod-36378",
+      "Name": "Unlimited Attribute Reset",
+      "Version": "1.0.1",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "NightCoop",
+        "redscript",
+        "ModSettings"
+      ],
+      "Warning": "ModSettings > Unlimited Attribute Reset: Points per Tap começa em 20; use 1 para gastar um ponto por toque. Remover o mod não desfaz atributos já alterados no save.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "UnlimitedAttributeReset 36378 1.0.1 2026-10-30T07-13Z sHlUHDPdU.zip",
+          "Sha256": "68a4dd6a6ff9f74717e07c794476435c6a100e8650aeb1c8ad58e63ec3a6e7f1",
+          "Size": 3281,
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/36378?tab=files&file_id=170886",
+          "ModId": 36378,
+          "FileId": 170886
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/UnlimitedAttributeReset/UnlimitedAttributeReset.reds",
+          "Path": "r6/scripts/UnlimitedAttributeReset/UnlimitedAttributeReset.reds",
+          "Size": 10532,
+          "Sha256": "92e97e222a7e43ebe1abb3545f947c0d4bd0e983b14d3fd308f8ce224c82dfaf"
+        }
+      ],
+      "BlockedReason": "",
+      "ThirdPerson": "Qualquer V; progressão do jogador",
+      "ThirdPersonNotes": "Permite repetir o reset de atributos e ajustar quantos pontos um toque curto compra, entre 1 e 20. A função usa os pontos disponíveis do jogador.\r\n\r\nTela de atributos > botão de reset; o script mantém o botão disponível após novos resets.\r\n\r\nConfigurações > Mod Settings > Unlimited Attribute Reset > Points per Tap. Valor padrão20; selecionar1 mantém compra de um ponto por toque.\r\n\r\nO código distingue o comando de melhorar atributo (F ou X no controle, conforme descrito pelo autor) de um clique simples que só abre a árvore; segurar compra um ponto.\r\n\r\nConserva os bloqueios de combate e as verificações de capacidade de ciberware implementadas no handler analisado.\r\n\r\nDependências disponíveis na base atual, sem exigência de atualizar RED4ext. Por alterar progressão e um quest fact, foi incluído para teste; conferir em save separado e em coop antes de usar nas partidas habituais.\r\n\r\n- Autor declara Cyberpunk2.5. RED4ext1.31.0, redscript0.5.32 e ModSettings0.2.27 já estão na base; mínimos numéricos não publicados.\r\n- ModSettings é necessário para configurar a quantidade; o código tem fallback sem esse módulo, com padrão20. Não é preciso instalar CET por causa deste script.\r\n- O código redefine o quest fact ResetAttributeDisabled para0 e usa métodos de compra/reembolso do jogo. Remover o script não desfaz atributos ou fatos já gravados em saves.\r\n- Existe @replaceMethod em NewPerksCategoriesGameController.OnResetAttributesButtonClick; outros mods que substituam esse handler podem colidir. Há wrappers adicionais de PlayerPuppet e eventos da tela de atributos.\r\n- Busca nos scripts atualmente instalados não encontrou os mesmos callbacks/fact; isso não inspeciona os hooks nativos da DLL NightCoop nem comprova sincronização.\r\n- Não foi compilado ou executado o script do mod, nem realizado reset de atributos. Testar host e convidado e conferir pontos/perks/ciberware após salvar/recarregar.\r\n\r\nSincronização em coop não demonstrada. Nenhum arquivo do jogo, corpo, loader ou save foi alterado.",
+      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/36378?tab=description\nhttps://www.nexusmods.com/cyberpunk2077/mods/36378?tab=files",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Sem exigência de expansão nas fontes e textos auditados; classificação documental/estática, sem teste de jogo sem DLC.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/36378?tab=description\nhttps://www.nexusmods.com/cyberpunk2077/mods/36378?tab=files"
+    },
+    {
+      "Id": "mod-35886",
+      "Name": "No-Clip (Fly Through Walls)",
+      "Version": "1.0.1",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "redscript"
+      ],
+      "Warning": "Três toques rápidos em agachar ligam/desligam. Desligue sobre piso livre. Não corrige missões; há sobreposição de movimento com ITP e sincronização em coop ainda não testada. Não combinar com a edição mod.io.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "No-Clip (Fly Through Walls) 35886 1.0.1 2026-10-25T18-18Z sHlUHDDuv.zip",
+          "Sha256": "2f473328edeeff9db8e821c18066ba3c44da33b336c7fadf712e39664a971cda",
+          "Size": 2395,
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/35886?tab=files&file_id=168484",
+          "ModId": 35886,
+          "FileId": 168484
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/NoClip/NoClip.reds",
+          "Path": "r6/scripts/NoClip/NoClip.reds",
+          "Size": 7317,
+          "Sha256": "bb281a922f54d43024202a5c6db29f298f846d8c281d3908021d940c2dd349d4"
+        }
+      ],
+      "BlockedReason": "",
+      "ThirdPerson": "Qualquer V; sem mod corporal",
+      "ThirdPersonNotes": "Voo e atravessar colisões; não corrige flags/progressão de missões\r\n\r\nTrês toques rápidos em agachar ligam/desligam; movimento pela câmera; Jump sobe, Crouch desce, Sprint acelera\r\n\r\nDesligar sobre piso livre; usar somente uma versão manual ou mod.io\r\n\r\nRequisitos da nossa base atendidos; coop não confirmado\r\n\r\nTeleporte por quadro, colisãoZERO e controle manual de yaw: possível disputa com posição da rede\r\n\r\nITP também encadeia LocomotionEventsTransition.OnUpdate; sobreposição não prova falha mas precisa de teste\r\n\r\nNão corrige portas/triggers de missão; não salvar em área bloqueada pela história durante teste\r\n\r\nNenhuma atualizaçãoRED4ext ou dependência extra necessária pelas fontes",
+      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/35886\nhttps://www.nexusmods.com/cyberpunk2077/mods/35886?tab=files&file_id=168484\nhttps://www.nexusmods.com/cyberpunk2077/mods/35886?tab=posts",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Sem exigência de expansão nas fontes e textos auditados; classificação documental/estática, sem teste de jogo sem DLC.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/35886\nhttps://www.nexusmods.com/cyberpunk2077/mods/35886?tab=files&file_id=168484\nhttps://www.nexusmods.com/cyberpunk2077/mods/35886?tab=posts"
     }
   ],
   "Excluded": [

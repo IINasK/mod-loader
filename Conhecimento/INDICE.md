@@ -1,11 +1,11 @@
-# Conhecimento dos mods
+﻿# Conhecimento dos mods
 
-Indice interno de80componentes do instalador. Revisao de30/10/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
+Indice interno de84componentes do instalador. Revisao de30/10/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
 
 ## Perfis Phantom Liberty
 
-- Com Phantom Liberty:80registros,78visiveis; BMW e Yamaha continuamretidos.
-- Sem Phantom Liberty:75registros elegiveis,73visiveis. ITP eNightCityAlive exigemDLC; Allies,Cyberpsycho eEconomyPunk ficaram fora desse perfil por evidencia insuficiente para a receita exata.
+- Com Phantom Liberty:84registros,82visiveis; BMW e Yamaha continuamretidos.
+- Sem Phantom Liberty:78registros elegiveis,76visiveis. ITP eNightCityAlive exigemDLC; Allies,Cyberpsycho,EconomyPunk eEXtra ficaram fora desse perfil por evidencia insuficiente para a receita exata.
 - A base NightCoop nao exige DLC segundo aFAQoficial; o anfitriao pode reiniciar sem a expansao pelo fluxo oferecido pelo proprio mod. Nao apagar arquivos de expansao nem converter saves automaticamente.
 - Esta separacao e documental/estatica. Nao foi executado um jogo semDLC para validar aparencia, gameplay ou rede. Confirmacoescoop anteriores do usuario continuam atribuidas a ele.
 
@@ -95,14 +95,7 @@ Busque nome ou ID em mods.json ou nesta lista. Cada ficha tem funcao, uso, depen
 | [Nola x Veegee · Rough Outfit (FemV vanilla)](Mods/mod-15606.md) | 1.2 | not-required | Disponivel |
 | [Nola x Veegee · Lethal Outfit (FemV vanilla)](Mods/mod-15867.md) | 1.2 | not-required | Disponivel |
 | [Nola x Veegee feminine store](Mods/mod-11964.md) | 1.2 | not-required | Disponivel |
-
-## Candidatos consultados
-
-Consultas separadas dos80componentes ativos. Não foram instalados nem acrescentados ao executável.
-
-| Mod | Versão | Situação |
-| --- | --- | --- |
-| [EXtra - Pose Pack](Candidatos/mod-35772.md) | 1.0 | Auditoria; consultar limites na ficha |
-| [NETGVNNER - FL00R SHXT POSE PACK](Candidatos/mod-35353.md) | 1 | Auditoria; consultar limites na ficha |
-| [Unlimited Attribute Reset](Candidatos/mod-36378.md) | 1.0.1 | Auditoria; consultar limites na ficha |
-| [No-Clip (Fly Through Walls)](Candidatos/mod-35886.md) | 1.0.1 | Requisitos atendidos; testar rede e sobreposição com ITP antes de incluir |
+| [EXtra - Pose Pack](Mods/mod-35772.md) | 1.0 | unverified | Disponivel para teste |
+| [NETGVNNER - FL00R SHXT POSE PACK](Mods/mod-35353.md) | 1 | not-required | Disponivel para teste |
+| [Unlimited Attribute Reset](Mods/mod-36378.md) | 1.0.1 | not-required | Disponivel para teste |
+| [No-Clip (Fly Through Walls)](Mods/mod-35886.md) | 1.0.1 | not-required | Disponivel para teste |

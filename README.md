@@ -1,4 +1,4 @@
-# Mod Loader Cyberpunk coop
+﻿# Mod Loader Cyberpunk coop
 
 Repositório privado: [IINasK/mod-loader-cyberpunk-coop](https://github.com/IINasK/mod-loader-cyberpunk-coop).
 
@@ -9,12 +9,12 @@ Gerenciador Windows de um catálogo fixado de mods para Cyberpunk2077 2.5, com d
 - `Instalador/Online/Fonte`: interface, catálogo, downloads, importação e testes.
 - `Instalador/Fonte`: motor compartilhado, validação de caminhos, backup e fixtures.
 - `Instalador/Online/Programa/catalogo.json`: receitas e fontes fixadas; não contém os mods.
-- `Conhecimento/INDICE.md` e `Conhecimento/mods.json`: fichas dos80componentes, função, uso, dependências, versões e evidências de compatibilidade.
+- `Conhecimento/INDICE.md` e `Conhecimento/mods.json`: fichas dos84componentes, função, uso, dependências, versões e evidências de compatibilidade.
 - `AGENTS.md`: histórico das decisões do projeto. As instruções antigas foram revogadas pelo usuário; as referências às auditorias locais não implicam inclusão dessas pastas no Git.
 
 Os perfis Com/Sem Phantom Liberty usam a auditoria das dependências diretas e transitivas. Evidência documental/estática não substitui teste em um jogo semDLC. O FAQ do NightCoop permite jogar sem a expansão; saves que dependem dela não abrem nesse modo. Trocar a lista do instalador não apaga arquivos existentes nem desliga a expansão por conta própria.
 
-Na versão1.0.20 há78mods visíveis comDLC e73semDLC. A loja Nola x Veegee e os conjuntos Vintage, Rough e Lethal foram incluídos com suporte declarado ao corpo padrão feminino. ImmersiveThirdPerson eNightCityAlive exigem a expansão. NightCityAllies, CyberpsychoEncounters eEconomyPunkStandard ficam fora da opção semDLC até evidência suficiente para essas receitas; continuam na lista comDLC. A seleção usa também as dependências, não somente o requisito direto do mod.
+Na versão1.0.21 há82mods visíveis comDLC e76semDLC. EXtra e FL00R SHXT (poses), Unlimited Attribute Reset e No-Clip foram integrados para teste, sem atualização do RED4ext nem troca de corpo. A loja Nola x Veegee e os conjuntos Vintage, Rough e Lethal foram incluídos com suporte declarado ao corpo padrão feminino. ImmersiveThirdPerson eNightCityAlive exigem a expansão. NightCityAllies, CyberpsychoEncounters, EconomyPunkStandard e EXtra ficam fora da opção semDLC até evidência suficiente para essas receitas; continuam na lista comDLC. A seleção usa também as dependências, não somente o requisito direto do mod.
 
 ## Compilar
 
