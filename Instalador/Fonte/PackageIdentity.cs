@@ -1,0 +1,1 @@
+internal static class PackageIdentity { internal const string ManifestHash="133574a4c2cbc425a89e12befe744c8221903011115ae77b5ce5f392a6e9023b"; internal const string PayloadHash="9c42e2a5a337ff1160a557802327bcf97bc8f9ff310bdda4caa786ae1e8c368d"; }

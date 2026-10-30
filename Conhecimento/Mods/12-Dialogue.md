@@ -1,0 +1,481 @@
+# Immersive V Dialogue Expanded
+
+- ID: `12-Dialogue`
+- Versao fixa: 1.1.0; jogo 2.5.
+- Grupo: Base.
+- Phantom Liberty: not-required.
+- Situacao: Disponivel conforme perfil e requisitos.
+
+## Funcao
+
+V comenta combate, direção, saques, ferimentos e outras ações; Johnny pode comentar e receber respostas.
+
+## Como usar
+
+- Configurar frequência e recursos emConfigurações>Mods pela página do mod. Funciona no mundo aberto paraV feminina e masculina.
+
+## Dependencias
+
+- [CET](CET.md) — v1.38.1 (`CET`).
+- [Audioware](Audioware.md) — v1.10.1 (`Audioware`).
+- [Codeware](Codeware.md) — v1.21.1 (`Codeware`).
+- [Native Settings UI](NativeSettings.md) — commit 4065b51 (`NativeSettings`).
+- [redscript](redscript.md) — v0.5.32 (`redscript`).
+- [TweakXL](TweakXL.md) — v1.12.0 (`TweakXL`).
+
+Requisitos autorais registrados: Audioware>=1.5.0 e demais frameworks fixados no catálogo.
+
+## Phantom Liberty e compatibilidade
+
+Autor descreve mais de200falas reaproveitadas do jogo base. Scripts fixos conferidos não têm dependênciaEP1; bancos personalizados acompanham o pacote.
+
+Nivel da evidencia: Author states base-game voice lines plus static script review. Sem ensaio runtime semDLC nesta revisao.
+
+Genero/corpo: Consultar funcao e limites; componente nao e um refit corporal.
+
+- Falas ligadas aDarkFuture dependem desse mod; integração opcional, não motivo para instalar tudo.
+- Reprodução/localização não comprova sincronização da voz entre jogadores.
+
+Coop: Relato anterior deDouglas aprovou uso do pacote comDLC emcoop; esta ficha nao comprova runtime semDLC nem estende o relato a novosmods.
+
+## Arquivos e identidade
+
+Caminhos relativos a pasta do jogo. Lista completa de pacotes, hashes e tamanhos em../mods.json.
+
+- Pacote: Immersive V Dialogue Expanded-24377-1-1-0-1758901777.zip; SHA256 `ee4f682764be17906e59ca053abdc88210465eb22f80eced6732556830675a07`.
+- `bin/x64/plugins/cyber_engine_tweaks/mods/ImmersiveVDialogueExpanded/init.lua` — 34892 bytes; SHA256 `0caaec67f2451973442a100a52989307959c4f4ef2f2188a6d95be3a73c94538`.
+- `bin/x64/plugins/cyber_engine_tweaks/mods/ImmersiveVDialogueExpanded/localization.json` — 591 bytes; SHA256 `7f38fb91c21a5c9f773e4eaa7497820707855c9dea96d6fd36f776cbec46e95e`.
+- `bin/x64/plugins/cyber_engine_tweaks/mods/ImmersiveVDialogueExpanded/native_settings_ui.lua` — 23566 bytes; SHA256 `632452ee846f4104154112cc7e1102a81bc3035555a993c16ed1cd8d2e810483`.
+- `bin/x64/plugins/cyber_engine_tweaks/mods/ImmersiveVDialogueExpanded/modules/Cron.lua` — 3798 bytes; SHA256 `1f04836eb99354e6dcac6c19ee46c5a46e950945ca308be2e39615a6b447afea`.
+- `bin/x64/plugins/cyber_engine_tweaks/mods/ImmersiveVDialogueExpanded/modules/interactionUI.lua` — 15884 bytes; SHA256 `67136717fb538fa6bb736d2295e86bd433fb0b5bc60a7ccd60824fb58af3d299`.
+- `bin/x64/plugins/cyber_engine_tweaks/mods/ImmersiveVDialogueExpanded/presets/defaultpreset.json` — 8303 bytes; SHA256 `62d11740e0f44ede371a285510131cb3cb479753fcd7c0629d348b6c15a68a6f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/audios.yaml` — 50778 bytes; SHA256 `324a13b92007680ea83fcfd75d249c13eb4d7cbfae932d0bb088e93a4a62564d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_loading_screen_f_175308d96644d000.Mp3` — 46464 bytes; SHA256 `0e375c3345f9de98dc9ef988ce65d72ba2b8203e9a2d3648de80bed0ae842dc5`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_mq001_f_19db83172d44d000.Mp3` — 53760 bytes; SHA256 `93ebf25cbbea1470925fec54e8155d0d7f70240d89f5e2117784dbfe67ef835d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_mq006_f_1a001f7ef2405004.Mp3` — 50688 bytes; SHA256 `7495f5a1bc9e70667d06244d9d95d3f035e359ac36b50399ef41c3ab4d9f7290`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_mq006_f_1a002393c0405004.Mp3` — 39168 bytes; SHA256 `5c26e6051c9ea43f42e909c4847b223ec6abf96bbbe903083c15521fe76278ba`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_mq006_f_1a9b2026912c5000.Mp3` — 47616 bytes; SHA256 `722059cf7da05f2b2697c94e6fda684b73d9ccda1ec556546504fef591f79897`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_mq017_f_19e5fd64424e2000.Mp3` — 65280 bytes; SHA256 `1e8be09cb6d23b4fe2d5e9925e9793e74be81167e3905e8b82c6d99c313a1eff`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_mq017_f_1a243fb80e44d000.Mp3` — 43008 bytes; SHA256 `96ba8d95fb91037098c9a6ec041d54cc9533cbbb668fc9645a9c3fddd74374b4`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_mq018_f_1ab03da7ad62a01c.Mp3` — 134016 bytes; SHA256 `c0bf10f03d28b77f90ce2dff0918df70fc8403528470793ee01fa1e86cd501e1`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_mq026_f_1ab5231b613bc000.Mp3` — 126336 bytes; SHA256 `34bd5a176364c6081a331219802d73151f4e19a535f28f3d1047703d961d577b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_mq032_f_195a9f16ce3bc000.Mp3` — 71040 bytes; SHA256 `b2fbe16d4cd7f65a4c3ec1128b209b32b92000399dd65345cdea14f75f729a45`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_mq042_f_1a05bfc5c944d000.Mp3` — 44544 bytes; SHA256 `b0bce700a4bfd8e6ff7dede28a79e617d76352c96a65ceb4384fe99a8ba457aa`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_mq303_f_2d8b5511a33c5000.Mp3` — 99456 bytes; SHA256 `a589893f41387f6435ccb40289d8952d1212e9af5d13d006b8f794394956cf71`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q101_f_1758988aaa28d000.Mp3` — 97152 bytes; SHA256 `71145fb2686d06c4852d1f74671dc656e8762d31f0af1ccf9b4d172160636a4d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q101_f_17820afb5c5b600c.Mp3` — 60672 bytes; SHA256 `3231b89762b53504e536e861e42e30ae2e9284d609f2480a7f707f1c1145a0bf`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q104_f_1859a4551029f000.Mp3` — 67200 bytes; SHA256 `42fbdd9183f912076b24c700e5d710071f811e3c2eed5ecde617d2d4f8d8e321`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q105_f_1656b0d8852fc000.Mp3` — 44928 bytes; SHA256 `b3414e5decb7fe27b58f8cff92c110bce6562981b97e21ea0324aa8635c29c6d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q105_f_17de78da7d351000.Mp3` — 48384 bytes; SHA256 `cd76445b039dcfa7e94de626e359c4f7b964d70bdf297706d814378695c1ba3d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q105_f_18121c8f522b6000.Mp3` — 21120 bytes; SHA256 `8fc95374f29153d9cb240e7e3f979fea718144835b4b7478da5bea8b87f3ff3f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q105_f_195a9ce7ad2b6000.Mp3` — 40320 bytes; SHA256 `1cd89e49d19161222bf2bcfaee68038605d05978227688d0aa903665762c8eeb`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q108_f_16852163be351000.Mp3` — 55296 bytes; SHA256 `0285193c5bfc67796e7bcb9bf663364787b7f6c5c69590f87afec26117b959c9`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q108_f_19571fb72b5b3000.Mp3` — 44928 bytes; SHA256 `91ccf21274737063e1481e46c75e35f8b9b73f3bf54b7bf890f3bf4d44f863c2`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q108_f_1bf46099bf2c5000.Mp3` — 46464 bytes; SHA256 `1e1b32deae9f55f3aabbdcdfbe336fdbd9017717a7ded996b4a42eb424d67657`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q110_f_1b208386812c5004.Mp3` — 61824 bytes; SHA256 `d1f7f7db22476fc3aa71253a8c3487b15df444f6f08b4915092fab3f98797a15`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q110_f_1b2097e4192c5004.Mp3` — 49536 bytes; SHA256 `971cbf32363c65b9758ab366324861ca192640f2cab674bc2fd8d2e68ab62f34`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q115_f_175d85cb304e1000.Mp3` — 45696 bytes; SHA256 `1625b744a057bd4ee66be6c7a1691a3aa980deadbec9fa8eb37975e27ca0d385`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q115_f_18738012e84e1000.Mp3` — 55296 bytes; SHA256 `817bfc635055316297b8c5750fd720175cc949847659b99350592269364bec9c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q115_f_1a8a45fe8350200c.Mp3` — 30720 bytes; SHA256 `fd030ca6184fd701108497d5a313afb12a734b90f3c854a8ae6241b94a0da175`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q115_f_1eee1e234845a000.Mp3` — 48384 bytes; SHA256 `23ff0180deb401d740f711fa2c62b3ade020f8bbd534abfcd405b23b7b490cf9`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q302_f_2e9f1366d045a000.Mp3` — 31872 bytes; SHA256 `36fbdd64349e6a895ea1a553fd9f7e652f0f34d0582433c46082edf870b007cb`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q303_f_304f6820af521000.Mp3` — 54528 bytes; SHA256 `57bccbfce050f8116b091fd577816894f55977e3b6b1f00b57dffa4871572607`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q304_f_2dc16aafd9653008.Mp3` — 33024 bytes; SHA256 `90126fb3ba4e8692cebf7b492349fe1cf38d34af11fc86939db491ed41978baa`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q305_f_2dc1555fb342f000.Mp3` — 59904 bytes; SHA256 `4ec59280cdc3112f67991ef153c580eb552224891ca894265ad5908a705ff605`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_q306_f_2b6bd27ed146a000.Mp3` — 66048 bytes; SHA256 `5dc4acd2e20bd6bfdd5fbf3ba75146c788a92a35a86e98d6d8a9c14e30780c60`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_rancho_corronado_f_1af6dc224544d000.Mp3` — 73728 bytes; SHA256 `ebf45d7dc32b8c63ffecd0fa1ce461b2722680d048d43303ebe5471851c6f682`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sq011_f_18e63b61954b6000.Mp3` — 45312 bytes; SHA256 `c3e6670a3e925e7420689f4b9e73be03f051534a0d2dd9a5a47de21c9718a513`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sq011_f_1a1ffc0c332c5004.Mp3` — 45696 bytes; SHA256 `329859d419c6c824731b5d7c3e505de2f44a296ce61f9de13eb2e406493c1e45`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sq023_f_190840dfcb5f9000.Mp3` — 57216 bytes; SHA256 `8d187f835e00bb79b22df52ea221e4ebaba2774ecc64a989a4432449dccbde93`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sq023_f_19c89e224c386000.Mp3` — 48000 bytes; SHA256 `3e7617ec36d2f824577454bf03ba3a58379c5d294556832e385b57edbb883d18`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sq026_f_1b063be0782b6000.Mp3` — 76416 bytes; SHA256 `0bfe54dc39c1ea48645d80914eaee925a577ea41eee53b8afd6b47b433761c3b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sq029_f_1b358187a6623014.Mp3` — 67200 bytes; SHA256 `c8029612a478a1607079e3f198b21654181b32eca5865f3e0693b609fc18bc4b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sq031_f_18ad3804404b6000.Mp3` — 48384 bytes; SHA256 `11a784e896a254a053737c6415bab692ea0bd2604cdbd0eb7690d57f6133a189`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sq031_f_1a588761e42c5000.Mp3` — 51072 bytes; SHA256 `ba22d2c7d96c0cad54ada6b4937cf9e08ea0d5997be5b661067e2bc35593adb6`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sq031_f_1a58bfa39d2c5000.Mp3` — 49920 bytes; SHA256 `096a9f7062b8036e8ce9b7e6c73e1ea69b193072f2a6a9a72d6b5c597a53dc6e`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sq032_f_192d6d6c334ea000.Mp3` — 61440 bytes; SHA256 `00bb2c945178ad4f98fd4a0834f029479d1973d86c6c646a9afb762d47c553ee`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sq032_f_19ec0e0cc9386008.Mp3` — 61440 bytes; SHA256 `87f71d042ac1f29bb2348b0f3da2336f9c71362fde80cbca624e7bd159f60c5a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sq032_f_19f15b22ac386000.Mp3` — 48768 bytes; SHA256 `ebb4103d9dcb7ef958e3868e6733b6b19a233be7db62472f5e8c4787c50d1131`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sq032_f_1a71982889386010.Mp3` — 47616 bytes; SHA256 `b2f7c0ff44037718fe7d5ef9e312afbd2e95f3e158a1b1642b1124ae8cc88503`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sq032_f_1b29f8b655386000.Mp3` — 60672 bytes; SHA256 `2e71e0ffd201e54f92967eb7027234eafeee9d5d9de43232834dae8d2e5a73da`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sts_std_arr_06_f_1bd5691e66559000.Mp3` — 41088 bytes; SHA256 `90b1d55252a2ebca45acfdb351b6663be3cb692ddbee79b65239309de8cddc73`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sts_std_rcr_05_f_1b72006b1e47a000.Mp3` — 77184 bytes; SHA256 `c3a61dddf39be56b9fa2403388fa9f9c96dbe380601dc058ac04e264d79e22ff`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_sts_wat_nid_07_f_1ad807fd9144d000.Mp3` — 71424 bytes; SHA256 `274027fbd782bca3b0684fcfe0846defa8c7eee370f6a3b61bc6dbe9d8925872`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_vs_vset_delamain_f_1f451aae4043e000.Mp3` — 55680 bytes; SHA256 `92b6f53e3377ef44056daeb9b2f23ec664b2fa2e7f8b4e45f689d0829198594f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_vs_vset_delamain_f_1f4533a79343e008.Mp3` — 48384 bytes; SHA256 `4b9a82387cd2a69798f347bd2f6d006b42d15eabea380e047a77a8ef6e2ecd2e`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_vs_vset_delamain_f_1f453d780943e008.Mp3` — 31488 bytes; SHA256 `c30b26cc2efd35a1aad008d02e0709b43debc4806a27658999701af9e2be1b34`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_vs_vset_delamain_f_1f454b01c743e008.Mp3` — 49152 bytes; SHA256 `3f640ad30bfc2793b662914ca5ae3fe6693d4ec1ea5050ef6505e4c7678fd51a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_vs_vset_delamain_f_1f456f83d443e008.Mp3` — 36096 bytes; SHA256 `a0cce4322cea7930fa361e33402e224fdb84fe6f7732dd142083fd9afd924a40`.
+- `r6/audioware/ImmersiveVDialogueExpanded/johnny_vs_vset_delamain_f_22022b04c13bc000.Mp3` — 45696 bytes; SHA256 `5c06c08bae2d0c102bd59ec1ee67314806598f7de99654ff8853787fe1a5d208`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_bls_ina_se1_foodshop_01_f_1adcce560246b004.Mp3` — 26112 bytes; SHA256 `f6daf825fb77867bb0795c1d82661341d639174befee06e52a896db4a24d15cf`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_bls_ina_se1_foodshop_01_m_1adcce560246b004.Mp3` — 25344 bytes; SHA256 `fcad3e0e621dcaccaee728a9d738e3f52fd8509e984ddc1c460ebc81fb7d1265`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_bls_ina_se1_foodshop_02_f_1adcd0c60446b004.Mp3` — 26496 bytes; SHA256 `f001417540d23a3a8a1705b09ef943a4a9c1c20f2be92ec1c1114ae4d9cd04fa`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_bls_ina_se1_foodshop_02_m_1adcd0c60446b004.Mp3` — 28032 bytes; SHA256 `cebeffcce6baf4caedca032a6335028aef68e147a3dcec3912a1e44910e6970c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_bls_ina_se1_junkshop_01_f_1b00bba64246b008.Mp3` — 36864 bytes; SHA256 `4ead411fb4ac98852d1fe447275ec326695a4bd84e7296f2241205d291b3d27c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_bls_ina_se1_junkshop_01_m_1b00bba64246b008.Mp3` — 37248 bytes; SHA256 `c0d91c191e962fc2a6c4bf411c724b728bc2611074ef94136c6489d51881c218`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_japantown_f_1a28e64f68464000.Mp3` — 35712 bytes; SHA256 `d8edc9e8587821064e47058b63e54a80e3c5a5c08423c7198e82ff9fe30bd712`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_japantown_f_1f664d8437494000.Mp3` — 41472 bytes; SHA256 `101682ebaa04c8557def27ef50163a58859f557617925437255c09422fcab11f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_japantown_m_1a28e64f68464000.Mp3` — 35712 bytes; SHA256 `c555a58b6fc4b29262c91a0b2dae750756177f6fe05d7b4b670f2989981010ad`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_japantown_m_1f664d8437494000.Mp3` — 38400 bytes; SHA256 `4e10cf378057d00bf662a47c12e872e3fcd0cb2c908cbf906316a34ae975d632`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_kabuki_f_1a4cf36908464004.Mp3` — 27648 bytes; SHA256 `132307c0934e23c20e27cedab7eea7795477354574f12a1262a9f5cb899567af`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_kabuki_m_1a4cf36908464004.Mp3` — 28800 bytes; SHA256 `bca043837302c99de2535bb968e0e7a361c8416f721453df3508a3da55096df4`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq001_f_192244a9493c5000.Mp3` — 28032 bytes; SHA256 `7b2881703822745ddc3ff01565ae3fbdff8a4bda4c8f7afbe8ef72ce7f073d78`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq001_m_192244a9493c5000.Mp3` — 28800 bytes; SHA256 `477b7e3127f9a392cd296981b0801ea7c5ad94fcadcaa6ae378d357156d10499`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq003_f_18cba5ea9a623000.Mp3` — 30336 bytes; SHA256 `2ba8ca0619ae49ee544c2aad42a1bd49d56afe7d4789dcd676f52ce169126607`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq003_f_18cc421a73623000.Mp3` — 24960 bytes; SHA256 `db4941653e7a2326d8a4ec04f9134fdc1f4e429e21313ff568f7829a2c613533`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq003_f_19c1a706ef623014.Mp3` — 33792 bytes; SHA256 `f6c8914efc02ff680b3ce0467e546539aaa25630ec37f2eb98c2616f21998b2e`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq003_f_19c1a97273623004.Mp3` — 38400 bytes; SHA256 `f6a4d69b8164ea32aa012b93ff0c523fbe69ac81e869a3bc6ffb21268154d1fa`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq003_m_18cba5ea9a623000.Mp3` — 31104 bytes; SHA256 `117a49f351bde1e9f2c1a0cf846b1589300b4d160c5fa897de5717f70972a1c0`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq003_m_18cc421a73623000.Mp3` — 23424 bytes; SHA256 `2534d5343e147821a392b20471c2473b76c5d870bce152efd5d1bc160774381d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq003_m_19c1a706ef623014.Mp3` — 34944 bytes; SHA256 `c525c0076631312a6833d0a740cc61d9b794b0711ae234a6aa4fb6e40e1da91f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq003_m_19c1a97273623004.Mp3` — 40320 bytes; SHA256 `9dc2b399de52b9a9e72a1263acba9be20062d401b8cc00bf1c2fe1546077bb4b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq007_f_19b3017f0d405000.Mp3` — 24960 bytes; SHA256 `1ce6bb8b182fe3931e8772a9b4493dc91e25aadb5b755f34cfa4f87f20209bfa`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq007_m_19b3017f0d405000.Mp3` — 25344 bytes; SHA256 `3a6a5e1b22480e93f020dfea2bb4d5c23081c612a46eb0a1dc0fecab14cbf7a2`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq010_f_1a4dc022ba3bc000.Mp3` — 31872 bytes; SHA256 `59ca228e68be1fb74ae7356db34889f0341fc6f31bf607ce361f25422272d778`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq010_m_1a4dc022ba3bc000.Mp3` — 28416 bytes; SHA256 `478e667d147eff673e49690344e09416da76e45f1cf079211bd1c085cbf2bc00`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq012_f_1b3aa68243502000.Mp3` — 57216 bytes; SHA256 `545d8d80138beb410518d95ea16ce4b644f99d6cd148ea588e01ff466d85eea2`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq012_m_1b3aa68243502000.Mp3` — 54912 bytes; SHA256 `070cb6dccbabf7c803484eef6ac24c3623439116121410821cb5a3bb5d69f760`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq013_f_18dfe64298502000.Mp3` — 41472 bytes; SHA256 `7885437447d493dd3f00253ff10831cd9ff1866204d4cb9f3e1ccf7ba919d6db`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq013_m_18dfe64298502000.Mp3` — 43008 bytes; SHA256 `a731fdda7f0748a95ef1dbff98bf30e0a9449e14104b45a22726d153f3bc62c7`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq014_f_1aaf8c986f2c5000.Mp3` — 31488 bytes; SHA256 `7be1ea80fefdecee19c985e47e4bc69a4c6a4369134c17e3e8fb6a62ec408206`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq014_m_1aaf8c986f2c5000.Mp3` — 33792 bytes; SHA256 `18e8cc006fe0b990c66ac5682cf8a326d43bcb1e5e7de2e10526b45c08488b29`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq015_f_1a47d760f044d000.Mp3` — 35712 bytes; SHA256 `705d400d877ab9c1b5085ffb9f4568e59d7c60374efb11dbebb8875db298a3ad`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq015_m_1a47d760f044d000.Mp3` — 34944 bytes; SHA256 `3af24151aafb1cdcbc4bdd8fff44e0676cdb3b58ff8151f95c992b5cbcb2b996`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq016_f_1a47739fb344d000.Mp3` — 41088 bytes; SHA256 `3923fcc80fbcfb092b85f5586d46f79231a19f19e8800b8e989ce50a8acea176`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq016_f_1a477733ff44d000.Mp3` — 29568 bytes; SHA256 `48800f787ea4534b90607e2c139cad1a10a8ead5625f2c42cc19efb302e1928e`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq016_f_1a47b26bdc44d000.Mp3` — 31488 bytes; SHA256 `62a13f0c4876c1c301815569a103f300c4eacab5182f46782f24208d99441e4c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq016_m_1a47739fb344d000.Mp3` — 41088 bytes; SHA256 `dc990db9372072c67166aa189ed8d13383ad2c855495a2ce26ac79ada411a0ee`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq016_m_1a477733ff44d000.Mp3` — 29184 bytes; SHA256 `af47bd141ed2b0ae6c71409975fe681a0a2a7c20ac9ac8b0337d8800fe544a1e`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq016_m_1a47b26bdc44d000.Mp3` — 31104 bytes; SHA256 `3240ee3808cbc941ef0c5da3c0bde5cb046760674d1690aab3c7f54ffee02def`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq017_f_1a9f1bcbfb4e2000.Mp3` — 47232 bytes; SHA256 `6fc01777faedd8088b972aa8af71f7f6fc1e994afffe46fa79c378a1e4c7c00d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq017_m_1a9f1bcbfb4e2000.Mp3` — 51456 bytes; SHA256 `5404e4a7a27da57d9924426e6b5ac0f11bc6bdeb95b95cc00dc662688fbd3b58`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq018_f_1a9144475f62a004.Mp3` — 66048 bytes; SHA256 `fb9048bc4db36e993207331571e0452f1f9b626bf472ce8fdc3bedaa20a1e07c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq018_f_1a914752e762a000.Mp3` — 34176 bytes; SHA256 `bbdf3d5f09aa603b807a7681d076e7f97028148f74c2bc43b013495c0fe11bd6`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq018_f_1ad8b4c0e444d000.Mp3` — 70656 bytes; SHA256 `2d9715b7987d107e52f6c5f927b54d17d2b02c38ac979ac36c7db700591d698d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq018_m_1a9144475f62a004.Mp3` — 66432 bytes; SHA256 `b064b19c29ac054e0f798fb7b908483a6d91e73506a72057053eadf8da127775`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq018_m_1a914752e762a000.Mp3` — 33024 bytes; SHA256 `cdd484edd00aab1a623114e1ca44cfdbd71ac35c234d69340837af414c0d3538`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq018_m_1ad8b4c0e444d000.Mp3` — 69888 bytes; SHA256 `043c3f2b515ef098125af1a0aeeb329655e9ac9fac839483330ff91fa563c560`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq025_f_19b3f680ee2d7004.Mp3` — 46464 bytes; SHA256 `ccfdb309f5abcaec8f34147053a16b33fde57550faf3441c5b973b5c9c3a7efc`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq025_f_19bd0748c12d7000.Mp3` — 34176 bytes; SHA256 `dd359591a573c9b68e86a511c320f3c0cc1869001c6866e24236a81debe8b043`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq025_f_19c209d3102d7004.Mp3` — 23808 bytes; SHA256 `77062b86b19b7e3ee07f0c7ffe11ac5c1d8e87ed2ee18a1708bbe30617dd09f3`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq025_m_19b3f680ee2d7004.Mp3` — 44544 bytes; SHA256 `cc8cea416d2b586b2d0c37f1005814f29d6e8fcca032f29ae6707841c5abb930`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq025_m_19bd0748c12d7000.Mp3` — 32256 bytes; SHA256 `4ca6ff65c4bbcc2ae3ad6e4888d31a95c9851e4f3c06f421bcb6e3b1f7710154`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq025_m_19c209d3102d7004.Mp3` — 23040 bytes; SHA256 `7600d547441474d958247e7450c24f20b979a7272c9b6fd4499d3b193e289a2d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq029_f_1aafb0819044d000.Mp3` — 84864 bytes; SHA256 `5eafb523c86ed4cbe51a30cbd4515dd7541babdee2ecafb4061ded5a2453c2de`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq029_m_1aafb0819044d000.Mp3` — 87936 bytes; SHA256 `d1fd88498e8dd877eb0d5ed8e30948b3900f04649b18d647fd3657eec8215d5c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq030_f_1a0f2f30c63bc000.Mp3` — 65664 bytes; SHA256 `7feb2a27f7523f8240358ef01eba9043c9afbecc9ffb2216cc3d71ada288849a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq030_m_1a0f2f30c63bc000.Mp3` — 64896 bytes; SHA256 `8541c77e58e50c809c52331b2b6564af45a8b21276b4358248c093dc8db05f35`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq032_f_19b89f77663bc000.Mp3` — 33792 bytes; SHA256 `d6ac588dd0d05a0a7665eaa776ab4112f258409a7b7b3374766268034c8d8462`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq032_f_19b8ab381d3bc000.Mp3` — 44160 bytes; SHA256 `dc26cfb49d9d5e9c2b13ee4078b1e7b04e922e9df4a7118d045d8be32fb168d5`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq032_m_19b89f77663bc000.Mp3` — 30336 bytes; SHA256 `8bc087799b0fa873b5ee877008a1fbf08cbd383dadded3cf7ab472371bc781a2`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq032_m_19b8ab381d3bc000.Mp3` — 41088 bytes; SHA256 `4e0cab28b485437b2422b65320999ecb52419a8d53c93ed9aaa711e8ec9c550c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq035_f_190e84c4512e3000.Mp3` — 35328 bytes; SHA256 `24c7ddfc155886118920bd82d163d4ba4b20902526001f1104cfae5e69517e2c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq035_m_190e84c4512e3000.Mp3` — 35712 bytes; SHA256 `968dd97e48c791edc3015bef700f287df616605690ef82af6dfc5b1e78a61170`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq038_f_192c941c174e6000.Mp3` — 25344 bytes; SHA256 `bfedd8792f401a53bbe78b994c3c73062ed62c4267f3e37dd0a31d1ba0cac37f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq038_m_192c941c174e6000.Mp3` — 25344 bytes; SHA256 `8b61da36a7208a1a64caa7eafbff97eeb99bd93dd64d9ba2e08a29e434b64f59`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq040_f_190f2005d8623000.Mp3` — 24960 bytes; SHA256 `8d3659d69985efaa02acc7c210706ba929e424922d34b2a6e3250b75c92f1e04`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq040_m_190f2005d8623000.Mp3` — 24576 bytes; SHA256 `d3e2aac0c7d4260c9f737c592cad6cc47aecaaca099cff151be63ec6b7000852`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq041_f_1a052f50c144d000.Mp3` — 58368 bytes; SHA256 `9268eb2ec22830bbfbb5079323d348b7fe12e2d1604934abfc7fa40cab3df61a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq041_m_1a052f50c144d000.Mp3` — 57984 bytes; SHA256 `b5babff38a5fddce29afd57932ceb240b14f5b93faac2082bf7129183d3931e9`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq042_f_195fdf26e94e2000.Mp3` — 45312 bytes; SHA256 `aea28b2d2dd200b26c87bddf99fdb0a075cf4bf98a24f0a9b1e97e318f5ce0de`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq042_f_1ad3b9c9e444d000.Mp3` — 43392 bytes; SHA256 `bd9c641a493ebdb877fb4e6073d0322157b9b45cdd41b5f5d8cc15ad332574e5`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq042_m_195fdf26e94e2000.Mp3` — 44160 bytes; SHA256 `bc9daeda93ae6f270bf80c423d5cd7636afbeb5eebd24781ad97a76dc92d512f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_mq042_m_1ad3b9c9e444d000.Mp3` — 39936 bytes; SHA256 `60465add8817cc16b381b83a1a9fdb460563e21d1601cdfbe1997bcf69dc325b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_posessed_sq031_f_1a8fdfe3842c5000.Mp3` — 29568 bytes; SHA256 `9d2fa7b2985447db1fdcb04cd22a49ff514c03f58f2ecb7eb8f5726ab0727ad6`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_posessed_sq031_m_1a8fdfe3842c5000.Mp3` — 29184 bytes; SHA256 `87bef56360339352b371f34eb21c6ef8b0cd677f1f18fca09dd1dafdd938ac7f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q000_f_17f36814f82ef000.Mp3` — 18048 bytes; SHA256 `858555856e7fb2f57c2d08eff512efce411513cc59cadbea0e0a383597f4c8aa`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q000_f_19041bf16c2ef000.Mp3` — 63744 bytes; SHA256 `a6f60561472215b20e779de19cbcea2666d505addb48e157d6de14980cb6b98f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q000_f_1904762b692ef000.Mp3` — 92928 bytes; SHA256 `5642d4a6d35ede6bf21f67c9ebeef9d0806470cc25c7fc7f9739d1bfab36f48f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q000_f_194b7e6fa42ef000.Mp3` — 33024 bytes; SHA256 `137dd15149d01bc8edd7aee7ed4f3d6003c82d87b6ef12c46696cbb9fe3337ca`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q000_f_1a1ec0c0cf2ef000.Mp3` — 43776 bytes; SHA256 `43730bd0013e2aafe89dd68741e31f3a5cd6397822ab9efc05c9a0b5398e9fc0`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q000_f_1ecf4decad73d000.Mp3` — 23424 bytes; SHA256 `0a372e482e2799f2f79afe59e5520e783a6a6974e4002601be82b3669103c7df`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q000_f_1f5f611a8042c000.Mp3` — 28416 bytes; SHA256 `9bb5ed1ff90c7303b75fc4ead8ba14adf61e60db0ee31ae3fda81ffe3868728e`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q000_m_17f36814f82ef000.Mp3` — 18048 bytes; SHA256 `14ef12e877192be55dca632409e3c12da0a99f4949f67adfe24a8e4773a2d714`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q000_m_19041bf16c2ef000.Mp3` — 60672 bytes; SHA256 `316c47e0f04f9d993163ef276b4ccc60dc415ebee73987b653ea14a8953a04a6`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q000_m_1904762b692ef000.Mp3` — 90240 bytes; SHA256 `4f73a5905af9688ebc0d4071928df1d40f8a355a9569c7959acb3984686c8680`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q000_m_194b7e6fa42ef000.Mp3` — 35712 bytes; SHA256 `7436958233200409fbf58950f73efae657e5111829959f8b33ff180483fe09f1`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q000_m_1a1ec0c0cf2ef000.Mp3` — 47232 bytes; SHA256 `f7f0100bd12d03a911fcd439828043771602219a82c5cf0f6192c34d3b206abe`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q000_m_1ecf4decad73d000.Mp3` — 24576 bytes; SHA256 `271ee67468176cc3533d313886591929124b7828fa4da4d1de7a406397a34fbb`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q000_m_1f5f611a8042c000.Mp3` — 30720 bytes; SHA256 `39792f26ef31e8f76be92bf3d80a26d1df637dd464a4cc19d28a62730102017a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q001_f_16a08773722ef000.Mp3` — 86016 bytes; SHA256 `2af3de35cae65ee020c472d362282c62216082045554c868092c3bdf8e21591d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q001_f_1a568ee879627000.Mp3` — 36864 bytes; SHA256 `bfef425f7b4a9038dfd972ecf01141c3af1ff9753b6f02697850eef06c1a258f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q001_m_16a08773722ef000.Mp3` — 85632 bytes; SHA256 `ae060504dad0c837c0fde735d690940a04f26a966cedc2c67ee73ad4fa267dbf`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q001_m_1a568ee879627000.Mp3` — 34944 bytes; SHA256 `9c8e5e3ad001f4304b03a1edaec99bc701d6d4283ea80210b80949f70316cc5e`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q003_f_17d4baa4d14b6000.Mp3` — 51072 bytes; SHA256 `d9b5e54b061f72d3ec144cf2aa601f086a532d67e27d8ba3dfdabd5eb6d85074`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q003_m_17d4baa4d14b6000.Mp3` — 51072 bytes; SHA256 `0f862ea7c0742ed4b78abc2c2412cec74de67231420ca6de86ed4a7c8546ebbe`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q004_f_1714cf3b0829f000.Mp3` — 41472 bytes; SHA256 `ada5e913c6accf93795830d4eeb6a62088995788a0c2546ebce8ca419d68a5a2`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q004_m_1714cf3b0829f000.Mp3` — 38784 bytes; SHA256 `b94f00e42733df2b7f2eaab51805760e07b8e0c1804c0ae2a0900f753678234d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q005_f_189db26ac82e3000.Mp3` — 34560 bytes; SHA256 `df205a6adc67a52c6374abcf992e10141574428db5296544355ead49e31ed44a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q005_f_1955e264535bf000.Mp3` — 32640 bytes; SHA256 `f84352bee87a0fedeba18d76c0840cd0a466f2787741351dffc984dd35bbde59`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q005_f_19e6c123832e3000.Mp3` — 40320 bytes; SHA256 `19ab0386fceaebead7a4d08099c3a53ce8a55acd53015a20c11614e88b00ae9d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q005_m_189db26ac82e3000.Mp3` — 34560 bytes; SHA256 `972a1bec48e8a2ab00cb5984a41d5b09cfc4a4daaf7425c5fd8944502038688d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q005_m_1955e264535bf000.Mp3` — 33792 bytes; SHA256 `78539b761e057f2db18dd9d756e042d477e174f25adfa93b59b0b941b2004a93`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q005_m_19e6c123832e3000.Mp3` — 39168 bytes; SHA256 `1286c1fef1f0055b1fdcaad4ac348c3fd0f6aa98562c449692f0825e482fa9e0`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_f_1541f6bc8c28d000.Mp3` — 36480 bytes; SHA256 `39353276dcd6acc3d2c267472fd9705afaa7c08c74a0a9abe06468eacd55193b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_f_15420beee128d000.Mp3` — 21504 bytes; SHA256 `2b1c9600ae33b9c71108ee0a5e1505c5e36d7421b8ea4767fe4a2cdbd6f6ee46`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_f_16e33d9f3a28d000.Mp3` — 49920 bytes; SHA256 `3dc96409cc1d20173b19ea2a063d483a71cc2b17e4eea3db452fc5259999e276`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_f_170b4b65485b6010.Mp3` — 41472 bytes; SHA256 `64351865e8d1ab61907ee1c9ae0ce92e196c56fc12976df2a8e54e08749e3f4e`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_f_17ce6841a328d00c.Mp3` — 41088 bytes; SHA256 `0f67509e7f68c8fb468c95793921a312896cb848064a260f0c4bcbc0b5bbb581`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_f_180708600c28d000.Mp3` — 36864 bytes; SHA256 `cab4dd42dbb88eebcaf11f8926a2368e54496f0b66422fc45a7f3342b803a4c0`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_f_185a7c8ab15b6000.Mp3` — 40704 bytes; SHA256 `5c66efc85c1687fbb4a123fc64d0b1467a317d17fd02c64d26fc247f9ee1e6dc`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_f_185ed13215386000.Mp3` — 53760 bytes; SHA256 `98e6812e27d7904b19c47b3d92908df86cad912c3ab9b58a6aa66b69467eacbe`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_f_18a1188610386000.Mp3` — 110592 bytes; SHA256 `7153be75b55c0fe5767eb13c2611e9fa39c76837d850ac6d35e44487fcd80b50`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_f_18ff92bf425b6000.Mp3` — 30720 bytes; SHA256 `bf66636566fb1f54fa9a09619ae7d424c5619a962ece17e09ed2bed69f8ad342`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_f_1be5ae3935386000.Mp3` — 33792 bytes; SHA256 `5ea72231dc8a341ed622e753d02d0778d332017aba3c5b80ac086a04ef4a79c1`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_m_1541f6bc8c28d000.Mp3` — 36864 bytes; SHA256 `5a80bb95556196fb609dee0c9fec1f32a7e58e74e5a3532f33085d5f56f58b4f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_m_15420beee128d000.Mp3` — 21888 bytes; SHA256 `544a64b3b498e2ac114b16edc92e114458a3985540a16cf140dbc2fa267c9cea`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_m_16e33d9f3a28d000.Mp3` — 33024 bytes; SHA256 `0be549cfdfaecfcf601a61fac730d6b17c77befd27cfb5cce685b45eb53696b2`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_m_170b4b65485b6010.Mp3` — 40320 bytes; SHA256 `5ffa63ff68c35b13f6031a08b704c5f18b95a1816f36a161486579be489e031c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_m_17ce6841a328d00c.Mp3` — 40704 bytes; SHA256 `38c193425df7fada3f02d7687ba832378165ac9125739662d3c38800e171aade`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_m_180708600c28d000.Mp3` — 34560 bytes; SHA256 `47c74ce7c318329ced32aa66acd08b714511098902c24f84e1e7bd468a2c1eb8`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_m_185a7c8ab15b6000.Mp3` — 40320 bytes; SHA256 `452a0c233429c8a898dbb64b969845e51c5863fa472acf04d390c222c7f9535b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_m_185ed13215386000.Mp3` — 51072 bytes; SHA256 `395da2654b92e62ed6aab8df0372f666a9897cab8832f74e926edcee4e0a8991`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_m_18a1188610386000.Mp3` — 110976 bytes; SHA256 `5b9690daa4c95f47c8e5ded2519d8e464ef3c3a4a54dda3345e5112a6fe88830`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_m_18ff92bf425b6000.Mp3` — 34176 bytes; SHA256 `db8656c833fdd1617055d2466fbd88092c8125d91d197be707d22bd91b8cf94c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q101_m_1be5ae3935386000.Mp3` — 32640 bytes; SHA256 `9927994605e8ef663b79fe3e5a9ae992e3ad10d20bc92a628a8a5ac3cb48e273`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q103_f_16f27b12c029f000.Mp3` — 29184 bytes; SHA256 `270bc761626937d98f50aca8561a537272a7fd0de8fa8a31f9b370e32c1d42b3`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q103_f_1bd56cacd229f000.Mp3` — 31488 bytes; SHA256 `9ebbe42a770db1fec7b457575672a0be0b1343df872c4dcce0c6c1eff298715a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q103_m_16f27b12c029f000.Mp3` — 29184 bytes; SHA256 `a2752ab02c3800b95a8d3b15c248d79e5c441ec1d49162812d0476438f4323be`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q103_m_1bd56cacd229f000.Mp3` — 29952 bytes; SHA256 `ad347260a397ba729a8f6d3e2867efc28d70f4b48e306a25c2c24a6ab34ece81`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q104_f_16cd8668ca3c5000.Mp3` — 16896 bytes; SHA256 `70677ca200cb612d1faa3d912cb922723c59048948aded5f5d7b2dc9dc168e79`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q104_f_17727704cf29f000.Mp3` — 38400 bytes; SHA256 `8b60c40e300c80f45780ebbe95da1df56e23eceb60eb68a67deacc0bf336573d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q104_f_179acc8e7e351000.Mp3` — 22272 bytes; SHA256 `d9df04485c59e674ed88b222d955c5cd207e63892c41eb95debf301649d6caae`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q104_f_182b8e8484351000.Mp3` — 49920 bytes; SHA256 `5389de16c683edce530d0fc374968b41fdac006c033896c9e160c8ea89cfd1e3`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q104_f_184fca8eb429f014.Mp3` — 36480 bytes; SHA256 `6f02d2a0f2f7e8416fc3d3a86224885db6d5255e945bdda8012563269409dcab`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q104_f_1859af114829f000.Mp3` — 95232 bytes; SHA256 `9987bb84b66de1813b733e73d8310058e5c9686bc15c2aabdc35fe187d14bc76`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q104_m_16cd8668ca3c5000.Mp3` — 26496 bytes; SHA256 `14feeae8bb5d795d2fecc662956f9c33dd8fececcd30028b611a81376a24787a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q104_m_17727704cf29f000.Mp3` — 38784 bytes; SHA256 `5cac2fb812d65cec7ae00d5c3b15e4cb1539ac1fff76caa9bf32bef146d51930`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q104_m_179acc8e7e351000.Mp3` — 21120 bytes; SHA256 `7d2d5df48460199a65e9f46d0625536bff9185c38363511086f0c120e404cb65`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q104_m_182b8e8484351000.Mp3` — 50304 bytes; SHA256 `450d375ec6eeea072ffc1a9be94554fb3c9aa625c0f1bd84748f1a3688f12bb6`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q104_m_184fca8eb429f014.Mp3` — 33408 bytes; SHA256 `377f8b64ccac1c117fbb06defd614bff2c3b836e5b77d53e6a1bd5f5093a9077`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q104_m_1859af114829f000.Mp3` — 97920 bytes; SHA256 `cb2dee94f4c5a3cf3a8a82af71ac2dc96873493a2b21fcd7e4801f63bdd4b916`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q105_f_157e1b715f2fc000.Mp3` — 24192 bytes; SHA256 `0fdc6ce5dbfc0fcb98a67d63afe283d6d3a0ecc31879c1d015437691a269c59b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q105_f_166c0e2dce2b6000.Mp3` — 64128 bytes; SHA256 `80ca60fb1fe0704eae3cec11f20ef486d78f67e1d1712d5da3b13212e820ef87`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q105_f_167ff10b922b6000.Mp3` — 28032 bytes; SHA256 `b9e29a34cc1766eb332dc79c7a5a377084aefd52999b5bb576608abcfbedc9ae`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q105_f_1758d867a12b6018.Mp3` — 45696 bytes; SHA256 `7dd0cf65cd9aaa2f25139fd87c8397553f92efd87bc3d4249e1c110c08f98909`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q105_m_157e1b715f2fc000.Mp3` — 24960 bytes; SHA256 `6cc2337c0d273cd9ceb9239cc0020b236b31d142f01c3169f0bb0e0a9aa5a3fb`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q105_m_166c0e2dce2b6000.Mp3` — 64896 bytes; SHA256 `826a63a329dc33d92b51b31d4e67626ea236a7048ec92714474d8c297126305f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q105_m_167ff10b922b6000.Mp3` — 28032 bytes; SHA256 `da53730455792746ff8e0de1b886339aea73cde6960ada5ef068f05d9b710a2f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q105_m_1758d867a12b6018.Mp3` — 43776 bytes; SHA256 `2ee226e83631a8ba5f387482230ff6dca18472ed421ab17bef4e3ebe4b488cee`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q110_f_17101b0f90351000.Mp3` — 36096 bytes; SHA256 `c34286567ee454011cfc5b6f5e5fec41625fb8f8c0914a74ccd7a2cec824d3c5`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q110_f_17aa747fed351000.Mp3` — 43392 bytes; SHA256 `922ac5c1db754b5203d6af34109f6299affe726aacdfb2abd8fac866fb0f7cc6`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q110_m_17101b0f90351000.Mp3` — 35328 bytes; SHA256 `6a036ce31009319dd52d2e5c09117e67cacf1380f1b1c210fd56a247652f06ce`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q110_m_17aa747fed351000.Mp3` — 43008 bytes; SHA256 `4dd7f076493c309e0107b0a374723764241cf16e3e71e74c1c812ffbdd01bc9a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q112_f_17cab7d8cd4e1000.Mp3` — 62592 bytes; SHA256 `f54ae4d9293511547c338971ff5482c3f479905775db5d49652af069c7d4691b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q112_f_1a2a82d193404000.Mp3` — 26112 bytes; SHA256 `acfff66d476b15b261913f366133ed01009c767ea036a4588241ff262b2873fb`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q112_f_1a2a849257404000.Mp3` — 38400 bytes; SHA256 `2fae00aaa8872bbdba25b46c7d9adf007d8728d7987bee06aa1c380efb0b635c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q112_m_17cab7d8cd4e1000.Mp3` — 61440 bytes; SHA256 `9f76bb3fe53ee896edc393d20273b083bb63fbdaa81d0d527ac455017578a8c2`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q112_m_1a2a82d193404000.Mp3` — 27264 bytes; SHA256 `55f715c61800c291162b30252c4331817e80d36da0cae39010e0508fef8a40da`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q112_m_1a2a849257404000.Mp3` — 41088 bytes; SHA256 `0760225a89810536bf5a3fcb46ac947cb14f57eae8452ea3abc33479a8f5f311`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q113_f_198f47e0a44e1000.Mp3` — 41856 bytes; SHA256 `175f2edcddc3a1563e8669cfb87943f15df20a431d72b9a078fd58b2353cb979`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q113_m_198f47e0a44e1000.Mp3` — 42240 bytes; SHA256 `69c774ee8736635583bff38c4f09e41be973458e54d9ef1aa9d25aa576f3f7c1`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q114_f_17830de7d13c5000.Mp3` — 23040 bytes; SHA256 `00033005a23fa130d37926aa9acd024acdc433d7c43a356885d698a2b1547552`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q114_f_18bbd6d6252cd000.Mp3` — 38016 bytes; SHA256 `10dc168fcf1a421d6e241912e029f7b1844ba0756c748ceb8ed259c597915831`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q114_f_1ae6c456d629f000.Mp3` — 91776 bytes; SHA256 `59fa2d9863d909342131f4f18d169eed3e1f10b462d379e7b13d69e100e79c40`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q114_m_17830de7d13c5000.Mp3` — 23040 bytes; SHA256 `478c6faa03f4313a62fd2ca5ffe8ef891502bd4f9a23f4ae6c4ea9a18b927032`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q114_m_18bbd6d6252cd000.Mp3` — 39168 bytes; SHA256 `b6702777f8580777485d0988835103328d460689acfe812f5c8c26eb6066df87`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q114_m_1ae6c456d629f000.Mp3` — 92160 bytes; SHA256 `e54df7e28ad1083f7b1b9ef8997e425e2030931b635af3b28842049461696204`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q115_f_17719f8f7a4e1000.Mp3` — 29184 bytes; SHA256 `9e074d900026c12e3e5ece5c5159a1926b1324689f3911c738632d9ccb3cd4e4`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q115_f_17a4d684d14e1000.Mp3` — 43776 bytes; SHA256 `edb211711dca47204b24de3ef11a8ae13b578c290300a86a29142d02e4d41655`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q115_f_19c32402622d2000.Mp3` — 59520 bytes; SHA256 `cea431813b250683f1286778cd6f463d24dd59cfc1b8ceea1c37fed237d8f1d1`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q115_m_17719f8f7a4e1000.Mp3` — 30720 bytes; SHA256 `88af988c220fb5beb0f09852218066309e40f566c2d00a5ba160ce822cc9dbc5`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q115_m_17a4d684d14e1000.Mp3` — 44928 bytes; SHA256 `af323f304d2211b3393dcb271cffbc54603196750938d3938eab16b11ff8eed7`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q115_m_19c32402622d2000.Mp3` — 60288 bytes; SHA256 `d0cab37747cb8e80452b06ec1de245cad5571c3988440a366bb83cfabdf6ea0b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q116_f_1a6261b8cc502000.Mp3` — 24192 bytes; SHA256 `8f22923a60560ac249fcbfd02f3bd097587ed0ba303d48b7a1e3facd8a86f09d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q116_m_1a6261b8cc502000.Mp3` — 23424 bytes; SHA256 `dd48ebffdf581d2f1fdf8dd0e49fa775d9750459f87b15ebdd0f7340ac1e8e82`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q201_f_173af1e132386000.Mp3` — 67968 bytes; SHA256 `8c9498681d0bd2475d172646b9feaf6bb3e72cf5de679a9de8f3d854330f01f5`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q201_f_173afbf462386000.Mp3` — 62592 bytes; SHA256 `299c3267498039ee791fd985bd8d03a36e79187f5b423b6c168f8d9f15cba508`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q201_f_174fdd5565386000.Mp3` — 23424 bytes; SHA256 `073cca126f39f3746099e7db3cbb5a34060c1d7284f217984d523600fb81210c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q201_f_17ca31c92c5f9000.Mp3` — 31104 bytes; SHA256 `b604136380bacfe5c581510c29da7beb83b33dc41dbea5624d6a74f184930ebf`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q201_f_1803a131a15b6000.Mp3` — 37632 bytes; SHA256 `13916f67917c30d82cf16d884e6a5e12aab0797af3724085c4883be2b3229259`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q201_f_1806aba3ae653000.Mp3` — 41088 bytes; SHA256 `65d5aba9f4951ebb3b10e892ebf5a0b78b8093ed1338b2fc1e409ad02f6b65c8`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q201_f_182b8e05b95b6000.Mp3` — 27264 bytes; SHA256 `e852c280a98814139742ca8c5acfe86fba71fb1d70dd3c3f349ce88973453119`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q201_f_19e2325dec5b6000.Mp3` — 103680 bytes; SHA256 `512923c4607a980ac2f6ac2118c81cfe268a2329606db8ab1537e0e169c712a7`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q201_m_173af1e132386000.Mp3` — 69888 bytes; SHA256 `3086858d3fb38f76a8f8a962126b83a3fee6adec7f3dd3078798585ee5a6958d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q201_m_173afbf462386000.Mp3` — 65280 bytes; SHA256 `e78029fa0837f5939881415ed8c7035140e85208c4ebc86394035031e56358a3`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q201_m_174fdd5565386000.Mp3` — 24960 bytes; SHA256 `76633c7cefb82f2c16068a9dd7e4f1e945e0168423ff35afef017cc865fe3ba2`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q201_m_17ca31c92c5f9000.Mp3` — 29568 bytes; SHA256 `70604a22951957aea1c4b6795b671e332190d19356e2efcde87b90cb65fb125a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q201_m_1803a131a15b6000.Mp3` — 36864 bytes; SHA256 `24b99b6ce0252f8fb940c861739d10b354dbdd58f3192560af2a61a3cc1deaa6`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q201_m_1806aba3ae653000.Mp3` — 39936 bytes; SHA256 `88898ee6baa3854108b7c5ce77bb9ad9fe950c8b7ddf43538d0bc4e276560c18`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q201_m_182b8e05b95b6000.Mp3` — 26880 bytes; SHA256 `0d583cc221d8cfba8caeef9d49f847f0f4ec74f3d7b7e325443c7236a4ca7442`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q201_m_19e2325dec5b6000.Mp3` — 106368 bytes; SHA256 `fb28a6124574b380ced34f3731c2d030b744e708e0154258583f2fae2ec22b5b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q202_f_1801fd11972cd000.Mp3` — 16512 bytes; SHA256 `ca7094c6cf53889e1792a83bbd69e9197ca3b33676017fec83b08dc11b10314a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q202_f_19562ed6dd29f000.Mp3` — 52992 bytes; SHA256 `b4e6d6e751e9cd62eaf057f9e3ec9d64bd5f7209ea6f3b9a59adf71645c9cc7e`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q202_f_1a43080be6570000.Mp3` — 61824 bytes; SHA256 `48d945a1ebdb5de091d806815e7eb77e533c31437da5f66537f3d0aac2c8f4fd`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q202_m_1801fd11972cd000.Mp3` — 27648 bytes; SHA256 `1909219932bc3721370956bf43fcfdbceb5ebc132c7175432319b6e72e83a243`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q202_m_19562ed6dd29f000.Mp3` — 52992 bytes; SHA256 `c2b62a6bd1ab9119f4a36187fe2265eeef805e736e6677076fc79e7b36229eba`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q202_m_1a43080be6570000.Mp3` — 64128 bytes; SHA256 `d7b95138f6ee4943320d5caf98902a8e9d7734021d111a67c6553d602ad76fad`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_f_1246ba4d7c29f000.Mp3` — 49152 bytes; SHA256 `e372356529952d0227fb2949a7f598fc469d93c86ff3db0b1839237968024af8`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_f_14aabcc86a29f000.Mp3` — 43008 bytes; SHA256 `25243f94e2feb22a10c08c30e1ba49d1c538278a6a9663bf2df4886bafb745d2`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_f_18e4675dd229f000.Mp3` — 82176 bytes; SHA256 `ba8eedcf8e8e525a9e46edb6da19777070cf19b54b7e9d5a554457d95b803963`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_f_18e532d96429f000.Mp3` — 52608 bytes; SHA256 `dbb4e54836532735113cc8f81f40b39c0331622bca415a819d9d436a2e1adf56`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_f_18e90d2b0c29f000.Mp3` — 40320 bytes; SHA256 `ef1780d1d3b9f0d9d0444ad4e3607aebd451d5cf0e082065726ab883f46aef0a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_f_18e9128c6b29f000.Mp3` — 96768 bytes; SHA256 `9ca21add611b364d019107827df04932da2eba758e15afb1dcfb505b41466f84`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_f_18ee24fe4029f000.Mp3` — 18048 bytes; SHA256 `e83b854fe2f04f04fe9c4ef678ceb954445db4a9e16c4cbe28eb7758e105d31d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_f_191d50403b29f000.Mp3` — 20352 bytes; SHA256 `7a2f8ce128c4e5bb1509c4810a8e79143703d41b764520340f19b3f95a4a361e`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_f_1a8ac359966d7000.Mp3` — 33792 bytes; SHA256 `ad6a483ab99a5b39deb93c0682e4e3c0c7e7e4ad13739bc21163eb093cacac04`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_m_1246ba4d7c29f000.Mp3` — 50304 bytes; SHA256 `18261e512d6bbd64cc95ee2722e48df0dc22dea027fc3e6219b590999e72c1ca`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_m_14aabcc86a29f000.Mp3` — 47232 bytes; SHA256 `334efc39290b9710e611f6e7fd57e8ef3e6c922f9c39dc11bb2830ef77e7f037`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_m_18e4675dd229f000.Mp3` — 82176 bytes; SHA256 `60aaab42bf751960b0de67a8f246d0f8b789b30d1323938e9183680cd592019b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_m_18e532d96429f000.Mp3` — 50304 bytes; SHA256 `a9f40530eefc79ecdefcd2efab4e6329e387bbbeb2870bdd8ed30d0e766e8e1b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_m_18e90d2b0c29f000.Mp3` — 38784 bytes; SHA256 `2b11add8697d2dc3f80f9f666a0286bfca87fa93f991d2d36d909d75b67c01f1`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_m_18e9128c6b29f000.Mp3` — 97536 bytes; SHA256 `d1358a04c8bc18272f1ae46f7ac84367c713f09ad3190c38e57874f5361975e2`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_m_18ee24fe4029f000.Mp3` — 19584 bytes; SHA256 `a55297e6a05b5ba0ea8eafda66886d3b734224c89ad5972337d5a9cbc05ebccc`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_m_191d50403b29f000.Mp3` — 21504 bytes; SHA256 `2d6fe986de85261951fd240801ed852b5ff977ddcbd044221ae0294cf38ddd99`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_q203_m_1a8ac359966d7000.Mp3` — 30720 bytes; SHA256 `b944f6e1896be58dd8b5c4bccf18949b93c5d33625788604dcb0e35b3fc573c2`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_scene_jackie_default_f_1b2fa2734c2c5000.Mp3` — 97152 bytes; SHA256 `d81749f762ea8bba71b93a4bdcb711c7b3b2bea954ce2b42cc058f4b680edf80`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_scene_jackie_default_m_1b2fa2734c2c5000.Mp3` — 97152 bytes; SHA256 `74ead37619d17ca2c7093457df45cda3892b7d67de72e30186d121aac0bae1d9`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq004_f_1a52871ca2623004.Mp3` — 54912 bytes; SHA256 `fbac0f00cd13ab3656edadc53707fdae2281400910db280d3116833e9731dd17`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq004_f_1a52871cb5623004.Mp3` — 49920 bytes; SHA256 `90172c35db58322dae04b740d1d7bbb800924aff8b76284ea413e08451d47289`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq004_f_1a573c07be2d2000.Mp3` — 27264 bytes; SHA256 `1a997517fa136b2af87badec8e8216cdd2115f6e2524ca61884813a1b43cc8f3`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq004_m_1a52871ca2623004.Mp3` — 56448 bytes; SHA256 `e899b7e44cb0f663c78e6877f6e58b8aa29173e369927fe0be22ad2a0799d8a6`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq004_m_1a52871cb5623004.Mp3` — 48384 bytes; SHA256 `c915c046e367aad07e5ad2c332e6e7b19e7ea4b624bfc8148ee9514d5db56c19`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq004_m_1a573c07be2d2000.Mp3` — 28032 bytes; SHA256 `3788ea42b03f53feeba67b98a435b6197e2bf19409d4810aba56a2731dc05c5f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq006_f_1b54279dc9521000.Mp3` — 41088 bytes; SHA256 `1bb972dc13a77b616a9ec1dd26f430c9fb85871f9f547456b43ff11f68274727`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq006_m_1b54279dc9521000.Mp3` — 38400 bytes; SHA256 `90933aa027c865a7f2c2b1f7242ba0f0bde54a55c37754866129ce66dee2012c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq011_f_1b6e2d854d2c500c.Mp3` — 33792 bytes; SHA256 `84fe4a9cfc9d376eb06ea24045fa613afa73d210160eeccb97cc1186a8ddba28`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq011_m_1b6e2d854d2c500c.Mp3` — 33408 bytes; SHA256 `07157d2257a5b7915ed15c6e895f4963efd34fdbadf666b032ecb2e7134dd694`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq012_f_1922523c7b49d000.Mp3` — 38784 bytes; SHA256 `b38c92f42896548eb083d27bcc8ac9b73af2052f2b6a7f0d843230fde9a2a15f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq012_f_1ae890cc1f2b6000.Mp3` — 58368 bytes; SHA256 `0e0479dd1f1eeb84e0e272c35007557fdda14831200b778514831995023fc248`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq012_m_1922523c7b49d000.Mp3` — 35712 bytes; SHA256 `9ad42cabfbdbc035614b6e332226f519b24e79921323542b9abc5fc047c5a664`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq012_m_1ae890cc1f2b6000.Mp3` — 54528 bytes; SHA256 `9a57f9e4a4e482a4a38e6329b93179f8817c6387a57b24867852127cc5126c4c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq017_f_19b24c015429f000.Mp3` — 29952 bytes; SHA256 `9c4db8423f7a65d80d7215fcb6cdac34b229f921d88618045999f51a0bdde278`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq017_m_19b24c015429f000.Mp3` — 29568 bytes; SHA256 `f514cad5dd4ad485df5b51a68492dcaf4ffaa3a518442a6e767c381dd128f63b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq018_f_1ae77167ab2ef000.Mp3` — 31872 bytes; SHA256 `7c4bbdd4a6fa0f11b358b503579e14f39f678b3ced377e9d9af555616417a0b6`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq018_m_1ae77167ab2ef000.Mp3` — 27648 bytes; SHA256 `e1178d9cad3bb969f6537c892c0826bf23084f57468c930366ef72f99c732b86`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq021_f_18a2c3ef54521000.Mp3` — 37248 bytes; SHA256 `e86cd578cdc1a73690b54178743d706102882ab7df1f97f03ff63e4c029a316a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq021_f_1a778fee05386000.Mp3` — 26496 bytes; SHA256 `8b8cc2ab76ce88e635c803cca19978e6be8db0264b08ec7c8a34ea21607e1265`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq021_f_1af7987e3c5f9000.Mp3` — 35328 bytes; SHA256 `cc2d2cf1b0c9694a1a1db6630c787c3787a78c911ac39d872c0f657a1c3ac2b8`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq021_m_18a2c3ef54521000.Mp3` — 39936 bytes; SHA256 `f7515f8657878c943a19fc81fc1a15c4325221b7d8e946ee6c7bf8155086b5c7`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq021_m_1a778fee05386000.Mp3` — 25344 bytes; SHA256 `653108eb292dbf17424133e923469133953a72d5aa1e68b035220e5f8b13288d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq021_m_1af7987e3c5f9000.Mp3` — 33024 bytes; SHA256 `bcccfd2e009c66467a37b843e9db54a31f87de835034a7c85c980fc1cfc1d356`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq023_f_19c83ca931386000.Mp3` — 168960 bytes; SHA256 `17f1576e2a1e3fab5d52ea5e7c3fce7be491a179cafbf3642e134ca19b32a97e`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq023_m_19c83ca931386000.Mp3` — 170880 bytes; SHA256 `a2196d1f127fb5f23100c162957042f2cb9d0b9cf30f15545ed4d940081a7406`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq025_f_1ae3e055cb386000.Mp3` — 52608 bytes; SHA256 `fbe2b5a51f2f2f0e6cb8f1d727f469e44efe3f35e2c1f82def3500405cfea334`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq025_f_1ae3f446e1386000.Mp3` — 25344 bytes; SHA256 `14092d64c609bcda1a5276a596726cf9c0051d223dcdb397db20588e270394e5`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq025_m_1ae3e055cb386000.Mp3` — 52224 bytes; SHA256 `1416a15a6fdfa3bafcbff6376c9d80774d4f689c0632ae8d5160eae78867e17e`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq025_m_1ae3f446e1386000.Mp3` — 27648 bytes; SHA256 `0084ae70e38907bdc42cdb7e718088f834ee6edcf0be0c46334963f688e8a125`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq026_f_1a251c58f62fc004.Mp3` — 61824 bytes; SHA256 `d7cc9cab4a684490459f25293af84daeafc88276cb616c379c46c4dbd56a0377`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq026_m_1a251c58f62fc004.Mp3` — 59136 bytes; SHA256 `946f848bb99894e95746d6236b184887c0f7978aa7cfaa9d4c32b9e9881044d1`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq027_f_1921d97e3e351000.Mp3` — 33408 bytes; SHA256 `d32bd954c616b13aa526888b444b6e652142ff48105c094e666a4232d685b5f2`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq027_f_19288f5632351000.Mp3` — 34176 bytes; SHA256 `3a6b8e2ceb86f456be34b4ca7c70637965e9818a48b8d74240627aefe016d438`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq027_f_1eeff73c64494000.Mp3` — 43776 bytes; SHA256 `d8efe89bb70331d4e50f4712ed2c67ed970b24428803d4871c7faed866caa59d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq027_m_1921d97e3e351000.Mp3` — 33408 bytes; SHA256 `fb529c9d17d6f9a01574d2a66e16b02c0bd07d18202f0605e57327c9e75e46c4`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq027_m_19288f5632351000.Mp3` — 32256 bytes; SHA256 `bc4d8ca3abda2faa4999a81b4dca8e312ebda665bbc64db675a61b57a2b52163`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq027_m_1eeff73c64494000.Mp3` — 41856 bytes; SHA256 `ed9784e2ddaa771e042214327de419efa02fe9aa55f51f07748a0f5a47e04091`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq029_f_168975a05252c000.Mp3` — 28800 bytes; SHA256 `9c3d5fe80d67e91d92ffb1aa89471b63e48e5658a117851d98653870e158735d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq029_f_1b351389f862301c.Mp3` — 25728 bytes; SHA256 `28a179f917e477b7ec79c7df6a4edf4ef1495ffaaf331c58f332f5f7e3094bda`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq029_f_1b3581880c62301c.Mp3` — 23040 bytes; SHA256 `70dbeca5b7b01faa3120b35766a9c87a5eee4ab6eb0008eebcbad24cd114396a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq029_f_1b7369c2d12c5000.Mp3` — 86784 bytes; SHA256 `2a5e6cf3b74a1efc9525849e592748a0c85c3ed345967c2b84bf60521abcf348`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq029_f_1b744af2452c5000.Mp3` — 30336 bytes; SHA256 `fd39065d2424775fe2ad1e5a8c132abed55f85e9abcbdecede6541c01dc03e8b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq029_m_168975a05252c000.Mp3` — 26112 bytes; SHA256 `a33f9c018916127060e61bd9781af846ffa70992c7c15a0ce470dc1c8d715951`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq029_m_1b351389f862301c.Mp3` — 28800 bytes; SHA256 `f88688396370e375e686aef3d1b620bef38a3ffd331a0e2c43b7be1d8dade399`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq029_m_1b3581880c62301c.Mp3` — 20736 bytes; SHA256 `7a5eb03a96dfabe3257ce834ab549d95d4260ce6dc585e92ef44b7de4603324c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq029_m_1b7369c2d12c5000.Mp3` — 89856 bytes; SHA256 `9c586859080691e636c42b02802529b63f167838cc359701c0182d64f5f6ef32`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq029_m_1b744af2452c5000.Mp3` — 29184 bytes; SHA256 `3e06bbaee4b4fb838a78c7a45e35d7488f1cb319e567094db9ed91dc2fba20ab`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq031_f_184a94a0e64b6000.Mp3` — 19584 bytes; SHA256 `d2e3d1b91e6aed9aa625ae3498bd22f89cceb3a15796a3a181c7c3a67853a9ff`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq031_f_18651deb314b6000.Mp3` — 34176 bytes; SHA256 `244bbbf2c54bb21f55a999b9379fae72616008b1ace7bb94503f910c387104f7`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq031_f_18eac29e80351000.Mp3` — 35712 bytes; SHA256 `ad13d2cacbb924c1d8c3e7e48bb7766105bd64e24e646297bd5202c7ab3684f3`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq031_f_18ee4ef564351000.Mp3` — 123264 bytes; SHA256 `469ba88b17d5b0adf935c3cf3c9371df2b8576cadca0b722a68b9c7f249832de`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq031_f_18eed6deda351000.Mp3` — 73728 bytes; SHA256 `34c6deb7b9890a11e4a051cd62f4b7546090a444a75d09964493d69a2554e849`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq031_f_194b8f1cef351000.Mp3` — 58752 bytes; SHA256 `dd107d4431e4446902a33e7e9c58ca9872074999da1255f07c86f2307423a871`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq031_f_1a4f242a136e4000.Mp3` — 30720 bytes; SHA256 `8231b40e57cac3933cbb3e84165b0b3a7ae525d05b4c2058004ca3b840575039`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq031_f_1a581e43cc2c5000.Mp3` — 66432 bytes; SHA256 `4c8c15fa3c3632e5e9a593baceef4af8e4864596dbb97c18e6f3dc72ae903371`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq031_m_184a94a0e64b6000.Mp3` — 21120 bytes; SHA256 `7655d739d56e5a33c9151af1d98e6faa3218570f94f171c902c4873058e3baf0`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq031_m_18651deb314b6000.Mp3` — 31104 bytes; SHA256 `2c8ecd1bd535eb88e8f3101f9d13b01df74331f2fc6e71608e45f2f04c9d7b5c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq031_m_18eac29e80351000.Mp3` — 34560 bytes; SHA256 `830210bbc9854cae81780e4931f76ca549832debae3b6a86cdd8a729cb2f8b1b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq031_m_18ee4ef564351000.Mp3` — 123264 bytes; SHA256 `5f77efd0bf1acd2fbfc886bb7f7aa520ce4256a0803bbb7af6b35c4a17f08842`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq031_m_18eed6deda351000.Mp3` — 77184 bytes; SHA256 `3ec98faf6a217088f680e957bb2eea758c19e816d6949c1effc1ee9c953b8276`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq031_m_194b8f1cef351000.Mp3` — 56832 bytes; SHA256 `e818660a231d8b87a24027a3e73d28fcc2d64c528bbff1b76c122907e525f099`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq031_m_1a4f242a136e4000.Mp3` — 26112 bytes; SHA256 `daa724d914b0dbb2561e86b6b78ba25b9f88d87588ed2f0bac5a9045c2506389`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq031_m_1a581e43cc2c5000.Mp3` — 66816 bytes; SHA256 `653dadcebd367ed90139730cc8af072f3cf8eed42af3fc654544898b64454f78`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq032_f_19e6f2d0db386000.Mp3` — 32256 bytes; SHA256 `504153d2f74a55d9bd8c230acd2ddb1924c49c9189b711e48995258f88b3ed1f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq032_f_19ec07b577386004.Mp3` — 162048 bytes; SHA256 `13661e3623f2f91292de281955c13c432d3ea16d7223f8bddd1eb343fc0786db`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq032_f_1b0850eb2a386000.Mp3` — 67968 bytes; SHA256 `1dc26947f4ada7836050d9c17c4f43ff1a24ca547be44395ad0f3e3203454514`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq032_f_1b1bdec02a386000.Mp3` — 75648 bytes; SHA256 `6135695a52bf9d7de2303bda3c875e91694c19e129491a4f93c9a1feba2c3b0f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq032_m_19e6f2d0db386000.Mp3` — 29952 bytes; SHA256 `9a0e5e679ef2f1f71de6b650ed0af15c5c234b033265f8fb576e5b6d9c2d4ce3`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq032_m_19ec07b577386004.Mp3` — 158208 bytes; SHA256 `be86ee66b532bc0bbc1be31d84f483e6af44209d453961826b34b1fa06476d06`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq032_m_1b0850eb2a386000.Mp3` — 69504 bytes; SHA256 `8aee84fe38b7a051bba22c7cbfdb1aecf01c7d198ecc9692b0df55ff681896f9`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sq032_m_1b1bdec02a386000.Mp3` — 72192 bytes; SHA256 `6290f9f9b01942d2cf6ad4ff863dc5ca80370b27806e8efe94ae76a8dd8f1f82`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sts_bls_ina_05_f_16e62c1d46377000.Mp3` — 35712 bytes; SHA256 `2d4c392d238ce92cfbe045cdc29fdeccaf76e0f9b99aa4dc9fbf839f6bdef5fc`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sts_bls_ina_05_m_16e62c1d46377000.Mp3` — 38784 bytes; SHA256 `bcabba47643f14aa8a22a40f1bed6df09322de5b56e7e4ef4c779b8ef40c1cb4`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sts_std_arr_06_f_1bd5779127559000.Mp3` — 43392 bytes; SHA256 `20b992682375c5e150eecc5d2fce23a9d160052c8af634d4573327e0ed7e8fbb`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sts_std_arr_06_f_1bd57adcf4559000.Mp3` — 39168 bytes; SHA256 `c1e4ac1f7ce5e29acb221e51973fb21779ac971cf080f77ae5250873ad86f4b5`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sts_std_arr_06_m_1bd5779127559000.Mp3` — 42240 bytes; SHA256 `7e89157b986fb1c63f5d46752a267bdbedd8c24f98d2f4689897c2ff3f5edccb`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sts_std_arr_06_m_1bd57adcf4559000.Mp3` — 40320 bytes; SHA256 `3cae561da6950dad288ce25ec98c56fa131bf2367e8729238315715c72e7aa64`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sts_wat_kab_02_f_177d8236f3559000.Mp3` — 24576 bytes; SHA256 `9b7e20c2d5017e859dd041dfc07871ee14e43296d74df14aa01469605645964a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sts_wat_kab_02_f_177d854f62559000.Mp3` — 23808 bytes; SHA256 `a5ef8a19eed525fbed41538e9d79ce23903d2b10e6002e3d74183b7fa630cc25`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sts_wat_kab_02_m_177d8236f3559000.Mp3` — 24576 bytes; SHA256 `10110318635e4b97f2139dbd84cb6ca41e5eac07925048e752b8d77383f52dbf`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sts_wat_kab_02_m_177d854f62559000.Mp3` — 24960 bytes; SHA256 `bca7ffab8d750e4f71583b25d63efd0d22d86c5e476df27ad183cff668c599f2`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sts_wbr_jpn_09_f_181278d91e2cd000.Mp3` — 33792 bytes; SHA256 `8c56af4a3f18cd58367afe38c6a768a37cd39b981359e9b5050280767797bfae`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_sts_wbr_jpn_09_m_181278d91e2cd000.Mp3` — 33792 bytes; SHA256 `982c5d407fddf110fa570df3b274c3ba52d50f2fb673ac57e4708525821fce13`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b535b38472fc004.Mp3` — 39168 bytes; SHA256 `10a4fa2a5e4d0b98b60aa6a427d93bec23be63210aa387430eb0016f2762758f`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b546b570a2fc004.Mp3` — 30336 bytes; SHA256 `5aa28554caf40ed5b85fcc3d9fbe60ca3ad5111d6787655d2eec725884c0de27`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b546b570c2fc004.Mp3` — 39552 bytes; SHA256 `a109c9384b6e80a52954f37ef99a083e107d3a437aca8f1971f73e3a5cd4d00b`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b546c31e32fc000.Mp3` — 32256 bytes; SHA256 `0921653e5909d47d6544d97094cc1dd138964e242688db909776d0e4c07e734e`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b546c31ef2fc004.Mp3` — 28800 bytes; SHA256 `6af204e201fa615889e4cc913d110bc1defd53ceab020a4eeede6064cfabfdd6`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b546c45c22fc004.Mp3` — 31872 bytes; SHA256 `fc82a55d14a0b203ac5e41e33257a74b666be3b6ad79fb033f7a73c0affe29b2`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b546c45c52fc004.Mp3` — 23808 bytes; SHA256 `1c278b249e5aeb0995f1b37e42ab1dd1050a4fad19c4ac3c625a87f6eac59412`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b54b150e72fc004.Mp3` — 24576 bytes; SHA256 `8aa3fd2b03df6d5eff8f18e261c5f22cb39dc3ce24c0b947bee6cf928f19d616`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b54b2e1cc2fc004.Mp3` — 34944 bytes; SHA256 `00b2ac0feacdd3e17772f7a8ef886a68799b5d8dbd2f8fbd84ac97977499a07a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b54b310472fc000.Mp3` — 29184 bytes; SHA256 `1cde3cc0ebe84bd9e446895a27c193ae9e259f8fd713569ae2f29f30a75d0485`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b54b3a8c42fc000.Mp3` — 33024 bytes; SHA256 `6783c034abb5f6088a557f1ec73a8a745fe9e3be32293f769dcab010288f1c18`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b54e33c072fc004.Mp3` — 27648 bytes; SHA256 `08d0340b8e4b7efc6462968442c7ab13ea023d7aed96954f3956dc0ce8454147`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b62d528592fc004.Mp3` — 38016 bytes; SHA256 `da09934d677777c4e13576d4effb7f5c3a20042aa9a0e2e38959e8366fa0a4c4`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b62d5ff7f2fc004.Mp3` — 34560 bytes; SHA256 `5742b88c740a798b232d044bd8898abdc427ddebcb25ee728b1875f63a274b62`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b62d607b52fc004.Mp3` — 20352 bytes; SHA256 `a0d8b7f4a109dcb23a5adefb6cae1d6f4989aa15634e1ec610e37f535e0f6d84`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b6305af502fc004.Mp3` — 36864 bytes; SHA256 `c686642fbb59d5733792562ea521a702883a713035f3a3d8f9229e502678d262`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b6306f3af2fc004.Mp3` — 31488 bytes; SHA256 `8772251f6d1dec988f0750f8d02f95f7c0d7c32386d835925e3273f8538a4fbe`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b6307904b2fc004.Mp3` — 28032 bytes; SHA256 `3331918487ec2226043319e66d8f70e52894da02d25edcc2e1ee8dd5fd505658`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b630b91e02fc000.Mp3` — 33792 bytes; SHA256 `8179ee0f64352eaeec7ea96a7e599db3efdb7aa8f01c88bbd1fc7ed021f29f72`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b630bb6a12fc004.Mp3` — 33792 bytes; SHA256 `56d29840eabbbd7b38e24018c154e3224346aeb22f63c316fae7cad3b71831bd`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b630cb8892fc004.Mp3` — 25344 bytes; SHA256 `6aadb5ea3a490507ec8b9acb03301e9e512c142d7eb93b420dcee49c4042f4e3`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b73dd006b2fc004.Mp3` — 29184 bytes; SHA256 `de29b3b3a2629ae520b8cb76c749e58976b467a52374ee2ce81eea53c40dd7d7`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b73e427142fc004.Mp3` — 92160 bytes; SHA256 `68e65523d0b0706010039440648b18311dba72e97c5e5187abb576746f21669c`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b73e450c32fc004.Mp3` — 55296 bytes; SHA256 `d385789bf3ad4e5dd076b46a5ea398deee4e599d4d181c305ac75cdef516c3ee`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1b73e461e32fc004.Mp3` — 30720 bytes; SHA256 `c509f1e37c7f1a29fbc9568bc4642225b36fc79833364199c8b3ff8e6c2b17c8`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1f11cf0dd72b6004.Mp3` — 52224 bytes; SHA256 `decf8c969bf3a43cff971cc77fd6885ad7409419bd7476ac1b0dab0e7e2a7c9d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1f64a4d8342b6000.Mp3` — 24960 bytes; SHA256 `456b3a4ed5f79b4b1b218cfcf3aa3bb673ab41c9d0fbef7f7063ee4e2003c666`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1f64a8835c2b6008.Mp3` — 19968 bytes; SHA256 `9117f07ddee39b273f2049c508ee523cd81a293b58c990e0642c181602995bae`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1f64e043052b6008.Mp3` — 22656 bytes; SHA256 `ed07ed147888db9bb787ffae9b624ce0db13f2698f87e863f381a14017904b49`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1f64e043132b6008.Mp3` — 29952 bytes; SHA256 `7eece516cafa42d49b90f1f36840d8a020e93233e5a143ddf5bfdc517a0274a1`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_f_1f64e043382b6008.Mp3` — 17280 bytes; SHA256 `58229cf3ac8856907463db47fb37a6267e56dba89cb685bc3e605024afe38319`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b535b38472fc004.Mp3` — 43392 bytes; SHA256 `db5d1a80a0427de981c7d5fda98fdbdeec4d03b69986086312adc513673cdbc0`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b546b570a2fc004.Mp3` — 29184 bytes; SHA256 `8c2ea98384174f4423e16b35ee4396059ada52d0d5b0936395bf71f4bad0bbb2`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b546b570c2fc004.Mp3` — 42240 bytes; SHA256 `07b19ab5ca551020db924ebe976772a3b192f12dca0f813f63b353efdee5ede8`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b546c31e32fc000.Mp3` — 30720 bytes; SHA256 `543c9cfe51055a54a7e6141f836db31edcabdd99be77fed5d372bedbaa8cba2e`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b546c31ef2fc004.Mp3` — 26112 bytes; SHA256 `064cd571fcc7cbe5d15375584118bbc3ccc16a186a0f859065e553a049edcfcc`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b546c45c22fc004.Mp3` — 29568 bytes; SHA256 `04d6beffe3d4f5eeaf35522d436bcffd12375e19d5753e056e536f4477fede91`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b546c45c52fc004.Mp3` — 24960 bytes; SHA256 `01d545808dd1f1189d2338531fcdf36f28dc03d58a7f024c7a554c515b3bf9e7`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b54b150e72fc004.Mp3` — 22656 bytes; SHA256 `90952cc06c2baee2dd4abfb81bc866278b84944eeaf1ba8e7e0f4ec530cb4364`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b54b2e1cc2fc004.Mp3` — 34944 bytes; SHA256 `1be01ba1a29fc9e63336aa6953ac63eed3415d93a73dc41ffbb17f1351711185`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b54b310472fc000.Mp3` — 31872 bytes; SHA256 `3eb7fda92744c0d9896a3f83765f5711cc1a2b041dd235489101a3479d70ad57`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b54b3a8c42fc000.Mp3` — 31488 bytes; SHA256 `ad0e2668fdd988365da363bdf6bf99a6d2015e58f3de986f6d5bf3584bef8d66`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b54e33c072fc004.Mp3` — 27264 bytes; SHA256 `1da9c0f170554094ede906c1b63a2f5313655706e1ea7774b8638451adceabda`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b62d528592fc004.Mp3` — 35712 bytes; SHA256 `6d608c85514bbf7a7765a38b3f8ce57025667fa6891afeec69f024e37340ed18`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b62d5ff7f2fc004.Mp3` — 33792 bytes; SHA256 `6889d45bdbd3cea3b384ef8fa00d18f10e9fa33abeffe6337ac4be3b8a2aff24`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b62d607b52fc004.Mp3` — 18432 bytes; SHA256 `5d716f5e380babbec429bedde170f32db4f9ba0b1a3b592cb1f4fea6640addc4`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b6305af502fc004.Mp3` — 35328 bytes; SHA256 `1030ec1cef0f85219b5790ffddeeb4b91388b7abb28b6d90761fe575c88ad4d1`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b6306f3af2fc004.Mp3` — 32256 bytes; SHA256 `56579387a41dacab88e9da1df4fdb333ee443a12f7f8600e5bd8d6d67fdba382`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b6307904b2fc004.Mp3` — 37632 bytes; SHA256 `e7b2039936c4075519d89e5056267864bd8cd4387e554e895da1b4e7260bce3e`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b630b91e02fc000.Mp3` — 36864 bytes; SHA256 `21b20c3215f06729414a1aed77c990a4cffe62962d1bd385d11f9ff48f0f0064`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b630bb6a12fc004.Mp3` — 34560 bytes; SHA256 `4b8bbd789e6bce7289525cb93fb3c9dcbbf9b3a31390ba84035365f0459b9913`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b630cb8892fc004.Mp3` — 26880 bytes; SHA256 `01280f33efd6b7ff6bc4d138f7503af9b258f6715501b689a1a91320fd3d2990`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b73dd006b2fc004.Mp3` — 29568 bytes; SHA256 `8ee7329cc78597968bf8909ad73534ff6eab56efafebc34c35bf4e8d05f15368`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b73e427142fc004.Mp3` — 92544 bytes; SHA256 `52d467e52cf9bf3648d04d0f5c139d7f3c89c4e11bed0f5fadd5eb6eb2b874ac`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b73e450c32fc004.Mp3` — 53760 bytes; SHA256 `3d47cdee070c014de1750991a052369c028db92e9fb32ce3739d12bcd969cf95`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1b73e461e32fc004.Mp3` — 31488 bytes; SHA256 `ef20e705dc8d55c06e30fd4ab95d5e5ae270c18769d5a2bced570bdd90114fbb`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1f11cf0dd72b6004.Mp3` — 52608 bytes; SHA256 `e273b01df634156ad8bcbe3cd3d5f6f22d75ed914cbc5ad053b23948daf3cd1a`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1f64a4d8342b6000.Mp3` — 28416 bytes; SHA256 `238163b33c5321b202b81604ee3960eb926136391cbcc6b60f719d04d17b3c33`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1f64a8835c2b6008.Mp3` — 21504 bytes; SHA256 `c0a3fe6a03b4996f761057982689656111e028d79730d7e0a3d20dbb8de994f2`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1f64e043052b6008.Mp3` — 23424 bytes; SHA256 `3ce0f7c8ee0136bd139ed2e3859c89104a6aedea593c217ee210b224e140d21e`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1f64e043132b6008.Mp3` — 31872 bytes; SHA256 `bbb334e4f9fc79113de6f81930a99de60d8582f9f2313ca9c5efcabb10fda30d`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_vs_vset_delamain_m_1f64e043382b6008.Mp3` — 19968 bytes; SHA256 `224f47d60cd4b8deb3079638a66d71a79a76eca6727d8ae7a2c91894d26271f6`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_west_wind_estates_f_16f761c28a47a00c.Mp3` — 31488 bytes; SHA256 `121757cfbba821d0c3c1a67637295a84ace8f4efcc51c373e054c5007b6dedff`.
+- `r6/audioware/ImmersiveVDialogueExpanded/v_west_wind_estates_m_16f761c28a47a00c.Mp3` — 30336 bytes; SHA256 `115a7d994a1b4736266830f49676f228b8b4dcd54cda7a5bcfa3e4c3c7661767`.
+
+## Fontes
+
+- https://www.nexusmods.com/cyberpunk2077/mods/24377
+
+Consulta:29/10/2026. Nao ampliar esta conclusao a versoes ou corpos novos sem revisar.

@@ -1,0 +1,56 @@
+# Deny by default: this workspace also contains downloaded mods, saves and local audit fixtures.
+*
+!*/
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/AGENTS.md
+!/Build.ps1
+!/Instalador/Fonte/*.cs
+!/Instalador/Fonte/*.ps1
+!/Instalador/Fonte/app.manifest
+!/Instalador/Online/Fonte/*.cs
+!/Instalador/Online/Fonte/*.ps1
+!/Instalador/Online/Programa/catalogo.json
+!/Conhecimento/**/*.md
+!/Conhecimento/**/*.json
+
+# Never commit payloads, local caches, receipts, save files, credentials or personal presets.
+*.exe
+*.dll
+*.asi
+*.archive
+*.zip
+*.7z
+*.rar
+*.cache
+*.part
+*.crdownload
+*.preset
+*.dat
+*.bin
+*.db
+*.sqlite3
+*.log
+**/.CoopModsOnline/**
+**/backups/**
+**/saves/**
+**/Logs/**
+**/.env*
+**/*credentials*
+**/*cookies*
+**/*token*
+**/*semente*
+**/sementes-locais.json
+
+# Skip entire local trees so Git does not traverse the large audit and fixture directories.
+/Auditoria/
+/T/
+/R18/
+/R18u/
+/B19/
+/Mods/
+/Coop/
+/Downloads-pendentes/
+/SItes dos mods/
+/Instalador/Online/Testes/
