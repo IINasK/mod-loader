@@ -13459,6 +13459,412 @@
       "PhantomLibertyStatus": "not-required",
       "PhantomLibertyNotes": "Sem exigência de expansão nas fontes e textos auditados; classificação documental/estática, sem teste de jogo sem DLC.",
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/35886\nhttps://www.nexusmods.com/cyberpunk2077/mods/35886?tab=files&file_id=168484\nhttps://www.nexusmods.com/cyberpunk2077/mods/35886?tab=posts"
+    },
+    {
+      "Id": "mod-31642",
+      "Name": "Night City FPV",
+      "Version": "1.31.4",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "NightCoop",
+        "CET",
+        "redscript",
+        "Codeware",
+        "TweakXL",
+        "Audioware",
+        "NativeSettings",
+        "ArchiveXL"
+      ],
+      "Warning": "Drone FPV opcional para teste. Configure FPV Drone: Toggle no CET e calibre o DualSense em Mods > FPV Drone. Comece em primeira pessoa e sem noclip; câmera e posição em coop ainda precisam de teste.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "NightCityFPV V1.31.4 31642 1.31.4 2026-10-26T14-25Z gMz5MuuGn.zip",
+          "Sha256": "6f0114f760f0d37d109f006955cc435d16a97b22a92c1987ec93a018b2183467",
+          "Size": 6728110,
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/31642?tab=files&file_id=168826",
+          "ModId": 31642,
+          "FileId": 168826
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/FPVDrone.archive",
+          "Path": "archive/pc/mod/FPVDrone.archive",
+          "Size": 110592,
+          "Sha256": "3e39fd931c95981f3759c6a598a0cd6cf707fa9183a6ff8db03dc2326cf02635",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/aerodynamics.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/aerodynamics.lua",
+          "Size": 78751,
+          "Sha256": "7763c4c5d2f46cce968469357aa4a537c14cdccc1c914f8dc2a566213858207a",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/battery.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/battery.lua",
+          "Size": 8918,
+          "Sha256": "99c7ce1dd1a087aa83dd7563b6a5f47d41a693bbfb2be9bc8146fd199d583661",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/bindings.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/bindings.lua",
+          "Size": 4915,
+          "Sha256": "ea9182638a3ad31b926422b556ec5c9eeed2c705ed7516235c3f6897fc6857e4",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/collision.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/collision.lua",
+          "Size": 110045,
+          "Sha256": "303d1d6ab9ab808c66f2173502d9054a20f8090e5fe426a5394de924bf81b18a",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/context.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/context.lua",
+          "Size": 431,
+          "Sha256": "50d8f0fcf25edd5116da372ef7c59e34561fb5f4f3a1873d98a1367d4301ac00",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/controller.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/controller.lua",
+          "Size": 50945,
+          "Sha256": "346a8c4b6dc17b33f653a92a5f102373aabd5a230e4cdb6381c10079641d9e30",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/controller_preferences.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/controller_preferences.lua",
+          "Size": 2799,
+          "Sha256": "9c5f2a6f5300bb2ef497f833b5815fd7a76d07769b98fed0f159e481f337bc19",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/controller_setup.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/controller_setup.lua",
+          "Size": 74,
+          "Sha256": "9d825a0ebc2c0815091fef6b861feeac33c2d65bed094902335821fa3b16bed7",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/controller_window.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/controller_window.lua",
+          "Size": 13876,
+          "Sha256": "25659ca681a3fef083dd1c36664906eacc5ebae84bd680e3a8423fe675273697",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/defaults.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/defaults.lua",
+          "Size": 39270,
+          "Sha256": "c851fac5b76d86ba7324e852fbaf0d644cd5b2b676faf51bb43d6b694f99c9e7",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/json.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/json.lua",
+          "Size": 32534,
+          "Sha256": "a3291e0f7e24647da57df1c05a605ee7bdb7ffc3acaa5180439f21a28590c1b0",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/lifecycle.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/lifecycle.lua",
+          "Size": 65836,
+          "Sha256": "b13bcd039eb84611a17e902f65a598db1f2966b0cf848dc38ac966e32d53b17f",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/physics.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/physics.lua",
+          "Size": 34898,
+          "Sha256": "de3c9a1491c3d9381f1c8cbfde659479c68ea1f1652dc31d7765034591190354",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/physics_model.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/physics_model.lua",
+          "Size": 211842,
+          "Sha256": "8b1ec396bce1783c0e9dcbfc7bf73231fd18d1ab8b39eab2d59b436395836882",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/powertrain.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/powertrain.lua",
+          "Size": 200648,
+          "Sha256": "6310234a17aba4c879bc9410ba21cd838b616197c4e94456236f727b02dfcb11",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/profile.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/profile.lua",
+          "Size": 51980,
+          "Sha256": "04287e50864ff41cf6386c29677db4dad7c434215cb3f44e7eab59ca92284103",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/profiles.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/profiles.lua",
+          "Size": 38783,
+          "Sha256": "798a15519da343be987763446aec3ea952cf7fc33c130c45a075331b4c15e438",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/rigid_body.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/rigid_body.lua",
+          "Size": 22676,
+          "Sha256": "0ee0dab6cc91b4a23b0918cbfe771426e03e3b81489f1e6971d7307dc94e4614",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/settings.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/settings.lua",
+          "Size": 91061,
+          "Sha256": "cbc75b961df4f4b7eb5b0053bf8621262c48aa58be92c34f5dd478aac8aabe50",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/state.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/state.lua",
+          "Size": 35497,
+          "Sha256": "a9852be4a42cb8d91840f20013bb5f615cbdfd05e6a60a4b33982e868137a58d",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/utilities.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/utilities.lua",
+          "Size": 38446,
+          "Sha256": "9a5195f63ffc4a9c8f9e29bcf206d6bb53d1bcff86acb8a9b5c668015436382d",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/FPVDrone_Profiles.json",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/FPVDrone_Profiles.json",
+          "Size": 102,
+          "Sha256": "d1366c493dca036de3d59f755c1e4cafec2b7e7757aaada6b7fed5564518b9ea",
+          "UserData": true
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/init.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/init.lua",
+          "Size": 1489,
+          "Sha256": "68c8ff240994d9c378157515e6ee9c776859d395f16bfa230834357c25c6eaec",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/LICENSE",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/LICENSE",
+          "Size": 35148,
+          "Sha256": "0ae0485a5bd37a63e63603596417e4eb0e653334fa6c7f932ca3a0e85d4af227",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/10 INCH LR.json",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/10 INCH LR.json",
+          "Size": 2004,
+          "Sha256": "12c85dd57ee2713bc36dd5a2f74c924bd1591df7aa8143769487b92cc06a41e3",
+          "UserData": true
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/2.5 INCH FS.json",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/2.5 INCH FS.json",
+          "Size": 2053,
+          "Sha256": "74e89b27e6d29331141f1973f93ead9e9a4ccfe07f97218987dc32bcca3d32c6",
+          "UserData": true
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/3.5 INCH FS.json",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/3.5 INCH FS.json",
+          "Size": 2053,
+          "Sha256": "8e9283d3e663924dda444bbecf55a2921d051485127a33b4ec2465e8b2236b2a",
+          "UserData": true
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/5 INCH FS.json",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/5 INCH FS.json",
+          "Size": 2063,
+          "Sha256": "1ad8c54529e46b25502c8d0c33b817525e0f8ea939dd3c31c2e41fe78834c039",
+          "UserData": true
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/65MM TINY.json",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/65MM TINY.json",
+          "Size": 2047,
+          "Sha256": "1238c57d332539345f76378b1788635554cb44653f9cbd4aa19a45991f571d98",
+          "UserData": true
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/7 INCH BALANCED.json",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/7 INCH BALANCED.json",
+          "Size": 2031,
+          "Sha256": "c55d93805e3d7f3345e2437f22e46d0ba91704ae8fe3ff69378a201c6ae73af2",
+          "UserData": true
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/75MM WHOOP.json",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/75MM WHOOP.json",
+          "Size": 2074,
+          "Sha256": "da47deb68614b71af10360bd7df8a572a5e03bef25d74a24911967e7b06e699c",
+          "UserData": true
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/85MM WHOOP.json",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/85MM WHOOP.json",
+          "Size": 2006,
+          "Sha256": "592b1e90a1d8fd4991524025e8db62e2e0fe88fd70ce207c3ef338e3608e7f00",
+          "UserData": true
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/Default.json",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/Default.json",
+          "Size": 1994,
+          "Sha256": "7c9f375e06da38518e4a01739ba8f89ae7a921fbe597101ab4d9da5898facad3",
+          "UserData": true
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/README.md",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/README.md",
+          "Size": 705,
+          "Sha256": "c11a28c2713cdf271c180449d831af4cd15876afe4ee8baf0eee4916755dcfe8",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/README.md",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/README.md",
+          "Size": 1285,
+          "Sha256": "f9832b01ec84568e080a219292a572608b9b424906ebe4ed281b7e5ee8c324e6",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/THIRD_PARTY_NOTICES.md",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/THIRD_PARTY_NOTICES.md",
+          "Size": 1898,
+          "Sha256": "90bde1e86f84c21b76d1cf6e97332f572f6e92300a875230fb10480fb1825580",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "engine/config/platform/pc/FovFix.ini",
+          "Path": "engine/config/platform/pc/FovFix.ini",
+          "Size": 57,
+          "Sha256": "5036a02f8c9163f7035f6a6f2cb58de0d99d62fab572c8cafe6faea3faef3789",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/audioware/FPVDrone/audios.yml",
+          "Path": "r6/audioware/FPVDrone/audios.yml",
+          "Size": 285,
+          "Sha256": "1dad8327475d94a7fd8b6c1f672fb508defaadf8a2918e35d6b94dfd31f6357c",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/audioware/FPVDrone/propeller_loop.wav",
+          "Path": "r6/audioware/FPVDrone/propeller_loop.wav",
+          "Size": 2878802,
+          "Sha256": "1f45a126a3852293cf59d006b1242dee99cb7b4e9bf43f76dcdfe3fb13e1a47d",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/audioware/FPVDrone/propeller_loop_wet.wav",
+          "Path": "r6/audioware/FPVDrone/propeller_loop_wet.wav",
+          "Size": 2878696,
+          "Sha256": "edd23eda8000c4dc27ab7643a3d002b5177a6383b9d7b95af7eaa1df5908c090",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/FPVDrone/FPVDroneAudio.reds",
+          "Path": "r6/scripts/FPVDrone/FPVDroneAudio.reds",
+          "Size": 6928,
+          "Sha256": "c0afe4b315d5fe2e637485a981c8e63421e90416b8e379b8e3a48e66969d81bf",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/FPVDrone/FPVDroneHUD.reds",
+          "Path": "r6/scripts/FPVDrone/FPVDroneHUD.reds",
+          "Size": 59166,
+          "Sha256": "fa2d6d8f7365b913c7ded0e076a4a4a9cbf6a8b325723bbb0031905ccfa9de14",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "red4ext/plugins/FPVDroneInput/FPVDroneInput.dll",
+          "Path": "red4ext/plugins/FPVDroneInput/FPVDroneInput.dll",
+          "Size": 227840,
+          "Sha256": "f4a40b8ae4c4d71a1dfbde586bd9eb62d6cfe435e03da692a62f59da932d2958",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "red4ext/plugins/FPVDroneInput/SDL3.dll",
+          "Path": "red4ext/plugins/FPVDroneInput/SDL3.dll",
+          "Size": 2470400,
+          "Sha256": "eb4c055ba3a974ee81414e8b357afa2de35a00336d29b2bd944a460e6dfd00c8",
+          "UserData": false
+        }
+      ],
+      "BlockedReason": "",
+      "ThirdPerson": "Drone FPV; câmera própria",
+      "ThirdPersonNotes": "CET > Bindings > FPV Drone: Toggle: escolha uma tecla livre; F6 é só exemplo. Configurações > Mods > FPV Drone: detectar/calibrar o DualSense e salvar perfil. Reconhecimento do DualSense ainda precisa de teste no jogo.\n\nOs scripts oficiais1.31.4 compilaram de forma isolada com redscript0.5.32, Codeware1.21.1 eAudioware1.10.1 da nossa base. NativeSettings fixado declara1.97; o autor pede1.96. RED4ext1.31.0 e todas as dependências existentes preservados. A página apresenta outros números em requisitos por arquivo, mas não foram encontrados erros de API na compilação com a receita atual. Isso não equivale a executar a DLL nativa ou o drone.\n\nInstalação legacy: archive/pc/mod, CET, redscript, audioware e plugins RED4ext; sem pacote mods/.../info.json, etapa de deploy ou recurso fornecido por REDmod identificado. O tutorial genérico manda ativar REDmod; a receita não o usa. A compilação isolada não incluiu REDmod. Carregamento nativo em jogo sem REDmod ainda precisa de teste.\n\nO drone troca/restaura a câmera FPP e move V para manter o streaming. Possível disputa de posição no NightCoop e de câmera no ITP; inferência, não falha reproduzida. Começar em primeira pessoa, com save separado e sem noclip simultâneo. Testar host/convidado, retorno para V e liberação dos saves. O bloqueio de saves durante a visão do drone é do próprio mod.\n\nFovFix.ini desativa Streaming/Culling/AutoHideDistanceNear.Enabled; ajuste global. Não altera corpo ou roupas. Perfis JSON e calibração são preservados ao instalar/remover; a versão instalada é conferida pelos35arquivos fixos, não por valores dos10JSONs personalizáveis. O ZIP e os45arquivos iniciais continuam conferidos por hash no staging. Dados existentes não são sobrescritos. A remoção deixa os perfis para eventual reinstalação.",
+      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/31642?tab=description\nhttps://www.nexusmods.com/cyberpunk2077/mods/31642?tab=files\nhttps://www.nexusmods.com/cyberpunk2077/mods/31642?tab=posts",
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertyNotes": "Sem requisito explícito de expansão nas fontes consultadas, mas execução semDLC não comprovada. Disponível para teste no perfil Com Phantom Liberty, sem afirmar que o DLC é obrigatório.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/31642?tab=description\nhttps://www.nexusmods.com/cyberpunk2077/mods/31642?tab=files\nhttps://www.nexusmods.com/cyberpunk2077/mods/31642?tab=posts",
+      "ExclusiveCodeDirectories": [
+        "r6/scripts/FPVDrone",
+        "red4ext/plugins/FPVDroneInput"
+      ]
     }
   ],
   "Excluded": [

@@ -56,3 +56,11 @@ Caminhos relativos a pasta do jogo. Lista completa de pacotes, hashes e tamanhos
 - https://www.nexusmods.com/cyberpunk2077/mods/34305
 
 Consulta:29/10/2026. Nao ampliar esta conclusao a versoes ou corpos novos sem revisar.
+
+## Diagnóstico de30/10/2026: dispositivo aparece, mas sem áudio
+
+Login e dispositivo funcionaram para o usuário e o amigo; o silêncio também ocorreu emsolo, com54.4 selecionado evolume100%. No registro atual ocorreram error audio key0 1, falha de obtenção da chave e três faixas recusadas peloSpotify. Causa conhecida do clienteunofficial/librespot, documentada pelo autor. O log de29/10 inicialmente lido era anterior ao teste e não justificava atribuir o problema à estação desligada. ArquivosRadioExt19/SpotOnRadio5 conferem com as receitas; não é necessário ClientID nem atualizarRED4ext.
+
+Alternativa já instalada: tocar música noSpotifyparaWindows com saídaEstecomputador; CET > Spot On Radio: App Capture > Refresh > Capture emSpotify.exe; sintonizar54.4 e sair dos menus. Não escolherSpotOnRadio como saídaSpotify neste modo. AppCapture captura o app oficial; Stop capture/Restore sound restauram volume direto. Se usar oSpotifyWeb, capturar o navegador pode incluir outras abas e sofrer limitações deprocessos; preferir oaplicativo dedicado. Reprodução local confirmada pelo usuário em30/10 capturando oBrave, comSpotifyWeb. A varianteSpotifydesktop é alternativa documentada; não foi o caminho utilizado nessa confirmação. O teste com oamigo ainda aguarda.
+
+Solução validada para orientar oamigo: tocarSpotifyWeb noBrave comsaída local; CET > Spot On Radio: App Capture > Refresh > Capture noBrave; sintonizar54.4 e sair dosmenus. Não transferirSpotify para odispositivoSpotOnRadio neste modo. AppCapture pode incluir som deoutras abas. Confirmar reprodução emcadaPC antes de avaliar osdois jogando juntos.

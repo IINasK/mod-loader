@@ -18,7 +18,7 @@ Adiciona páginas nativas de opções emConfigurações>Mods para scriptsCET.
 
 - [CET](CET.md) — v1.38.1 (`CET`).
 
-Requisitos autorais registrados: CET>=1.18.1; usado comCET1.38.1 neste pacote.
+Requisitos autorais registrados: CET>=1.25 conforme init.lua fixado; biblioteca declara1.97 e é usada comCET1.38.1 neste pacote.
 
 ## Phantom Liberty e compatibilidade
 
@@ -52,3 +52,5 @@ Caminhos relativos a pasta do jogo. Lista completa de pacotes, hashes e tamanhos
 - https://github.com/justarandomguyintheinternet/CP77_nativeSettings
 
 Consulta:29/10/2026. Nao ampliar esta conclusao a versoes ou corpos novos sem revisar.
+
+Conferência adicional30/10/2026: o arquivo fixado emcommit4065b51 declara version=1.97 eminCETVersion=1.25. A versão da receita continua sendo ocommit; não houve atualização da biblioteca para oFPV.

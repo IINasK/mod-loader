@@ -1,11 +1,11 @@
 # Conhecimento dos mods
 
-Indice interno de84componentes do instalador. Revisao de30/10/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
+Indice interno de85componentes do instalador. Revisao de30/10/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
 
 ## Perfis Phantom Liberty
 
-- Com Phantom Liberty:84registros,82visiveis; BMW e Yamaha continuamretidos.
-- Sem Phantom Liberty:78registros elegiveis,76visiveis. ITP eNightCityAlive exigemDLC; Allies,Cyberpsycho,EconomyPunk eEXtra ficaram fora desse perfil por evidencia insuficiente para a receita exata.
+- Com Phantom Liberty:85registros,83visiveis; BMW e Yamaha continuamretidos.
+- Sem Phantom Liberty:78registros elegiveis,76visiveis. ITP eNightCityAlive exigemDLC; Allies,Cyberpsycho,EconomyPunk,EXtra eNightCityFPV ficaram fora desse perfil por evidencia insuficiente para a receita exata.
 - A base NightCoop nao exige DLC segundo aFAQoficial; o anfitriao pode reiniciar sem a expansao pelo fluxo oferecido pelo proprio mod. Nao apagar arquivos de expansao nem converter saves automaticamente.
 - Esta separacao e documental/estatica. Nao foi executado um jogo semDLC para validar aparencia, gameplay ou rede. Confirmacoescoop anteriores do usuario continuam atribuidas a ele.
 
@@ -99,11 +99,4 @@ Busque nome ou ID em mods.json ou nesta lista. Cada ficha tem funcao, uso, depen
 | [NETGVNNER - FL00R SHXT POSE PACK](Mods/mod-35353.md) | 1 | not-required | Disponivel para teste |
 | [Unlimited Attribute Reset](Mods/mod-36378.md) | 1.0.1 | not-required | Disponivel para teste |
 | [No-Clip (Fly Through Walls)](Mods/mod-35886.md) | 1.0.1 | not-required | Disponivel para teste |
-
-## Candidatos consultados
-
-Fora dos84componentes ativos e do executável.
-
-| Mod | Versão | Situação |
-| --- | --- | --- |
-| [Night City FPV](Candidatos/mod-31642.md) | 1.31.4 | Conferir dependências, REDmod e coop antes de integrar |
+| [Night City FPV](Mods/mod-31642.md) | 1.31.4 | unverified | Disponivel para teste comPL |

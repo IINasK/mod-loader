@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -9,7 +9,7 @@ using System.Windows.Forms;
 
 public static class FacialMainListTests {
     // Historical preparation fixtures keep their original catalog; production faces now use the unified installer.
-    internal static FixedCatalog PreparationCatalog(){var c=FixedData.Load();c.Packages.RemoveAll(m=>m.Id.StartsWith("face-",StringComparison.Ordinal)||m.Id=="RadioExt"||m.Id=="SpotOnRadio"||new[]{"mod-11963","mod-15606","mod-15867","mod-11964","mod-35772","mod-35353","mod-36378","mod-35886"}.Contains(m.Id));FixedData.Validate(c);return c;}
+    internal static FixedCatalog PreparationCatalog(){var c=FixedData.Load();c.Packages.RemoveAll(m=>m.Id.StartsWith("face-",StringComparison.Ordinal)||m.Id=="RadioExt"||m.Id=="SpotOnRadio"||new[]{"mod-11963","mod-15606","mod-15867","mod-11964","mod-35772","mod-35353","mod-36378","mod-35886","mod-31642"}.Contains(m.Id));FixedData.Validate(c);return c;}
     const BindingFlags Private=BindingFlags.Instance|BindingFlags.NonPublic;
     static object Get(object o,string name){return o.GetType().GetField(name,Private).GetValue(o);}
     static void Set(object o,string name,object value){o.GetType().GetField(name,Private).SetValue(o,value);}

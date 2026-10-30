@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
@@ -32,7 +32,7 @@ public sealed partial class FixedInstaller {
             string ledger=Safe.In(Data,r.Id+".json");Save(ledger,r);
             try {
                 BackupSaves(Safe.In(Data,"backups/"+r.Id+"/saves"));int moved=0;
-                foreach(var f in mod.Files) {
+                foreach(var f in mod.Files.Where(f=>!f.UserData)) {
                     Closed();string source=Safe.In(game,f.Path);
                     if(!File.Exists(source)){if(Directory.Exists(source))throw new IOException("Uma pasta ocupa o arquivo do mod.");continue;}
                     if(new FileInfo(source).Length!=f.Size||Safe.Hash(source)!=f.Sha256)throw new IOException("Arquivo alterado após a conferência: "+f.Path);

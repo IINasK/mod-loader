@@ -34,7 +34,7 @@ public sealed partial class FixedInstaller {
             string ledger=Safe.In(Data,receipt.Id+".json");Save(ledger,receipt);
             try {
                 BackupSaves(Safe.In(Data,"backups/"+receipt.Id+"/saves"));int moved=0;
-                foreach(var mod in present)foreach(var file in mod.Files) {
+                foreach(var mod in present)foreach(var file in mod.Files.Where(f=>!f.UserData)) {
                     Closed();string source=Safe.In(game,file.Path);
                     if(!File.Exists(source)){if(Directory.Exists(source))throw new IOException("Uma pasta ocupa o arquivo do mod: "+file.Path);continue;}
                     if(new FileInfo(source).Length!=file.Size||Safe.Hash(source)!=file.Sha256)throw new IOException("Arquivo alterado após a conferência: "+file.Path);

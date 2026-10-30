@@ -39,7 +39,7 @@ public sealed class ModDetailsInfo {
         foreach(var file in filesMod.Files){
             string path=hasRoot?Safe.In(info.GameRoot,file.Path):file.Path;bool present=false;
             if(hasRoot){Safe.NoLinks(path);present=File.Exists(path);}
-            info.Files.Add(new[]{path,hasRoot?(present?"Presente":"Ausente"):"Destino previsto"});
+            info.Files.Add(new[]{path,file.UserData?"Perfil personalizável (preservado)":hasRoot?(present?"Presente":"Ausente"):"Destino previsto"});
         }
         return info;
     }

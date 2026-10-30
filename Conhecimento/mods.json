@@ -2,12 +2,12 @@
   "Schema": 1,
   "CheckedOn": "2026-10-30",
   "CatalogId": "cp25-fixed-20261028",
-  "BaselineCatalogSha256": "468efa83f1f30ceda319683e0c8a16e5517ca9fe9d9fdc092e1fecdc4d9ac012",
-  "Count": 84,
+  "BaselineCatalogSha256": "bf73a6c02f92cbe2882c83a8b12acff40ed11aac67b8bfe0b563a12b2e741be1",
+  "Count": 85,
   "Profiles": {
     "WithPL": {
-      "Total": 84,
-      "Visible": 82
+      "Total": 85,
+      "Visible": 83
     },
     "WithoutPL": {
       "Total": 78,
@@ -21,7 +21,8 @@
       "14-NightCityAllies",
       "16-Cyberpsycho",
       "21-EconomyPunk",
-      "mod-35772"
+      "mod-35772",
+      "mod-31642"
     ]
   },
   "MetadataOnly": true,
@@ -1292,7 +1293,7 @@
         }
       ],
       "AuthorRequirements": [
-        "CET>=1.18.1; usado comCET1.38.1 neste pacote."
+        "CET>=1.25 conforme init.lua fixado; biblioteca declara1.97 e é usada comCET1.38.1. A receita continua fixada no commit4065b51."
       ],
       "GenderAndBody": "Consultar funcao e limites; componente nao e um refit corporal.",
       "KnownConflictsAndLimits": [
@@ -1402,7 +1403,8 @@
         "TextFilesChecked": 5,
         "PLStringHits": 0,
         "Interpretation": "NomesPhantom/EP1 isolados nao provam dependencia paga. Inspecao textual nao prova todosassets deumarchive nem runtime."
-      }
+      },
+      "DeclaredVersion": "1.97"
     },
     {
       "Id": "12-Dialogue",
@@ -12818,9 +12820,9 @@
       "Category": "Base",
       "Function": "ConectaSpotify ao rádio54.4; também captura áudio de aplicativo local peloAppCapture.",
       "HowToUse": [
-        "Abrir o jogo/carregar partida. Entrar na própria contaSpotify pelo navegador aberto uma vez ou pelo botãoLog in to Spotify na janelaCET.",
-        "NoSpotify escolher dispositivoSpot On Radio; no carro sintonizar54.4Spot On Radio. O volume vem das opções de rádio do jogo.",
-        "SeSpotifyConnect recusar áudio, testarAppCapture no painel usando o aplicativoSpotify."
+        "Caminho validado porDouglas em30/10: SpotifyWeb tocando noBrave; CET > Spot On Radio: App Capture > Refresh > Capture ao ladoBrave; rádio54.4. Usar saída local do navegador, sem transferir a reprodução para o dispositivoSpotOnRadio.",
+        "AppCapture pode capturar áudio de outras abas do navegador; para isolar música, uma alternativa é capturar oSpotifydesktop emEstecomputador. Stop capture/Restore sound restauram ovolume direto.",
+        "SpotifyConnect nativo: login uma vez, dispositivoSpotOnRadio, play e54.4. ClientID é opcional. Se aparecer AudioKey recusada, não repetirlogin/APIkey; usarAppCapture."
       ],
       "Dependencies": [
         {
@@ -12863,7 +12865,7 @@
       },
       "Blocked": false,
       "BlockedReason": null,
-      "CoopEvidence": "Instalados localmente29/10/2026; sem login/reproducao/sincronizacao musical testada pelo agente.",
+      "CoopEvidence": "Reprodução local confirmada pelo usuário em30/10/2026 usando AppCapture doBrave. Teste com oamigo ainda aguardando; não confundir áudio local com sincronização entrejogadores.",
       "CoopStatusFromExistingCatalog": "Áudio local",
       "CoopNotesFromExistingCatalog": "Integra a estação 54.4 ao rádio. Não altera corpo, roupas ou câmera. Não oferece transporte documentado de áudio entre jogadores.",
       "Assets": [
@@ -12918,6 +12920,24 @@
         "TextFilesChecked": 3,
         "PLStringHits": 0,
         "Interpretation": "NomesPhantom/EP1 isolados nao provam dependencia paga. Inspecao textual nao prova todosassets deumarchive nem runtime."
+      },
+      "LatestDiagnosis": {
+        "Date": "2026-10-30",
+        "UserReported": "Dispositivo listado eplayativo, estação54.4 evolume100, semáudio inclusive foracoop",
+        "Cause": "Spotify/librespot recusa chave de áudio",
+        "Evidence": [
+          "error audio key 0 1",
+          "Unable to load key: Service unavailable",
+          "3 tracks in a row refused"
+        ],
+        "ExistingFiles": "19RadioExt+5SpotOnRadio corretos porSHA/tamanho",
+        "RecommendedWorkaround": "AppCapture capturando oBrave comSpotifyWeb; reprodução local validada pelo usuário",
+        "NewClientIdNeeded": false,
+        "RED4extUpdateNeeded": false,
+        "AppCaptureRuntimeValidated": true,
+        "LocalPlaybackValidatedByUser": true,
+        "LocalPlaybackMethod": "AppCapture doBrave",
+        "PlaybackWithFriendValidated": false
       }
     },
     {
@@ -13722,6 +13742,403 @@
         "UsesFrameTeleport": true,
         "NightCoopAware": false,
         "ModCodeExecuted": false
+      }
+    },
+    {
+      "Id": "mod-31642",
+      "Name": "Night City FPV",
+      "FixedVersion": "1.31.4",
+      "GameVersion": "2.5",
+      "Category": "Gameplay",
+      "Function": "Simulador de drone FPV com física própria, câmera e áudio de motores. Não é uma melhoria da pilotagem dos carros nem substituto simples de noclip.",
+      "HowToUse": [
+        "CET > Bindings > FPV Drone: Toggle; definir tecla. F6 é exemplo do autor, não vínculo automático.",
+        "Configurações > Mods > FPV Drone: calibrar controle, selecionar preset e salvar perfil.",
+        "Projeto pensado para rádio FPV USB; Xbox é aceito pelo autor. Pilotagem completa por teclado não documentada; teclas CET apenas alternam modo e limpeza."
+      ],
+      "Dependencies": [
+        {
+          "Id": "NightCoop",
+          "Name": "NightCoop + RED4ext 1.31.0",
+          "FixedVersion": "0.1.2-beta"
+        },
+        {
+          "Id": "CET",
+          "Name": "CET",
+          "FixedVersion": "v1.38.1"
+        },
+        {
+          "Id": "redscript",
+          "Name": "redscript",
+          "FixedVersion": "v0.5.32"
+        },
+        {
+          "Id": "Codeware",
+          "Name": "Codeware",
+          "FixedVersion": "v1.21.1"
+        },
+        {
+          "Id": "TweakXL",
+          "Name": "TweakXL",
+          "FixedVersion": "v1.12.0"
+        },
+        {
+          "Id": "Audioware",
+          "Name": "Audioware",
+          "FixedVersion": "v1.10.1"
+        },
+        {
+          "Id": "NativeSettings",
+          "Name": "Native Settings UI",
+          "FixedVersion": "commit 4065b51"
+        },
+        {
+          "Id": "ArchiveXL",
+          "Name": "ArchiveXL",
+          "FixedVersion": "v1.28.2"
+        }
+      ],
+      "AuthorRequirements": [
+        "Descrição do autor: CET1.38.1, RED4ext1.31.0, Codeware1.21.1, redscript0.5.32, TweakXL1.12.0, Audioware1.10.1, NativeSettings1.96",
+        "Tabela por arquivo lista Codeware1.21.2 eAudioware1.11.0; receita preserva versões da descrição, com compilação isolada confirmada.",
+        "ArchiveXL é recomendado e já pertence à base; incluído na receita. KillTrigger Areas Removed não foi incluído."
+      ],
+      "GenderAndBody": "Sem refit de corpo; o pacote cria drone e controla câmera/movimento. Compatibilidade de câmera com ITP ainda não testada.",
+      "KnownConflictsAndLimits": [
+        "CET > Bindings > FPV Drone: Toggle: escolha uma tecla livre; F6 é só exemplo. Configurações > Mods > FPV Drone: detectar/calibrar o DualSense e salvar perfil. Reconhecimento do DualSense ainda precisa de teste no jogo.\n\nOs scripts oficiais1.31.4 compilaram de forma isolada com redscript0.5.32, Codeware1.21.1 eAudioware1.10.1 da nossa base. NativeSettings fixado declara1.97; o autor pede1.96. RED4ext1.31.0 e todas as dependências existentes preservados. A página apresenta outros números em requisitos por arquivo, mas não foram encontrados erros de API na compilação com a receita atual. Isso não equivale a executar a DLL nativa ou o drone.\n\nInstalação legacy: archive/pc/mod, CET, redscript, audioware e plugins RED4ext; sem pacote mods/.../info.json, etapa de deploy ou recurso fornecido por REDmod identificado. O tutorial genérico manda ativar REDmod; a receita não o usa. A compilação isolada não incluiu REDmod. Carregamento nativo em jogo sem REDmod ainda precisa de teste.\n\nO drone troca/restaura a câmera FPP e move V para manter o streaming. Possível disputa de posição no NightCoop e de câmera no ITP; inferência, não falha reproduzida. Começar em primeira pessoa, com save separado e sem noclip simultâneo. Testar host/convidado, retorno para V e liberação dos saves. O bloqueio de saves durante a visão do drone é do próprio mod.\n\nFovFix.ini desativa Streaming/Culling/AutoHideDistanceNear.Enabled; ajuste global. Não altera corpo ou roupas. Perfis JSON e calibração são preservados ao instalar/remover; a versão instalada é conferida pelos35arquivos fixos, não por valores dos10JSONs personalizáveis. O ZIP e os45arquivos iniciais continuam conferidos por hash no staging. Dados existentes não são sobrescritos. A remoção deixa os perfis para eventual reinstalação."
+      ],
+      "PhantomLiberty": {
+        "Status": "unverified",
+        "Required": false,
+        "Evidence": "Documentação e inspeção estática; sem execução semDLC",
+        "Notes": "Sem requisito explícito de expansão nas fontes consultadas, mas execução semDLC não comprovada. Disponível para teste no perfil Com Phantom Liberty, sem afirmar que o DLC é obrigatório.",
+        "Sources": [
+          "https://www.nexusmods.com/cyberpunk2077/mods/31642?tab=description",
+          "https://www.nexusmods.com/cyberpunk2077/mods/31642?tab=files",
+          "https://www.nexusmods.com/cyberpunk2077/mods/31642?tab=posts"
+        ],
+        "RuntimeWithoutDLCValidated": false,
+        "WithoutDLCProfileEligible": false
+      },
+      "Blocked": false,
+      "BlockedReason": "",
+      "CoopEvidence": "Nenhum ensaio do drone emNightCoop executado. Disponível para teste, sem estender validação dos outros mods.",
+      "CoopStatusFromExistingCatalog": "Drone FPV; câmera própria",
+      "CoopNotesFromExistingCatalog": "CET > Bindings > FPV Drone: Toggle: escolha uma tecla livre; F6 é só exemplo. Configurações > Mods > FPV Drone: detectar/calibrar o DualSense e salvar perfil. Reconhecimento do DualSense ainda precisa de teste no jogo.\n\nOs scripts oficiais1.31.4 compilaram de forma isolada com redscript0.5.32, Codeware1.21.1 eAudioware1.10.1 da nossa base. NativeSettings fixado declara1.97; o autor pede1.96. RED4ext1.31.0 e todas as dependências existentes preservados. A página apresenta outros números em requisitos por arquivo, mas não foram encontrados erros de API na compilação com a receita atual. Isso não equivale a executar a DLL nativa ou o drone.\n\nInstalação legacy: archive/pc/mod, CET, redscript, audioware e plugins RED4ext; sem pacote mods/.../info.json, etapa de deploy ou recurso fornecido por REDmod identificado. O tutorial genérico manda ativar REDmod; a receita não o usa. A compilação isolada não incluiu REDmod. Carregamento nativo em jogo sem REDmod ainda precisa de teste.\n\nO drone troca/restaura a câmera FPP e move V para manter o streaming. Possível disputa de posição no NightCoop e de câmera no ITP; inferência, não falha reproduzida. Começar em primeira pessoa, com save separado e sem noclip simultâneo. Testar host/convidado, retorno para V e liberação dos saves. O bloqueio de saves durante a visão do drone é do próprio mod.\n\nFovFix.ini desativa Streaming/Culling/AutoHideDistanceNear.Enabled; ajuste global. Não altera corpo ou roupas. Perfis JSON e calibração são preservados ao instalar/remover; a versão instalada é conferida pelos35arquivos fixos, não por valores dos10JSONs personalizáveis. O ZIP e os45arquivos iniciais continuam conferidos por hash no staging. Dados existentes não são sobrescritos. A remoção deixa os perfis para eventual reinstalação.",
+      "Assets": [
+        {
+          "Name": "NightCityFPV V1.31.4 31642 1.31.4 2026-10-26T14-25Z gMz5MuuGn.zip",
+          "ModId": 31642,
+          "FileId": 168826,
+          "Size": 6728110,
+          "Sha256": "6f0114f760f0d37d109f006955cc435d16a97b22a92c1987ec93a018b2183467",
+          "OfficialUrl": "https://www.nexusmods.com/cyberpunk2077/mods/31642?tab=files&file_id=168826"
+        }
+      ],
+      "Files": [
+        {
+          "RelativeInstallPath": "archive/pc/mod/FPVDrone.archive",
+          "Size": 110592,
+          "Sha256": "3e39fd931c95981f3759c6a598a0cd6cf707fa9183a6ff8db03dc2326cf02635",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/aerodynamics.lua",
+          "Size": 78751,
+          "Sha256": "7763c4c5d2f46cce968469357aa4a537c14cdccc1c914f8dc2a566213858207a",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/battery.lua",
+          "Size": 8918,
+          "Sha256": "99c7ce1dd1a087aa83dd7563b6a5f47d41a693bbfb2be9bc8146fd199d583661",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/bindings.lua",
+          "Size": 4915,
+          "Sha256": "ea9182638a3ad31b926422b556ec5c9eeed2c705ed7516235c3f6897fc6857e4",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/collision.lua",
+          "Size": 110045,
+          "Sha256": "303d1d6ab9ab808c66f2173502d9054a20f8090e5fe426a5394de924bf81b18a",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/context.lua",
+          "Size": 431,
+          "Sha256": "50d8f0fcf25edd5116da372ef7c59e34561fb5f4f3a1873d98a1367d4301ac00",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/controller.lua",
+          "Size": 50945,
+          "Sha256": "346a8c4b6dc17b33f653a92a5f102373aabd5a230e4cdb6381c10079641d9e30",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/controller_preferences.lua",
+          "Size": 2799,
+          "Sha256": "9c5f2a6f5300bb2ef497f833b5815fd7a76d07769b98fed0f159e481f337bc19",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/controller_setup.lua",
+          "Size": 74,
+          "Sha256": "9d825a0ebc2c0815091fef6b861feeac33c2d65bed094902335821fa3b16bed7",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/controller_window.lua",
+          "Size": 13876,
+          "Sha256": "25659ca681a3fef083dd1c36664906eacc5ebae84bd680e3a8423fe675273697",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/defaults.lua",
+          "Size": 39270,
+          "Sha256": "c851fac5b76d86ba7324e852fbaf0d644cd5b2b676faf51bb43d6b694f99c9e7",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/json.lua",
+          "Size": 32534,
+          "Sha256": "a3291e0f7e24647da57df1c05a605ee7bdb7ffc3acaa5180439f21a28590c1b0",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/lifecycle.lua",
+          "Size": 65836,
+          "Sha256": "b13bcd039eb84611a17e902f65a598db1f2966b0cf848dc38ac966e32d53b17f",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/physics.lua",
+          "Size": 34898,
+          "Sha256": "de3c9a1491c3d9381f1c8cbfde659479c68ea1f1652dc31d7765034591190354",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/physics_model.lua",
+          "Size": 211842,
+          "Sha256": "8b1ec396bce1783c0e9dcbfc7bf73231fd18d1ab8b39eab2d59b436395836882",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/powertrain.lua",
+          "Size": 200648,
+          "Sha256": "6310234a17aba4c879bc9410ba21cd838b616197c4e94456236f727b02dfcb11",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/profile.lua",
+          "Size": 51980,
+          "Sha256": "04287e50864ff41cf6386c29677db4dad7c434215cb3f44e7eab59ca92284103",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/profiles.lua",
+          "Size": 38783,
+          "Sha256": "798a15519da343be987763446aec3ea952cf7fc33c130c45a075331b4c15e438",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/rigid_body.lua",
+          "Size": 22676,
+          "Sha256": "0ee0dab6cc91b4a23b0918cbfe771426e03e3b81489f1e6971d7307dc94e4614",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/settings.lua",
+          "Size": 91061,
+          "Sha256": "cbc75b961df4f4b7eb5b0053bf8621262c48aa58be92c34f5dd478aac8aabe50",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/state.lua",
+          "Size": 35497,
+          "Sha256": "a9852be4a42cb8d91840f20013bb5f615cbdfd05e6a60a4b33982e868137a58d",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/fpv/utilities.lua",
+          "Size": 38446,
+          "Sha256": "9a5195f63ffc4a9c8f9e29bcf206d6bb53d1bcff86acb8a9b5c668015436382d",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/FPVDrone_Profiles.json",
+          "Size": 102,
+          "Sha256": "d1366c493dca036de3d59f755c1e4cafec2b7e7757aaada6b7fed5564518b9ea",
+          "UserData": true
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/init.lua",
+          "Size": 1489,
+          "Sha256": "68c8ff240994d9c378157515e6ee9c776859d395f16bfa230834357c25c6eaec",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/LICENSE",
+          "Size": 35148,
+          "Sha256": "0ae0485a5bd37a63e63603596417e4eb0e653334fa6c7f932ca3a0e85d4af227",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/10 INCH LR.json",
+          "Size": 2004,
+          "Sha256": "12c85dd57ee2713bc36dd5a2f74c924bd1591df7aa8143769487b92cc06a41e3",
+          "UserData": true
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/2.5 INCH FS.json",
+          "Size": 2053,
+          "Sha256": "74e89b27e6d29331141f1973f93ead9e9a4ccfe07f97218987dc32bcca3d32c6",
+          "UserData": true
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/3.5 INCH FS.json",
+          "Size": 2053,
+          "Sha256": "8e9283d3e663924dda444bbecf55a2921d051485127a33b4ec2465e8b2236b2a",
+          "UserData": true
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/5 INCH FS.json",
+          "Size": 2063,
+          "Sha256": "1ad8c54529e46b25502c8d0c33b817525e0f8ea939dd3c31c2e41fe78834c039",
+          "UserData": true
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/65MM TINY.json",
+          "Size": 2047,
+          "Sha256": "1238c57d332539345f76378b1788635554cb44653f9cbd4aa19a45991f571d98",
+          "UserData": true
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/7 INCH BALANCED.json",
+          "Size": 2031,
+          "Sha256": "c55d93805e3d7f3345e2437f22e46d0ba91704ae8fe3ff69378a201c6ae73af2",
+          "UserData": true
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/75MM WHOOP.json",
+          "Size": 2074,
+          "Sha256": "da47deb68614b71af10360bd7df8a572a5e03bef25d74a24911967e7b06e699c",
+          "UserData": true
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/85MM WHOOP.json",
+          "Size": 2006,
+          "Sha256": "592b1e90a1d8fd4991524025e8db62e2e0fe88fd70ce207c3ef338e3608e7f00",
+          "UserData": true
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/Default.json",
+          "Size": 1994,
+          "Sha256": "7c9f375e06da38518e4a01739ba8f89ae7a921fbe597101ab4d9da5898facad3",
+          "UserData": true
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/README.md",
+          "Size": 705,
+          "Sha256": "c11a28c2713cdf271c180449d831af4cd15876afe4ee8baf0eee4916755dcfe8",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/README.md",
+          "Size": 1285,
+          "Sha256": "f9832b01ec84568e080a219292a572608b9b424906ebe4ed281b7e5ee8c324e6",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/THIRD_PARTY_NOTICES.md",
+          "Size": 1898,
+          "Sha256": "90bde1e86f84c21b76d1cf6e97332f572f6e92300a875230fb10480fb1825580",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "engine/config/platform/pc/FovFix.ini",
+          "Size": 57,
+          "Sha256": "5036a02f8c9163f7035f6a6f2cb58de0d99d62fab572c8cafe6faea3faef3789",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "r6/audioware/FPVDrone/audios.yml",
+          "Size": 285,
+          "Sha256": "1dad8327475d94a7fd8b6c1f672fb508defaadf8a2918e35d6b94dfd31f6357c",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "r6/audioware/FPVDrone/propeller_loop.wav",
+          "Size": 2878802,
+          "Sha256": "1f45a126a3852293cf59d006b1242dee99cb7b4e9bf43f76dcdfe3fb13e1a47d",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "r6/audioware/FPVDrone/propeller_loop_wet.wav",
+          "Size": 2878696,
+          "Sha256": "edd23eda8000c4dc27ab7643a3d002b5177a6383b9d7b95af7eaa1df5908c090",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "r6/scripts/FPVDrone/FPVDroneAudio.reds",
+          "Size": 6928,
+          "Sha256": "c0afe4b315d5fe2e637485a981c8e63421e90416b8e379b8e3a48e66969d81bf",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "r6/scripts/FPVDrone/FPVDroneHUD.reds",
+          "Size": 59166,
+          "Sha256": "fa2d6d8f7365b913c7ded0e076a4a4a9cbf6a8b325723bbb0031905ccfa9de14",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "red4ext/plugins/FPVDroneInput/FPVDroneInput.dll",
+          "Size": 227840,
+          "Sha256": "f4a40b8ae4c4d71a1dfbde586bd9eb62d6cfe435e03da692a62f59da932d2958",
+          "UserData": false
+        },
+        {
+          "RelativeInstallPath": "red4ext/plugins/FPVDroneInput/SDL3.dll",
+          "Size": 2470400,
+          "Sha256": "eb4c055ba3a974ee81414e8b357afa2de35a00336d29b2bd944a460e6dfd00c8",
+          "UserData": false
+        }
+      ],
+      "Sources": [
+        "https://www.nexusmods.com/cyberpunk2077/mods/31642?tab=description",
+        "https://www.nexusmods.com/cyberpunk2077/mods/31642?tab=files",
+        "https://www.nexusmods.com/cyberpunk2077/mods/31642?tab=posts",
+        "https://www.nexusmods.com/cyberpunk2077/mods/31642?tab=files&file_id=168826",
+        "https://github.com/jac3km4/redscript/blob/v0.5.32/scc/cli/src/opts.rs"
+      ],
+      "CheckedOn": "2026-10-30",
+      "EvidenceGroup": "FPV-integracao-20261030",
+      "Limitations": [
+        "Compilação de scripts e integridade não comprovam carregamento da DLL, reconhecimento DualSense ou comportamento emcoop."
+      ],
+      "DocumentationSummary": "Simulador de drone FPV com física própria, câmera e áudio de motores. Não é uma melhoria da pilotagem dos carros nem substituto simples de noclip.",
+      "Redmod": {
+        "Requires": false,
+        "Classification": "legacy",
+        "TutorialSaysEnable": true,
+        "Explanation": "Nenhuma implantação ou recurso REDmod identificado; teste runtime semREDmod ainda não executado."
+      },
+      "Validation": {
+        "IsolatedRedscriptCompileSucceeded": true,
+        "RED4extUpdated": false,
+        "CodewareUpdated": false,
+        "AudiowareUpdated": false,
+        "NativeSettingsVersionFound": "1.97",
+        "ModRuntimeExecuted": false
+      },
+      "UserControllerContext": {
+        "Device": "Sony DualSense PS5",
+        "Evidence": "Usuário informa possuir o controle e já saber pilotar FPV nele",
+        "ModRecognitionValidated": false,
+        "Notes": "Não tratar teclado como impedimento para este usuário. Reconhecimento e calibração específicos ainda precisam de teste."
       }
     }
   ]

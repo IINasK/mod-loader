@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -24,7 +24,7 @@ public static class OnlineTests {
         return new FixedCatalog{Schema=1,Id="fixture",GameVersion="2.5",GameFileVersion="2.5.0.0",Packages=new List<FixedMod>{new FixedMod{Id="NightCoop",Name="Base de teste",Version="test",Profile="Kit inicial",GameVersion="2.5",RequiresPL=true,Immutable=true,Dependencies=new string[0],Assets=new List<FixedAsset>{asset},Files=files.Take(5).ToList()},new FixedMod{Id="Extra",Name="Mod de teste",Version="test",Profile="Complementos",GameVersion="2.5",RequiresPL=true,Dependencies=new[]{"NightCoop"},Assets=new List<FixedAsset>{asset},Files=files.Skip(5).ToList()}}};
     }
     public static void Run(string parent) {
-        var embedded=FixedData.Load();Check(embedded.Id=="cp25-fixed-20261028"&&embedded.Packages.Count==84&&embedded.Packages.Any(m=>m.Id=="face-35807-168171")&&embedded.Packages.Any(m=>m.Id=="RadioExt")&&embedded.Packages.Any(m=>m.Id=="SpotOnRadio")&&new[]{"mod-11963","mod-15606","mod-15867","mod-11964"}.All(id=>embedded.Packages.Any(m=>m.Id==id))&&FacialDownload.List().All(item=>embedded.Packages.Any(m=>m.Id==item.Id)),"Catálogo84 embutido conferido por hash preserva faciais, RadioExt e Spotify e inclui os quatro pacotes Nola sem arquivo externo");
+        var embedded=FixedData.Load();Check(embedded.Id=="cp25-fixed-20261028"&&embedded.Packages.Count==85&&embedded.Packages.Any(m=>m.Id=="face-35807-168171")&&embedded.Packages.Any(m=>m.Id=="RadioExt")&&embedded.Packages.Any(m=>m.Id=="SpotOnRadio")&&new[]{"mod-11963","mod-15606","mod-15867","mod-11964"}.All(id=>embedded.Packages.Any(m=>m.Id==id))&&FacialDownload.List().All(item=>embedded.Packages.Any(m=>m.Id==item.Id)),"Catálogo85 embutido conferido por hash preserva faciais, RadioExt e Spotify e inclui os quatro pacotes Nola sem arquivo externo");
         var additions=new[]{"mod-35772","mod-35353","mod-36378","mod-35886"}.Select(id=>embedded.Packages.Single(m=>m.Id==id)).ToList();
         Check(additions.Sum(m=>m.Files.Count)==8&&additions.All(m=>!m.Immutable&&!m.RequiresPL&&!m.RequiresRedmod&&m.Assets.Count==1),"Quatro novos mods: oito arquivos fixados sem alterar corpo ou base");
         Check(additions.Select(m=>m.Assets[0].FileId).SequenceEqual(new[]{168073,168808,170886,168484}),"Downloads oficiais dos quatro mods mantem os IDs auditados");
@@ -122,6 +122,7 @@ public static class OnlineTests {
         OnlineUnifiedQueueTests.Run(parent);
         OnlineFacialInstallTests.Run(parent);
         OnlineGameEditionTests.Run(parent);
+        OnlineUserDataTests.Run(parent);
         Safe.WriteJson(Path.Combine(root,"resultado.json"),new{Passed=passed.Count,Tests=passed,FixtureOnly=true,RealGameTouched=false});File.WriteAllText(Path.Combine(parent,"ultimo-teste.txt"),root);Console.WriteLine(passed.Count+" testes aprovados em "+root);
     }
     public static void VerifySources(FixedCatalog catalog,string seedsFile,string resultFile) {

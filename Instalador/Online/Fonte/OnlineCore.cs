@@ -22,7 +22,7 @@ public sealed class FixedMod {
     public List<FixedDensityProfile> DensityProfiles;
 }
 public sealed class FixedAsset { public string Id,Name,Sha256,Format,Url; public long Size; public int ModId,FileId; }
-public sealed class FixedFile { public string Asset,Entry,Path,Sha256; public long Size; }
+public sealed class FixedFile { public string Asset,Entry,Path,Sha256; public long Size; public bool UserData; }
 public sealed class ModScan {
     public string Id,State,Detail; public int Correct,Missing,Different;
     public bool IsCorrect { get { return State=="Instalado correto"; } }
@@ -46,7 +46,7 @@ public static class FixedData {
         var ids=new HashSet<string>(StringComparer.Ordinal); var paths=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var immutable=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach(var m in c.Packages) {
-            if(m==null||!Regex.IsMatch(m.Id??"","^[A-Za-z0-9-]+$")||!ids.Add(m.Id)||m.GameVersion!=c.GameVersion||m.Files==null||m.Files.Count==0||m.Files.Count>20000||m.Assets==null||m.Assets.Count==0||m.Dependencies==null) throw new IOException("Componente inválido.");
+            if(m==null||!Regex.IsMatch(m.Id??"","^[A-Za-z0-9-]+$")||!ids.Add(m.Id)||m.GameVersion!=c.GameVersion||m.Files==null||m.Files.Count==0||m.Files.Count>20000||m.Files.All(f=>f!=null&&f.UserData)||m.Assets==null||m.Assets.Count==0||m.Dependencies==null) throw new IOException("Componente inválido.");
             if(!String.IsNullOrEmpty(m.PhantomLibertyStatus)&&!new[]{"not-required","required","unverified"}.Contains(m.PhantomLibertyStatus))throw new IOException("Classificação Phantom Liberty inválida.");
             if(m.RequiresRedmod)throw new IOException("Esta lista não aceita mods que exigem REDmod.");
             if(m.NexusModId<0||m.NexusFileId<0||(m.NexusModId==0)!=(m.NexusFileId==0))throw new IOException("Alias Nexus sem versão fixada.");
@@ -61,6 +61,7 @@ public static class FixedData {
             }
             foreach(var f in m.Files) {
                 if(f==null||!assets.Contains(f.Asset)||!HashValid(f.Sha256)||f.Size<0||f.Size>8L*1024*1024*1024||!Safe.Allowed(f.Path)||!paths.Add(f.Path)) throw new IOException("Colisão ou receita inválida no catálogo.");
+                if(f.UserData&&(m.Immutable||!f.Path.StartsWith("bin/x64/plugins/cyber_engine_tweaks/mods/",StringComparison.Ordinal)||!f.Path.EndsWith(".json",StringComparison.OrdinalIgnoreCase)))throw new IOException("Perfil personalizável inválido.");
                 Safe.In(Path.GetTempPath(),f.Path); if(f.Entry!="") Safe.In(Path.GetTempPath(),f.Entry);
                 if(m.Immutable) immutable.Add(f.Path);
             }
@@ -89,13 +90,14 @@ public static class FixedData {
             string conflict=checkIncompatibilities?Incompatibility(mod,game):null;
             if(conflict!=null){s.State="Incompatível";s.Different=1;s.Detail=conflict;return s;}
             if(mod.Id==NightCityDensity.ModId)return NightCityDensity.Scan(mod,game);
-            foreach(var f in mod.Files) {
+            foreach(var f in mod.Files.Where(f=>!f.UserData)) {
                 string p=Safe.In(game,f.Path);
                 if(!File.Exists(p)) { if(Directory.Exists(p)) s.Different++; else s.Missing++;OnlineDiagnostics.Record("scan.file",mod.Id,"Arquivo não encontrado.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,Present=false}); }
                 else {var info=new FileInfo(p);string hash=info.Length==f.Size?Safe.Hash(p):null;bool correct=info.Length==f.Size&&hash==f.Sha256;if(correct)s.Correct++;else s.Different++;OnlineDiagnostics.Record("scan.file",mod.Id,correct?"Arquivo conferido.":"Arquivo divergente.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,ActualSize=info.Length,ActualSha256=hash,WrittenUtc=info.LastWriteTimeUtc.ToString("o"),Present=true,Correct=correct});}
             }
             s.State=s.Different>0?"Diferente/alterado":s.Missing==0?"Instalado correto":s.Correct==0?"Não instalado":"Parcial";
             s.Detail=s.Correct+" corretos; "+s.Missing+" ausentes; "+s.Different+" diferentes";
+            if(mod.Files.Any(f=>f.UserData))s.Detail+="; arquivos de perfil preservados, fora da verificação de versão";
         }catch(IOException){s.State="Não verificável";s.Detail="Não foi possível ler o caminho com segurança.";}
         catch(UnauthorizedAccessException){s.State="Não verificável";s.Detail="Sem permissão para ler os arquivos.";}
         finally{OnlineDiagnostics.Record("scan.result",mod.Id,"Conferência dos arquivos do jogo.",new{Game=game,State=s.State,Correct=s.Correct,Missing=s.Missing,Different=s.Different,Detail=s.Detail});}
@@ -289,7 +291,8 @@ public sealed partial class FixedInstaller {
                 BackupSaves(Safe.In(Data,"backups/"+id+"/saves"));
                 receipt.Status="instalando";Save(ledger,receipt);int written=0;
                 foreach(var m in pending)foreach(var f in m.Files) {
-                    Closed();string dest=Safe.In(game,f.Path);
+                    Closed();string dest=Safe.In(game,f.Path);Safe.NoLinks(dest);
+                    if(f.UserData&&File.Exists(dest))continue;
                     if(File.Exists(dest)){if(new FileInfo(dest).Length==f.Size&&Safe.Hash(dest)==f.Sha256)continue;throw new IOException("Arquivo mudou após a conferência: "+f.Path);}
                     if(Directory.Exists(dest))throw new IOException("Uma pasta ocupa o destino: "+f.Path);
                     var change=new OwnedChange{Path=f.Path,Before=null,After=f.Sha256};receipt.Files.Add(change);Save(ledger,receipt);

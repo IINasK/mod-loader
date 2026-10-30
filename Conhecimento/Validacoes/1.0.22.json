@@ -1,0 +1,55 @@
+{
+  "Version": "1.0.22",
+  "CheckedOn": "2026-10-30",
+  "CatalogCount": 85,
+  "VisibleWithPL": 83,
+  "VisibleWithoutPL": 76,
+  "Added": [
+    "mod-31642"
+  ],
+  "PreservedPreviousRecords": 84,
+  "CatalogSha256": "bf73a6c02f92cbe2882c83a8b12acff40ed11aac67b8bfe0b563a12b2e741be1",
+  "ExecutableSha256": "5138362f40cfa883237508b967bf92bcf6489b0bf1e242f8cfb4e03660588323",
+  "Tests": {
+    "RegressionAndUserData": 822,
+    "OriginalFPVArchiveQueue": 36,
+    "EditionUI": 25,
+    "Total": 883,
+    "IsolatedRedscriptCompilation": "passed"
+  },
+  "FPV": {
+    "Version": "1.31.4",
+    "NexusFileId": 168826,
+    "OriginalFilesVerified": 45,
+    "StrictFiles": 35,
+    "PersonalJSONDefaults": 10,
+    "ProfilesAndCalibrationPreserved": true,
+    "Codeware": "1.21.1",
+    "Audioware": "1.10.1",
+    "NativeSettings": "1.97",
+    "RED4ext": "1.31.0",
+    "RequiresRedmod": false,
+    "RedmodEvidence": "Legacy package paths; no deploy or REDmod resource identified; isolated script compile withoutREDmod",
+    "RedmodNativeRuntimeValidated": false
+  },
+  "RealGameModified": false,
+  "RED4extUpdated": false,
+  "OtherDependenciesUpdated": false,
+  "BodyChanged": false,
+  "FPVRuntimeExecuted": false,
+  "DualSenseRecognitionValidated": false,
+  "FPVCoopValidated": false,
+  "Spotify": {
+    "CauseConfirmed": "Spotify/librespot audio key refused",
+    "WorkaroundConfirmedByUser": "AppCapture doBrave",
+    "LocalPlaybackValidated": true,
+    "PlaybackWithFriendValidated": false,
+    "CredentialsCopied": false
+  },
+  "Limits": [
+    "FPVnativeDLL,control recognition,camera and position incoop need gameplay test",
+    "FPVwithoutPhantomLiberty not validated; shown only inwithPL profile",
+    "Compiledscripts and fixturecopy do not executeFPVlogic",
+    "AppCapture works locally peruser; friend test separate"
+  ]
+}
