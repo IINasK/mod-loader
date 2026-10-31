@@ -1,0 +1,70 @@
+{
+  "Version": "0.1.0",
+  "CheckedOn": "2026-10-31",
+  "Executable": "D:\\Projetos\\Mod Loader Cyberpunk coop\\Calibrador FPV 0.1.0.exe",
+  "Sha256": "a5afcbe70604cfd3bd37565c6408560ac9416cbfaf5b336f2e286078356dea9a",
+  "Size": 2725888,
+  "InstallerIndependent": true,
+  "InstallerVersion": "1.0.24",
+  "Tests": {
+    "Passed": 258,
+    "GameOrder": 7,
+    "Capture": 48,
+    "Sequence": 178,
+    "Gamepad": 17,
+    "RuntimeHardwareUsed": false,
+    "VirtualCreated": false,
+    "GameTouched": false,
+    "PreviewOnly": true
+  },
+  "PhysicalRead": {
+    "PhysicalName": "DualSense Wireless Controller",
+    "Connected": true,
+    "Throttle": 0.5,
+    "Yaw": 0,
+    "Roll": 0.027436140018921477,
+    "Pitch": 0,
+    "VirtualCreated": false,
+    "DriverInstalled": false,
+    "GameFilesChanged": false
+  },
+  "BusProbe": {
+    "DriverResponded": true,
+    "VirtualCreated": false,
+    "ControllerInputSent": false,
+    "GameFilesChanged": false
+  },
+  "DriverInstalledByUs": false,
+  "ActualVirtualDeviceCreated": false,
+  "GameCommandInjectionTested": false,
+  "ActualGameVideoCaptured": false,
+  "Geometry": {
+    "CenterWidth": 960,
+    "CenterHeight": 540,
+    "FPS": 30,
+    "Audio": false
+  },
+  "Workflow": {
+    "StartAndContinue": "F10",
+    "EmergencyStop": "F12",
+    "GameOrder": [
+      "Uncrashed",
+      "Cyberpunk"
+    ],
+    "BeforeEachStageZeroSeconds": 1,
+    "AutomaticL1": false,
+    "AutoGameSwitch": true,
+    "PauseAndResumeKey": "Esc",
+    "MenuStateDetected": false,
+    "PitchStickUpExpected": "NoseUp per user calibration"
+  },
+  "RealGameFilesModified": false,
+  "SavesModified": false,
+  "Limits": [
+    "Game device selection and calibration need operator validation",
+    "Zero1s does not prove landing/leveling",
+    "Menu switching requires Uncrashed live and Cyberpunk root-pause state",
+    "Center crop must show usable scenario references",
+    "No gravity inference or measured game telemetry yet"
+  ]
+}

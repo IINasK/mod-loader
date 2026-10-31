@@ -54,3 +54,8 @@
 /Downloads-pendentes/
 /SItes dos mods/
 /Instalador/Online/Testes/
+
+# FPV calibration tool: source only; native dependencies and recordings stay local.
+!/Ferramentas/Calibrador FPV/Fonte/*.cs
+!/Ferramentas/Calibrador FPV/Fonte/*.ps1
+/Ferramentas/Calibrador FPV/Dependencias/
