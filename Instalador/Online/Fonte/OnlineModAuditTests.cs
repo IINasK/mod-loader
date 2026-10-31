@@ -16,6 +16,8 @@ public static class ModAuditTests {
         return new ModImportItem{Name=name,Kind="Arquivo",Source=path,Size=new FileInfo(path).Length,Sha256=Safe.Hash(path)};
     }
     static string Snapshot(string root){return String.Join("\n",Directory.GetFiles(root,"*",SearchOption.AllDirectories).OrderBy(p=>p).Select(p=>p+" "+Safe.Hash(p)));}
+    static string Canonical(object value){var map=value as IDictionary<string,object>;if(map!=null)return "{"+String.Join(",",map.Keys.OrderBy(k=>k,StringComparer.Ordinal).Select(k=>Safe.Json.Serialize(k)+":"+Canonical(map[k])))+"}";var array=value as object[];return array==null?Safe.Json.Serialize(value):"["+String.Join(",",array.Select(Canonical))+"]";}
+    static string Identity(FixedCatalog catalog){return Canonical(Safe.Json.DeserializeObject(Safe.Json.Serialize(catalog)));}
     static bool Has(ModAuditReport report,string code,string level=null){return report.Findings.Any(f=>f.Code==code&&(level==null||f.Level==level));}
     public static void Run(string parent){
         string root=Path.Combine(parent,"audit-"+Guid.NewGuid().ToString("N").Substring(0,12));Directory.CreateDirectory(root);
@@ -50,8 +52,10 @@ public static class ModAuditTests {
         string rar=Path.Combine(root,"source.rar");File.WriteAllText(rar,"rarfixture");check(Has(ModAudit.Build(catalog,new string[0],game,new ModImportItem{Kind="Arquivo",Name="rar",Source=rar,Size=new FileInfo(rar).Length,Sha256=Safe.Hash(rar)}),"format","Informação"),"RAR/7z nao sao executados nem recebem inspecao inventada");
         File.AppendAllText(package.Source,"modified");check(Has(ModAudit.Build(catalog,new string[0],game,package),"changed-import","Problema"),"Arquivo alterado desde a importacao nao recebe inventario de outra identidade");
         check(Has(ModAudit.Build(catalog,new[]{"Extra"},@"\\invalid-server\share"),"root","Problema"),"Auditoria recusa caminho de rede antes de consultar arquivos remotos");
-        var real=FixedData.Load();var active=real.Packages.Where(m=>String.IsNullOrWhiteSpace(m.BlockedReason)).Select(m=>m.Id).ToList();string identity=Safe.Json.Serialize(real);var full=ModAudit.Build(real,active,"");
-        check(Has(full,"wardrobe")&&Safe.Json.Serialize(real)==identity&&!Safe.Json.Serialize(full).Contains("coop pendente")&&!Safe.Json.Serialize(full).Contains("experimental"),"Receitas atuais preservam confirmacao coop e notas reais sem alterar catalogo");
+        var real=FixedData.Load();var active=real.Packages.Where(m=>String.IsNullOrWhiteSpace(m.BlockedReason)).Select(m=>m.Id).ToList();string identity=Identity(real);var full=ModAudit.Build(real,active,"");
+        string afterIdentity=Identity(real),auditJson=Safe.Json.Serialize(full);
+        if(afterIdentity!=identity)Safe.WriteJson(Path.Combine(root,"catalog-difference.json"),new{Before=identity,After=afterIdentity});
+        check(Has(full,"wardrobe")&&afterIdentity==identity&&!auditJson.Contains("coop pendente")&&!auditJson.Contains("experimental"),"Receitas atuais preservam confirmacao coop e notas reais sem alterar catalogo; wardrobe="+Has(full,"wardrobe")+" identity="+(afterIdentity==identity)+" pending="+auditJson.Contains("coop pendente")+" experimental="+auditJson.Contains("experimental"));
         using(var window=new ModAuditWindow(imported)){
             window.ShowInTaskbar=false;window.StartPosition=FormStartPosition.Manual;window.Location=new Point(-30000,-30000);window.Show();Application.DoEvents();
             var controls=new Stack<Control>();controls.Push(window);var buttons=new List<Button>();bool informative=false;

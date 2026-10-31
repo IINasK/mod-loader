@@ -13951,6 +13951,36 @@
     "Section": null,
     "Content": "{\"enableAutoMode\":false,\"useOpenHubCallTrigger\":true,\"lastLanguageSelected\":\"pt-br\",\"fileName\":\"mod_user_settings.json\",\"showWelcomeShard\":true}",
     "Sha256": "80f7354d581cc754b76aa580eb0affe0b9b9f93e4ce7a5b53e4b7dfdbf509b68"
+  },
+  {
+    "Id": "defaults-fpv-nask667",
+    "ModId": "mod-31642",
+    "Version": "1.31.4",
+    "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/Nask 667.json",
+    "Format": "json",
+    "Section": null,
+    "Content": "{\"audio\":{\"audioMasterGain\":0.75},\"camera\":{\"angle\":25,\"aspectRatio\":1.7777777777777777,\"crosshair\":true,\"customHUD\":true,\"forwardOffset\":0.2,\"horizontalFOV\":125,\"motorRPMTelemetry\":true,\"stickMode\":2,\"stickOverlay\":true,\"verticalOffset\":0.19999998807907104},\"collision\":{\"angularImpulseScale\":0.62,\"heightMm\":50,\"horizontalScale\":1,\"impactDisarmThreshold\":70,\"impactFriction\":0.16,\"restitution\":0.03,\"surfaceFriction\":4.5},\"controls\":{\"actualRates\":{\"pitch\":{\"centerSensitivity\":200,\"expo\":0.55,\"maxRate\":667},\"roll\":{\"centerSensitivity\":200,\"expo\":0.55,\"maxRate\":667},\"yaw\":{\"centerSensitivity\":200,\"expo\":0.55,\"maxRate\":667}},\"threeDThrottle\":{\"deadband\":0.06,\"enabledOnStart\":false,\"inputCenter\":0.5,\"reverseThrustMultiplier\":1,\"toggleTransitionTime\":0.1},\"throttleCurve\":0},\"general\":{\"infiniteBattery\":true,\"performanceMode\":false,\"teleportPlayerToDroneOnExit\":true},\"physics\":{\"dronePreset\":\"5in_freestyle\",\"feedForward\":0,\"gravity\":12.748645,\"idleMotorRpm\":3000,\"installedPropellerDiameterInches\":5.1,\"installedPropellerPitchInches\":3,\"massGrams\":628,\"motorToMotorDiagonalMm\":220,\"powerSystem\":{\"referenceMassGrams\":628,\"referencePropellerBladeCount\":3,\"referencePropellerDiameterInches\":5.1,\"referenceThrustToWeightRatio\":13.845000743865967},\"propellerBladeCount\":3,\"tuneTightness\":100},\"profileVersion\":35,\"vtxSimulation\":{\"linkLossPerDistanceUnit\":0.02,\"signalNoise\":true,\"startAtLinkPercentage\":50}}",
+    "Sha256": "a23c868ddd4f702b2ded60b6af875a7b92dadf2156150bb56a42c5c73556018f"
+  },
+  {
+    "Id": "defaults-fpv-bindings",
+    "ModId": "mod-31642",
+    "Version": "1.31.4",
+    "Path": "bin/x64/plugins/cyber_engine_tweaks/bindings.json",
+    "Format": "cet-bindings",
+    "Section": "FPVDrone",
+    "Content": "{\"fpv_drone_toggle\":61924494876344320}",
+    "Sha256": "4f3c8e00c9759dcf2e2a56016d4952ae136a8081989c02abe79b389ad0141cd4"
+  },
+  {
+    "Id": "defaults-fpv-index",
+    "ModId": "mod-31642",
+    "Version": "1.31.4",
+    "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/FPVDrone_Profiles.json",
+    "Format": "fpv-index",
+    "Section": null,
+    "Content": "{\"activePath\":\"profiles/Nask 667.json\",\"indexVersion\":5,\"legacyMigrationComplete\":true}",
+    "Sha256": "0c8c0ecf61bb8222bef90c3db0a3df2f9e30b57e19340a82a9c199441c87be92"
   }
 ]
 }

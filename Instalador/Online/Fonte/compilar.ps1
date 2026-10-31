@@ -31,6 +31,7 @@ $extensions += Join-Path $PSScriptRoot 'OnlineUserDataTests.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineDefaults.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineDefaultsTests.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineDefaultsQueueTests.cs'
+$extensions += Join-Path $PSScriptRoot 'OnlineFPVDefaultsTests.cs'
 & $compiler /nologo /target:winexe /main:OnlineProgram /platform:x64 /optimize+ /codepage:65001 ('/win32manifest:'+(Join-Path $shared 'app.manifest')) ('/out:'+(Join-Path $out 'Cyberpunk Coop.exe')) /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Core.dll /reference:System.Security.dll ('/reference:'+(Join-Path $framework 'System.Web.Extensions.dll')) ('/reference:'+(Join-Path $framework 'System.IO.Compression.dll')) ('/reference:'+(Join-Path $framework 'System.IO.Compression.FileSystem.dll')) (Join-Path $shared 'Installer.cs') (Join-Path $shared 'SelfTests.cs') (Join-Path $shared 'PackageIdentity.cs') (Join-Path $PSScriptRoot 'OnlineIdentity.cs') (Join-Path $PSScriptRoot 'OnlineCore.cs') (Join-Path $PSScriptRoot 'OnlineWindow.cs') (Join-Path $PSScriptRoot 'OnlineTests.cs') @extensions
 if($LASTEXITCODE -ne 0){throw 'Compilação falhou'}
 & $compiler /nologo /target:exe ('/out:'+(Join-Path (Split-Path -Parent $PSScriptRoot) 'FixtureGame.exe')) (Join-Path $shared 'FixtureGame.cs')

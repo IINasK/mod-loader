@@ -1,0 +1,61 @@
+{
+  "Version": "1.0.24",
+  "CheckedOn": "2026-10-30",
+  "CatalogCount": 85,
+  "VisibleWithPL": 83,
+  "VisibleWithoutPL": 76,
+  "PreservedPreviousRecords": 85,
+  "PreservedPreviousDefaults": 8,
+  "DefaultsCount": 11,
+  "CatalogSha256": "738527fc15e0de06fcdcb33f4b8075bec369b3e1982f71460e8df8d98b0a7f4d",
+  "ExecutableSha256": "51b953be3f2b5f676b1861fd14b8b811a14827df9be7d7e5bbf6b3805acb27a0",
+  "Tests": {
+    "ExistingRegressionAndDefaults": 869,
+    "FPVDefaults": 22,
+    "EditionUI": 25,
+    "Total": 916
+  },
+  "FPV": {
+    "Profile": "Nask 667",
+    "Version": "1.31.4",
+    "Axes": [
+      "roll",
+      "pitch",
+      "yaw"
+    ],
+    "ActualRates": {
+      "Center": 200,
+      "MaxRate": 667,
+      "Expo": 0.55
+    },
+    "ApproximationOf": {
+      "Model": "Betaflight",
+      "RcRate": 1,
+      "SuperRate": 0.7,
+      "Expo": 0
+    },
+    "Gravity": 12.748645,
+    "MotorReference": 13.845000743865967,
+    "GravityAndMotorMultiplier": 1.3,
+    "InitialSelectionOnlyWhenIndexMissingOrCopiedThisOperation": true,
+    "ExistingProfileSelectionPreserved": true,
+    "ExistingBindingsPreserved": true,
+    "ExactBindingConflictsSkipped": true,
+    "ControllerIdentificationAndCalibrationCopied": false,
+    "ARMControlCopied": false
+  },
+  "Corrections": [
+    "Canonical catalog equality avoids reflection field order false failure",
+    "Atomic temporary file uses short independent filename in same directory"
+  ],
+  "RealGameModified": false,
+  "FlightTested": false,
+  "RED4extUpdated": false,
+  "OtherDependenciesUpdated": false,
+  "BodyChanged": false,
+  "Limits": [
+    "ActualRates curve is approximate; physical motor model can saturate requested thrust",
+    "Existing setups choose Nask667 manually; personal settings are preserved",
+    "ARM and controller calibration remain individual"
+  ]
+}

@@ -310,7 +310,7 @@ public sealed partial class FixedInstaller {
                     OnlineDiagnostics.Record("install.file.applied",m.Id,"Arquivo copiado e registrado.",new{Game=game,Receipt=id,Path=f.Path,Sha256=f.Sha256});
                     written++;if(failAfter>=0&&written>=failAfter)throw new IOException("Falha de teste após a cópia.");report("Instalado: "+m.Name);
                 }
-                Closed();ModDefaults.Apply(catalog,mods,game,Safe.In(Data,"defaults-backups/"+id),report);
+                Closed();ModDefaults.Apply(catalog,mods,game,Safe.In(Data,"defaults-backups/"+id),report,-1,new HashSet<string>(receipt.Files.Where(f=>f.Applied).Select(f=>f.Path),StringComparer.OrdinalIgnoreCase));
                 receipt.Status="instalado";Save(ledger,receipt);OnlineDiagnostics.Record("install.complete",null,"Instalação concluída pelo motor.",new{Game=game,Receipt=id,Mods=pending.Select(m=>m.Id).ToArray(),Files=written});return "Instalação concluída. Mods que já estavam corretos foram preservados. Pronto para jogar.";
             }catch(Exception ex) {
                 OnlineDiagnostics.Record("install.failed",null,"Falha na instalação; fluxo de desfazer será acionado.",new{Game=game,Receipt=id,ErrorType=ex.GetType().Name});
