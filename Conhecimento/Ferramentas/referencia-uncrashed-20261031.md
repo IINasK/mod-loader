@@ -1,0 +1,11 @@
+# Referência de voo Uncrashed — 31/10/2026
+
+Análise concluída da sessão 20261031-040122-Serie-Uncrashed-Cyberpunk-d9182a41/01-Uncrashed (calibrador0.1.2). Treze clipes completos, 1.739frames/30fps, nenhum erro ou duplicata registrado pelo gravador. Quadros dos13trechos conferidos. Os vídeos originais permanecem em Documentos/FPV Calibrador; análise detalhada, inventário SHA e folhas de quadros ficam apenas localmente em Auditoria/Analise-Uncrashed-20261031.
+
+- Máximo em yaw/roll/pitch: aproximadamente670graus/s, coerente com a referência667. Repetição de cenário a cada~16quadros (~0,53s); correlação de imagens e inspeção visual apoiam a estimativa. Não tratar como telemetria ou precisão de1grau/s; erro temporal de1quadro equivale a dezenas de graus/s. Não deduzir Center/Expo só do máximo.
+- Os níveis25/50/75 respondem progressivamente; velocidades exatas nesses níveis ainda não medidas. Vários não completam360graus. Precisam de orientação/projeção conhecida ou comparação relativa comCyberpunk.
+- Pitchpositivo do macro causa nariz para baixo nesta sessãoUncrashed, divergindo da convenção narizcima desejada anteriormente. Não inverter o perfil por conta própria; registrar o sentido ao compararCyberpunk.
+- Vertical: pico aparente~2,4–2,8s e contato/tombamento~4,8–5,0s do clipe, com deriva/inclinação. F10~11,24s encerrou o registro depois; não representa o instante de impacto. Não inferir gravidade/massa/motor separadamente sem escala/telemetria.
+- SavedCyberpunkProfile dentro do session.json0.1.2 contém NASK doCyberpunk salvo na ocasião (Max870/Center250/Expo0); não são rates doUncrashed. A0.1.3 limita esse campo ao modoCyberpunk.
+
+O usuário pediu aproveitar esta gravação e não repetir oUncrashed. A análise não mudou configurações dos jogos. Próximo passo é comparar uma sessãoCyberpunk por eixo/nível alinhando início do pulso e sentido, separando transiente e rotação sustentada. O calibrador atual é0.1.3 com modos independentes, sem foco/checkbox/trocaautomática; consultar calibrador-fpv-0.1.3.md. Não substituir ensaios reais pelos vídeos sintéticos dos self-tests.
