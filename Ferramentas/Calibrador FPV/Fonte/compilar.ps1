@@ -1,4 +1,4 @@
-param([string]$Root=$PSScriptRoot,[string]$Deps=(Join-Path (Split-Path -Parent $PSScriptRoot) 'Dependencias'),[string]$Output=(Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))) 'Calibrador FPV 0.1.3.exe'))
+param([string]$Root=$PSScriptRoot,[string]$Deps=(Join-Path (Split-Path -Parent $PSScriptRoot) 'Dependencias'),[string]$Output=(Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))) 'Calibrador FPV 0.1.4.exe'))
 $ErrorActionPreference='Stop'
 $compiler=Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe';$framework=Split-Path -Parent $compiler
 $pins=@{'ViGEmClient.dll'='00303f99e1968d523fbd08a7c691d60d145b7335059ec593947841d124c10875';'SDL3.dll'='eb4c055ba3a974ee81414e8b357afa2de35a00336d29b2bd944a460e6dfd00c8'}
