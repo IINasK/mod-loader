@@ -1,0 +1,31 @@
+{
+  "Version": "0.1.2",
+  "CheckedOn": "2026-10-31",
+  "Executable": "D:\\Projetos\\Mod Loader Cyberpunk coop\\Calibrador FPV 0.1.2.exe",
+  "Sha256": "ce56f3f8796030c31118dd58a78c51b1d4ba272c59bf0fe36bafdb800536d8bd",
+  "Size": 2731008,
+  "Change": "Prominent game name and step count in overlay and application status",
+  "Tests": {
+    "Passed": 265,
+    "StageLabels": 2,
+    "Hotkeys": 5,
+    "GameOrder": 7,
+    "Capture": 48,
+    "Sequence": 178,
+    "Gamepad": 17,
+    "RuntimeHardwareUsed": false,
+    "VirtualCreated": false,
+    "GameTouched": false,
+    "PreviewOnly": true
+  },
+  "SequenceChanged": false,
+  "CalibrationChanged": false,
+  "GameFilesChanged": false,
+  "DriverChanged": false,
+  "SequenceExecutedInGame": false,
+  "VisualPreviewsReviewed": [
+    "hud-uncrashed.png",
+    "hud-cyberpunk.png"
+  ],
+  "ClosePreviousVersionBeforeOpening": true
+}

@@ -1,0 +1,9 @@
+# Calibrador FPV 0.1.2
+
+Revisão visual de 31/10/2026 sobre a 0.1.1. O indicador sobre o jogo mostra o nome em destaque (18 pt, dourado): “UNCRASHED — ETAPA X DE Y” ou “CYBERPUNK 2077 — ETAPA X DE Y”. Instrução da etapa e atalhos ficam abaixo. O status na janela também identifica jogo e etapa, com fonte maior. A conclusão dos dois jogos mostra “SÉRIE CONCLUÍDA”.
+
+Fluxo, temporização, controle, captura, ordem Uncrashed → Cyberpunk e calibração permanecem como documentados em calibrador-fpv-0.1.1.md. F10 inicia/continua; F11 interrompe. Fechar a versão anterior pelo aplicativo antes de abrir a nova: o Xbox virtual será reconectado pela nova instância. Não fechar automaticamente durante um ensaio nem executar as duas versões simultaneamente.
+
+Build aprovada e 265 verificações passaram (263 anteriores e duas para os títulos de jogo/etapa). As duas prévias do indicador foram renderizadas e conferidas visualmente. Os testes não criaram controle virtual, não enviaram entrada aos jogos e não executaram voo ou troca real. Exibição sobre um jogo em execução ainda depende da validação do usuário. Hash/tamanho em calibrador-fpv-0.1.2.json. Evidências e backup da fonte anterior em Auditoria/Calibrador-FPV-0.1.2-20261031, apenas localmente.
+
+O usuário informou possível exclusão das pastas de clipes em Documentos/FPV Calibrador/.../01-Uncrashed. A consulta encontrou apenas commands.csv; os AVI e arquivos de sessão estavam ausentes. Nenhum metadado da Lixeira estava acessível à consulta, portanto não foi possível concluir recuperação. Uma cópia do CSV restante foi preservada na auditoria local; não enviar esse log ao Git. O usuário decidiu não repetir esse ensaio e pediu finalizar a versão. Não descrever o ensaio excluído como vídeo validado ou recuperado.
