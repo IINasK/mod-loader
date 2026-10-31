@@ -24,6 +24,7 @@ public sealed class CalibratorSettings
     public int Repetitions = 1;
     public bool AllRates = true;
     public bool ControlledStart = false;
+    public bool RequireFocus = true;
     public double RotationThrottle = 0.35;
 }
 
@@ -71,7 +72,7 @@ public sealed class CalibratorSequence
             VerticalTest = source.VerticalTest, ClimbSeconds = source.ClimbSeconds,
             PulseSeconds = source.PulseSeconds, BaselineSeconds = source.BaselineSeconds,
             VerticalTimeout = source.VerticalTimeout, Repetitions = source.Repetitions,
-            AllRates = source.AllRates, ControlledStart = source.ControlledStart,
+            AllRates = source.AllRates, ControlledStart = source.ControlledStart, RequireFocus = source.RequireFocus,
             RotationThrottle = source.RotationThrottle
         };
         if (settings.VerticalTest)
@@ -110,7 +111,7 @@ public sealed class CalibratorSequence
                 prepareStart = now;
                 State = "Preparing";
                 Recording = false;
-                Status = "Preparação: potência zero por 1 s; manter o jogo em foco.";
+                Status = settings.RequireFocus ? "Preparação: potência zero por 1 s; manter o jogo em foco." : "Preparação: potência zero por 1 s; início automático em seguida.";
             }
             else
             {
@@ -138,11 +139,11 @@ public sealed class CalibratorSequence
 
         if (State == "Preparing")
         {
-            if (!foregroundOk) { Abort("Jogo sem foco durante a preparação."); return output; }
+            if (settings.RequireFocus && !foregroundOk) { Abort("Jogo sem foco durante a preparação."); return output; }
             double preparationElapsed = now - prepareStart;
             if (preparationElapsed < PreparationSeconds)
             {
-                Status = "Preparação: potência zero por 1 s; eixos neutros, sem gravação.";
+                Status = "Preparação: potência zero por 1 s; eixos neutros.";
                 return output;
             }
             runningStart = now;
@@ -157,14 +158,14 @@ public sealed class CalibratorSequence
                     Math.Ceiling(countdownEnd - now).ToString(CultureInfo.InvariantCulture) + " s. ARM manual.";
                 return output;
             }
-            if (!foregroundOk) { Abort("Jogo sem foco ao terminar a contagem."); return output; }
+            if (settings.RequireFocus && !foregroundOk) { Abort("Jogo sem foco ao terminar a contagem."); return output; }
             // Start on the actual first output tick so a delayed caller never skips the climb.
             runningStart = now;
             State = steps[position].Axis == "vertical" ? "RunningVertical" : "RunningRotation";
             Recording = true;
         }
         if (State != "RunningVertical" && State != "RunningRotation") return output;
-        if (!foregroundOk) { Abort("Jogo perdeu o foco. Sequência interrompida."); return output; }
+        if (settings.RequireFocus && !foregroundOk) { Abort("Jogo perdeu o foco. Sequência interrompida."); return output; }
 
         double elapsed = now - runningStart;
         Step step = steps[position];
@@ -257,7 +258,7 @@ public sealed class CalibratorSequence
             "_id" + instance.ToString(CultureInfo.InvariantCulture);
         Status = "Etapa " + StepIndex + "/" + StepCount + ": " + StepDescription() + ". " +
             (settings.ControlledStart ?
-                "Nivelar perto do chão, ARM manual se preciso; zero por 1 s não detecta pouso. Confirmar com o jogo em foco." :
+                "Nivelar perto do chão, ARM manual se preciso; zero por 1 s não detecta pouso. Confirmar com F10." :
                 "Reposicionar, ARM manual e estabilizar; confirmar para contagem de 3 s.");
     }
 
@@ -429,6 +430,7 @@ public sealed class CalibratorSequence
             Assert(ref checks, rejected, "Invalid settings must be rejected.");
         }
         ControlledStartTests(ref checks);
+        FocusDisabledTests(ref checks);
         return checks;
     }
 
@@ -530,6 +532,49 @@ public sealed class CalibratorSequence
         }
     }
 
+    private static void FocusDisabledTests(ref int checks)
+    {
+        ControlSample physical = new ControlSample { Throttle = 0.5, Yaw = 1, Buttons = 0xFFFF };
+        var source = new CalibratorSettings { ControlledStart = true, RequireFocus = false };
+        var sequence = new CalibratorSequence(source);
+        source.RequireFocus = true;
+        sequence.Start(0);
+        Assert(ref checks, sequence.StepCount == 13, "Independent mode keeps the full 13-step series.");
+        double now = 0;
+        for (int step = 1; step <= 13; step++)
+        {
+            Assert(ref checks, sequence.State == "Waiting" && sequence.StepIndex == step, "Each step waits for F10.");
+            sequence.Confirm(now, physical);
+            Assert(ref checks, IsNeutral(sequence.Tick(now + 0.999, physical, false)) && sequence.State == "Preparing", "Focus-free mode holds zero for a full second.");
+            var sample = sequence.Tick(now + 1, physical, false);
+            Assert(ref checks, sample.Throttle == 1 && NeutralAxesAndButtons(sample) && sequence.Recording, "Focus-free mode climbs after one second without ARM.");
+            if (step == 1)
+            {
+                sample = sequence.Tick(now + 1.5, physical, false);
+                Assert(ref checks, IsNeutral(sample) && sequence.State == "RunningVertical", "Vertical cuts power without a focus gate.");
+                sequence.Confirm(now + 2, physical);
+            }
+            else
+            {
+                sample = sequence.Tick(now + 2, physical, false);
+                int axis = (step - 2) / 4, percent = ((step - 2) % 4 + 1) * 25;
+                double expected = percent / 100.0;
+                Assert(ref checks, sample.Throttle == 0.35 && sample.Yaw == (axis == 0 ? expected : 0) && sample.Roll == (axis == 1 ? expected : 0) && sample.Pitch == (axis == 2 ? expected : 0), "Focus-free mode sends the scheduled axis and power.");
+                sequence.Tick(now + 4, physical, false);
+            }
+            Assert(ref checks, IsNeutral(sequence.Tick(now + 4, physical, false)) && !sequence.Recording, "Each completed step releases output without focus.");
+            now += 5;
+        }
+        Assert(ref checks, sequence.Complete && sequence.StepIndex == 13, "Independent mode ends after one game.");
+        sequence.Start(100);
+        sequence.Confirm(100, physical);
+        sequence.Tick(101, physical, false);
+        sequence.Abort("F11");
+        Assert(ref checks, IsNeutral(sequence.Tick(101.1, physical, false)) && sequence.State == "Aborted", "F11 still releases output without focus.");
+        sequence.Start(200);
+        sequence.Confirm(200, physical);
+        Assert(ref checks, IsNeutral(sequence.Tick(201, null, false)) && sequence.State == "Aborted", "Physical disconnect remains a stop condition.");
+    }
     private static bool NeutralAxesAndButtons(ControlSample sample)
     {
         return sample.Yaw == 0 && sample.Roll == 0 && sample.Pitch == 0 && sample.Buttons == 0 &&
