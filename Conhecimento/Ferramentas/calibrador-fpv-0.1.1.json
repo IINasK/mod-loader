@@ -1,0 +1,46 @@
+{
+  "Version": "0.1.1",
+  "CheckedOn": "2026-10-31",
+  "Executable": "D:\\Projetos\\Mod Loader Cyberpunk coop\\Calibrador FPV 0.1.1.exe",
+  "Sha256": "1dd2a5807db049a4d40b5408c1d9bd3258cdd764c8e21dceb825354d122035b3",
+  "Size": 2729472,
+  "Fix": "Replace reservedF12 emergency binding withF11; preserveF10 start/continue",
+  "Tests": {
+    "Passed": 263,
+    "Hotkeys": 5,
+    "GameOrder": 7,
+    "Capture": 48,
+    "Sequence": 178,
+    "Gamepad": 17,
+    "RuntimeHardwareUsed": false,
+    "VirtualCreated": false,
+    "GameTouched": false,
+    "PreviewOnly": true
+  },
+  "NativeHotkeyProbe": {
+    "Results": [
+      {
+        "Key": "F10",
+        "Registered": false,
+        "Error": 1409
+      },
+      {
+        "Key": "F11",
+        "Registered": true,
+        "Error": 0
+      }
+    ],
+    "F12Attempted": false,
+    "GameInputSent": false,
+    "VirtualCreated": false
+  },
+  "ClosePreviousVersionBeforeOpening": true,
+  "CalibrationChanged": false,
+  "GameFilesChanged": false,
+  "DriverChanged": false,
+  "SequenceExecutedInGame": false,
+  "WorkflowPreserved": true,
+  "Start": "F10",
+  "EmergencyStop": "F11",
+  "InstallerUnchanged": true
+}

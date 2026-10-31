@@ -46,6 +46,6 @@ O Git usa lista explícita de arquivos permitidos. Downloads, mods originais, DL
 
 Os pacotes baixados, caches e cópias binárias de preparação/teste foram retirados da pasta do projeto após a instalação local. O código, o catálogo fixado, as fichas, os relatórios e os backups foram preservados. A compilação normal por Build.ps1 continua usando fontes e catálogo; ensaios específicos com pacotes originais exigem baixá-los novamente pelas fontes oficiais.
 
-## Calibrador FPV 0.1.0
+## Calibrador FPV 0.1.1
 
-Ferramenta independente para comparar entradas e vídeos do Uncrashed/Cyberpunk. Fontes em Ferramentas/Calibrador FPV/Fonte; [uso, testes e limites](Conhecimento/Ferramentas/calibrador-fpv-0.1.0.md). Não muda o instalador ou o catálogo. Dependências e gravações ficam locais.
+Ferramenta independente para comparar entradas e vídeos do Uncrashed/Cyberpunk. Fontes em Ferramentas/Calibrador FPV/Fonte; [uso, testes e limites](Conhecimento/Ferramentas/calibrador-fpv-0.1.1.md). Não muda o instalador ou o catálogo. Dependências e gravações ficam locais.
