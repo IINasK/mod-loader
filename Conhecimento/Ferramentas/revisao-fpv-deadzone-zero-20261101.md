@@ -1,0 +1,10 @@
+# Revisão FPV após deadzone zero — 01/11/2026 18:40
+
+Sessão completa20261101-184018-Serie-Cyberpunk-d5dc757d/02-Cyberpunk,0.1.4/ID6:13clipes,1.562frames,0erros/duplicatas reportados. Treze clipes conferidos; auditoria local emAuditoria/Comparacao-FPV-20261101/18-40/resultado.md. Não enviar frames, vídeos, logs ou identificação do controle aoGit.
+
+- Max visual~650–680graus/s, próximo doUncrashed~670. Período16–17frames/volta e33frames/DUASvoltas; não interpretar33como uma volta. O antigo excesso30% no máximo desapareceu dentro da precisão30fps.
+- Usuário confirmou entrada manualCenter200/Expo0,55/Max660 (menu avança emdezenas). Aceitar660, diferença~1% para667. Ele NÃO usouCenter20; não repetir essa hipótese como fato. Max observado coerente com660.
+- Deadzone atual0 nos quatro eixos, hash67ac12a895185df63b8e8ee72aa6505a6e4c40218b8ba6e143120a207975776a, mesmo arquivo aplicado18:27. Binds preservados.
+- Pulsos25/50ainda apresentam menor rotação/entrada inicial queUncrashed, especialmenteroll. Não declarar equivalência integral nem prescrever novoCenter/Expo sem separar dinâmica, baixa potência e contato com chão. Não foi medida orientação precisa nesses pulsos. Manter200/0,55/660 como ponto departida; máximo está alinhado.
+- NASK emdisco continua250/870/0, câmera20; não é leitura viva. CódigoMarkDirty/Save exigeOverwriteProfile para persistir; tab-close/shutdown não salvam. OrientarOverwriteProfile após conferir os valores, separado deSaveandApplyControllerProfile doXbox. Não editar silenciosamente oNASK e não afirmar que a edição do usuário foi ignorada.
+- Sem nova alteração física ouEXE; gravidade/motor/peso mantidos. Recortevertical/ângulo não permite inferir gravidade. PreservarUncrashed; priorizar salvamento e eventualtestecurto emvoo estável, sem outra sériecompleta só para distinguir660de667.
