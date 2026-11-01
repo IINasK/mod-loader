@@ -1,0 +1,7 @@
+# Deadzone do Xbox zerada — 01/11/2026
+
+Douglas autorizou restaurar zero em todos os eixos e confirmou o jogo fechado. O processoCyberpunk2077 foi conferido ausente antes da preparação e novamente antes da alteração. No perfilXbox360, somente axes.roll/pitch/yaw.deadzone mudaram de0,08 para0; axes.throttle.deadzone de0,04 para0.
+
+Backup integral local emAuditoria/FPV-Xbox-deadzone-20261101, comsubpasta porhorário, arquivooriginal e resultado.json comhashes. Nunca enviar o backup aoGit: contém identificação/calibração do controle. Substituição atômica doJSON, preservando codificação e todo texto fora dos quatro números. ValidaçãoJSON comparou todos os demais campos e verificou os quatro zeros após leitura do arquivo final.
+
+Eixos, limites, centros, inversões, ARM e identificação doXbox preservados. Nenhuma alteração emrates, gravidade, motor, peso, RED4ext, drivers ou instaladores. Esta é uma alteração somente no jogo local. Não declarar as recomendações200/667/0,55 como aplicadas por este procedimento. Não houve abertura do jogo para teste; verificar resposta ao retomar. Uma nova associação/recriação do perfil de controle pode reintroduzir os padrões do mod; conferir as deadzones após refazer binds.
