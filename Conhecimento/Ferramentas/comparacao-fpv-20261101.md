@@ -1,0 +1,12 @@
+# Comparação FPV — 01/11/2026
+
+Verificação doUncrashed de31/10 contra duas sériesCyberpunk de01/11,13clipescada. A referência é20261031-040122.../01-Uncrashed. Cyberpunk completo mais recente:20261101-181213-Serie-Cyberpunk-baf3bebf/02-Cyberpunk (0.1.4),1.633frames, semerro/duplicata reportado. Duas pastasposteriores contêm sóvertical e não são completas. Auditoria local completa emAuditoria/Comparacao-FPV-20261101/resultado.md; vídeos/logs/backupdecontrole não vão aoGit.
+
+- Máximo visualUncrashed~670graus/s (~16frames/volta); Cyberpunk~870 (~12–13frames/volta). Maior correlação em25framesCyberpunk corresponde aDUASvoltas, não432graus/s. Aproximadamente30% mais rápido;667é o máximo proposto para a referência original. Não tratar a estimativa30fps como telemetria exata.
+- Nova vertical mostra subida/retorno. Pico aparente~2,6–3,2s e assentamento~4,5–4,9s, próximos dos intervalosUncrashed. Semescala/telemetria não identificar gravidade/motor; preservar física satisfatória do usuário. A primeira série18:02 não teve trajetória clara.
+- Novo perfilXbox salvo/aplicado01/11 às18:00:44. Deadzones:roll/pitch/yaw8%, throttle4%; não herdou os zeros do perfilDualSense30/10. Isso afeta comparação perto docentro. Preservar eixos/sinais/ARM ao zerar futuramente.
+- Usuário regravou comcâmera0°. Imagem fica horizontal, masSavedCyberpunkProfile ainda contémCameraAngle20 doNASK emdisco:SavedOnly não é leitura dos valores vivos. Não afirmar que a mudança não aconteceu. Mesma cautela para rates250/870/0 salvos.
+- Proposta NÃO aplicada:ActualRates200/667/0,55 nos três eixos, a aproximação anteriormente aprovada da referência1/0,7/0; deadzones0 conforme preferência anterior. Formula produz~63/157/314/667 nos quatro níveis semdeadzone. Curva intermediária não medida com precisão nos vídeos; tratar como ponto departida e confirmar trecho curto. Nenhuma mudança emjogo, driver, RED4ext ouEXE nesta análise.
+- Pitchpositivo olha para chão nos dois ensaios, consistente entreeles mas diferente da convenção narizcima desejada antes. Não inverter silenciosamente.
+
+Rates/câmera precisam deOverwriteProfile para persistir; controleXbox usaSaveandApplyControllerProfile. São dois salvamentos distintos. Nenhum ensaioUncrashed precisa ser refeito. Não declarar a proposta como configuração já aplicada.
