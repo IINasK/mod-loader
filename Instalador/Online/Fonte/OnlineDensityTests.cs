@@ -91,7 +91,7 @@ public static class OnlineDensityTests {
         foreach(string from in new[]{"low","medium","high"})foreach(string to in new[]{"low","medium","high"}.Where(id=>id!=from)) {
             var f=Game(root,"troca-"+from+"-"+to,catalog,cache,from);var before=Snapshot(f.Game);
             Text(f.Game,"archive/pc/mod/terceiro.archive","terceiro");before=Snapshot(f.Game);
-            check(NightCityDensity.Read(f.Mod,f.Game).Id==from,"Reconhece perfil manual "+from+" antes de "+to);
+            check(NightCityDensity.Read(f.Mod,f.Game).Id==from,"Reconhece perfil manual "+from+" antes de "+to);check(NightCityDensity.Read(f.Mod,f.Game).Version=="2.3"&&FixedData.Scan(f.Mod,f.Game).Detail.Contains("Versão reconhecida: 2.3"),"Versao instalada confirmada por hashes para "+from);check(ModDetailsInfo.Read(f.Mod,f.Game,"").InstalledVersion.StartsWith("2.3 · "),"Detalhes mostram versao e densidade de "+from);
             f.Engine.ApplyDensityProfile(to,Quiet);
             check(NightCityDensity.Read(f.Mod,f.Game).Id==to&&FixedData.Scan(f.Mod,f.Game).IsCorrect,"Troca "+from+" para "+to+" reconhecida pelo scan");
             check(!File.Exists(Safe.In(f.Game,Only(from)))&&File.Exists(Safe.In(f.Game,Only(to))),"Troca "+from+" para "+to+" retira camada antiga e instala nova");
@@ -107,13 +107,13 @@ public static class OnlineDensityTests {
             File.Delete(Safe.In(keep.Game,Shared));keep.Engine.Install(new[]{ModId},true,Quiet);
             check(Same(original,keep.Game)&&NightCityDensity.Read(keep.Mod,keep.Game).Id==id,"Reparo de arquivo comum preserva perfil "+id);
         }
-        var fresh=Game(root,"primeira-instalacao",catalog,cache,null);fresh.Engine.Install(new[]{ModId},true,Quiet);
+        var fresh=Game(root,"primeira-instalacao",catalog,cache,null);check(NightCityDensity.Read(fresh.Mod,fresh.Game).Version==null,"Ausencia nao herda versao do catalogo");Text(fresh.Game,Shared,Contents(Shared,"low"));check(NightCityDensity.Read(fresh.Mod,fresh.Game).Version==null,"Instalacao parcial nao afirma versao completa");File.Delete(Safe.In(fresh.Game,Shared));fresh.Engine.Install(new[]{ModId},true,Quiet);
         check(NightCityDensity.Read(fresh.Mod,fresh.Game).Id=="low","Primeira instalacao usa densidade Baixa");
         var fail=Game(root,"rollback-falha",catalog,cache,"medium");var failBefore=Snapshot(fail.Game);
         refuse(()=>fail.Engine.ApplyDensityProfile("high",Quiet,1),"Falha injetada durante troca e propagada");
         check(Same(failBefore,fail.Game)&&NightCityDensity.Read(fail.Mod,fail.Game).Id=="medium","Rollback restaura arquivos anteriores apos falha");
         var edited=Game(root,"alterado",catalog,cache,"medium");Text(edited.Game,Changed,"edicao do usuario");var editBefore=Snapshot(edited.Game);
-        check(!NightCityDensity.Read(edited.Mod,edited.Game).CanApply,"Perfil com arquivo diferente bloqueia seletor");
+        check(!NightCityDensity.Read(edited.Mod,edited.Game).CanApply,"Perfil com arquivo diferente bloqueia seletor");check(NightCityDensity.Read(edited.Mod,edited.Game).Version==null&&!ModDetailsInfo.Read(edited.Mod,edited.Game,"").InstalledVersion.StartsWith("2.3"),"Arquivo alterado nao recebe versao instalada presumida");
         refuse(()=>edited.Engine.ApplyDensityProfile("low",Quiet),"Arquivo modificado bloqueia troca");check(Same(editBefore,edited.Game),"Troca bloqueada preserva edicao e demais arquivos");
         refuse(()=>noop.Engine.ApplyDensityProfile("desconhecido",Quiet),"ID de perfil desconhecido recusado");
         var later=Game(root,"edicao-posterior",catalog,cache,"low");later.Engine.ApplyDensityProfile("high",Quiet);Text(later.Game,Changed,"edicao posterior");later.Engine.Undo(Quiet);

@@ -11,7 +11,7 @@ public sealed class FixedDensityProfile {
     public List<FixedFile> Files;
 }
 public sealed class DensityProfileState {
-    public string Id,Name,Detail;
+    public string Id,Name,Detail,Version;
     public bool CanApply,Partial;
 }
 public static class NightCityDensity {
@@ -69,9 +69,9 @@ public static class NightCityDensity {
         if(mod==null||mod.Id!=ModId)throw new IOException("Night City Alive não encontrado na lista.");
         var all=KnownFiles(mod).ToList();Safe.NoLinks(game);
         var candidates=mod.DensityProfiles==null?new[]{"medium"}:new[]{"low","medium","high"};
-        foreach(string id in candidates)if(Match(Resolve(mod,id),all,game))return new DensityProfileState{Id=id,Name=id=="low"?"Baixa (recomendada)":id=="medium"?"Média":"Alta",Detail="Pacote completo conferido por hashes. Reinicie o jogo após trocar.",CanApply=true};
+        foreach(string id in candidates)if(Match(Resolve(mod,id),all,game))return new DensityProfileState{Id=id,Version=mod.Version,Name=id=="low"?"Baixa (recomendada)":id=="medium"?"Média":"Alta",Detail="Pacote completo conferido por hashes. Reinicie o jogo após trocar.",CanApply=true};
         var legacy=Legacy(mod);
-        if(legacy!=null&&Match(legacy,all,game))return new DensityProfileState{Id="legacy-low",Name="Baixa personalizada",Detail="Perfil local anterior reconhecido. Aplicar substitui pelo pacote oficial escolhido.",CanApply=true};
+        if(legacy!=null&&Match(legacy,all,game))return new DensityProfileState{Id="legacy-low",Version=mod.Version,Name="Baixa personalizada",Detail="Perfil local anterior reconhecido. Aplicar substitui pelo pacote oficial escolhido.",CanApply=true};
         bool absent=all.All(f=>{string p=Safe.In(game,f.Path);return !File.Exists(p)&&!Directory.Exists(p);});
         if(!absent){
             var partial=new List<string>();
@@ -99,8 +99,8 @@ public static class NightCityDensity {
         var s=new ModScan{Id=mod.Id};
         try {
             var state=Read(mod,game);
-            if(state.Partial){var files=Resolve(mod,state.Id).Files;s.Correct=files.Count(f=>File.Exists(Safe.In(game,f.Path)));s.Missing=files.Count-s.Correct;s.State="Parcial";s.Detail="Densidade: "+state.Name+". "+state.Detail;}
-            else if(Supported(state.Id)||state.Id=="legacy-low"){s.State="Instalado correto";s.Correct=Installed(mod,game).Files.Count;s.Detail="Densidade: "+state.Name+". "+state.Detail;}
+            if(state.Partial){var files=Resolve(mod,state.Id).Files;s.Correct=files.Count(f=>File.Exists(Safe.In(game,f.Path)));s.Missing=files.Count-s.Correct;s.State="Parcial";s.Detail=(String.IsNullOrEmpty(state.Version)?"Versão não identificada. ":"Versão reconhecida: "+state.Version+". ")+"Densidade: "+state.Name+". "+state.Detail;}
+            else if(Supported(state.Id)||state.Id=="legacy-low"){s.State="Instalado correto";s.Correct=Installed(mod,game).Files.Count;s.Detail=(String.IsNullOrEmpty(state.Version)?"Versão não identificada. ":"Versão reconhecida: "+state.Version+". ")+"Densidade: "+state.Name+". "+state.Detail;}
             else if(state.Id=="absent"){s.State="Não instalado";s.Missing=Default(mod).Files.Count;s.Detail="Densidade padrão: Baixa (recomendada).";}
             else{s.State="Diferente/alterado";s.Different=1;s.Detail=state.Detail;}
         }catch(IOException){s.State="Não verificável";s.Detail="Não foi possível ler a densidade com segurança.";}

@@ -256,7 +256,7 @@ public sealed partial class OnlineWindow:Form {
     FixedMod DensityMod(){return catalog.Packages.FirstOrDefault(m=>m.DensityProfiles!=null&&m.DensityProfiles.Count>0);}
     string DensityNote(FixedMod mod,string root,string note){
         if(mod.DensityProfiles==null||mod.DensityProfiles.Count==0)return note;
-        try{var current=NightCityDensity.Read(mod,root);return "Densidade atual: "+current.Name+(String.IsNullOrWhiteSpace(note)?"":" · "+note);}
+        try{var current=NightCityDensity.Read(mod,root);return "Night City Alive "+(current.Version??"(versão não identificada)")+" · Densidade atual: "+current.Name+(String.IsNullOrWhiteSpace(note)?"":" · "+note);}
         catch(IOException ex){return "Densidade não verificada: "+ex.Message;}
     }
     async void ChooseDensityProfile(){
@@ -269,7 +269,7 @@ public sealed partial class OnlineWindow:Form {
             bool read=await Run(()=>{current=NightCityDensity.Read(mod,root);return "Perfil de densidade lido. Escolha o ajuste e clique em Aplicar e instalar.";});
             if(!read)return;
             using(var f=new Form{Text="Densidade de NPCs · Night City Alive",ClientSize=new Size(740,325),StartPosition=FormStartPosition.CenterParent,Font=Font,FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false,MinimizeBox=false}){
-                var actual=new Label{Text="Perfil atual: "+current.Name,Location=new Point(18,16),Size=new Size(704,30),Font=new Font(Font,FontStyle.Bold)};
+                var actual=new Label{Text="Versão: "+(current.Version??(current.Id=="absent"?"não instalado":"não identificada"))+" · Perfil atual: "+current.Name,Location=new Point(18,16),Size=new Size(704,30),Font=new Font(Font,FontStyle.Bold)};
                 var detail=new Label{Text=current.Detail,Location=new Point(18,49),Size=new Size(704,55)};
                 var label=new Label{Text="Novo perfil",Location=new Point(18,112),AutoSize=true};
                 var choice=new ComboBox{Location=new Point(18,137),Width=345,DropDownStyle=ComboBoxStyle.DropDownList,AccessibleName="Densidade de NPCs"};

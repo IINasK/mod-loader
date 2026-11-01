@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -137,7 +137,7 @@ public static class OnlineDensityWindowTests {
                     try{
                         dialog.StartPosition=FormStartPosition.Manual;dialog.Location=new Point(-30000,-30000);
                         selected=Descendants(dialog).OfType<ComboBox>().Single().SelectedIndex;
-                        actual=Descendants(dialog).OfType<Label>().First(x=>x.Text.StartsWith("Perfil atual:")).Text;
+                        actual=Descendants(dialog).OfType<Label>().First(x=>x.Text.StartsWith("Versão:")).Text;
                         apply=Descendants(dialog).OfType<Button>().Single(x=>x.Text=="Aplicar e instalar").Text;
                         using(var bitmap=new Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(bitmap,new Rectangle(0,0,dialog.Width,dialog.Height));bitmap.Save(preview,System.Drawing.Imaging.ImageFormat.Png);}
                         captured=true;
