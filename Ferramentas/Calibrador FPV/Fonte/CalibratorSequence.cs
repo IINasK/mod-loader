@@ -26,6 +26,8 @@ public sealed class CalibratorSettings
     public bool ControlledStart = false;
     public bool RequireFocus = true;
     public double RotationThrottle = 0.35;
+    public bool ThrottleTest = false;
+    public double ThrottlePulseSeconds = 1;
 }
 
 // Pure state machine: the caller owns the clock, focus detection, recording and R3 handling.
@@ -66,6 +68,9 @@ public sealed class CalibratorSequence
         CheckRange(source.BaselineSeconds, 0.1, 2, "BaselineSeconds");
         CheckRange(source.VerticalTimeout, 2, 30, "VerticalTimeout");
         CheckRange(source.RotationThrottle, 0, 1, "RotationThrottle");
+        CheckRange(source.ThrottlePulseSeconds, 0.25, 2, "ThrottlePulseSeconds");
+        if (source.ThrottleTest && (!source.ControlledStart || source.ThrottlePulseSeconds >= source.VerticalTimeout))
+            throw new ArgumentException("O teste de aceleração exige preparação controlada e tempo para a queda.");
         if (source.Repetitions < 1 || source.Repetitions > 3)
             throw new ArgumentOutOfRangeException("Repetitions", "Use de 1 a 3 repetições.");
         settings = new CalibratorSettings {
@@ -73,14 +78,24 @@ public sealed class CalibratorSequence
             PulseSeconds = source.PulseSeconds, BaselineSeconds = source.BaselineSeconds,
             VerticalTimeout = source.VerticalTimeout, Repetitions = source.Repetitions,
             AllRates = source.AllRates, ControlledStart = source.ControlledStart, RequireFocus = source.RequireFocus,
-            RotationThrottle = source.RotationThrottle
+            RotationThrottle = source.RotationThrottle, ThrottleTest = source.ThrottleTest,
+            ThrottlePulseSeconds = source.ThrottlePulseSeconds
         };
-        if (settings.VerticalTest)
-            steps.Add(new Step { Axis = "vertical", Percent = 100, Repetition = 1 });
-        foreach (string axis in new string[] { "yaw", "roll", "pitch" })
-            for (int percent = settings.AllRates ? 25 : 100; percent <= 100; percent += 25)
+        if (settings.ThrottleTest)
+        {
+            for (int percent = 25; percent <= 75; percent += 25)
                 for (int repetition = 1; repetition <= settings.Repetitions; repetition++)
-                    steps.Add(new Step { Axis = axis, Percent = percent, Repetition = repetition });
+                    steps.Add(new Step { Axis = "throttle", Percent = percent, Repetition = repetition });
+        }
+        else
+        {
+            if (settings.VerticalTest)
+                steps.Add(new Step { Axis = "vertical", Percent = 100, Repetition = 1 });
+            foreach (string axis in new string[] { "yaw", "roll", "pitch" })
+                for (int percent = settings.AllRates ? 25 : 100; percent <= 100; percent += 25)
+                    for (int repetition = 1; repetition <= settings.Repetitions; repetition++)
+                        steps.Add(new Step { Axis = axis, Percent = percent, Repetition = repetition });
+        }
         State = "Idle";
         Status = "Pronto para iniciar. Reposicionar, ARM manual e estabilizar antes de confirmar.";
         ClipName = "";
@@ -120,12 +135,12 @@ public sealed class CalibratorSequence
                 Status = "Preparação: focar o jogo em 3 segundos. ARM permanece manual.";
             }
         }
-        else if (State == "RunningVertical")
+        else if (State == "RunningVertical" || State == "RunningThrottle")
         {
             double elapsed = now - runningStart;
             if (elapsed >= settings.VerticalTimeout)
-                Abort("Tempo limite do teste vertical. Reposicionar e reiniciar manualmente.");
-            else if (elapsed >= settings.ClimbSeconds)
+                Abort("Tempo limite da queda. Reposicionar e reiniciar manualmente.");
+            else if (elapsed >= (settings.ThrottleTest ? settings.ThrottlePulseSeconds : settings.ClimbSeconds))
                 FinishStep();
         }
     }
@@ -147,7 +162,7 @@ public sealed class CalibratorSequence
                 return output;
             }
             runningStart = now;
-            State = steps[position].Axis == "vertical" ? "RunningVertical" : "RunningRotation";
+            State = settings.ThrottleTest ? "RunningThrottle" : steps[position].Axis == "vertical" ? "RunningVertical" : "RunningRotation";
             Recording = true;
         }
         if (State == "Countdown")
@@ -161,17 +176,26 @@ public sealed class CalibratorSequence
             if (settings.RequireFocus && !foregroundOk) { Abort("Jogo sem foco ao terminar a contagem."); return output; }
             // Start on the actual first output tick so a delayed caller never skips the climb.
             runningStart = now;
-            State = steps[position].Axis == "vertical" ? "RunningVertical" : "RunningRotation";
+            State = settings.ThrottleTest ? "RunningThrottle" : steps[position].Axis == "vertical" ? "RunningVertical" : "RunningRotation";
             Recording = true;
         }
-        if (State != "RunningVertical" && State != "RunningRotation") return output;
+        if (State != "RunningVertical" && State != "RunningRotation" && State != "RunningThrottle") return output;
         if (settings.RequireFocus && !foregroundOk) { Abort("Jogo perdeu o foco. Sequência interrompida."); return output; }
 
         double elapsed = now - runningStart;
         Step step = steps[position];
-        if (State == "RunningVertical" && elapsed >= settings.VerticalTimeout)
+        if ((State == "RunningVertical" || State == "RunningThrottle") && elapsed >= settings.VerticalTimeout)
         {
-            Abort("Tempo limite do teste vertical. Reposicionar e reiniciar manualmente.");
+            Abort("Tempo limite da queda. Reposicionar e reiniciar manualmente.");
+            return output;
+        }
+        if (State == "RunningThrottle")
+        {
+            // No full-power lift first: it would contaminate the throttle response measurement.
+            output.Throttle = elapsed < settings.ThrottlePulseSeconds ? step.Percent / 100.0 : 0;
+            Status = elapsed < settings.ThrottlePulseSeconds ?
+                "Gravando: aceleração " + step.Percent + "% por " + settings.ThrottlePulseSeconds.ToString("0.##", CultureInfo.CurrentCulture) + " s; eixos neutros." :
+                "Gravando: potência zero. F10 após tocar o chão; se não decolou, confirme agora. Depois resete a posição.";
             return output;
         }
         double pulseStart = settings.ClimbSeconds + settings.BaselineSeconds;
@@ -265,7 +289,7 @@ public sealed class CalibratorSequence
     private string StepDescription()
     {
         Step step = steps[position];
-        return step.Axis + " " + step.Percent + "% (repetição " + step.Repetition + ")";
+        return (step.Axis == "throttle" ? "aceleração" : step.Axis) + " " + step.Percent + "% (repetição " + step.Repetition + ")";
     }
 
     private static bool Finite(double value) { return !Double.IsNaN(value) && !Double.IsInfinity(value); }
@@ -431,7 +455,76 @@ public sealed class CalibratorSequence
         }
         ControlledStartTests(ref checks);
         FocusDisabledTests(ref checks);
+        ThrottleTests(ref checks);
         return checks;
+    }
+
+    private static void ThrottleTests(ref int checks)
+    {
+        var physical = new ControlSample { Throttle = 1, Yaw = -1, Roll = 1, Pitch = -1,
+            Buttons = 0xFFFF, LeftTrigger = 255, RightTrigger = 255, ContinuePressed = true };
+        var source = new CalibratorSettings { ThrottleTest = true, ControlledStart = true,
+            RequireFocus = false, Repetitions = 2, ThrottlePulseSeconds = 1 };
+        var sequence = new CalibratorSequence(source);
+        source.ThrottlePulseSeconds = 2;
+        source.ThrottleTest = false;
+        sequence.Start(0);
+        Assert(ref checks, sequence.StepCount == 6 && IsNeutral(sequence.Tick(0, physical, false)), "Throttle mode schedules only three powers with requested repetitions and starts neutral.");
+        var names = new HashSet<string>();
+        for (int i = 0; i < 6; i++)
+        {
+            double now = i * 10;
+            double expected = (i / 2 + 1) * 0.25;
+            Assert(ref checks, names.Add(sequence.ClipName) && sequence.ClipName.StartsWith("throttle_") && AsciiClip(sequence.ClipName), "Throttle clips have unique identifiable names.");
+            sequence.Confirm(now, physical);
+            Assert(ref checks, IsNeutral(sequence.Tick(now + 0.999, physical, false)), "Throttle mode begins with one second of zero, not a launch boost.");
+            var sample = sequence.Tick(now + 1, physical, false);
+            Assert(ref checks, sequence.State == "RunningThrottle" && sequence.Recording && sample.Throttle == expected && NeutralAxesAndButtons(sample), "Throttle pulse uses requested power only, without physical axes, buttons, triggers or ARM.");
+            sequence.Confirm(now + 1.5, physical);
+            sample = sequence.Tick(now + 1.999, physical, false);
+            Assert(ref checks, sequence.Recording && sample.Throttle == expected && NeutralAxesAndButtons(sample), "Early F10 cannot shorten the pulse; settings were copied.");
+            sample = sequence.Tick(now + 2, physical, false);
+            Assert(ref checks, IsNeutral(sample) && sequence.Recording, "At pulse end power is cut but video continues.");
+            sample = sequence.Tick(now + 3, physical, false);
+            Assert(ref checks, IsNeutral(sample) && sequence.StepIndex == i + 1 && sequence.Recording, "Fall waits for manual observation, not automatic impact detection.");
+            sequence.Confirm(now + 3, physical);
+            Assert(ref checks, IsNeutral(sequence.Tick(now + 3, physical, false)) && !sequence.Recording, "Confirming after pulse ends clip at zero.");
+        }
+        Assert(ref checks, sequence.Complete && sequence.StepCount == 6, "Throttle series ends without rotation or 100 percent tests.");
+        sequence.Start(100);
+        sequence.Confirm(100, physical);
+        sequence.Tick(101, physical, false);
+        Assert(ref checks, IsNeutral(sequence.Tick(121, physical, false)) && sequence.State == "Aborted" && !sequence.Recording, "Fall timeout stops at zero.");
+        sequence.Start(130);
+        sequence.Confirm(130, physical);
+        sequence.Tick(131, physical, false);
+        sequence.Abort("F11");
+        Assert(ref checks, IsNeutral(sequence.Tick(131.1, physical, false)) && !sequence.Recording, "Emergency stop removes throttle immediately.");
+        sequence.Start(140);
+        sequence.Confirm(140, physical);
+        Assert(ref checks, IsNeutral(sequence.Tick(141, null, false)) && sequence.State == "Aborted", "Physical disconnect stops the throttle test.");
+        foreach (double value in new[] { Double.NaN, Double.PositiveInfinity, 0.24, 2.01 })
+        {
+            bool rejected = false;
+            try { new CalibratorSequence(new CalibratorSettings { ThrottlePulseSeconds = value }); }
+            catch (ArgumentOutOfRangeException) { rejected = true; }
+            Assert(ref checks, rejected, "Throttle duration is finite and bounded.");
+        }
+        bool invalidMode = false;
+        try { new CalibratorSequence(new CalibratorSettings { ThrottleTest = true }); }
+        catch (ArgumentException) { invalidMode = true; }
+        Assert(ref checks, invalidMode, "Throttle test cannot use uncontrolled physical passthrough.");
+        invalidMode = false;
+        try { new CalibratorSequence(new CalibratorSettings { ThrottleTest = true, ControlledStart = true, ThrottlePulseSeconds = 2, VerticalTimeout = 2 }); }
+        catch (ArgumentException) { invalidMode = true; }
+        Assert(ref checks, invalidMode, "Throttle test requires a remaining fall window.");
+        sequence.Start(150);
+        sequence.Confirm(150, physical);
+        var delayed = sequence.Tick(155, physical, false);
+        Assert(ref checks, delayed.Throttle == 0.25 && NeutralAxesAndButtons(delayed) && sequence.Recording,
+            "A late preparation tick still starts the requested pulse, never a 100 percent boost.");
+        Assert(ref checks, sequence.Tick(155.999, physical, false).Throttle == 0.25 &&
+            IsNeutral(sequence.Tick(156, physical, false)), "The complete pulse lasts from its actual first output tick.");
     }
 
     private static void ControlledStartTests(ref int checks)

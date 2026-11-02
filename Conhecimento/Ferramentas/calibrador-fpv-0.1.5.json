@@ -1,0 +1,20 @@
+{
+  "Version": "0.1.5",
+  "Artifact": "Calibrador FPV 0.1.5.exe",
+  "Bytes": 2739712,
+  "SHA256": "10F385B11F166E80D8C6D7F5D3F042D2626B0FD45B66E47440FC05F44C6BEE82",
+  "Assertions": 398,
+  "BaselineAssertions": 340,
+  "ThrottleLevels": [
+    25,
+    50,
+    75
+  ],
+  "DefaultPulseSeconds": 1,
+  "DefaultRepetitions": 1,
+  "RotationModePreserved": true,
+  "RuntimeHardwareUsed": false,
+  "VirtualCreated": false,
+  "GameFilesWritten": false,
+  "LiveFlightValidated": false
+}
