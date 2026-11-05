@@ -116,5 +116,17 @@
     "Safe.In relative paths require forward slashes; DataPath fixed.",
     "Home column exceeded window width after resize; percentage column and bounds checks added."
   ],
-  "LiveReleaseVerification": "To be recorded locally after publication."
+  "LiveReleaseVerification": {
+    "AnonymousRequest": true,
+    "Runtime": "Windows PowerShell 5.1 / .NET Framework",
+    "UsedPublished116Checker": true,
+    "AvailableToVersion116": "1.1.7",
+    "Version117DoesNotNotifyItself": true,
+    "ReleasePage": "https://github.com/IINasK/mod-loader/releases/tag/v1.1.7",
+    "DownloadUrl": "https://github.com/IINasK/mod-loader/releases/download/v1.1.7/Mod-Loader-1.1.7.exe",
+    "DownloadBytes": 7288832,
+    "DownloadedSha256": "7AF64716A2F3D19D30CC85BAF89BADF0F577BC1A92E4FBD4335D2144981E03B5",
+    "DownloadedExecutableWasRun": false,
+    "TempDownloadRemoved": true
+  }
 }
