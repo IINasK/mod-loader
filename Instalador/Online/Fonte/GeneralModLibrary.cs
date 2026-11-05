@@ -17,6 +17,7 @@ public sealed class GeneralModList {
 public sealed class GeneralModPreset {
     public string Id, Name;
     public List<string> ModIds = new List<string>();
+    public List<string> Categories = new List<string>();
 }
 
 public sealed class GeneralModEntry {
@@ -94,6 +95,7 @@ public sealed class GeneralModLibrary {
             mod.Category = null;
         list.Categories.Remove(existing);
         list.CategoryDescriptions.Remove(existing);
+        foreach (var preset in list.Presets) preset.Categories.RemoveAll(item => String.Equals(item, existing, StringComparison.OrdinalIgnoreCase));
     }
 
     public GeneralModList Import(string path) {
@@ -251,6 +253,12 @@ public sealed class GeneralModLibrary {
             if (preset == null || !ValidId(preset.Id) || !presetIds.Add(preset.Id) || preset.ModIds == null || preset.ModIds.Count > 1000)
                 throw new IOException("A lista contém um preset inválido ou repetido.");
             preset.Name = RequiredText(preset.Name, 300, "Nome do preset");
+            if (preset.Categories == null) preset.Categories = new List<string>();
+            if (preset.Categories.Count > 1000) throw new IOException("O preset contém categorias demais.");
+            var groups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string category in preset.Categories)
+                if (category == null || !list.Categories.Contains(category, StringComparer.OrdinalIgnoreCase) || !groups.Add(category))
+                    throw new IOException("O preset contém uma categoria desconhecida ou repetida.");
             var members = new HashSet<string>(StringComparer.Ordinal);
             foreach (string id in preset.ModIds)
                 if (id == null || !ids.Contains(id) || !members.Add(id)) throw new IOException("O preset contém um mod desconhecido ou repetido.");

@@ -370,7 +370,8 @@ internal sealed class GeneralPresetEditor : GeneralDialog {
         var save = GeneralStyle.Button(GeneralStyle.T("Salvar", "Save"), () => {
             Result = new GeneralModPreset {
                 Id = preset == null ? Guid.NewGuid().ToString("N") : preset.Id,
-                Name = name.Text.Trim(), ModIds = choices.CheckedIndices.Cast<int>().Select(index => entries[index].Id).ToList()
+                Name = name.Text.Trim(), ModIds = choices.CheckedIndices.Cast<int>().Select(index => entries[index].Id).ToList(),
+                Categories = preset == null ? new List<string>() : new List<string>(preset.Categories)
             };
             DialogResult = DialogResult.OK;
         }, true);

@@ -79,11 +79,17 @@ internal sealed partial class GeneralModWindow {
                     GeneralModLibrary.DeleteCategory(state.List,category);ResetColumnFilters();Persist();DrawRows();return;
                 }
                 string renamed=dialog.ResultName;
+                string existing=state.List.Categories.FirstOrDefault(c=>String.Equals(c,renamed,StringComparison.OrdinalIgnoreCase));
+                if(create&&existing!=null&&ActivePreset!=null){
+                    if(!ActivePreset.Categories.Contains(existing,StringComparer.OrdinalIgnoreCase))ActivePreset.Categories.Add(existing);
+                    if(categoryFilters!=null)categoryFilters.Add(existing);Persist();DrawRows();return;
+                }
                 if(state.List.Categories.Any(c=>!String.Equals(c,category,StringComparison.OrdinalIgnoreCase)&&String.Equals(c,renamed,StringComparison.OrdinalIgnoreCase)))throw new IOException(T("Já existe uma categoria com esse nome.","A category with this name already exists."));
-                if(create){state.List.Categories.Add(renamed);state.List.CategoryDescriptions[renamed]=dialog.ResultDescription;}
+                if(create){state.List.Categories.Add(renamed);state.List.CategoryDescriptions[renamed]=dialog.ResultDescription;if(ActivePreset!=null)ActivePreset.Categories.Add(renamed);}
                 else if(category==null){state.List.UncategorizedName=renamed;state.List.UncategorizedDescription=dialog.ResultDescription;}
                 else{
                     state.List.Categories[state.List.Categories.IndexOf(category)]=renamed;
+                    foreach(var item in state.List.Presets)for(int i=0;i<item.Categories.Count;i++)if(String.Equals(item.Categories[i],category,StringComparison.OrdinalIgnoreCase))item.Categories[i]=renamed;
                     foreach(var mod in state.List.Mods.Where(m=>String.Equals(m.Category,category,StringComparison.OrdinalIgnoreCase)))mod.Category=renamed;
                     state.List.CategoryDescriptions.Remove(category);state.List.CategoryDescriptions[renamed]=dialog.ResultDescription;
                 }

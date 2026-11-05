@@ -1,0 +1,90 @@
+{
+  "Version": "1.1.6",
+  "BasedOn": "1.1.5",
+  "Passed": true,
+  "ExecutableSha256": "727A8321C82FE3AABFE62F0F85194D9DBC4F7BC63B8E6E24A8108D7C13539F7A",
+  "ExecutableBytes": 7211520,
+  "CatalogSha256": "89c68e6bdb8c192977fcace5d30a4b8b25912d8780fd6067f77f5c7d41c6dc05",
+  "Checks": 988,
+  "Reports": 16,
+  "Results": [
+    {
+      "Report": "resultado-loader-geral.json",
+      "Checks": 25
+    },
+    {
+      "Report": "resultado-pintura-botoes.json",
+      "Checks": 24
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 24
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 36
+    },
+    {
+      "Report": "resultado-category-delete.json",
+      "Checks": 16
+    },
+    {
+      "Report": "resultado-floating.json",
+      "Checks": 30
+    },
+    {
+      "Report": "resultado-progresso-geral.json",
+      "Checks": 27
+    },
+    {
+      "Report": "resultado-status-presentation.json",
+      "Checks": 46
+    },
+    {
+      "Report": "resultado-p2p.json",
+      "Checks": 45
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Checks": 552
+    },
+    {
+      "Report": "resultado-preset-clean.json",
+      "Checks": 24
+    },
+    {
+      "Report": "resultado-redesign.json",
+      "Checks": 28
+    },
+    {
+      "Report": "resultado-snapshot.json",
+      "Checks": 44
+    },
+    {
+      "Report": "resultado-table-dialogs.json",
+      "Checks": 14
+    },
+    {
+      "Report": "resultado-ui-v2.json",
+      "Checks": 28
+    },
+    {
+      "Report": "resultado-updates.json",
+      "Checks": 25
+    }
+  ],
+  "TestScope": "General suite including installer, library, queue, UI, filters, P2P, installed snapshots, new preset isolation and updater",
+  "RealGameTouched": false,
+  "TestNetworkUsed": false,
+  "PublicRepository": "https://github.com/IINasK/mod-loader",
+  "PublicityAuthorized": true,
+  "Audit": {
+    "Commits": 26,
+    "Blobs": 561,
+    "DownloadedModsOrSavesTracked": false,
+    "CredentialPatternFindings": 0,
+    "HistoricalLocalPathsDisclosed": true
+  },
+  "InitialFailure": "Self-test invoked from distribution root could not find build-only FixtureGame.exe; repeated with hash-identical Program executable in build layout.",
+  "LiveReleaseVerification": "Recorded locally after publication; do not interpret fixture tests as an internet download test."
+}

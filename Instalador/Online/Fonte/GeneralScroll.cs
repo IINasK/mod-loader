@@ -63,7 +63,10 @@ internal sealed class GeneralScrollView : Panel {
         try{
             int total=0,page=1,value=0;
             var grid=content as DataGridView;var list=content as ListBox;var text=content as TextBox;
-            if(grid!=null){total=grid.RowCount;page=Math.Max(1,grid.DisplayedRowCount(false));value=Math.Max(0,grid.FirstDisplayedScrollingRowIndex);}
+            if(grid!=null){
+                total=grid.RowCount;page=Math.Max(1,grid.DisplayedRowCount(false));value=Math.Max(0,grid.FirstDisplayedScrollingRowIndex);
+                if(grid.Rows.GetRowsHeight(DataGridViewElementStates.Visible)<=grid.ClientSize.Height-grid.ColumnHeadersHeight)page=Math.Max(1,total);
+            }
             else if(list!=null){total=list.Items.Count;page=Math.Max(1,list.ClientSize.Height/Math.Max(1,list.ItemHeight));value=list.TopIndex;}
             else if(text!=null&&text.Multiline){total=(int)SendMessage(text.Handle,0x00ba,IntPtr.Zero,IntPtr.Zero);page=Math.Max(1,text.ClientSize.Height/Math.Max(1,text.Font.Height));value=(int)SendMessage(text.Handle,0x00ce,IntPtr.Zero,IntPtr.Zero);}
             bar.Configure(total,page,value);bool visible=total>page;if(bar.Visible!=visible){bar.Visible=visible;PerformLayout();}

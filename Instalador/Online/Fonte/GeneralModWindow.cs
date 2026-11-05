@@ -63,14 +63,14 @@ internal sealed partial class GeneralModWindow : Form {
         }
         if(String.IsNullOrWhiteSpace(state.DownloadFolder))state.DownloadFolder=OnlineDownloadWatch.DefaultFolder();
         if(state.SelectedPreset==null&&state.List.Presets.Any(p=>p.Id=="all"))state.SelectedPreset="all";
-        Text="Mod Loader 1.1.5";ClientSize=new Size(1240,820);MinimumSize=new Size(1000,680);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
+        Text="Mod Loader "+GeneralUpdateChecker.CurrentVersion;ClientSize=new Size(1240,820);MinimumSize=new Size(1000,680);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
         BuildInterface();
         FormClosing+=(s,e)=>{
             if(p2p!=null&&p2p.Installing){e.Cancel=true;detail.Text=T("Aguarde a instalação do pacote recebido terminar antes de fechar.","Wait for the received pack installation to finish before closing.");return;}
             if(working){RequestSkip();normal.Clear();priority.Clear();e.Cancel=true;detail.Text=T("Aguarde a operação atual terminar antes de fechar.","Wait for the current operation to finish before closing.");}
             else if(scanning){RequestSkip();e.Cancel=true;}
         };
-        if(fixture==null)Shown+=async(s,e)=>await Scan();
+        if(fixture==null)Shown+=async(s,e)=>{CheckUpdatesOnStartup();await Scan();};
     }
     void BuildInterface(){
         GeneralStyle.Dark=state.Theme=="dark";GeneralStyle.Language=state.Language??"pt";
@@ -102,12 +102,17 @@ internal sealed partial class GeneralModWindow : Form {
         reloadButton=IconButton("refresh",T("Atualizar lista","Refresh list"),async()=>await Scan(),true);((GeneralButton)reloadButton).Bare=true;filters.Controls.Add(reloadButton);
         var summary=Flow();summary.Margin=new Padding(0,0,0,12);layout.Controls.Add(summary,0,3);
         counts=new Label{AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=Padding.Empty};summary.Controls.Add(counts);
+        AddUpdateNotice(summary);
         var tableHeading=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,Height=52,Margin=Padding.Empty,Padding=new Padding(14,4,0,4),BackColor=GeneralStyle.Surface};
         tableHeading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));tableHeading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));tableHeading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         tableName=new TextBox{Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,Font=GeneralStyle.Font(16,true),MaxLength=120,Margin=new Padding(0,8,12,0),BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground};
         tableName.Leave+=(s,e)=>Guard(SaveTableTitle);tableName.KeyDown+=(s,e)=>{if(e.KeyCode==Keys.Enter){e.SuppressKeyPress=true;Guard(SaveTableTitle);}};
         tableHeading.Controls.Add(tableName,0,0);presetSettings=IconButton("settings",T("Configurar preset","Preset settings"),ShowPresetSettings,true);((GeneralButton)presetSettings).Bare=true;presetSettings.Margin=Padding.Empty;tableHeading.Controls.Add(presetSettings,1,0);
-        tableHeading.Controls.Add(reloadButton,2,0);layout.Controls.Add(tableHeading,0,4);
+        tableHeading.Controls.Add(reloadButton,2,0);
+        var tableTitle=new Panel{Dock=DockStyle.Fill,Height=64,Margin=Padding.Empty,Padding=new Padding(0,0,0,12),BackColor=GeneralStyle.Surface,Name="PresetHeading"};
+        tableTitle.Controls.Add(tableHeading);
+        tableTitle.Paint+=(s,e)=>{using(var pen=new Pen(GeneralStyle.Line))e.Graphics.DrawLine(pen,16,tableTitle.Height-6,tableTitle.Width-17,tableTitle.Height-6);};
+        layout.Controls.Add(tableTitle,0,4);
         grid=new DataGridView{Dock=DockStyle.Fill,AllowUserToAddRows=false,AllowUserToDeleteRows=false,AllowUserToResizeRows=false,AllowUserToResizeColumns=false,
             RowHeadersVisible=false,SelectionMode=DataGridViewSelectionMode.FullRowSelect,MultiSelect=false,BackgroundColor=GeneralStyle.Surface,BorderStyle=BorderStyle.None,
             CellBorderStyle=DataGridViewCellBorderStyle.None,ColumnHeadersBorderStyle=DataGridViewHeaderBorderStyle.None,AutoGenerateColumns=false,EnableHeadersVisualStyles=false,
@@ -199,7 +204,7 @@ internal sealed partial class GeneralModWindow : Form {
         if(grid==null)return;string old=grid.CurrentRow==null?null:grid.CurrentRow.Tag as string;
         int scroll=grid.FirstDisplayedScrollingRowIndex;drawing=true;hoveredRow=-1;grid.Rows.Clear();
         var visible=VisibleMods();var groups=new List<string>();
-        groups.Add(null);groups.AddRange(state.List.Categories);
+        groups.Add(null);groups.AddRange(PresetCategories());
         if(categoryFilters!=null)groups=groups.Where(category=>categoryFilters.Contains(category??"")).ToList();
         if(variantFilters!=null||statusFilters!=null||!String.IsNullOrWhiteSpace(nameFilter))groups=groups.Where(category=>visible.Any(mod=>String.Equals(mod.Category,category,StringComparison.OrdinalIgnoreCase)||String.IsNullOrEmpty(mod.Category)&&category==null)).ToList();
         foreach(var category in groups){
@@ -314,7 +319,7 @@ internal sealed partial class GeneralModWindow : Form {
             bool existing=state.List.Mods.Contains(item);var selected=Selected(item);
             string info=T("Destino: ","Destination: ")+(state.Destination??T("Escolha uma pasta na tela principal.","Choose a folder on the main screen."));
             var recipe=catalog.Packages.FirstOrDefault(m=>m.Id==selected.CyberpunkId);if(recipe!=null)info=T("Versão do pacote: ","Package version: ")+recipe.Version+"   ·   "+info;
-            using(var dialog=new GeneralModEditor(item,state.List.Categories,selected.Id,!working||current!=null,info)){
+            using(var dialog=new GeneralModEditor(item,PresetCategories(),selected.Id,!working||current!=null,info)){
                 if(dialog.ShowDialog(this)!=DialogResult.OK)return;
                 ApplyEdited(item,dialog.Result,dialog.SelectedVariant,existing);DrawRows();
                 if(dialog.InstallRequested)Enqueue(new[]{MakeWork(dialog.Result)},true);else if(!working)await Scan();
@@ -353,7 +358,7 @@ internal sealed partial class GeneralModWindow : Form {
                 var target=current;string source=paths[0];
                 var added=NewEntry(Path.GetFileNameWithoutExtension(source),source);added.Category=DefaultCategory;
                 editingAttachment=true;
-                try{using(var editor=new GeneralModEditor(added,state.List.Categories,added.DefaultVariant,true,T("Adicione este mod ou associe o arquivo ao download atual.","Add this mod or attach its file to the current download."))){
+                try{using(var editor=new GeneralModEditor(added,PresetCategories(),added.DefaultVariant,true,T("Adicione este mod ou associe o arquivo ao download atual.","Add this mod or attach its file to the current download."))){
                     editor.OfferAttachment(target.Entry);
                     if(editor.ShowDialog(this)!=DialogResult.OK)return;
                     if(editor.AttachRequested){

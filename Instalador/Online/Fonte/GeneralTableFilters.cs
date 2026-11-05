@@ -10,6 +10,12 @@ internal sealed partial class GeneralModWindow {
     TextBox tableName;
     Button presetSettings;
     GeneralModPreset ActivePreset {get{return state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);}}
+    IEnumerable<string> PresetCategories(){
+        var active=ActivePreset;
+        if(active==null)return state.List.Categories;
+        var used=new HashSet<string>(state.List.Mods.Where(mod=>active.ModIds.Contains(mod.Id)).Select(mod=>mod.Category),StringComparer.OrdinalIgnoreCase);
+        return state.List.Categories.Where(category=>used.Contains(category)||active.Categories.Contains(category,StringComparer.OrdinalIgnoreCase));
+    }
     string DefaultCategory {get{return categoryFilters!=null&&categoryFilters.Count==1?categoryFilters.Single():null;}}
     void ResetColumnFilters(){categoryFilters=variantFilters=statusFilters=null;nameFilter="";}
     static string StatusFilterKey(string value){return value=="Não baixado"||value=="Not downloaded"?"pending":value=="Baixando"||value=="Downloading"?"active":value=="Download concluído"||value=="Download complete"?"complete":"error";}
@@ -23,7 +29,7 @@ internal sealed partial class GeneralModWindow {
     void ShowColumnFilter(int column){
         if(column<1||column>3)return;
         string uncat=UncatName();
-        var values=column==1?new[]{uncat}.Concat(state.List.Categories).ToList():column==2?state.List.Mods.Select(mod=>Selected(mod).Name).Distinct().OrderBy(value=>value).ToList():
+        var values=column==1?new[]{uncat}.Concat(PresetCategories()).ToList():column==2?state.List.Mods.Select(mod=>Selected(mod).Name).Distinct().OrderBy(value=>value).ToList():
             new[]{T("Não baixado","Not downloaded"),T("Baixando","Downloading"),T("Download concluído","Download complete"),T("Falha","Failed")}.ToList();
         var current=column==1?categoryFilters:column==2?variantFilters:statusFilters;
         IEnumerable<string> selected=current==null?null:column==3?values.Where(value=>current.Any(item=>StatusFilterKey(item)==StatusFilterKey(value))):current.Select(value=>column==1&&value==""?uncat:value);
@@ -70,6 +76,6 @@ internal sealed partial class GeneralModWindow {
         var selected=ActivePreset;
         if(selected==null){ResetColumnFilters();marked.Clear();DrawRows();return;}
         if(GeneralDialog.Message(this,T("Esvaziar este preset? Isso não desinstala mods nem apaga seus arquivos.","Empty this preset? This does not uninstall mods or delete their files."),T("Limpar preset","Clear preset"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-        selected.ModIds.Clear();marked.Clear();ResetColumnFilters();Persist();DrawRows();
+        selected.ModIds.Clear();selected.Categories.Clear();marked.Clear();ResetColumnFilters();Persist();DrawRows();
     }
 }

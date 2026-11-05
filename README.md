@@ -1,8 +1,10 @@
-# Mod Loader Cyberpunk coop
+# Mod Loader
 
-Repositório privado: [IINasK/mod-loader-cyberpunk-coop](https://github.com/IINasK/mod-loader-cyberpunk-coop).
+Repositório público: [IINasK/mod-loader](https://github.com/IINasK/mod-loader). [Baixar o executável mais recente](https://github.com/IINasK/mod-loader/releases/latest).
 
-Mod Loader geral para Windows, com listas/presets/categorias editáveis e pacote fixado de Cyberpunk2077 2.5. Mantém downloads oficiais, identificação por SHA256, monitor da pasta Downloads, backup e desfazer. O usuário conclui os downloads gratuitos Manual/Slow no Nexus; o aplicativo confere o arquivo original e continua a fila autorizada.
+Gerenciador de mods para Windows, com listas, presets e categorias definidos pelo usuário. Cyberpunk2077 2.5 é um pacote incluído; outros jogos podem ter suas próprias listas e destinos. Mantém downloads oficiais, identificação por SHA256, monitor da pasta Downloads, backup e desfazer. O usuário conclui os downloads gratuitos Manual/Slow no Nexus; o aplicativo confere o arquivo original e continua a fila autorizada. Receitas específicas e verificações de versão do pacote Cyberpunk não são inferidas para outros jogos.
+
+A versão1.1.6 consulta as Releases deste repositório uma vez por abertura, em segundo plano e sem login. Se existir uma versão estável mais nova com executável publicado, aparece um aviso para abrir a página oficial de download. Não troca nem executa programas automaticamente. Falta de internet não impede o uso. Presets novos não herdam categorias vazias do pacote; grupos que o usuário criar persistem e acompanham a lista exportada. O título da tabela tem um separador mais visível nos dois temas. Consulte [presets e atualizações](Conhecimento/Atualizacoes-e-presets-1.1.6.md).
 
 A versão1.1.5 oferece **Compartilhar P2P > Exportar mods instalados**: um ZIP temporário com os arquivos do preset identificados no jogo, dependências e configurações permitidas. Funciona depois de excluir os downloads originais. O destinatário autoriza a pasta local, recebe, confere e instala automaticamente; os ZIPs são removidos após sucesso, sem cache permanente do pacote. Registros e backups locais permitem reconhecer, remover e reexportar os mods instalados. Não sincroniza a pasta inteira do jogo, saves ou contas. Consulte [uso e limites atuais](Conhecimento/Pacotes-instalados-1.1.5.md), [motor P2P e fontes](Conhecimento/Compartilhamento-P2P-1.1.4.md) e [interface1.1.3](Conhecimento/Interface-1.1.3.md).
 
@@ -11,7 +13,7 @@ A versão1.1.5 oferece **Compartilhar P2P > Exportar mods instalados**: um ZIP t
 - `Instalador/Online/Fonte`: interface, catálogo, downloads, importação e testes.
 - `Instalador/Fonte`: motor compartilhado, validação de caminhos, backup e fixtures.
 - `Instalador/Online/Programa/catalogo.json`: receitas e fontes fixadas; não contém os mods.
-- `Conhecimento/INDICE.md` e `Conhecimento/mods.json`: fichas dos95componentes, função, uso, dependências, versões e evidências de compatibilidade.
+- `Conhecimento/INDICE.md` e `Conhecimento/mods.json`: fichas dos138componentes do pacote Cyberpunk, função, uso, dependências, versões e evidências de compatibilidade;135entradas visíveis.
 - `AGENTS.md`: histórico das decisões do projeto. As instruções antigas foram revogadas pelo usuário; as referências às auditorias locais não implicam inclusão dessas pastas no Git.
 
 Os perfis Com/Sem Phantom Liberty usam a auditoria das dependências diretas e transitivas. Evidência documental/estática não substitui teste em um jogo semDLC. O FAQ do NightCoop permite jogar sem a expansão; saves que dependem dela não abrem nesse modo. Trocar a lista do instalador não apaga arquivos existentes nem desliga a expansão por conta própria.
@@ -44,7 +46,7 @@ Os scripts históricos de remontagem do catálogo a partir dos pacotes baixados 
 
 Os testes rodam apenas em fixtures, com base inerte e navegação simulada. O modo `--self-test` exige um perfilWindows funcional para os recibos DPAPI e uma raiz curta de testes. Nunca execute fixtures como jogo ou confunda hashes válidos com sincronização emcoop.
 
-Preservar RED4ext1.31.0 e a base NightCoop de cinco arquivos; não atualizar dependências silenciosamente. BMW/Yamaha permanecem retidos pelas falhas reproduzidas. Arquivos desconhecidos não recebem instalação genérica.
+No pacote Cyberpunk, preservar RED4ext1.31.0 e a base NightCoop de cinco arquivos; não atualizar dependências silenciosamente. Componentes retidos continuam registrados nas fichas. Mods personalizados usam arquivos e destinos explícitos, validação de caminhos e recibos próprios; o gerenciador não deduz requisitos de jogos desconhecidos.
 
 ## Conteúdo excluído
 

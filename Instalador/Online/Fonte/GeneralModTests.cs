@@ -108,6 +108,7 @@ internal sealed partial class GeneralModWindow {
         InstalledSnapshotTests.Run(root);InstalledSnapshotInstallerTests.Run(root);
         GeneralStatusPresentationTests.Run(root);
         RunFloatingTests(root);GeneralCategoryDeleteTests.Run(root);GeneralTableDialogTests.Run(root);RunRedesignTests(root);
+        GeneralUpdatesTests.Run(root);RunPresetIsolationTests(root);
         Safe.WriteJson(Path.Combine(root,"resultado-loader-geral.json"),new{Passed=true,Tests=checks,ArchiveChecks=archiveChecks,LibraryChecks=libraryChecks,RealGameTouched=false,NetworkUsed=false});
     }
     static string TestZip(string root,string name,string entry,string contents){
