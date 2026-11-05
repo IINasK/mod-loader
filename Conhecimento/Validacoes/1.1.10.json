@@ -105,5 +105,19 @@
     "Real game installation or gameplay",
     "P2P transfer between real PCs",
     "Previously reported rectangular selection defect"
-  ]
+  ],
+  "SourceCommit": "f36f122ea33084bd548e93c821a3f113b55d79a3",
+  "LiveReleaseVerification": {
+    "AnonymousRequest": true,
+    "Runtime": "Windows PowerShell 5.1 / .NET Framework",
+    "UsedPublished118Checker": true,
+    "AvailableToVersion118": "1.1.10",
+    "Version110DoesNotNotifyItself": true,
+    "ReleasePage": "https://github.com/IINasK/mod-loader/releases/tag/v1.1.10",
+    "DownloadUrl": "https://github.com/IINasK/mod-loader/releases/download/v1.1.10/Mod-Loader-1.1.10.exe",
+    "DownloadBytes": 7409152,
+    "DownloadedSha256": "8F4FD605BA58DF4A675B23E5E946C2613B7D8E0CA86E072EE3BFAEA276D337F5",
+    "DownloadedExecutableWasRun": false,
+    "TempDownloadRemoved": true
+  }
 }
