@@ -25,6 +25,10 @@ Registro solicitado por Douglas em 05/11/2026 para preparar um relatório futuro
 
 ## Abertura, posição e pintura
 
+- Falha reportada por Douglas após1.1.8: a moldura era arredondada, mas o preenchimento da seleção interna continuava retangular. Evidência: codex-clipboard-c109694a-c1ed-4514-8520-7b86d784c39f.png. A imagem comprova a inconsistência visual, não identifica sozinha a rotina de pintura responsável.
+- A seleção/hover interna deve ter raio próprio coerente com o recuo e a geometria interna. Arredondar apenas a moldura ou aplicar recorte no limite externo não resolve a quina de um destaque recuado. Preservar borda, margem, texto, foco e área clicável; usar a pintura compartilhada. Conferir primeiro, intermediário e último item, nos estados hover/selecionado/foco, após scroll e resize.
+- Aprendizado incorporado às referências Geometria e Auditoria visual da skill G3 Design. Esta rodada registra a regra; não altera o executável nem comprova a correção da interface do Mod Loader.
+
 - Não mostrar o cartão inteiro antes de começar a animação de abertura. Preparar o estado inicial antes da primeira exposição; iniciar a expansão depois. Considerar também menus nativos hospedando controles.
 - Pop-ups internos mantêm uma folga clara das bordas da janela dona. Se não couberem, devem ficar claramente fora dela com folga, quando houver espaço na tela. Evitar bordas quase coincidentes ou uma sobreposição de poucos pixels.
 - Usar a mesma regra de posicionamento para formulários ancorados e listas dos seletores. Testar sobretudo o seletor Idioma na borda direita de Opções.
