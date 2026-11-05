@@ -110,6 +110,7 @@ internal sealed partial class GeneralModWindow {
         RunFloatingTests(root);GeneralCategoryDeleteTests.Run(root);GeneralTableDialogTests.Run(root);RunRedesignTests(root);
         GeneralUpdatesTests.Run(root);RunPresetIsolationTests(root);
         GeneralBrandTests.Run(root);
+        GeneralProjectStoreTests.Run(root);RunProjectHomeTests(root);
         Safe.WriteJson(Path.Combine(root,"resultado-loader-geral.json"),new{Passed=true,Tests=checks,ArchiveChecks=archiveChecks,LibraryChecks=libraryChecks,RealGameTouched=false,NetworkUsed=false});
     }
     static string TestZip(string root,string name,string entry,string contents){

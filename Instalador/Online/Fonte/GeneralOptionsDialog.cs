@@ -41,8 +41,8 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
         choices.Controls.Add(FieldLabel(T("Tema", "Theme")), 0, 0);
         choices.Controls.Add(FieldLabel(T("Idioma", "Language")), 1, 0);
         Configure(this.theme, T("Tema", "Theme"), new Padding(0, 0, 10, 0));
-        this.theme.Items.AddRange(new object[] { T("Claro", "Light"), T("Escuro", "Dark") });
-        this.theme.SelectedIndex = theme == "dark" ? 1 : 0;
+        this.theme.Items.AddRange(new object[] { T("Claro — violeta", "Light — violet"), T("Escuro", "Dark"), T("Claro — vermelho", "Light — red") });
+        this.theme.SelectedIndex = theme == "dark" ? 1 : theme == "light-red" ? 2 : 0;
         Configure(this.language, T("Idioma", "Language"), new Padding(10, 0, 0, 0));
         this.language.Items.AddRange(new object[] { "Português", "English" });
         this.language.SelectedIndex = language == "en" ? 1 : 0;
@@ -143,7 +143,7 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
     void Save() {
         try {
             string selectedFolder = new OnlineDownloadWatch(folder.Text).Folder;
-            ThemeValue = theme.SelectedIndex == 1 ? "dark" : "light";
+            ThemeValue = theme.SelectedIndex == 1 ? "dark" : theme.SelectedIndex == 2 ? "light-red" : "light";
             LanguageValue = language.SelectedIndex == 1 ? "en" : "pt";
             DownloadFolder = selectedFolder;
             DialogResult = DialogResult.OK;

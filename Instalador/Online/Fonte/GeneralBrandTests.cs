@@ -12,14 +12,14 @@ internal static class GeneralBrandTests {
         var assembly=Assembly.GetExecutingAssembly();string svg;
         check(assembly.GetName().Version.ToString()==GeneralUpdateChecker.CurrentVersion+".0","Versão nativa do executável corresponde à versão do aplicativo.");
         using(var reader=new StreamReader(assembly.GetManifestResourceStream("ModLoader.Logo.svg")))svg=reader.ReadToEnd();
-        check(svg.Contains("<polygon")&&!svg.Contains("<image")&&!svg.Contains("<script")&&!svg.Contains("data:")&&!svg.Contains("href="),"Logo usa somente geometria vetorial embutida, sem raster ou recursos externos.");
+        check(svg.Contains("<polygon")&&!svg.Contains("<image")&&!svg.Contains("<rect")&&!svg.Contains("<script")&&!svg.Contains("data:")&&!svg.Contains("href="),"Logo vetorial não contém fundo sólido, raster ou recursos externos.");
         foreach(int size in new[]{16,24,32,48,64,128,256}){
             using(var bitmap=new Bitmap(size,size)){
-                using(var graphics=Graphics.FromImage(bitmap)){graphics.Clear(Color.Magenta);ModLoaderBrand.Draw(graphics,new Rectangle(0,0,size,size));}
+                using(var graphics=Graphics.FromImage(bitmap)){graphics.Clear(Color.Transparent);ModLoaderBrand.Draw(graphics,new Rectangle(0,0,size,size));}
                 int red=0,white=0;
                 for(int y=0;y<size;y++)for(int x=0;x<size;x++){var pixel=bitmap.GetPixel(x,y);if(pixel.R>200&&pixel.G<120&&pixel.B<150)red++;if(pixel.R>230&&pixel.G>230&&pixel.B>230)white++;}
                 check(red>8&&white>0,"Logo mantém vermelho e branco ao renderizar a "+size+"px.");
-                check(bitmap.GetPixel(size/2,0).ToArgb()!=Color.Magenta.ToArgb(),"Fundo vetorial foi renderizado sem corte a "+size+"px.");
+                check(bitmap.GetPixel(size/2,0).A==0&&bitmap.GetPixel(0,size-1).A==0,"Logo mantém transparência real a "+size+"px.");
                 if(size==256)bitmap.Save(Path.Combine(root,"logo-256.png"),System.Drawing.Imaging.ImageFormat.Png);
             }
             using(var stream=assembly.GetManifestResourceStream("ModLoader.Logo.ico")){
@@ -30,7 +30,7 @@ internal static class GeneralBrandTests {
                         stream.Position=6+16*6;int w=reader.ReadByte(),h=reader.ReadByte();stream.Position+=6;
                         int length=reader.ReadInt32(),offset=reader.ReadInt32();stream.Position=offset;
                         using(var png=new MemoryStream(reader.ReadBytes(length)))using(var bitmap=new Bitmap(png))
-                            check(w==0&&h==0&&bitmap.Width==256&&bitmap.Height==256,"ICO contém PNG256 íntegro e cabeçalho Windows correto.");
+                            check(w==0&&h==0&&bitmap.Width==256&&bitmap.Height==256&&bitmap.GetPixel(0,0).A==0,"ICO contém PNG256 transparente e cabeçalho Windows correto.");
                     }
                 }else using(var icon=new Icon(stream,new Size(size,size)))check(icon.Width==size&&icon.Height==size,"ICO oferece quadro nativo "+size+"px.");
             }
@@ -40,8 +40,18 @@ internal static class GeneralBrandTests {
             using(var bitmap=icon.ToBitmap()){
                 bool red=false;for(int y=0;y<bitmap.Height;y++)for(int x=0;x<bitmap.Width;x++){var pixel=bitmap.GetPixel(x,y);if(pixel.R>200&&pixel.G<120&&pixel.B<150)red=true;}
                 check(red,"Ícone nativo do EXE usa a logo do projeto.");
+                check(bitmap.GetPixel(0,0).A==0,"Ícone nativo do Windows tem fundo transparente.");
             }
         }
+        foreach(string theme in new[]{"light","dark","light-red"}){
+            GeneralStyle.UseTheme(theme);using(var bitmap=new Bitmap(128,128))using(var graphics=Graphics.FromImage(bitmap)){
+                graphics.Clear(Color.Transparent);ModLoaderBrand.Draw(graphics,new Rectangle(0,0,128,128),true);
+                bool accent=false,foreground=false;for(int y=0;y<128;y++)for(int x=0;x<128;x++){var pixel=bitmap.GetPixel(x,y);accent|=pixel.ToArgb()==GeneralStyle.Accent.ToArgb();foreground|=pixel.ToArgb()==GeneralStyle.Foreground.ToArgb();}
+                check(accent&&foreground&&bitmap.GetPixel(0,0).A==0,"Logo acompanha a paleta e mantém transparência no tema "+theme);
+                bitmap.Save(Path.Combine(root,"logo-"+theme+".png"),System.Drawing.Imaging.ImageFormat.Png);
+            }
+        }
+        GeneralStyle.UseTheme("light");
         Safe.WriteJson(Path.Combine(root,"resultado-brand.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});
     }
 }

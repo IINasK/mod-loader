@@ -268,7 +268,7 @@ public sealed class GeneralModLibrary {
     static void ValidateChoices(GeneralModState state) {
         state.Theme = String.IsNullOrEmpty(state.Theme) ? "light" : state.Theme;
         state.Language = String.IsNullOrEmpty(state.Language) ? "pt" : state.Language;
-        if (state.Theme != "light" && state.Theme != "dark") throw new IOException("Tema inválido.");
+        if (state.Theme != "light" && state.Theme != "dark" && state.Theme != "light-red") throw new IOException("Tema inválido.");
         if (state.Language != "pt" && state.Language != "en") throw new IOException("Idioma inválido.");
         if (!String.IsNullOrEmpty(state.SelectedPreset) && !ValidId(state.SelectedPreset)) throw new IOException("Preset selecionado inválido.");
         if (!state.List.Presets.Any(preset => preset.Id == state.SelectedPreset)) state.SelectedPreset = null;

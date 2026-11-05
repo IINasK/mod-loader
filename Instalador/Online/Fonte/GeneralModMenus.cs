@@ -12,8 +12,7 @@ internal sealed partial class GeneralModWindow {
         if(working||scanning)return;
         string action;
         using(var menu=new GeneralActionsMenu()){menu.AnchorTo(optionsButton);if(menu.ShowDialog(this)!=DialogResult.OK)return;action=menu.ActionId;}
-        if(action=="new")CreateList();else if(action=="import")Guard(ImportList);else if(action=="export")Guard(ExportList);
-        else if(action=="new-preset")SavePresetSelection(true);else if(action=="edit-preset")SavePresetSelection(false);else if(action=="delete-preset")Guard(DeletePreset);else if(action=="options")ShowOptions();else if(action=="p2p")ShowP2P();
+        ProjectCommand(action);
     }
     void ShowPackages(){
         if(working||scanning)return;
@@ -119,10 +118,10 @@ internal sealed partial class GeneralModWindow {
     void ShowOptions(){
         if(working||scanning)return;
         using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder,()=>cache.ClearDownloads())){
-            dialog.AnchorTo(optionsButton);
+            dialog.AnchorTo(settingsButton);
             if(dialog.ShowDialog(this)!=DialogResult.OK)return;
             state.Theme=dialog.ThemeValue;state.Language=dialog.LanguageValue;state.DownloadFolder=dialog.DownloadFolder;
-            Persist();BuildInterface();
+            Persist();if(projectStore!=null)projectStore.SavePreferences(state.Theme,state.Language,state.DownloadFolder);BuildInterface();
         }
     }
 }

@@ -70,6 +70,7 @@ $extensions += Join-Path $PSScriptRoot 'GeneralP2PUiTests.cs'
 $extensions += @('InstalledSnapshot.cs','InstalledSnapshotConfig.cs','InstalledSnapshotOwnership.cs','InstalledSnapshotInstaller.cs','InstalledSnapshotTests.cs','InstalledSnapshotInstallerTests.cs','InstalledSnapshotP2PTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += @('GeneralUpdates.cs','GeneralUpdatesTests.cs','GeneralPresetIsolationTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += @('GeneralBrand.cs','GeneralBrandTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
+$extensions += @('GeneralProjectStore.cs','GeneralProjectStoreTests.cs','GeneralProjectHome.cs','GeneralProjectHomeTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += '/reference:System.Xml.dll'
 $extensions += '/win32icon:'+(Join-Path $PSScriptRoot 'Assets\ModLoader.ico')
 $extensions += '/resource:'+(Join-Path $PSScriptRoot 'Assets\ModLoader.svg')+',ModLoader.Logo.svg'

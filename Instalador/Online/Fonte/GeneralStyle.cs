@@ -9,6 +9,8 @@ using System.Windows.Forms;
 
 internal static class GeneralStyle {
     internal static bool Dark;
+    internal static bool RedTheme;
+    internal static void UseTheme(string theme){Dark=theme=="dark";RedTheme=theme=="light-red";}
     internal static string Language="pt";
     internal static bool AnimationsEnabled=true;
     static readonly PrivateFontCollection fonts=new PrivateFontCollection();
@@ -29,13 +31,13 @@ internal static class GeneralStyle {
     }
     internal static Color Background {get{return ColorTranslator.FromHtml(Dark?"#15121d":"#ffffff");}}
     internal static Color Surface {get{return ColorTranslator.FromHtml(Dark?"#242032":"#ffffff");}}
-    internal static Color Foreground {get{return ColorTranslator.FromHtml(Dark?"#ece8f6":"#221d33");}}
-    internal static Color Muted {get{return ColorTranslator.FromHtml(Dark?"#b9b1cf":"#625b7c");}}
-    internal static Color Accent {get{return ColorTranslator.FromHtml(Dark?"#b8a4ff":"#5b3fd8");}}
-    internal static Color Primary {get{return ColorTranslator.FromHtml("#5b3fd8");}}
-    internal static Color Line {get{return ColorTranslator.FromHtml(Dark?"#827592":"#897d9d");}}
-    internal static Color SoftLine {get{return ColorTranslator.FromHtml(Dark?"#3a334e":"#e9e5f0");}}
-    internal static Color Selection {get{return ColorTranslator.FromHtml(Dark?"#3e335b":"#eee9fc");}}
+    internal static Color Foreground {get{return ColorTranslator.FromHtml(Dark?"#ece8f6":RedTheme?"#2b2326":"#221d33");}}
+    internal static Color Muted {get{return ColorTranslator.FromHtml(Dark?"#b9b1cf":RedTheme?"#756167":"#625b7c");}}
+    internal static Color Accent {get{return ColorTranslator.FromHtml(Dark?"#b8a4ff":RedTheme?"#d92e42":"#5b3fd8");}}
+    internal static Color Primary {get{return ColorTranslator.FromHtml(!Dark&&RedTheme?"#d92e42":"#5b3fd8");}}
+    internal static Color Line {get{return ColorTranslator.FromHtml(Dark?"#827592":RedTheme?"#a5747d":"#897d9d");}}
+    internal static Color SoftLine {get{return ColorTranslator.FromHtml(Dark?"#3a334e":RedTheme?"#f0dde1":"#e9e5f0");}}
+    internal static Color Selection {get{return ColorTranslator.FromHtml(Dark?"#3e335b":RedTheme?"#fde9ec":"#eee9fc");}}
     internal static Color Danger {get{return ColorTranslator.FromHtml(Dark?"#ffadb9":"#b42348");}}
     internal static GraphicsPath Round(RectangleF box,float radius){
         float d=Math.Min(radius*2,Math.Min(box.Width,box.Height));

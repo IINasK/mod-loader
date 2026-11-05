@@ -42,7 +42,7 @@ internal sealed partial class GeneralModWindow {
             CaptureUi(form,Path.Combine(root,"tabela-clara.png"));
             using(var menu=new GeneralActionsMenu()){
                 menu.StartPosition=FormStartPosition.Manual;menu.Location=new Point(-30000,-30000);menu.Show(form);Application.DoEvents();
-                check(menu.Width==620&&AllControls(menu).OfType<Button>().Any(button=>button.Name=="options"),"Menu único tem tamanho consistente e acesso a Opções.");
+                check(menu.Width==620&&menu.Height==230&&AllControls(menu).OfType<Button>().Count(button=>button.Name!="")==4,"Menu compacto reúne apenas as quatro ações do projeto.");
                 CaptureUi(menu,Path.Combine(root,"menu-unico.png"));menu.Close();
             }
             using(var packages=new GeneralActionsMenu(true)){

@@ -694,6 +694,7 @@ static class OnlineProgram {
         var cache=new DownloadCache(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CyberpunkCoop","Downloads"));
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
         if(args.Length==2&&args[0]=="--self-test-general"){GeneralModWindow.RunGeneralTests(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--self-test-projects"){GeneralProjectStoreTests.Run(args[1]);GeneralModWindow.RunProjectHomeTests(args[1]);GeneralBrandTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-p2p-ui"){GeneralP2PUiTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--preview-p2p"){GeneralP2PUiTests.Preview(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--preview"){using(var f=new OnlineWindow(c,cache,true))f.Preview(args[1]);return 0;}
@@ -703,6 +704,6 @@ static class OnlineProgram {
         }
         if(args.Length!=0)throw new IOException("Argumento não reconhecido. A instalação exige confirmação na interface.");
         OnlineDiagnostics.Start(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CyberpunkCoop","Logs"));string exeHash=null;try{if(OnlineDiagnostics.Enabled)exeHash=Safe.Hash(Application.ExecutablePath);}catch(Exception){}OnlineDiagnostics.Record("app.start",null,"Aplicativo iniciado com diagnóstico ativo.",new{Executable=Path.GetFileName(Application.ExecutablePath),ExecutableSha256=exeHash,Catalog=c.Id,CatalogSha256=OnlineIdentity.CatalogHash});
-        Application.Run(new GeneralModWindow(c,cache,Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"ModLoaderGeral")));OnlineDiagnostics.Stop();return 0;
+        Application.Run(new GeneralProjectHome(c,cache,Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"ModLoaderGeral")));OnlineDiagnostics.Stop();return 0;
     }catch(Exception ex){if(args.Length>0){File.WriteAllText(Path.Combine(Path.GetTempPath(),"CyberpunkCoopOnline-erro.txt"),ex.ToString());return 1;}MessageBox.Show(ex.Message,"Não foi possível abrir o programa",MessageBoxButtons.OK,MessageBoxIcon.Error);return 1;}}
 }

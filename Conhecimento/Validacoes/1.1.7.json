@@ -1,0 +1,120 @@
+{
+  "Version": "1.1.7",
+  "BasedOn": "1.1.6",
+  "Passed": true,
+  "ExecutableSha256": "7AF64716A2F3D19D30CC85BAF89BADF0F577BC1A92E4FBD4335D2144981E03B5",
+  "ExecutableBytes": 7288832,
+  "CatalogSha256": "89c68e6bdb8c192977fcace5d30a4b8b25912d8780fd6067f77f5c7d41c6dc05",
+  "Checks": 1142,
+  "Reports": 19,
+  "Results": [
+    {
+      "Report": "resultado-loader-geral.json",
+      "Checks": 25
+    },
+    {
+      "Report": "resultado-pintura-botoes.json",
+      "Checks": 24
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 24
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 36
+    },
+    {
+      "Report": "resultado-brand.json",
+      "Checks": 30
+    },
+    {
+      "Report": "resultado-category-delete.json",
+      "Checks": 16
+    },
+    {
+      "Report": "resultado-floating.json",
+      "Checks": 30
+    },
+    {
+      "Report": "resultado-project-home.json",
+      "Checks": 44
+    },
+    {
+      "Report": "resultado-progresso-geral.json",
+      "Checks": 27
+    },
+    {
+      "Report": "resultado-status-presentation.json",
+      "Checks": 46
+    },
+    {
+      "Report": "resultado-p2p.json",
+      "Checks": 45
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Checks": 552
+    },
+    {
+      "Report": "resultado-preset-clean.json",
+      "Checks": 26
+    },
+    {
+      "Report": "resultado-project-store.json",
+      "Checks": 50
+    },
+    {
+      "Report": "resultado-redesign.json",
+      "Checks": 28
+    },
+    {
+      "Report": "resultado-snapshot.json",
+      "Checks": 44
+    },
+    {
+      "Report": "resultado-table-dialogs.json",
+      "Checks": 42
+    },
+    {
+      "Report": "resultado-ui-v2.json",
+      "Checks": 28
+    },
+    {
+      "Report": "resultado-updates.json",
+      "Checks": 25
+    }
+  ],
+  "ProjectStoreChecks": 50,
+  "HomeChecks": 44,
+  "BrandChecks": 30,
+  "MenuAdditionalChecks": 28,
+  "RealGameTouched": false,
+  "ExistingUserDataMigratedByTests": false,
+  "TestNetworkUsed": false,
+  "Index": "projects.json",
+  "Migration": "Legacy state and DPAPI receipts stay at original root",
+  "ProjectDeletion": "Removes index entry only, preserves installed files and receipts/backups",
+  "Logo": {
+    "SvgBytes": 1184,
+    "SvgSha256": "D2F8556D491D7F916FBBDBFB63D959B54ECD1D879A18AEF3533B02C607180741",
+    "Transparent": true,
+    "ThemeAwareInApp": true,
+    "NativeIconColors": "original red and white",
+    "Frames": [
+      16,
+      24,
+      32,
+      48,
+      64,
+      128,
+      256
+    ]
+  },
+  "InitialFindings": [
+    "Legacy P2P menu asserts changed to match requested menu.",
+    "Safe.In relative paths require forward slashes; DataPath fixed.",
+    "Home column exceeded window width after resize; percentage column and bounds checks added."
+  ],
+  "LiveReleaseVerification": "To be recorded locally after publication."
+}

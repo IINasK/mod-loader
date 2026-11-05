@@ -13,7 +13,8 @@ internal sealed class GeneralUpdateRelease {
 }
 
 internal sealed class GeneralUpdateChecker {
-    internal const string CurrentVersion="1.1.6";
+    internal const string CurrentVersion="1.1.7";
+    internal static readonly GeneralUpdateChecker Session=new GeneralUpdateChecker();
     internal const string Repository="IINasK/mod-loader";
     internal const string Endpoint="https://api.github.com/repos/"+Repository+"/releases/latest";
     const int MaxResponse=262144;
@@ -72,7 +73,7 @@ internal sealed class GeneralUpdateChecker {
 }
 
 internal sealed partial class GeneralModWindow {
-    readonly GeneralUpdateChecker updateChecker=new GeneralUpdateChecker();
+    readonly GeneralUpdateChecker updateChecker=GeneralUpdateChecker.Session;
     GeneralUpdateRelease updateAvailable;
     LinkLabel updateNotice;
     void AddUpdateNotice(Control parent){

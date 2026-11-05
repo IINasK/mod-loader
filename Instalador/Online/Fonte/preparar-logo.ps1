@@ -12,9 +12,6 @@ try{$svg=New-Object System.Xml.XmlDocument;$svg.XmlResolver=$null;$svg.Load($rea
 $culture=[Globalization.CultureInfo]::InvariantCulture
 $view=@($svg.DocumentElement.GetAttribute('viewBox').Split(' ')|ForEach-Object {[single]::Parse($_,$culture)})
 if($view.Count -ne 4 -or $view[0] -ne 0 -or $view[1] -ne 0 -or $view[2] -le 0 -or $view[3] -le 0){throw 'viewBox da logo inválido'}
-$background=$svg.DocumentElement.SelectSingleNode('*[local-name()="rect"]')
-if($null -eq $background){throw 'Fundo da logo ausente'}
-$backgroundColor=[Drawing.ColorTranslator]::FromHtml($background.GetAttribute('fill'))
 $shapes=@($svg.DocumentElement.SelectNodes('*[local-name()="polygon"]')|ForEach-Object {
     $points=@($_.GetAttribute('points').Split(' ')|Where-Object {$_}|ForEach-Object {
         $xy=$_.Split(',');if($xy.Count -ne 2){throw 'Ponto vetorial inválido'}
@@ -27,7 +24,7 @@ function Render-Logo([int]$size){
     $bitmap=New-Object Drawing.Bitmap -ArgumentList @($size,$size,([Drawing.Imaging.PixelFormat]::Format32bppArgb))
     $graphics=[Drawing.Graphics]::FromImage($bitmap)
     try{
-        $graphics.Clear($backgroundColor)
+        $graphics.Clear([Drawing.Color]::Transparent)
         $graphics.SmoothingMode=[Drawing.Drawing2D.SmoothingMode]::AntiAlias
         $graphics.PixelOffsetMode=[Drawing.Drawing2D.PixelOffsetMode]::HighQuality
         $scale=[single][Math]::Min($size/$view[2],$size/$view[3])

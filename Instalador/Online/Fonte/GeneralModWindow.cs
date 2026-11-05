@@ -23,7 +23,7 @@ internal sealed partial class GeneralModWindow : Form {
     GeneralPicker preset;
     DataGridView grid;
     Label detail,counts;
-    Button next,listButton,reloadButton,optionsButton;
+    Button next,listButton,reloadButton,optionsButton,settingsButton;
     int hoveredRow=-1;
     GeneralProgress currentProgress,totalProgress;
     bool drawing,working,scanning;
@@ -73,15 +73,16 @@ internal sealed partial class GeneralModWindow : Form {
         if(fixture==null)Shown+=async(s,e)=>{CheckUpdatesOnStartup();await Scan();};
     }
     void BuildInterface(){
-        GeneralStyle.Dark=state.Theme=="dark";GeneralStyle.Language=state.Language??"pt";
+        GeneralStyle.UseTheme(state.Theme);GeneralStyle.Language=state.Language??"pt";
         SuspendLayout();
         while(Controls.Count>0){var old=Controls[0];Controls.Remove(old);old.Dispose();}
         idle.Clear();Font=GeneralStyle.Font(12);BackColor=GeneralStyle.Background;ForeColor=GeneralStyle.Foreground;
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(32,24,32,22),ColumnCount=1,RowCount=9,BackColor=BackColor};
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         for(int i=0;i<9;i++)layout.RowStyles.Add(i==5?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.AutoSize));
         Controls.Add(layout);
-        var heading=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=3,Margin=Padding.Empty};
-        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
+        var heading=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=4,Margin=Padding.Empty};
+        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         var titles=new FlowLayoutPanel{AutoSize=true,Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false,Margin=Padding.Empty};
         var brand=new FlowLayoutPanel{AutoSize=true,WrapContents=false,Margin=Padding.Empty};
         brand.Controls.Add(new ModLoaderLogo{Size=new Size(44,44),Margin=new Padding(0,0,12,0),Name="ProjectLogo"});
@@ -89,9 +90,10 @@ internal sealed partial class GeneralModWindow : Form {
         titles.Controls.Add(brand);
         titles.Controls.Add(new Label{Text=T("Criado por Nask e Codex. Se achou ruim, faz você.","Made by Nask and Codex. Don't like it? Make your own."),AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(0,0,0,14)});
         heading.Controls.Add(titles,0,0);
-        listButton=Command(T("Pacotes","Packs"),ShowPackages,true);listButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;listButton.Margin=new Padding(0,0,12,0);heading.Controls.Add(listButton,1,0);
+        listButton=Command(T("Projetos","Projects"),BackToProjects,true);listButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;listButton.Margin=new Padding(0,0,12,0);heading.Controls.Add(listButton,1,0);
+        settingsButton=IconButton("settings",T("Opções","Options"),ShowOptions,true);((GeneralButton)settingsButton).Bare=true;settingsButton.Margin=Padding.Empty;heading.Controls.Add(settingsButton,2,0);
         optionsButton=IconButton("menu",T("Menu","Menu"),ToggleListMenu,true);((GeneralButton)optionsButton).Bare=true;optionsButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;optionsButton.Margin=Padding.Empty;
-        heading.Controls.Add(optionsButton,2,0);layout.Controls.Add(heading,0,0);
+        heading.Controls.Add(optionsButton,3,0);layout.Controls.Add(heading,0,0);
         var path=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=new Padding(0,0,0,14)};
         path.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));path.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         var pathSurface=new GeneralSurface{Dock=DockStyle.Fill,Height=44,MinimumSize=new Size(100,44),MaximumSize=new Size(0,44),Padding=new Padding(16,11,16,0),Margin=new Padding(0,0,12,0)};
@@ -163,7 +165,9 @@ internal sealed partial class GeneralModWindow : Form {
         totalProgress=new GeneralProgress{Dock=DockStyle.Fill,Caption=T("Progresso geral","Overall progress"),Margin=Padding.Empty};
         bars.Controls.Add(currentProgress,1,0);bars.Controls.Add(totalProgress,1,1);layout.Controls.Add(bars,0,7);
         var bottom=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=Padding.Empty};bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));bottom.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        var remove=Command(T("Desinstalar selecionados","Uninstall selected"),async()=>await Uninstall(),true);((GeneralButton)remove).Destructive=true;bottom.Controls.Add(remove,0,0);remove.Anchor=AnchorStyles.Left;
+        var leftActions=Flow();leftActions.Margin=Padding.Empty;leftActions.Anchor=AnchorStyles.Left;
+        var remove=Command(T("Desinstalar selecionados","Uninstall selected"),async()=>await Uninstall(),true);((GeneralButton)remove).Destructive=true;leftActions.Controls.Add(remove);
+        var share=Command(T("Compartilhar P2P","Share over P2P"),ShowP2P,true);share.Name="ShareP2P";leftActions.Controls.Add(share);bottom.Controls.Add(leftActions,0,0);
         var install=Command(T("Baixar/Instalar","Download/Install"),StartSelected);((GeneralButton)install).Primary=true;install.MinimumSize=new Size(226,52);install.Font=GeneralStyle.Font(13,true);bottom.Controls.Add(install,1,0);
         layout.Controls.Add(bottom,0,8);
         foreach(Control control in new Control[]{destination,preset}){control.BackColor=GeneralStyle.Surface;control.ForeColor=GeneralStyle.Foreground;}

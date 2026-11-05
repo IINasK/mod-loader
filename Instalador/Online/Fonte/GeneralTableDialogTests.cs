@@ -9,7 +9,7 @@ internal static class GeneralTableDialogTests {
     internal static int Run(string parent) {
         string root = Path.Combine(Path.GetFullPath(parent), "table-dialogs-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
         var checks = new List<string>(); Action<bool, string> check = (ok, message) => { if (!ok) throw new IOException(message); checks.Add(message); };
-        bool animations = GeneralStyle.AnimationsEnabled; GeneralStyle.AnimationsEnabled = false;
+        bool animations = GeneralStyle.AnimationsEnabled, originalDark = GeneralStyle.Dark; string originalLanguage = GeneralStyle.Language; GeneralStyle.AnimationsEnabled = false;
         try {
             using (var dialog = new GeneralNameDialog("Preset", "  Friends  ")) {
                 Open(dialog); var name = Find<TextBox>(dialog, "NameInput"); var save = Find<Button>(dialog, "SaveName");
@@ -50,7 +50,25 @@ internal static class GeneralTableDialogTests {
                 Open(dialog); Find<Button>(dialog, "CancelPresetActions").PerformClick();
                 check(dialog.ActionId == null && dialog.DialogResult == DialogResult.Cancel, "Cancel does not select a preset action.");
             }
-        } finally { GeneralStyle.AnimationsEnabled = animations; }
+            foreach(bool dark in new[]{false,true})foreach(string language in new[]{"pt","en"}){
+                GeneralStyle.Dark=dark;GeneralStyle.Language=language;
+                using(var menu=new GeneralActionsMenu()){
+                    Open(menu);var buttons=Descendants(menu).OfType<Button>().Where(button=>button.Name!="").ToArray();
+                    check(buttons.Length==4&&buttons.Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"delete-project","export","import","new"}),"Project menu contains exactly the four project actions: "+dark+"/"+language);
+                    check(Find<Label>(menu,"ProjectSection").Text==(language=="pt"?"Projeto":"Project"),"Project section heading is translated: "+language);
+                    var create=Find<Button>(menu,"new");var open=Find<Button>(menu,"import");var export=Find<Button>(menu,"export");var delete=Find<GeneralButton>(menu,"delete-project");
+                    check(create.Top==open.Top&&export.Top==delete.Top&&create.Left==export.Left&&open.Left==delete.Left&&export.Top>create.Bottom,"Project actions use aligned two-column rows: "+dark+"/"+language);
+                    check(buttons.All(button=>button.Height==create.Height&&Math.Abs(button.Width-create.Width)<=1)&&buttons.All(button=>button.Bottom<=button.Parent.ClientSize.Height),"Buttons have matching sizes and remain inside the popup: "+dark+"/"+language);
+                    check(delete.Destructive&&!((GeneralButton)create).Destructive,"Only delete project is styled as destructive: "+dark+"/"+language);
+                    check(create.Text==(language=="pt"?"Novo projeto":"New project")&&open.Text==(language=="pt"?"Abrir projeto":"Open project"),"New/open labels match the selected language: "+language);
+                    using(var bitmap=new Bitmap(menu.Width,menu.Height)){menu.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(root,"project-menu-"+language+"-"+(dark?"dark":"light")+".png"),System.Drawing.Imaging.ImageFormat.Png);}
+                    menu.Close();
+                }
+            }
+            foreach(string id in new[]{"new","import","export","delete-project"})using(var menu=new GeneralActionsMenu()){
+                Open(menu);Find<Button>(menu,id).PerformClick();check(menu.ActionId==id&&menu.DialogResult==DialogResult.OK,"Project action returns its explicit identifier: "+id);
+            }
+        } finally { GeneralStyle.AnimationsEnabled = animations; GeneralStyle.Dark=originalDark;GeneralStyle.Language=originalLanguage; }
         Safe.WriteJson(Path.Combine(root, "resultado-table-dialogs.json"), new { Passed = true, Tests = checks, RealGameTouched = false, NetworkUsed = false });
         return checks.Count;
     }

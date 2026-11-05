@@ -65,8 +65,8 @@ internal static class GeneralP2PUiTests {
                     using(var menu=new GeneralActionsMenu()) {
                         menu.ShowInTaskbar=false;menu.StartPosition=FormStartPosition.Manual;menu.Location=new Point(-30000,-30000);menu.Show();Layout(menu);
                         var buttons=Descendants(menu.Content).OfType<Button>().ToArray();
-                        check(buttons.Count(b=>b.Name=="p2p")==1&&buttons.Count(b=>b.Name=="options")==1,label+": menu único oferece P2P e Opções sem duplicatas.");
-                        check(buttons.Single(b=>b.Name=="p2p").Text==(language=="pt"?"Compartilhar P2P":"Share over P2P"),label+": ação P2P traduzida no menu.");
+                        check(buttons.All(b=>b.Name!="p2p"&&b.Name!="options"),label+": menu de projeto não inclui P2P nem Opções.");
+                        check(buttons.Single(b=>b.Name=="export").Text==(language=="pt"?"Exportar projeto":"Export project"),label+": ação de projeto traduzida no menu.");
                         Capture(menu,Path.Combine(root,"p2p-menu-"+label+".png"));menu.Close();
                     }
                 }
