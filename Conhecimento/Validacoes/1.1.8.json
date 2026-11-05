@@ -142,5 +142,19 @@
     "Personal project migration on user data",
     "P2P transfer between two real computers",
     "Final appearance confirmed by user on their monitor"
-  ]
+  ],
+  "SourceCommit": "5e4dae1bd7759fb1d6a8c032bf7cef0323b7cccc",
+  "LiveReleaseVerification": {
+    "AnonymousRequest": true,
+    "Runtime": "Windows PowerShell 5.1 / .NET Framework",
+    "UsedPublished117Checker": true,
+    "AvailableToVersion117": "1.1.8",
+    "Version118DoesNotNotifyItself": true,
+    "ReleasePage": "https://github.com/IINasK/mod-loader/releases/tag/v1.1.8",
+    "DownloadUrl": "https://github.com/IINasK/mod-loader/releases/download/v1.1.8/Mod-Loader-1.1.8.exe",
+    "DownloadBytes": 7382016,
+    "DownloadedSha256": "DE218E0BB602DE2B15462ACCFA48FDFC845835B36D63AAE520E80830C6CCE869",
+    "DownloadedExecutableWasRun": false,
+    "TempDownloadRemoved": true
+  }
 }
