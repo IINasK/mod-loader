@@ -1,0 +1,34 @@
+{
+  "Version": "1.1.9",
+  "Purpose": "Logo ML aprovada, cores por tema e transparencia",
+  "ExecutableSha256": "407668F7FE4CDC69868FEAB6FDB54C19BCFFD559422D86FC1EE39BE88369907B",
+  "CatalogSha256": "89c68e6bdb8c192977fcace5d30a4b8b25912d8780fd6067f77f5c7d41c6dc05",
+  "Checks": 128.0,
+  "Reports": [
+    {
+      "Report": "resultado-brand.json",
+      "Passed": true,
+      "Checks": 45,
+      "Path": "C:\\Users\\Douglas\\Desktop\\Mods\\T\\Brand119Final\\brand-b1ed5f669bb24e219b0d81b6ef60b620\\resultado-brand.json"
+    },
+    {
+      "Report": "resultado-project-home.json",
+      "Passed": true,
+      "Checks": 57,
+      "Path": "C:\\Users\\Douglas\\Desktop\\Mods\\T\\Brand119Final\\home-e924dfb3885144afbc0c4a285a22dc7f\\resultado-project-home.json"
+    },
+    {
+      "Report": "resultado-preset-clean.json",
+      "Passed": true,
+      "Checks": 26,
+      "Path": "C:\\Users\\Douglas\\Desktop\\Mods\\T\\Brand119Final\\preset-clean-5b2bbc2214d34cc7b4b3d239523ff4c8\\resultado-preset-clean.json"
+    }
+  ],
+  "RealGameTouched": false,
+  "PublishedToGitHub": false,
+  "FullGeneralSuite": "Timeout fixture1.zip reproduzido na base inalterada 1.1.8 e na 1.1.9 neste ambiente; suite geral nao declarada aprovada.",
+  "HarnessCorrections": [
+    "Executavel da suite exige FixtureGame.exe no diretorio pai; executar a copia em Programa",
+    "Controle transparente isolado tem alpha zero; testar composicao pelo painel pai"
+  ]
+}

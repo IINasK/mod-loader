@@ -1,57 +1,30 @@
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Drawing
 $assets=Join-Path $PSScriptRoot 'Assets'
-$source=Join-Path $assets 'ModLoader.svg'
-$destination=Join-Path $assets 'ModLoader.ico'
-$preview=Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))) 'logo-preview.png'
-$settings=New-Object System.Xml.XmlReaderSettings
-$settings.DtdProcessing=[System.Xml.DtdProcessing]::Prohibit
-$settings.XmlResolver=$null
-$reader=[System.Xml.XmlReader]::Create($source,$settings)
-try{$svg=New-Object System.Xml.XmlDocument;$svg.XmlResolver=$null;$svg.Load($reader)}finally{$reader.Dispose()}
-$culture=[Globalization.CultureInfo]::InvariantCulture
-$view=@($svg.DocumentElement.GetAttribute('viewBox').Split(' ')|ForEach-Object {[single]::Parse($_,$culture)})
-if($view.Count -ne 4 -or $view[0] -ne 0 -or $view[1] -ne 0 -or $view[2] -le 0 -or $view[3] -le 0){throw 'viewBox da logo inválido'}
-$shapes=@($svg.DocumentElement.SelectNodes('*[local-name()="polygon"]')|ForEach-Object {
-    $points=@($_.GetAttribute('points').Split(' ')|Where-Object {$_}|ForEach-Object {
-        $xy=$_.Split(',');if($xy.Count -ne 2){throw 'Ponto vetorial inválido'}
-        New-Object Drawing.PointF([single]::Parse($xy[0],$culture)),([single]::Parse($xy[1],$culture))
-    })
-    if($points.Count -lt 3){throw 'Polígono vetorial incompleto'}
-    [pscustomobject]@{Color=[Drawing.ColorTranslator]::FromHtml($_.GetAttribute('fill'));Points=[Drawing.PointF[]]$points}
-})
-function Render-Logo([int]$size){
-    $bitmap=New-Object Drawing.Bitmap -ArgumentList @($size,$size,([Drawing.Imaging.PixelFormat]::Format32bppArgb))
-    $graphics=[Drawing.Graphics]::FromImage($bitmap)
-    try{
-        $graphics.Clear([Drawing.Color]::Transparent)
-        $graphics.SmoothingMode=[Drawing.Drawing2D.SmoothingMode]::AntiAlias
-        $graphics.PixelOffsetMode=[Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-        $scale=[single][Math]::Min($size/$view[2],$size/$view[3])
-        $matrix=New-Object Drawing.Drawing2D.Matrix $scale,0,0,$scale,([single](($size-$view[2]*$scale)/2)),([single](($size-$view[3]*$scale)/2))
-        try{$graphics.Transform=$matrix}finally{$matrix.Dispose()}
-        foreach($shape in $shapes){$brush=New-Object Drawing.SolidBrush $shape.Color;try{$graphics.FillPolygon($brush,$shape.Points)}finally{$brush.Dispose()}}
-    }finally{$graphics.Dispose()}
-    return ,$bitmap
+# These two files are generated together from the approved Estudo 02, not from a screenshot.
+$expected=@{
+ 'ModLoader.svg'='E2ED35028B5B3104A1269CE234B04C052FBB131E24F8847C6342C11AE3CBE233'
+ 'ModLoader.ico'='9967FE9CE16BBA9AEC6ADED9E4B8E1E571C359C27DEAE35D8D0CB7288066F8F8'
 }
-$frames=@()
-foreach($size in @(16,24,32,48,64,128,256)){
-    $bitmap=Render-Logo $size;$stream=New-Object IO.MemoryStream
-    try{$bitmap.Save($stream,[Drawing.Imaging.ImageFormat]::Png);$frames+=[pscustomobject]@{Size=$size;Bytes=$stream.ToArray()}}finally{$stream.Dispose();$bitmap.Dispose()}
+foreach($name in $expected.Keys){
+ if((Get-FileHash -LiteralPath (Join-Path $assets $name)).Hash -ne $expected[$name]){throw "Recurso da marca divergente: $name. Reexportar SVG e ICO juntos e revisar a identidade."}
 }
-$output=New-Object IO.MemoryStream;$writer=New-Object IO.BinaryWriter $output
+$stream=[IO.File]::OpenRead((Join-Path $assets 'ModLoader.ico'))
+$reader=New-Object IO.BinaryReader $stream
 try{
-    $writer.Write([uint16]0);$writer.Write([uint16]1);$writer.Write([uint16]$frames.Count)
-    $offset=[uint32](6+16*$frames.Count)
-    foreach($frame in $frames){
-        $dimension=if($frame.Size -eq 256){[byte]0}else{[byte]$frame.Size}
-        $writer.Write($dimension);$writer.Write($dimension);$writer.Write([byte]0);$writer.Write([byte]0)
-        $writer.Write([uint16]1);$writer.Write([uint16]32);$writer.Write([uint32]$frame.Bytes.Length);$writer.Write($offset)
-        $offset+=[uint32]$frame.Bytes.Length
-    }
-    foreach($frame in $frames){$writer.Write([byte[]]$frame.Bytes)}
-    $writer.Flush();[IO.File]::WriteAllBytes($destination,$output.ToArray())
-}finally{$writer.Dispose();$output.Dispose()}
-$bitmap=Render-Logo 640
-try{$bitmap.Save($preview,[Drawing.Imaging.ImageFormat]::Png)}finally{$bitmap.Dispose()}
-Get-Item -LiteralPath $source,$destination,$preview|Select-Object FullName,Length
+ if($reader.ReadUInt16() -ne 0 -or $reader.ReadUInt16() -ne 1 -or $reader.ReadUInt16() -ne 7){throw 'ICO deve conter sete tamanhos'}
+ $frames=@()
+ foreach($size in @(16,24,32,48,64,128,256)){
+  $w=$reader.ReadByte();$h=$reader.ReadByte();$null=$reader.ReadBytes(6)
+  $length=$reader.ReadInt32();$offset=$reader.ReadInt32()
+  $dimension=if($size -eq 256){0}else{$size}
+  if($w -ne $dimension -or $h -ne $dimension){throw 'Dimensao ICO divergente'}
+  $frames+=@{Size=$size;Length=$length;Offset=$offset}
+ }
+ foreach($frame in $frames){
+  $stream.Position=$frame.Offset
+  $png=New-Object IO.MemoryStream(,$reader.ReadBytes($frame.Length))
+  $bitmap=New-Object Drawing.Bitmap $png
+  try{if($bitmap.Width -ne $frame.Size -or $bitmap.Height -ne $frame.Size -or $bitmap.GetPixel(0,0).A -ne 0){throw 'Quadro ICO sem transparencia ou tamanho correto'}}finally{$bitmap.Dispose();$png.Dispose()}
+ }
+}finally{$reader.Dispose();$stream.Dispose()}

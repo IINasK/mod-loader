@@ -4,3 +4,6 @@
 *.md text eol=lf
 *.json text eol=lf
 Instalador/Online/Programa/catalogo.json -text
+
+# Preserve the exact approved SVG bytes used by the brand identity check.
+Instalador/Online/Fonte/Assets/ModLoader.svg -text

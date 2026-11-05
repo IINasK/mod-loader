@@ -66,7 +66,8 @@ internal static class GeneralStyle {
     }
     internal static void Apply(Control control,bool dark){
         Dark=dark;
-        control.BackColor=control is Form?Background:Surface;control.ForeColor=Foreground;
+        control.BackColor=control is ModLoaderLogo?Color.Transparent:control is Form?Background:Surface;control.ForeColor=Foreground;
+        var window=control as Form;if(window!=null)window.Icon=ModLoaderBrand.AppIcon;
         if(control.Font==null||control.Font.FontFamily.Name=="Microsoft Sans Serif"||control.Font.FontFamily.Name=="Segoe UI")control.Font=Font(control.Font==null?12:control.Font.Size,control.Font!=null&&control.Font.Bold);
         var button=control as Button;
         if(button!=null){button.MinimumSize=new Size(Math.Max(button.MinimumSize.Width,44),Math.Max(button.MinimumSize.Height,44));button.FlatStyle=FlatStyle.Flat;button.FlatAppearance.BorderColor=Line;button.FlatAppearance.BorderSize=1;button.UseVisualStyleBackColor=false;}
