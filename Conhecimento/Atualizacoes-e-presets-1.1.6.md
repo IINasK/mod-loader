@@ -16,6 +16,10 @@ Douglas autorizou tornar público o repositório existente e distribuir o EXE pe
 - Offline,404,rate-limit,JSON inválido e falhas de rede são ignorados nesta abertura, sem bloquear a interface ou disparar uma fila de tentativas. Na próxima abertura há nova consulta.
 - Para próximas versões: incrementar a versão no código e no empacotamento, compilar/testar, fazer commit main e publicar Release estável vX.Y.Z com EXE e notas. A versão anterior passa a avisar na próxima abertura. Não incluir mods, saves, dados de contas ou caches nos assets.
 
+Use Mod-Loader-X.Y.Z.exe como nome público do asset: GitHub normalizou os espaços do primeiro upload para pontos, então o asset desta entrega foi renomeado para hífens. O executável local pode manter espaços. A primeira versão com o verificador é1.1.6; versões anteriores precisam ser baixadas manualmente uma vez para passar a receber os avisos futuros.
+
+A Release pública v1.1.6 foi consultada sem login pelo próprio método ReadLatest do EXE, executado no Windows PowerShell5.1/.NETFramework. O parser reconheceu1.1.6 quando a versão corrente simulada era1.1.5 e não gerou aviso para1.1.6. O download anônimo teve tamanho e SHA idênticos ao artefato testado, sem executar o arquivo recebido; temporário removido. Um ensaio de reflexão anterior no PowerShell7 falhou pela incompatibilidade de System.Web entre runtimes, não pela API ou pelo aplicativo. Resultados em Validacoes/1.1.6.json.
+
 ## Categorias e tabela
 
 Presets guardam ModIds e Categories opcionais no schema1. A tabela mostra as categorias usadas pelos membros do preset e as categorias vazias criadas explicitamente nele; não mostra sugestões vazias de outro pacote/preset. O grupo neutro Sem categoria permanece como ponto de entrada para adicionar itens. Todos os itens ainda permite acessar a organização global. Listas novas continuam vazias.

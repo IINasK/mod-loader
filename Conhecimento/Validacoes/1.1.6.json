@@ -90,7 +90,19 @@
     "HistoricalLocalPathsDisclosed": true
   },
   "InitialFailure": "Self-test invoked from distribution root could not find build-only FixtureGame.exe; repeated with hash-identical Program executable in build layout.",
-  "LiveReleaseVerification": "Recorded locally after publication; do not interpret fixture tests as an internet download test.",
+  "LiveReleaseVerification": {
+    "AnonymousRequest": true,
+    "UsedCompiledRequestMethod": true,
+    "Runtime": "Windows PowerShell 5.1 / .NET Framework",
+    "AvailableToOlderVersion": "1.1.6",
+    "ReleasePage": "https://github.com/IINasK/mod-loader/releases/tag/v1.1.6",
+    "CurrentVersionDoesNotNotify": true,
+    "DownloadUrl": "https://github.com/IINasK/mod-loader/releases/download/v1.1.6/Mod-Loader-1.1.6.exe",
+    "DownloadBytes": 7241728,
+    "DownloadedSha256": "AADD6C505067D67778816F7815D9F0A51BD99B228EC06E0EBA95F7FCC594DDC2",
+    "DownloadedExecutableWasRun": false,
+    "TempDownloadRemoved": true
+  },
   "Logo": {
     "Source": "Instalador/Online/Fonte/Assets/ModLoader.svg",
     "VectorBytes": 1248,
