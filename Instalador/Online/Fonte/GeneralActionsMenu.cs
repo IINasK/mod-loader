@@ -24,6 +24,6 @@ internal sealed class GeneralActionsMenu : GeneralDialog {
     }
     void Add(TableLayoutPanel layout,string id,string pt,string en,string icon,int row){
         var button=(GeneralButton)GeneralStyle.Button(GeneralStyle.T(pt,en),()=>{ActionId=id;Complete(DialogResult.OK);});
-        button.Name=id;button.IconKind=icon;button.TextAlign=ContentAlignment.MiddleLeft;button.Dock=DockStyle.Fill;button.Margin=new Padding(0,0,0,4);layout.Controls.Add(button,0,row);
+        button.Name=id;button.IconKind=icon;button.TextAlign=ContentAlignment.MiddleLeft;button.Dock=DockStyle.Fill;button.Margin=new Padding(0,2,0,2);layout.Controls.Add(button,0,row);
     }
 }

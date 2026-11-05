@@ -208,6 +208,7 @@ internal sealed class GeneralPicker : UserControl {
     internal ComboBoxStyle DropDownStyle {get{return style;}set{style=value;input.Visible=value==ComboBoxStyle.DropDown;PerformLayout();Invalidate();}}
     internal int MaxLength {get{return input.MaxLength;}set{input.MaxLength=value;}}
     internal ToolStripDropDown OpenPopup {get{return dropdown;}}
+    internal bool IconOnly {get;set;}
     internal GeneralPicker(){
         SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.Selectable,true);
         Height=44;MinimumSize=new Size(80,44);MaximumSize=new Size(0,44);Font=GeneralStyle.Font(12);BackColor=GeneralStyle.Surface;ForeColor=GeneralStyle.Foreground;Cursor=Cursors.Hand;
@@ -224,9 +225,9 @@ internal sealed class GeneralPicker : UserControl {
     protected override void OnPaint(PaintEventArgs e){
         Control surface=Parent;while(surface!=null&&surface.BackColor.A<255)surface=surface.Parent;
         e.Graphics.Clear(surface==null?GeneralStyle.Background:surface.BackColor);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
-        GeneralStyle.PaintRoundedFace(e.Graphics,new RectangleF(0,0,Width,Height),16,Focused||input.Focused||dropdown!=null&&dropdown.Visible?GeneralStyle.Accent:GeneralStyle.Line,GeneralStyle.Surface);
-        if(style==ComboBoxStyle.DropDownList)TextRenderer.DrawText(e.Graphics,Text,Font,new Rectangle(14,0,Width-62,Height),Enabled?GeneralStyle.Foreground:GeneralStyle.Muted,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
-        LucideIcons.Draw(e.Graphics,dropdown!=null&&dropdown.Visible?"up":"down",new Rectangle(Width-34,(Height-20)/2,20,20),GeneralStyle.Accent);
+        if(!IconOnly||Focused||dropdown!=null&&dropdown.Visible)GeneralStyle.PaintRoundedFace(e.Graphics,new RectangleF(0,0,Width,Height),16,Focused||input.Focused||dropdown!=null&&dropdown.Visible?GeneralStyle.Accent:GeneralStyle.Line,GeneralStyle.Surface);
+        if(!IconOnly&&style==ComboBoxStyle.DropDownList)TextRenderer.DrawText(e.Graphics,Text,Font,new Rectangle(14,0,Width-62,Height),Enabled?GeneralStyle.Foreground:GeneralStyle.Muted,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
+        LucideIcons.Draw(e.Graphics,dropdown!=null&&dropdown.Visible?"up":"down",new Rectangle(IconOnly?(Width-20)/2:Width-34,(Height-20)/2,20,20),Enabled?GeneralStyle.Accent:GeneralStyle.Muted);
     }
     protected override void OnMouseClick(MouseEventArgs e){base.OnMouseClick(e);if(e.Button==MouseButtons.Left&&(style==ComboBoxStyle.DropDownList||e.X>=Width-44)){Focus();Toggle();}}
     protected override bool ProcessCmdKey(ref Message message,Keys keyData){

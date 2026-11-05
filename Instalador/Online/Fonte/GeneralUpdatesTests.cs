@@ -9,8 +9,8 @@ internal static class GeneralUpdatesTests {
     internal static void Run(string parent){
         string root=Path.Combine(parent,"updates-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
         var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
-        Func<string,string> payload=tag=>Safe.Json.Serialize(new{tag_name=tag,draft=false,prerelease=false,assets=new[]{new{name="Mod Loader 1.1.10.exe",state="uploaded",size=12345,
-            browser_download_url="https://github.com/"+GeneralUpdateChecker.Repository+"/releases/download/"+tag+"/Mod%20Loader%201.1.10.exe"}}});
+        Func<string,string> payload=tag=>Safe.Json.Serialize(new{tag_name=tag,draft=false,prerelease=false,assets=new[]{new{name="Mod Loader "+tag.TrimStart('v')+".exe",state="uploaded",size=12345,
+            browser_download_url="https://github.com/"+GeneralUpdateChecker.Repository+"/releases/download/"+tag+"/Mod%20Loader%20"+tag.TrimStart('v')+".exe"}}});
         string valid=payload("v1.1.10");
         var newer=GeneralUpdateChecker.Parse(valid,"1.1.6");
         check(newer!=null&&newer.Version=="1.1.10"&&newer.Page.EndsWith("/releases/tag/v1.1.10"),"Compara versões numericamente: 1.1.10 é posterior a 1.1.6 e aponta para a Release oficial.");
@@ -26,7 +26,8 @@ internal static class GeneralUpdatesTests {
         var checker=new GeneralUpdateChecker(()=>{calls++;return source.Task;});
         var first=checker.CheckOnce();var second=checker.CheckOnce();
         check(Object.ReferenceEquals(first,second)&&calls==1&&!first.IsCompleted,"Duas chamadas simultâneas fazem uma só consulta sem bloquear a interface.");
-        source.SetResult(valid);check(first.GetAwaiter().GetResult().Version=="1.1.10"&&Object.ReferenceEquals(first,checker.CheckOnce())&&calls==1,"Reabrir menu/recriar UI não repete a consulta nesta sessão.");
+        var current=new Version(GeneralUpdateChecker.CurrentVersion);string future=current.Major+"."+current.Minor+"."+(current.Build+1);
+        source.SetResult(payload("v"+future));var result=first.GetAwaiter().GetResult();check(result!=null&&result.Version==future&&Object.ReferenceEquals(first,checker.CheckOnce())&&calls==1,"Reabrir menu/recriar UI não repete a consulta nesta sessão.");
         int failed=0;var offline=new GeneralUpdateChecker(()=>{failed++;throw new WebException("offline");});
         check(offline.CheckOnce().GetAwaiter().GetResult()==null&&offline.CheckOnce().Result==null&&failed==1,"Sem internet, privado, timeout ou rate limit não bloqueiam nem repetem a abertura.");
         var malformed=new GeneralUpdateChecker(()=>Task.FromResult("{invalido"));

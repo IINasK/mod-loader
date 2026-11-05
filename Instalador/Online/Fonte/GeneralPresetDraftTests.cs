@@ -18,6 +18,7 @@ internal sealed partial class GeneralModWindow {
             check(!form.presetSettings.Enabled&&!form.discardPreset.Enabled&&form.deletePreset.Enabled,"Salvar/descartar aguardam alterações; excluir requer um preset.");
             check(((GeneralButton)form.presetSettings).IconKind=="save"&&((GeneralButton)form.discardPreset).IconKind=="close"&&((GeneralButton)form.deletePreset).IconKind=="trash","Preset usa os ícones oficiais de disquete, X e lixeira.");
             check(form.preset.PointToScreen(Point.Empty).Y==form.presetSettings.PointToScreen(Point.Empty).Y&&form.presetSettings.Right<=form.discardPreset.Left&&form.discardPreset.Right<=form.deletePreset.Left,"Ações do preset ficam alinhadas ao seletor e na ordem pedida.");
+            check(form.preset.IconOnly&&form.preset.Parent==form.tableName.Parent&&form.presetSettings.Parent==form.tableName.Parent&&form.mainLayout.GetControlFromPosition(0,2)==null,"Seletor e ações integrados ao título, sem a linha Preset duplicada.");
             check(!form.grid.Columns.Contains("ResetPreset"),"A lixeira antiga não fica duplicada no cabeçalho da tabela.");
             form.tableName.Text="Rascunho";form.marked.Add(a.Id);form.DrawRows();
             check(form.ActivePreset.Name=="Original"&&form.library.Load().List.Presets.Single().Name=="Original"&&form.presetSettings.Enabled&&form.discardPreset.Enabled,"Nome digitado e seleção são rascunhos até salvar.");
@@ -42,10 +43,11 @@ internal sealed partial class GeneralModWindow {
                 state.Theme=theme;form.BuildInterface();form.PerformLayout();await Task.Delay(40);
                 var remove=AllControls(form).OfType<Button>().Single(button=>button.Name=="UninstallSelected");var install=AllControls(form).OfType<Button>().Single(button=>button.Name=="DownloadInstall");
                 check(Math.Abs(remove.PointToScreen(Point.Empty).Y+remove.Height/2-install.PointToScreen(Point.Empty).Y-install.Height/2)<=1,"Botões do rodapé têm o mesmo centro vertical: "+theme);
+                check(((GeneralButton)remove).Primary&&((GeneralButton)remove).Destructive&&remove.Height==install.Height&&remove.Font.Size==install.Font.Size&&remove.Font.Bold==install.Font.Bold,"Desinstalar segue altura, preenchimento e tipografia de Baixar/Instalar: "+theme);
                 var windowBounds=form.Bounds;int rows=form.grid.RowCount,height=form.grid.Height;string selectedPreset=form.state.SelectedPreset;var markedBefore=form.marked.ToArray();
                 form.expandList.PerformClick();form.PerformLayout();await Task.Delay(25);
                 check(form.listExpanded&&form.Bounds==windowBounds&&form.grid.Height>height+150&&form.tableName.Visible&&form.expandList.Visible,"Expandir aumenta só a lista dentro da janela: "+theme);
-                check(!form.destination.Visible&&!form.preset.Visible&&!form.optionsButton.Visible&&!remove.Visible&&!install.Visible&&!form.currentProgress.Visible,"Modo lista oculta controles externos: "+theme);
+                check(!form.destination.Visible&&form.preset.Visible&&form.presetSettings.Visible&&!form.optionsButton.Visible&&!remove.Visible&&!install.Visible&&!form.currentProgress.Visible,"Modo lista oculta controles externos e mantém ações do título: "+theme);
                 check(form.grid.RowCount==rows&&form.state.SelectedPreset==selectedPreset&&form.marked.SetEquals(markedBefore)&&((GeneralButton)form.expandList).IconKind=="minimize","Expandir preserva itens, preset e seleção e oferece restaurar: "+theme);
                 CaptureUi(form,Path.Combine(root,"lista-expandida-"+theme+".png"));form.expandList.PerformClick();form.PerformLayout();
                 check(!form.listExpanded&&form.grid.Height==height&&form.destination.Visible&&form.preset.Visible&&remove.Visible&&install.Visible&&form.Bounds==windowBounds,"Restaurar recupera layout e controles sem maximizar o aplicativo: "+theme);

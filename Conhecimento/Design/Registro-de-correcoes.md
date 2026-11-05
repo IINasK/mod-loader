@@ -56,3 +56,11 @@ Registro solicitado por Douglas em 05/11/2026 para preparar um relatório futuro
 Última revisão concluída: 1.1.8. Validação: 1.394 verificações em22relatórios, com limites e falhas intermediárias em ../Menus-e-estabilidade-1.1.8.md e ../Validacoes/1.1.8.json.
 
 - Rodapé: centralizar verticalmente os botões de alturas diferentes; não alinhar só o topo ou a base. Compartilhar fica no menu, sem duplicar o botão inferior.
+
+## Cabeçalho e navegação — 1.1.10
+
+- O seletor de preset e disquete/X/lixeira ficam no cabeçalho da tabela, junto ao nome editável. Remover o campo Preset duplicado acima. Manter essas ações ao expandir somente a lista.
+- Desinstalar selecionados segue preenchimento, altura, raio e fonte de Baixar/Instalar, com cor destrutiva própria e contraste legível.
+- Preferir ícones oficiais reconhecíveis para navegação; usar texto nos menus e nome acessível nos botões compactos. Incorporado à referência de ícones da G3 Design.
+- Divisor entre grupos deve ter respiro simétrico entre os limites pintados dos itens, incluindo suas margens. Margem só embaixo deslocava o centro percebido. Corrigido com margens verticais iguais e medido em seis combinações de idioma/tema. Regra incorporada à geometria da G3 Design.
+- 1.431 verificações/22relatórios aprovados em fixtures; imagens de cabeçalho e menu conferidas. O defeito anterior da seleção retangular continua apenas registrado, sem correção neste executável.

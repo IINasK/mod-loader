@@ -39,6 +39,7 @@ internal static class GeneralStyle {
     internal static Color SoftLine {get{return ColorTranslator.FromHtml(Dark?"#3a334e":RedTheme?"#f0dde1":"#e9e5f0");}}
     internal static Color Selection {get{return ColorTranslator.FromHtml(Dark?"#3e335b":RedTheme?"#fde9ec":"#eee9fc");}}
     internal static Color Danger {get{return ColorTranslator.FromHtml(Dark?"#ffadb9":"#b42348");}}
+    internal static Color DangerFill {get{return ColorTranslator.FromHtml("#b42348");}}
     internal static GraphicsPath Round(RectangleF box,float radius){
         float d=Math.Min(radius*2,Math.Min(box.Width,box.Height));
         var path=new GraphicsPath();
@@ -144,7 +145,7 @@ internal sealed class GeneralButton : Button {
         // ButtonBase can leave stale themed pixels outside the rounded face.
         Control surface=Parent;while(surface!=null&&surface.BackColor.A<255)surface=surface.Parent;
         g.Clear(surface==null?GeneralStyle.Background:surface.BackColor);
-        Color fill=Primary?GeneralStyle.Primary:GeneralStyle.Surface;
+        Color fill=Primary?(Destructive?GeneralStyle.DangerFill:GeneralStyle.Primary):GeneralStyle.Surface;
         Color ink=Primary?Color.White:Destructive?GeneralStyle.Danger:GeneralStyle.Foreground;
         if(!Enabled){fill=GeneralStyle.Selection;ink=GeneralStyle.Muted;}
         if(!Bare)GeneralStyle.PaintRoundedFace(g,new RectangleF(0,0,Width,Height),Math.Min(22,Height/2),Focused?GeneralStyle.Accent:Primary?fill:GeneralStyle.Line,fill);

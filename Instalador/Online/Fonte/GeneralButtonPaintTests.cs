@@ -10,11 +10,12 @@ internal static class GeneralButtonPaintTests {
         var records=new List<object>();
         bool before=GeneralStyle.Dark;
         try{
-            foreach(bool dark in new[]{false,true})foreach(bool primary in new[]{false,true}){
+            foreach(bool dark in new[]{false,true})foreach(int kind in new[]{0,1,2}){
+                bool primary=kind!=0;
                 GeneralStyle.Dark=dark;
                 using(var surface=new Panel{BackColor=GeneralStyle.Background,Size=new Size(360,120)})
                 using(var nested=new Panel{BackColor=Color.Transparent,Size=surface.Size})
-                using(var button=new GeneralButton{Text="Teste",Primary=primary,Size=new Size(140,44)}){
+                using(var button=new GeneralButton{Text="Teste",Primary=primary,Destructive=kind==2,Size=new Size(140,44)}){
                     surface.Controls.Add(nested);nested.Controls.Add(button);
                     foreach(string state in new[]{"normal","hover","pressed","disabled","resized","repaint"}){
                         button.Enabled=state!="disabled";
@@ -30,7 +31,8 @@ internal static class GeneralButtonPaintTests {
                                 if(bitmap.GetPixel(point.X,point.Y).ToArgb()!=expected)throw new InvalidOperationException("Restos de pintura no canto: "+state);
                             var center=bitmap.GetPixel(bitmap.Width/2,8);
                             if(center.ToArgb()==Color.Magenta.ToArgb())throw new InvalidOperationException("A face do botão não foi pintada.");
-                            passed++;records.Add(new{Dark=dark,Primary=primary,State=state,OpaqueCorners=true});
+                            if(kind==2&&button.Enabled&&center.ToArgb()!=GeneralStyle.DangerFill.ToArgb())throw new InvalidOperationException("A ação destrutiva preenchida precisa manter sua cor própria.");
+                            passed++;records.Add(new{Dark=dark,Primary=primary,Destructive=kind==2,State=state,OpaqueCorners=true});
                         }
                     }
                 }

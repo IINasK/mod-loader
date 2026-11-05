@@ -11,6 +11,8 @@ Indice interno de138componentes ativos do instalador. Revisao de05/11/2026; font
 
 ## Consulta
 
+- Cabeçalho, botões e divisor do menu: [versão1.1.10](Cabecalho-e-acoes-1.1.10.md), mantendo a logo local1.1.9.
+
 - Menus, projetos prontos e presets: [versão 1.1.8](Menus-e-estabilidade-1.1.8.md), [validação](Validacoes/1.1.8.json) e [registro de correções de design](Design/Registro-de-correcoes.md).
 
 - Tela inicial, projetos e temas: [versão 1.1.7](Projetos-e-temas-1.1.7.md). Preserva a biblioteca anterior, separa projetos e adiciona logo transparente e tema claro vermelho.

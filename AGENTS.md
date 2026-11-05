@@ -1,6 +1,15 @@
 # Cyberpunk 2077 — pacote coop
 
-## Revisão atual 1.1.8 — Mod Loader — 05/11/2026
+## Revisão atual 1.1.10 — cabeçalho, ações e divisor — 05/11/2026
+
+- Incremental sobre1.1.8 e a logo1.1.9 local aprovada em outro chat concluído. Preservar SVG/ICO exatos, renderer vetorial e ícones por tema; recursos e validação da logo entram no histórico antes desta revisão. Não voltar ao renderer de polígonos antigo. A1.1.9 não foi publicada;1.1.10 consolida a interface e a marca sem alterar catálogo/mods/RED4ext.
+- Pedido por imagens: remover linha Preset acima da tabela; nome editável, seta de presets, disquete, X, lixeira, reload e expandir ficam numa linha no cabeçalho da tabela. Reutiliza GeneralPicker.IconOnly (44px), com o mesmo popup/teclado/lista de largura legível, foco e nome acessível. Ações do cabeçalho permanecem no modo lista expandida. Não substituir a edição de nome nem as regras de preset protegido.
+- Desinstalar selecionados segue o botão preenchido de Baixar/Instalar:52px/fonte13bold/mesmo componente, vermelho DangerFill e texto branco. Só apresentação; confirmações/recibos/fila/motor de remoção preservados. Divisor do menu centralizado entre limites visíveis dos botões; margens agora2px acima/abaixo, não4px só embaixo. Seis asserts PT/EN x3temas medem simetria.
+- G3 Design: referências de ícones e geometria receberam preferência por ícones reconhecíveis na navegação e divisores entre áreas pintadas. Outros arquivos/alterações do repositório G3 preservados, sem commit/publicação daquele repositório. Registro no conhecimento do Mod Loader. Defeito anterior seleção retangular/moldura arredondada segue registrado e não foi corrigido nesta revisão.
+- Suíte final1431checks/22relatórios em D:\T110release passou. Inclui48preset,85menu,36pintura,45marca. Rodada anterior parou em GeneralUpdatesTests porque mockfuturo1.1.10 coincidia com versão atual; teste agora calcula próxima patch e confere não nulo antes de acessar. Verificador real inalterado. Menus/editor renderizados conferidos; fixtures de fila/P2P/snapshots passaram. Não houve instalação/gameplay/savesreais nem transferência entre PCs.
+- EXEúnico Mod Loader1.1.10.exe7409152bytes/SHA8F4FD605BA58DF4A675B23E5E946C2613B7D8E0CA86E072EE3BFAEA276D337F5. Catálogo138/135/8 SHA89c68e6bdb8c192977fcace5d30a4b8b25912d8780fd6067f77f5c7d41c6dc05 preservado. Publicar Mod-Loader-1.1.10.exe pelas Releases IINasK/mod-loader e commitmain, sem mods/saves/cache/recibos. Referências Conhecimento/Cabecalho-e-acoes-1.1.10.md e Validacoes/1.1.10.json. Não repetir desligamento antigo.
+
+## Revisão 1.1.8 — Mod Loader — 05/11/2026
 
 - Pedido adicional: ícone Lucide maximize-2/minimize-2 à direita de reload alterna somente a área da lista. SetListExpanded oculta linhas externas do TableLayoutPanel e restaura AutoSize, mantendo título/grid/scroll/filtros/seleção e Bounds da janela. Estado apenas de sessão, sem Persist ou mudar preset.12asserts adicionais nos3temas verificam aumento da área, ocultação, preservação e restauração; suite final1394/22 em D:\T118done. Não confundir com maximizar a janela do Windows.
 
