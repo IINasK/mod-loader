@@ -2,7 +2,7 @@ $ErrorActionPreference='Stop'
 $online=Split-Path -Parent $PSScriptRoot
 $project=Split-Path -Parent (Split-Path -Parent $online)
 $program=Join-Path $online 'Programa'
-$version='1.1.1'
+$version='1.1.2'
 $source=Join-Path $program 'Cyberpunk Coop.exe'
 $destination=Join-Path $project ('Mod Loader '+$version+'.exe')
 $assembly=[Reflection.Assembly]::Load([IO.File]::ReadAllBytes($source))
@@ -16,6 +16,8 @@ $expected=@{
  'CyberpunkCoop.Reader.Source.tar.xz'=(Join-Path $reader '7z2605-src.tar.xz')
  'ModLoader.Jost.ttf'=(Join-Path $PSScriptRoot 'Assets\Jost.ttf')
  'ModLoader.Jost-OFL.txt'=(Join-Path $PSScriptRoot 'Assets\Jost-OFL.txt')
+ 'ModLoader.Lucide.ttf'=(Join-Path $PSScriptRoot 'Assets\Lucide.ttf')
+ 'ModLoader.Lucide-LICENSE.txt'=(Join-Path $PSScriptRoot 'Assets\Lucide-LICENSE.txt')
 }
 if($resources.Count -ne $expected.Count -or @($resources|Where-Object {-not $expected.ContainsKey($_)}).Count -ne 0){throw 'Recursos inesperados no executável'}
 foreach($resource in $resources){

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -73,7 +74,7 @@ internal sealed partial class GeneralModWindow {
         var visible=grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(r=>Equals(r.Tag,work.Entry.Id));
         var listed=state.List.Mods.FirstOrDefault(m=>m.Id==work.Entry.Id);
         if(visible!=null&&listed!=null&&Object.ReferenceEquals(Selected(listed),work.Variant)){
-            visible.Cells["Status"].Value=GeneralStyle.Status(status);visible.Cells["Status"].ToolTipText=message??status;
+            visible.Cells["Status"].Value=GeneralStatusPresentation.Label(status);visible.Cells["Status"].ToolTipText=message??GeneralStyle.Status(status);
             visible.Cells["Progress"].Value=pct.HasValue?(object)pct.Value:"—";UpdateCounts();
         }
         if(message!=null)detail.Text=message;
@@ -126,6 +127,8 @@ internal sealed partial class GeneralModWindow {
                 string found=null;
                 if(!skipRequests.Contains(work))found=await Task.Run(()=>{try{return Status(work,root);}catch(Exception){return "Não verificável";}});
                 bool skipped=skipRequests.Contains(work);statuses[work.Key]=skipped?"Verificação pulada":found??"Não verificável";progress.Remove(work.Key);
+                var visible=ModRows().FirstOrDefault(row=>Equals(row.Tag,work.Entry.Id));
+                if(visible!=null){visible.Cells["Status"].Value=GeneralStatusPresentation.Label(statuses[work.Key]);visible.Cells["Status"].ToolTipText=GeneralStyle.Status(statuses[work.Key]);grid.InvalidateRow(visible.Index);UpdateCounts();}
                 operationFinished++;work.Ended=true;UpdateFlow(work,statuses[work.Key],skipped?(int?)null:found=="Instalado"?100:0);Stage(work,"scan.end");
             }
             DrawRows();
@@ -143,7 +146,7 @@ internal sealed partial class GeneralModWindow {
         string root=Root();
         string description=String.Join("\n",jobs.Take(9).Select(w=>"• "+w.Entry.Name+" — "+w.Variant.Name));
         if(jobs.Count>9)description+="\n… e mais "+(jobs.Count-9)+".";
-        if(MessageBox.Show(this,T("Baixar/Instalar ","Download/Install ")+jobs.Count+T(" mod(s) em:\n"," mod(s) in:\n")+root+"\n\n"+description,T("Confirmar instalação","Confirm installation"),MessageBoxButtons.OKCancel,MessageBoxIcon.Question)!=DialogResult.OK)return;
+        if(GeneralDialog.Message(this,T("Baixar/Instalar ","Download/Install ")+jobs.Count+T(" mod(s) em:\n"," mod(s) in:\n")+root+"\n\n"+description,T("Confirmar instalação","Confirm installation"),MessageBoxButtons.OKCancel,MessageBoxIcon.Question)!=DialogResult.OK)return;
         Enqueue(jobs,false);
     }
     async void Enqueue(IEnumerable<Work> jobs,bool urgent){
@@ -183,7 +186,7 @@ internal sealed partial class GeneralModWindow {
         catch(Exception ex){
             string message=work.Entry.Name+": "+ex.Message;
             RowStatus(work,"Falhou",null,message);
-            if(!interrupt&&!testMode)MessageBox.Show(this,message,T("Falha na instalação","Installation failed"),MessageBoxButtons.OK,MessageBoxIcon.Warning);
+            if(!interrupt&&!testMode)GeneralDialog.Message(this,message,T("Falha na instalação","Installation failed"),MessageBoxButtons.OK,MessageBoxIcon.Warning);
         }
         finally{work.Ended=true;operationFinished++;UpdateFlow(null,"");skipRequests.Remove(work);Stage(work,"work.end");}
     }
@@ -234,7 +237,7 @@ internal sealed partial class GeneralModWindow {
                 var request=ex.InnerException as FileApprovalRequest;
                 if(request==null||testMode||!approvals.Add(request.ModId+"/"+request.Entry))throw;
                 string path=Safe.In(root,request.Path);Safe.NoLinks(path);
-                if(File.Exists(path)||Directory.Exists(path)||MessageBox.Show(this,ex.Message+"\n\nO arquivo difere do catálogo e pode causar falhas. Instalar mesmo assim?","Arquivo diferente",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)throw;
+                if(File.Exists(path)||Directory.Exists(path)||GeneralDialog.Message(this,ex.Message+"\n\nO arquivo difere do catálogo e pode causar falhas. Instalar mesmo assim?","Arquivo diferente",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)throw;
                 UserFileApprovals.Approve(catalog,root,request);
             }
         }
@@ -251,7 +254,7 @@ internal sealed partial class GeneralModWindow {
                     if(association!=null){
                         string selected=association;association=null;
                         try{await Task.Run(()=>cache.Import(selected,asset));return;}
-                        catch(IOException ex){if(!testMode)MessageBox.Show(this,ex.Message,T("Arquivo diferente","Different file"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+                        catch(IOException ex){if(!testMode)GeneralDialog.Message(this,ex.Message,T("Arquivo diferente","Different file"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}
                     }
                     var file=await Task.Run(()=>watch.Poll());
                     while(editingAttachment)await Task.Delay(100);
@@ -347,7 +350,7 @@ internal sealed partial class GeneralModWindow {
             if(jobs.Count==0){var item=FocusedEntry();if(item!=null)jobs.Add(MakeWork(item));}
             if(jobs.Count==0)return;
             string root=Root();
-            if(MessageBox.Show(this,"Desinstalar "+jobs.Count+" variante(s) de:\n"+root+"?","Confirmar remoção",MessageBoxButtons.OKCancel,MessageBoxIcon.Warning)!=DialogResult.OK)return;
+            if(GeneralDialog.Message(this,"Desinstalar "+jobs.Count+" variante(s) de:\n"+root+"?","Confirmar remoção",MessageBoxButtons.OKCancel,MessageBoxIcon.Warning)!=DialogResult.OK)return;
             working=true;Busy(true);
             try{
                 string result=await Task.Run(()=>{
@@ -380,16 +383,23 @@ internal sealed partial class GeneralModWindow {
             if(clean){
                 var plan=await Task.Run(()=>engine.PlanExtraReset());
                 if(plan.Count==0){detail.Text="Nenhum arquivo fora do pacote Cyberpunk foi encontrado.";return;}
-                using(var review=new Form{Text="Revisar arquivos fora do pacote Cyberpunk",Width=820,Height=475,StartPosition=FormStartPosition.CenterParent}){
+                using(var review=new GeneralDialog(T("Revisar arquivos fora do pacote Cyberpunk","Review files outside the Cyberpunk pack")){ClientSize=new Size(820,475)}){
+                    var layout=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(20,8,20,20),ColumnCount=1,RowCount=2};
+                    layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                    var field=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(12),Margin=Padding.Empty};
                     var paths=new TextBox{Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Both,WordWrap=false,Dock=DockStyle.Fill,Text=String.Join("\r\n",plan.Select(p=>p.Path))};
-                    var go=new Button{Text="Revisado, continuar",DialogResult=DialogResult.OK,AutoSize=true,Dock=DockStyle.Bottom};
-                    review.Controls.Add(paths);review.Controls.Add(go);
+                    field.Controls.Add(paths);layout.Controls.Add(field,0,0);
+                    var buttons=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.RightToLeft,Padding=new Padding(0,14,0,0),WrapContents=false};
+                    var go=GeneralStyle.Button(T("Revisado, continuar","Reviewed, continue"),()=>review.Complete(DialogResult.OK),true);
+                    var cancel=GeneralStyle.Button(T("Cancelar","Cancel"),()=>review.Complete(DialogResult.Cancel));
+                    buttons.Controls.Add(go);buttons.Controls.Add(cancel);layout.Controls.Add(buttons,0,1);review.Content.Controls.Add(layout);
+                    review.AcceptButton=go;review.CancelButton=cancel;GeneralStyle.Apply(review,GeneralStyle.Dark);paths.BorderStyle=BorderStyle.None;
                     if(review.ShowDialog(this)!=DialogResult.OK)return;
                 }
-                if(MessageBox.Show(this,"Retirar os "+plan.Count+" arquivos listados? Eles serão guardados para desfazer a operação.","Confirmar limpeza",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+                if(GeneralDialog.Message(this,"Retirar os "+plan.Count+" arquivos listados? Eles serão guardados para desfazer a operação.","Confirmar limpeza",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
                 detail.Text=await Task.Run(()=>engine.ApplyExtraReset(plan,Report));
             }else{
-                if(MessageBox.Show(this,"Desfazer a última operação do Cyberpunk?","Confirmar reversão",MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+                if(GeneralDialog.Message(this,"Desfazer a última operação do Cyberpunk?","Confirmar reversão",MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
                 detail.Text=await Task.Run(()=>engine.Undo(Report));
             }
             changed=true;
@@ -398,3 +408,4 @@ internal sealed partial class GeneralModWindow {
         if(changed)await Scan();
     }
 }
+

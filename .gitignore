@@ -63,3 +63,8 @@
 # UI font and license required for offline builds.
 !/Instalador/Online/Fonte/Assets/Jost.ttf
 !/Instalador/Online/Fonte/Assets/Jost-OFL.txt
+
+## Official icon font and license required for offline builds.
+!/Instalador/Online/Fonte/Assets/Lucide.ttf
+!/Instalador/Online/Fonte/Assets/Lucide.css
+!/Instalador/Online/Fonte/Assets/Lucide-LICENSE.txt

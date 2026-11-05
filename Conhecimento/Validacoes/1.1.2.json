@@ -1,0 +1,549 @@
+{
+  "Version": "1.1.2",
+  "BasedOn": "1.1.1",
+  "Passed": true,
+  "ExecutableSha256": "3ED2A47391D6BE735DB341ACBB92E732A72C010A3F12F8FE7537F54E9C0070D6",
+  "CatalogSha256": "87a1039ef472f6e64011a49f5ea9a84839458738f287030014626dea1e9283b8",
+  "Checks": 1284,
+  "Reports": 39,
+  "Results": [
+    {
+      "Report": "resultado-auditor.json",
+      "Checks": 24
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 26
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 46
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 26
+    },
+    {
+      "Report": "resultado-categorias.json",
+      "Checks": 12
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 13
+    },
+    {
+      "Report": "resultado-defaults.json",
+      "Checks": 36
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 10
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 13
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 22
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 109
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 38
+    },
+    {
+      "Report": "resultado-aceite-interface.json",
+      "Checks": 8
+    },
+    {
+      "Report": "resultado-importacao-local.json",
+      "Checks": 9
+    },
+    {
+      "Report": "resultado-diagnostico.json",
+      "Checks": 10
+    },
+    {
+      "Report": "resultado-aprovacoes.json",
+      "Checks": 32
+    },
+    {
+      "Report": "resultado-unified.json",
+      "Checks": 25
+    },
+    {
+      "Report": "resultado-limpeza.json",
+      "Checks": 8
+    },
+    {
+      "Report": "resultado-facial-install.json",
+      "Checks": 110
+    },
+    {
+      "Report": "resultado-fpv-defaults.json",
+      "Checks": 20
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 100
+    },
+    {
+      "Report": "resultado-user-data.json",
+      "Checks": 17
+    },
+    {
+      "Report": "resultado-leitor.json",
+      "Checks": 41
+    },
+    {
+      "Report": "resultado-skip-download.json",
+      "Checks": 18
+    },
+    {
+      "Report": "resultado-density-window.json",
+      "Checks": 18
+    },
+    {
+      "Report": "resultado-loader-geral.json",
+      "Checks": 25
+    },
+    {
+      "Report": "resultado-pintura-botoes.json",
+      "Checks": 24
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 36
+    },
+    {
+      "Report": "resultado-floating.json",
+      "Checks": 31
+    },
+    {
+      "Report": "resultado-progresso-geral.json",
+      "Checks": 27
+    },
+    {
+      "Report": "resultado-status-presentation.json",
+      "Checks": 46
+    },
+    {
+      "Report": "resultado-ui-v2.json",
+      "Checks": 28
+    },
+    {
+      "Report": "resultado-skip.json",
+      "Checks": 22
+    },
+    {
+      "Report": "resultado-densidade.json",
+      "Checks": 91
+    },
+    {
+      "Report": "resultado-perfis-dlc.json",
+      "Checks": 29
+    },
+    {
+      "Report": "resultado-defaults-queue.json",
+      "Checks": 11
+    },
+    {
+      "Report": "resultado-remocao.json",
+      "Checks": 36
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 62
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 25
+    }
+  ],
+  "Painting": {
+    "Passed": true,
+    "Tests": [
+      {
+        "Dark": false,
+        "Primary": false,
+        "State": "normal",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": false,
+        "Primary": false,
+        "State": "hover",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": false,
+        "Primary": false,
+        "State": "pressed",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": false,
+        "Primary": false,
+        "State": "disabled",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": false,
+        "Primary": false,
+        "State": "resized",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": false,
+        "Primary": false,
+        "State": "repaint",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": false,
+        "Primary": true,
+        "State": "normal",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": false,
+        "Primary": true,
+        "State": "hover",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": false,
+        "Primary": true,
+        "State": "pressed",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": false,
+        "Primary": true,
+        "State": "disabled",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": false,
+        "Primary": true,
+        "State": "resized",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": false,
+        "Primary": true,
+        "State": "repaint",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": true,
+        "Primary": false,
+        "State": "normal",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": true,
+        "Primary": false,
+        "State": "hover",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": true,
+        "Primary": false,
+        "State": "pressed",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": true,
+        "Primary": false,
+        "State": "disabled",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": true,
+        "Primary": false,
+        "State": "resized",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": true,
+        "Primary": false,
+        "State": "repaint",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": true,
+        "Primary": true,
+        "State": "normal",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": true,
+        "Primary": true,
+        "State": "hover",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": true,
+        "Primary": true,
+        "State": "pressed",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": true,
+        "Primary": true,
+        "State": "disabled",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": true,
+        "Primary": true,
+        "State": "resized",
+        "OpaqueCorners": true
+      },
+      {
+        "Dark": true,
+        "Primary": true,
+        "State": "repaint",
+        "OpaqueCorners": true
+      }
+    ],
+    "RealGameTouched": false
+  },
+  "Popups": {
+    "Passed": true,
+    "Tests": [
+      "Ícone Lucide renderiza: menu",
+      "Ícone Lucide renderiza: list",
+      "Ícone Lucide renderiza: refresh",
+      "Ícone Lucide renderiza: down",
+      "Ícone Lucide renderiza: up",
+      "Ícone Lucide renderiza: check",
+      "Ícone Lucide renderiza: close",
+      "Ícone Lucide renderiza: folder",
+      "Variante diferente não entra no contador de instalados.",
+      "Erros aparecem na contagem.",
+      "Hover destaca uma linha de mod.",
+      "Sair da linha restaura o fundo.",
+      "Tema e idioma têm a mesma linha e altura.",
+      "Pasta e Escolher pasta compartilham altura e alinhamento.",
+      "Salvar e Cancelar terminam à direita.",
+      "Rodapé de opções não deixa faixa vazia extra.",
+      "Seletor abre popup próprio com recorte arredondado.",
+      "Seletor termina a expansão visível e sem recortar as opções. Visible=True Size={Width=300, Height=104} Client={Width=300, Height=104}",
+      "Navegar no seletor não altera a escolha antes de confirmar.",
+      "Fechamento do seletor inicia a contração.",
+      "Fechar seletor preserva o valor.",
+      "Enter confirma a escolha no seletor.",
+      "Menu Lista usa a animação de expansão.",
+      "Gerenciar termina a expansão mostrando a última opção.",
+      "Menu Lista completa a animação de fechamento.",
+      "Opções usa ancoragem e permanece dentro da área visível.",
+      "Diálogo animado termina mostrando todo o conteúdo.",
+      "Animação de fechamento preserva o resultado OK do diálogo.",
+      "A trilha da barra de rolagem fica escura.",
+      "Legenda traduzida acompanha a cor do estado.",
+      "Voltar ao tema claro restaura a barra de rolagem clara."
+    ],
+    "RealGameTouched": false,
+    "NetworkUsed": false
+  },
+  "Status": {
+    "Passed": 46,
+    "Tests": [
+      {
+        "Status": "Instalado",
+        "Kind": "installed"
+      },
+      {
+        "Status": "Instalado correto",
+        "Kind": "installed"
+      },
+      {
+        "Status": " INSTALADO ",
+        "Kind": "installed"
+      },
+      {
+        "Status": "Falhou",
+        "Kind": "error"
+      },
+      {
+        "Status": "Incompatível",
+        "Kind": "error"
+      },
+      {
+        "Status": "Não verificável",
+        "Kind": "error"
+      },
+      {
+        "Status": "Diferente/alterado",
+        "Kind": "error"
+      },
+      {
+        "Status": "Arquivos alterados",
+        "Kind": "error"
+      },
+      {
+        "Status": "Arquivo não encontrado",
+        "Kind": "error"
+      },
+      {
+        "Status": "Parcial",
+        "Kind": "error"
+      },
+      {
+        "Status": "Instalação parcial",
+        "Kind": "error"
+      },
+      {
+        "Status": "Parcial/pulado",
+        "Kind": "error"
+      },
+      {
+        "Status": "Na fila",
+        "Kind": "active"
+      },
+      {
+        "Status": "Verificando",
+        "Kind": "active"
+      },
+      {
+        "Status": "Baixando",
+        "Kind": "active"
+      },
+      {
+        "Status": "Instalando",
+        "Kind": "active"
+      },
+      {
+        "Status": "Conferindo download",
+        "Kind": "active"
+      },
+      {
+        "Status": "Aguardando download",
+        "Kind": "active"
+      },
+      {
+        "Status": "Aguardando arquivo",
+        "Kind": "active"
+      },
+      {
+        "Status": "",
+        "Kind": "pending"
+      },
+      {
+        "Status": "Não instalado",
+        "Kind": "pending"
+      },
+      {
+        "Status": "Não iniciado",
+        "Kind": "pending"
+      },
+      {
+        "Status": "Não conferido",
+        "Kind": "pending"
+      },
+      {
+        "Status": "A baixar",
+        "Kind": "pending"
+      },
+      {
+        "Status": "Pronto para instalar",
+        "Kind": "pending"
+      },
+      {
+        "Status": "Pulado",
+        "Kind": "pending"
+      },
+      {
+        "Status": "Verificação pulada",
+        "Kind": "pending"
+      },
+      {
+        "Status": "Setup NASK disponível",
+        "Kind": "pending"
+      },
+      {
+        "Status": "Instalado: Média",
+        "Kind": "pending"
+      },
+      {
+        "Status": "Instalado: Baixa",
+        "Kind": "pending"
+      },
+      {
+        "Status": "Instalado: Alta",
+        "Kind": "pending"
+      },
+      {
+        "Status": "Requer Phantom Liberty",
+        "Kind": "pending"
+      },
+      {
+        "Status": "Requer Cyberpunk 2077",
+        "Kind": "pending"
+      },
+      {
+        "Status": "Installed",
+        "Kind": "pending"
+      },
+      {
+        "Status": "Instalado parcialmente",
+        "Kind": "pending"
+      },
+      {
+        "Status": "Estado futuro",
+        "Kind": "pending"
+      },
+      {
+        "Status": null,
+        "Kind": "pending"
+      },
+      {
+        "Status": "Não conferido",
+        "Label": "Não baixado"
+      },
+      {
+        "Status": "Na fila",
+        "Label": "Não baixado"
+      },
+      {
+        "Status": "Baixando",
+        "Label": "Baixando"
+      },
+      {
+        "Status": "Pronto para instalar",
+        "Label": "Download concluído"
+      },
+      {
+        "Status": "Instalando",
+        "Label": "Download concluído"
+      },
+      {
+        "Status": "Instalado",
+        "Label": "Download concluído"
+      },
+      {
+        "Status": "Falhou",
+        "Label": "Falha"
+      },
+      {
+        "Status": "Parcial",
+        "Label": "Falha"
+      },
+      {
+        "Status": "Instalado",
+        "Label": "Download complete"
+      }
+    ],
+    "RealGameTouched": false,
+    "NetworkUsed": false
+  },
+  "RealGameTouched": false,
+  "LiveChecks": "Categoria e tema abrindo por inteiro; seleção e aplicação de tema; opções ancoradas com borda. Conferência ao vivo posterior da barra de título foi interrompida pelo Esc físico.",
+  "NativeCaptionTest": "DWM não disponível na sessão isolada; chamadas nativas com fallback incluídas. Rolagem escura e retorno ao claro testados por pixels."
+}

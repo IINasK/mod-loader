@@ -28,8 +28,10 @@ internal sealed partial class GeneralModWindow {
             check(!form.grid.Columns.Contains("Category")&&form.grid.Columns["Progress"].Visible==false,"Categoria vira seção e as duas barras ficam no rodapé.");
             check(form.grid.Rows.Cast<DataGridViewRow>().Count(r=>r.Tag is SectionRow&&((SectionRow)r.Tag).Kind=="add")==3,"Cada categoria, inclusive vazia, oferece Adicionar item.");
             check(((SectionRow)form.grid.Rows[form.grid.RowCount-1].Tag).Kind=="new","A lista termina com Criar nova categoria.");
-            var actions=form.listButton.Parent;
-            check(actions.Controls.Cast<Control>().All(c=>c.Top==form.listButton.Top&&c.Right<=actions.Width),"Ações do cabeçalho cabem na mesma linha em janela compacta.");
+            int center=form.filter.PointToScreen(new Point(0,form.filter.Height/2)).Y;
+            check(new Control[]{form.preset,form.reloadButton}.All(c=>Math.Abs(c.PointToScreen(new Point(0,c.Height/2)).Y-center)<=2),"Filtros e reload ficam na mesma linha.");
+            check(((GeneralButton)form.optionsButton).Bare&&form.optionsButton.Text==""&&((GeneralButton)form.optionsButton).IconKind=="menu","Opções usa apenas ícone de menu sem moldura.");
+            check(form.optionsButton.PointToScreen(Point.Empty).Y==form.listButton.PointToScreen(Point.Empty).Y&&form.listButton.Text=="Gerenciar"&&form.listButton.PointToScreen(new Point(form.listButton.Width,0)).X<form.optionsButton.PointToScreen(Point.Empty).X,"Gerenciar fica ao lado do ícone de Opções no cabeçalho.");
             check(form.destination.Parent.Height==44,"Campo da pasta mantém altura compacta alinhada ao botão.");
             check(form.Font.FontFamily.Name.IndexOf("Jost",StringComparison.OrdinalIgnoreCase)>=0,"A fonte Jost está embutida e em uso.");
             var click=new DataGridViewCellMouseEventArgs(0,-1,1,1,new MouseEventArgs(MouseButtons.Left,1,1,1,0));

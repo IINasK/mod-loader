@@ -10,6 +10,7 @@ using System.Windows.Forms;
 internal static class GeneralStyle {
     internal static bool Dark;
     internal static string Language="pt";
+    internal static bool AnimationsEnabled=true;
     static readonly PrivateFontCollection fonts=new PrivateFontCollection();
     static readonly IntPtr fontMemory;
     [DllImport("gdi32.dll")]static extern IntPtr AddFontMemResourceEx(IntPtr memory,uint size,IntPtr reserved,ref uint count);
@@ -50,18 +51,19 @@ internal static class GeneralStyle {
     internal static void Apply(Control control,bool dark){
         Dark=dark;
         control.BackColor=control is Form?Background:Surface;control.ForeColor=Foreground;
-        if(control.Font==null||control.Font.FontFamily.Name=="Microsoft Sans Serif"||control.Font.FontFamily.Name=="Segoe UI")control.Font=Font(12);
+        if(control.Font==null||control.Font.FontFamily.Name=="Microsoft Sans Serif"||control.Font.FontFamily.Name=="Segoe UI")control.Font=Font(control.Font==null?12:control.Font.Size,control.Font!=null&&control.Font.Bold);
         var button=control as Button;
         if(button!=null){button.MinimumSize=new Size(Math.Max(button.MinimumSize.Width,44),Math.Max(button.MinimumSize.Height,44));button.FlatStyle=FlatStyle.Flat;button.FlatAppearance.BorderColor=Line;button.FlatAppearance.BorderSize=1;button.UseVisualStyleBackColor=false;}
-        var combo=control as ComboBox;
-        if(combo!=null){combo.FlatStyle=FlatStyle.Flat;combo.BackColor=Surface;combo.ForeColor=Foreground;combo.DrawMode=DrawMode.OwnerDrawFixed;}
+        var combo=control as GeneralPicker;
+        if(combo!=null){combo.BackColor=Surface;combo.ForeColor=Foreground;}
         var text=control as TextBox;
-        if(text!=null){text.BackColor=Surface;text.ForeColor=Foreground;text.BorderStyle=BorderStyle.FixedSingle;}
+        if(text!=null){text.BackColor=Surface;text.ForeColor=Foreground;if(!(text.Parent is GeneralPicker)&&!(text.Parent is GeneralSurface))text.BorderStyle=BorderStyle.FixedSingle;}
         var checkbox=control as CheckBox;
         if(checkbox!=null)checkbox.UseVisualStyleBackColor=false;
         var progress=control as GeneralProgress;
         if(progress!=null){progress.Invalidate();return;}
         foreach(Control child in control.Controls)Apply(child,dark);
+        GeneralNativeTheme.Apply(control);
         control.Invalidate();
     }
     internal static string Status(string value){
@@ -84,16 +86,26 @@ internal static class GeneralStyle {
     };
 }
 
-internal sealed class GeneralPicker : ComboBox {
-    internal GeneralPicker(){DrawMode=DrawMode.OwnerDrawFixed;FlatStyle=FlatStyle.Flat;}
-    protected override void OnDrawItem(DrawItemEventArgs e){
-        Color fill=(e.State&DrawItemState.Selected)!=0?GeneralStyle.Selection:GeneralStyle.Surface;
-        using(var brush=new SolidBrush(fill))e.Graphics.FillRectangle(brush,e.Bounds);
-        string text=e.Index>=0?Convert.ToString(Items[e.Index]):Text;
-        var bounds=e.Bounds;bounds.X+=7;bounds.Width-=12;
-        TextRenderer.DrawText(e.Graphics,text,Font,bounds,GeneralStyle.Foreground,TextFormatFlags.SingleLine|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis);
-        base.OnDrawItem(e);
+internal static class GeneralNativeTheme {
+    [DllImport("dwmapi.dll")]static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
+    [DllImport("uxtheme.dll",CharSet=CharSet.Unicode)]static extern int SetWindowTheme(IntPtr window,string application,string classes);
+    internal static void ApplyTree(Control control){Apply(control);foreach(Control child in control.Controls)ApplyTree(child);}
+    internal static void Apply(Control control){
+        control.HandleCreated-=Created;control.HandleCreated+=Created;
+        if(!control.IsHandleCreated)return;
+        try{
+            if(control is Form){
+                int dark=GeneralStyle.Dark?1:0;
+                if(DwmSetWindowAttribute(control.Handle,20,ref dark,4)!=0)DwmSetWindowAttribute(control.Handle,19,ref dark,4);
+                int caption=GeneralStyle.Dark?ColorTranslator.ToWin32(GeneralStyle.Background):-1,text=GeneralStyle.Dark?ColorTranslator.ToWin32(GeneralStyle.Foreground):-1;
+                DwmSetWindowAttribute(control.Handle,35,ref caption,4);DwmSetWindowAttribute(control.Handle,36,ref text,4);
+            }
+            if(control is ScrollBar||control is TextBox||control is ListBox||control is DataGridView){
+                SetWindowTheme(control.Handle,GeneralStyle.Dark?"DarkMode_Explorer":"Explorer",null);
+            }
+        }catch(DllNotFoundException){}catch(EntryPointNotFoundException){}
     }
+    static void Created(object sender,EventArgs e){Apply((Control)sender);}
 }
 
 internal sealed class GeneralSurface : Panel {
@@ -109,7 +121,7 @@ internal sealed class GeneralSurface : Panel {
 }
 
 internal sealed class GeneralButton : Button {
-    internal bool Primary,Destructive;
+    internal bool Primary,Destructive,Bare;
     internal string IconKind;
     internal GeneralButton(){SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.Opaque,true);BackColor=GeneralStyle.Background;Cursor=Cursors.Hand;FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;UseVisualStyleBackColor=false;}
     protected override void OnPaintBackground(PaintEventArgs e){}
@@ -122,19 +134,15 @@ internal sealed class GeneralButton : Button {
         Color ink=Primary?Color.White:Destructive?GeneralStyle.Danger:GeneralStyle.Foreground;
         if(!Enabled){fill=GeneralStyle.Selection;ink=GeneralStyle.Muted;}
         using(var path=GeneralStyle.Round(new RectangleF(1,1,Width-3,Height-3),Math.Min(22,Height/2))){
+            if(!Bare){
             using(var brush=new SolidBrush(fill))g.FillPath(brush,path);
             using(var pen=new Pen(Focused?GeneralStyle.Accent:Primary?fill:GeneralStyle.Line,Focused?2:1))g.DrawPath(pen,path);
+            }else if(Focused&&ShowFocusCues){using(var pen=new Pen(GeneralStyle.Accent,2))g.DrawLine(pen,Width/2-10,Height-6,Width/2+10,Height-6);}
         }
         var textRect=new Rectangle(12,0,Width-24,Height);
         if(!String.IsNullOrEmpty(IconKind)){
             int x=String.IsNullOrEmpty(Text)?Width/2-9:14,y=Height/2-9;
-            using(var p=new Pen(ink,1.8f)){
-                p.StartCap=LineCap.Round;p.EndCap=LineCap.Round;
-                if(IconKind=="folder"){g.DrawLines(p,new[]{new Point(x,y+5),new Point(x,y),new Point(x+7,y),new Point(x+10,y+4),new Point(x+19,y+4),new Point(x+17,y+17),new Point(x,y+17),new Point(x,y+5),new Point(x+18,y+5)});}
-                if(IconKind=="refresh"){g.DrawArc(p,x+1,y+1,16,16,40,285);g.DrawLines(p,new[]{new Point(x+13,y),new Point(x+18,y+1),new Point(x+17,y+6)});}
-                if(IconKind=="options"){g.DrawEllipse(p,x+2,y+2,14,14);g.DrawEllipse(p,x+7,y+7,4,4);for(int i=0;i<8;i++){double a=i*Math.PI/4;g.DrawLine(p,x+9+(float)Math.Cos(a)*7,y+9+(float)Math.Sin(a)*7,x+9+(float)Math.Cos(a)*10,y+9+(float)Math.Sin(a)*10);}}
-                if(IconKind=="menu"){g.DrawLine(p,x,y+3,x+18,y+3);g.DrawLine(p,x,y+9,x+18,y+9);g.DrawLine(p,x+6,y+15,x+18,y+15);}
-            }
+            LucideIcons.Draw(g,IconKind,new Rectangle(x,y,20,20),ink);
             if(!String.IsNullOrEmpty(Text))textRect=new Rectangle(42,0,Width-52,Height);
         }
         TextRenderer.DrawText(g,Text,Font,textRect,ink,TextFormatFlags.VerticalCenter|TextFormatFlags.HorizontalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine);
@@ -166,13 +174,14 @@ internal sealed class GeneralMenuRenderer : ToolStripProfessionalRenderer {
         using(var brush=new SolidBrush(GeneralStyle.Selection))using(var shape=GeneralStyle.Round(new RectangleF(6,2,e.Item.Width-12,e.Item.Height-4),12))e.Graphics.FillPath(brush,shape);
     }
     protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e){e.TextColor=e.Item.Enabled?GeneralStyle.Foreground:GeneralStyle.Muted;base.OnRenderItemText(e);}
+    protected override void OnRenderImageMargin(ToolStripRenderEventArgs e){}
+    protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e){LucideIcons.Draw(e.Graphics,"check",new Rectangle(10,(e.Item.Height-18)/2,18,18),GeneralStyle.Accent);}
     protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e){using(var p=new Pen(GeneralStyle.SoftLine))e.Graphics.DrawLine(p,14,e.Item.Height/2,e.Item.Width-14,e.Item.Height/2);}
     internal static ContextMenuStrip Create(){
-        var menu=new ContextMenuStrip{Renderer=new GeneralMenuRenderer(),ShowImageMargin=false,DropShadowEnabled=false,Font=GeneralStyle.Font(12),Padding=new Padding(6),BackColor=GeneralStyle.Surface};
-        menu.Opened+=(s,e)=>{using(var path=GeneralStyle.Round(new RectangleF(0,0,menu.Width,menu.Height),16))menu.Region=new Region(path);};
+        var menu=new GeneralPopupMenu{Renderer=new GeneralMenuRenderer(),ShowImageMargin=false,DropShadowEnabled=false,Font=GeneralStyle.Font(12),Padding=new Padding(10),BackColor=GeneralStyle.Surface};
         return menu;
     }
     internal static ToolStripItem Add(ContextMenuStrip menu,string text,Action action){
-        var item=menu.Items.Add(text);item.AutoSize=false;item.Size=new Size(254,44);item.Click+=(s,e)=>action();return item;
+        var item=menu.Items.Add(text);item.AutoSize=false;item.Size=new Size(280,44);item.Padding=new Padding(12,0,12,0);item.Click+=(s,e)=>action();return item;
     }
 }

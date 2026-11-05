@@ -20,10 +20,11 @@ internal sealed partial class GeneralModWindow : Form {
     readonly Dictionary<string,int> progress=new Dictionary<string,int>();
     readonly List<Control> idle=new List<Control>();
     TextBox destination;
-    ComboBox filter,preset;
+    GeneralPicker filter,preset;
     DataGridView grid;
     Label detail,counts;
-    Button next,listButton;
+    Button next,listButton,reloadButton,optionsButton;
+    int hoveredRow=-1;
     GeneralProgress currentProgress,totalProgress;
     bool drawing,working,scanning;
     string startupIssue;
@@ -37,6 +38,7 @@ internal sealed partial class GeneralModWindow : Form {
     }
     internal GeneralModWindow(FixedCatalog catalog,DownloadCache cache,string appData,GeneralModState fixture=null) {
         this.catalog=catalog;this.cache=cache;data=appData;testMode=fixture!=null;
+        if(testMode)GeneralStyle.AnimationsEnabled=false;
         if(testMode)launch=url=>{throw new IOException("A abertura do navegador foi bloqueada no teste.");};
         library=new GeneralModLibrary(Path.Combine(data,"lista.json"));
         seed=GeneralModLibrary.Seed(catalog,new ModImportItem[0]);state=fixture;
@@ -60,7 +62,7 @@ internal sealed partial class GeneralModWindow : Form {
             foreach(var original in seed.Presets)state.List.Presets.Add(new GeneralModPreset{Id=original.Id,Name=original.Name,ModIds=original.ModIds.Where(ids.Contains).ToList()});
         }
         if(String.IsNullOrWhiteSpace(state.DownloadFolder))state.DownloadFolder=OnlineDownloadWatch.DefaultFolder();
-        Text="Mod Loader 1.1.1";ClientSize=new Size(1240,820);MinimumSize=new Size(1000,680);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
+        Text="Mod Loader 1.1.2";ClientSize=new Size(1240,820);MinimumSize=new Size(1000,680);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
         BuildInterface();
         FormClosing+=(s,e)=>{
             if(working){RequestSkip();normal.Clear();priority.Clear();e.Cancel=true;detail.Text=T("Aguarde a operação atual terminar antes de fechar.","Wait for the current operation to finish before closing.");}
@@ -79,29 +81,29 @@ internal sealed partial class GeneralModWindow : Form {
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(32,24,32,22),ColumnCount=1,RowCount=8,BackColor=BackColor};
         for(int i=0;i<8;i++)layout.RowStyles.Add(i==4?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.AutoSize));
         Controls.Add(layout);
-        var heading=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2};
-        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        var heading=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=3,Margin=Padding.Empty};
+        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         var titles=new FlowLayoutPanel{AutoSize=true,Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false,Margin=Padding.Empty};
         titles.Controls.Add(new Label{Text="MOD LOADER",AutoSize=true,Font=GeneralStyle.Font(27,true),ForeColor=GeneralStyle.Accent,Margin=Padding.Empty});
         titles.Controls.Add(new Label{Text=T("Criado por Nask e Codex. Se achou ruim, faz você.","Made by Nask and Codex. Don't like it? Make your own."),AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(0,0,0,14)});
         heading.Controls.Add(titles,0,0);
-        var actions=Flow();actions.Dock=DockStyle.None;actions.WrapContents=false;actions.MinimumSize=new Size(360,44);actions.Anchor=AnchorStyles.Top|AnchorStyles.Right;actions.Margin=Padding.Empty;
-        actions.Controls.Add(IconButton("refresh",T("Atualizar lista","Refresh list"),async()=>await Scan(),true));
-        actions.Controls.Add(IconButton("folder",T("Abrir pasta de downloads","Open download folder"),OpenDownloads));
-        listButton=Command(T("Lista","List"),()=>ToggleListMenu(),true);listButton.Width=104;((GeneralButton)listButton).IconKind="menu";actions.Controls.Add(listButton);
-        actions.Controls.Add(Command(T("Opções","Options"),ShowOptions,true));
-        heading.Controls.Add(actions,1,0);layout.Controls.Add(heading,0,0);
+        listButton=Command(T("Gerenciar","Manage"),ToggleListMenu,true);listButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;listButton.Margin=new Padding(0,0,12,0);heading.Controls.Add(listButton,1,0);
+        optionsButton=IconButton("menu",T("Opções","Options"),ShowOptions,true);((GeneralButton)optionsButton).Bare=true;optionsButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;optionsButton.Margin=Padding.Empty;
+        heading.Controls.Add(optionsButton,2,0);layout.Controls.Add(heading,0,0);
         var path=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=new Padding(0,0,0,14)};
         path.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));path.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         var pathSurface=new GeneralSurface{Dock=DockStyle.Fill,Height=44,MinimumSize=new Size(100,44),MaximumSize=new Size(0,44),Padding=new Padding(16,11,16,0),Margin=new Padding(0,0,12,0)};
         destination=new TextBox{ReadOnly=true,BorderStyle=BorderStyle.None,Dock=DockStyle.Fill,Text=state.Destination??"",Font=GeneralStyle.Font(11),AccessibleName=T("Pasta de instalação","Installation folder")};
         pathSurface.Controls.Add(destination);path.Controls.Add(pathSurface,0,0);path.Controls.Add(Command(T("Escolher pasta","Choose folder"),()=>ChooseFolder(false),true),1,0);layout.Controls.Add(path,0,1);
-        var filters=Flow();filters.Margin=new Padding(0,0,0,10);layout.Controls.Add(filters,0,2);
+        var filterRow=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=1,Margin=new Padding(0,0,0,10)};
+        filterRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        var filters=Flow();filters.Margin=Padding.Empty;filters.WrapContents=false;filterRow.Controls.Add(filters,0,0);layout.Controls.Add(filterRow,0,2);
         filters.Controls.Add(FieldLabel(T("Categoria","Category")));
         filter=Picker(210);filters.Controls.Add(filter);
         filters.Controls.Add(FieldLabel(T("Preset","Preset")));
         preset=Picker(250);filters.Controls.Add(preset);
         var editPreset=Command(T("Editar preset","Edit preset"),()=>EditPreset(false),true);filters.Controls.Add(editPreset);
+        reloadButton=IconButton("refresh",T("Atualizar lista","Refresh list"),async()=>await Scan(),true);((GeneralButton)reloadButton).Bare=true;filters.Controls.Add(reloadButton);
         var summary=Flow();summary.Margin=new Padding(0,0,0,12);layout.Controls.Add(summary,0,3);
         counts=new Label{AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=Padding.Empty};summary.Controls.Add(counts);
         grid=new DataGridView{Dock=DockStyle.Fill,AllowUserToAddRows=false,AllowUserToDeleteRows=false,AllowUserToResizeRows=false,AllowUserToResizeColumns=false,
@@ -127,6 +129,8 @@ internal sealed partial class GeneralModWindow : Form {
         grid.CellDoubleClick+=(s,e)=>{if(e.RowIndex>=0&&e.ColumnIndex>0){var id=grid.Rows[e.RowIndex].Tag as string;if(id!=null)Edit(state.List.Mods.Single(m=>m.Id==id));}};
         grid.KeyDown+=(s,e)=>{if(e.KeyCode!=Keys.Enter&&e.KeyCode!=Keys.F2)return;e.Handled=true;var item=FocusedEntry();if(item!=null)Edit(item);else if(grid.CurrentRow!=null)HandleSection(grid.CurrentRow.Tag as SectionRow);};
         grid.RowPrePaint+=PaintSection;grid.CellPainting+=PaintName;
+        grid.CellMouseEnter+=(s,e)=>SetHover(e.RowIndex);
+        grid.MouseLeave+=(s,e)=>SetHover(-1);
         grid.DataError+=(s,e)=>{e.ThrowException=false;};
         var menu=GeneralMenuRenderer.Create();
         GeneralMenuRenderer.Add(menu,T("Detalhes e variantes","Details and variants"),()=>{var item=FocusedEntry();if(item!=null)Edit(item);});
@@ -156,11 +160,11 @@ internal sealed partial class GeneralModWindow : Form {
         RebuildFilter(group,oldFilter);RebuildPresets();
         filter.SelectedIndexChanged+=(s,e)=>{if(!drawing)DrawRows();};
         preset.SelectedIndexChanged+=(s,e)=>{if(drawing)return;state.SelectedPreset=preset.SelectedIndex>0?state.List.Presets[preset.SelectedIndex-1].Id:null;Guard(Persist);DrawRows();};
-        idle.Add(preset);Busy(working||scanning);ResumeLayout(true);
+        idle.Add(preset);Busy(working||scanning);ResumeLayout(true);GeneralNativeTheme.ApplyTree(this);
     }
     static Label FieldLabel(string text){return new Label{Text=text,AutoSize=true,Font=GeneralStyle.Font(11),ForeColor=GeneralStyle.Muted,Margin=new Padding(0,11,10,0)};}
     static FlowLayoutPanel Flow(){return new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,WrapContents=true,BackColor=Color.Transparent};}
-    static ComboBox Picker(int width){return new GeneralPicker{DropDownStyle=ComboBoxStyle.DropDownList,FlatStyle=FlatStyle.Flat,Width=width,Font=GeneralStyle.Font(12),Margin=new Padding(0,8,20,0),BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground};}
+    static GeneralPicker Picker(int width){return new GeneralPicker{DropDownStyle=ComboBoxStyle.DropDownList,Width=width,Font=GeneralStyle.Font(12),Margin=new Padding(0,0,16,0),BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground};}
     Button Command(string text,Action action,bool onlyIdle=false){
         var b=GeneralStyle.Button(text,()=>Guard(action));b.Margin=new Padding(0,0,10,0);b.Font=GeneralStyle.Font(11);if(onlyIdle)idle.Add(b);return b;
     }
@@ -173,7 +177,7 @@ internal sealed partial class GeneralModWindow : Form {
         foreach(Control child in target.Controls)EnableDrops(child);
     }
     void Guard(Action action){try{action();}catch(Exception ex){ShowError(ex);}}
-    void ShowError(Exception ex){detail.Text=ex.Message;MessageBox.Show(this,ex.Message,T("Não foi possível concluir","Unable to complete"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+    void ShowError(Exception ex){detail.Text=ex.Message;GeneralDialog.Message(this,ex.Message,T("Não foi possível concluir","Unable to complete"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}
     GeneralModEntry FocusedEntry(){string id=grid.CurrentRow==null?null:grid.CurrentRow.Tag as string;return id==null?null:state.List.Mods.FirstOrDefault(x=>x.Id==id);}
     IEnumerable<DataGridViewRow> ModRows(){return grid.Rows.Cast<DataGridViewRow>().Where(r=>r.Tag is string);}
     GeneralModVariant Selected(GeneralModEntry entry){string id;return state.ChosenVariants.TryGetValue(entry.Id,out id)?entry.Variants.FirstOrDefault(v=>v.Id==id)??entry.Variants.First(v=>v.Id==entry.DefaultVariant):entry.Variants.First(v=>v.Id==entry.DefaultVariant);}
@@ -197,7 +201,7 @@ internal sealed partial class GeneralModWindow : Form {
     }
     void DrawRows(){
         if(grid==null)return;string old=grid.CurrentRow==null?null:grid.CurrentRow.Tag as string;
-        int scroll=grid.FirstDisplayedScrollingRowIndex;drawing=true;grid.Rows.Clear();
+        int scroll=grid.FirstDisplayedScrollingRowIndex;drawing=true;hoveredRow=-1;grid.Rows.Clear();
         var visible=VisibleMods();var groups=new List<string>();
         if(filter.SelectedIndex<=1)groups.Add(null);
         if(filter.SelectedIndex!=1)groups.AddRange(filter.SelectedIndex>=2?(IEnumerable<string>)new[]{(string)filter.SelectedItem}:state.List.Categories);
@@ -209,7 +213,7 @@ internal sealed partial class GeneralModWindow : Form {
             AddSection("heading",category,String.IsNullOrWhiteSpace(description)?54:78);
             foreach(var m in visible.Where(m=>String.Equals(m.Category,category,StringComparison.OrdinalIgnoreCase)||String.IsNullOrEmpty(m.Category)&&category==null)){
                 var v=Selected(m);string key=Key(m,v),status;int pct;statuses.TryGetValue(key,out status);bool hasProgress=progress.TryGetValue(key,out pct);
-                int i=grid.Rows.Add(marked.Contains(m.Id),m.Name,v.Name,GeneralStyle.Status(status??"Não conferido"),hasProgress?(object)pct:null);var row=grid.Rows[i];row.Tag=m.Id;
+                int i=grid.Rows.Add(marked.Contains(m.Id),m.Name,v.Name,GeneralStatusPresentation.Label(status),hasProgress?(object)pct:null);var row=grid.Rows[i];row.Tag=m.Id;row.Cells["Status"].ToolTipText=GeneralStyle.Status(status??"Não conferido");
                 row.Cells["Name"].ToolTipText=m.Description??"";row.Cells["Status"].ToolTipText=status??"";
                 if(m.Id==old)grid.CurrentCell=row.Cells[1];
             }
@@ -229,26 +233,26 @@ internal sealed partial class GeneralModWindow : Form {
         grid.Columns[0].HeaderText="";
         grid.Columns[0].HeaderCell.ToolTipText=T("Selecionar todos os itens visíveis","Select all visible items");
         grid.InvalidateCell(0,-1);
-        int installed=rows.Count(r=>{var m=state.List.Mods.Single(x=>x.Id==(string)r.Tag);string status;return statuses.TryGetValue(Key(m,Selected(m)),out status)&&status.StartsWith("Instalado",StringComparison.Ordinal);});
-        int failed=rows.Count(r=>{var m=state.List.Mods.Single(x=>x.Id==(string)r.Tag);string status;return statuses.TryGetValue(Key(m,Selected(m)),out status)&&status=="Falhou";});
+        int installed=rows.Count(r=>{var m=state.List.Mods.Single(x=>x.Id==(string)r.Tag);string status;return statuses.TryGetValue(Key(m,Selected(m)),out status)&&GeneralStatusPresentation.Kind(status)=="installed";});
+        int failed=rows.Count(r=>{var m=state.List.Mods.Single(x=>x.Id==(string)r.Tag);string status;return statuses.TryGetValue(Key(m,Selected(m)),out status)&&GeneralStatusPresentation.Kind(status)=="error";});
         counts.Text=T("Mods na lista: ","Mods in list: ")+rows.Count+"   ·   "+T("Instalados: ","Installed: ")+installed+"   ·   "+T("Falhas: ","Failed: ")+failed;
     }
     void PaintSection(object sender,DataGridViewRowPrePaintEventArgs e){
         var section=grid.Rows[e.RowIndex].Tag as SectionRow;if(section==null)return;
         e.Handled=true;var g=e.Graphics;var bounds=e.RowBounds;bounds.Width=grid.ClientSize.Width-(grid.Controls.OfType<VScrollBar>().Any(s=>s.Visible)?SystemInformation.VerticalScrollBarWidth:0);
-        using(var b=new SolidBrush(GeneralStyle.Surface))g.FillRectangle(b,bounds);
+        using(var b=new SolidBrush(e.RowIndex==hoveredRow&&section.Kind!="divider"?GeneralStyle.Selection:GeneralStyle.Surface))g.FillRectangle(b,bounds);
         if(section.Kind=="divider"){using(var p=new Pen(GeneralStyle.SoftLine))g.DrawLine(p,bounds.X+20,bounds.Y+bounds.Height/2,bounds.Right-20,bounds.Y+bounds.Height/2);return;}
         string text,description=null;int y=bounds.Y+8;
         Font font=GeneralStyle.Font(12);
         if(section.Kind=="heading"){
             text=section.Category??UncatName();font=GeneralStyle.Font(15,true);y=bounds.Y+12;
             if(section.Category==null)description=state.List.UncategorizedDescription;else state.List.CategoryDescriptions.TryGetValue(section.Category,out description);
-            TextRenderer.DrawText(g,T("Editar","Edit"),GeneralStyle.Font(10.5f),new Rectangle(bounds.Right-90,y+4,65,25),GeneralStyle.Accent,TextFormatFlags.Right);
         }else text=section.Kind=="add"?"+ "+T("Adicionar item","Add item"):"+ "+T("Criar nova categoria","Create new category");
-        TextRenderer.DrawText(g,text,font,new Rectangle(bounds.X+18,y,bounds.Width-135,30),section.Kind=="heading"?GeneralStyle.Foreground:GeneralStyle.Accent,TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(g,text,font,new Rectangle(bounds.X+18,y,bounds.Width-40,30),section.Kind=="heading"?GeneralStyle.Foreground:GeneralStyle.Accent,TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
         if(!String.IsNullOrWhiteSpace(description))TextRenderer.DrawText(g,description.Replace("\r"," ").Replace("\n"," "),GeneralStyle.Font(10.5f),new Rectangle(bounds.X+18,y+31,bounds.Width-40,24),GeneralStyle.Muted,TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
     }
     void PaintName(object sender,DataGridViewCellPaintingEventArgs e){
+        if(e.RowIndex>=0&&e.ColumnIndex==grid.Columns["Status"].Index&&grid.Rows[e.RowIndex].Tag is string){PaintStatus(e);return;}
         if(e.RowIndex==-1&&e.ColumnIndex==0){
             e.PaintBackground(e.ClipBounds,true);var rows=ModRows().ToList();int selected=rows.Count(r=>marked.Contains((string)r.Tag));
             var value=selected==0?System.Windows.Forms.VisualStyles.CheckBoxState.UncheckedNormal:selected==rows.Count?System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal:System.Windows.Forms.VisualStyles.CheckBoxState.MixedNormal;
@@ -260,6 +264,30 @@ internal sealed partial class GeneralModWindow : Form {
         int nameWidth=Math.Min(box.Width-suffix,TextRenderer.MeasureText(mod.Name,e.CellStyle.Font).Width);
         TextRenderer.DrawText(e.Graphics,mod.Name,e.CellStyle.Font,new Rectangle(box.X,box.Y,Math.Max(1,nameWidth),box.Height),e.CellStyle.ForeColor,TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine);
         TextRenderer.DrawText(e.Graphics,"NSFW",GeneralStyle.Font(9.5f,true),new Rectangle(box.X+nameWidth+5,box.Y,suffix-5,box.Height),GeneralStyle.Danger,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine);
+        e.Handled=true;
+    }
+    void SetHover(int row){
+        if(row==hoveredRow)return;
+        int old=hoveredRow;hoveredRow=row;
+        foreach(int at in new[]{old,row}){
+            if(at<0||at>=grid.RowCount)continue;
+            var section=grid.Rows[at].Tag as SectionRow;if(section!=null&&section.Kind=="divider")continue;
+            grid.Rows[at].DefaultCellStyle.BackColor=at==hoveredRow?GeneralStyle.Selection:GeneralStyle.Surface;grid.InvalidateRow(at);
+        }
+        grid.Cursor=row>=0&&row<grid.RowCount?Cursors.Hand:Cursors.Default;
+    }
+    void PaintStatus(DataGridViewCellPaintingEventArgs e){
+        string id=(string)grid.Rows[e.RowIndex].Tag,raw;var item=state.List.Mods.Single(m=>m.Id==id);
+        if(!statuses.TryGetValue(Key(item,Selected(item)),out raw))raw="Não conferido";
+        string kind=GeneralStatusPresentation.Kind(raw),label=GeneralStatusPresentation.Label(raw);
+        Color fill=ColorTranslator.FromHtml(kind=="installed"?"#157347":kind=="error"?"#b42348":kind=="active"?"#a85000":"#202026");
+        e.PaintBackground(e.ClipBounds,true);e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        using(var font=GeneralStyle.Font(10.5f)){
+            int width=Math.Min(e.CellBounds.Width-20,TextRenderer.MeasureText(label,font).Width+22);
+            var rect=new Rectangle(e.CellBounds.X+10,e.CellBounds.Y+(e.CellBounds.Height-30)/2,Math.Max(20,width),30);
+            using(var round=GeneralStyle.Round(rect,15))using(var brush=new SolidBrush(fill))e.Graphics.FillPath(brush,round);
+            TextRenderer.DrawText(e.Graphics,label,font,new Rectangle(rect.X+11,rect.Y,rect.Width-22,rect.Height),Color.White,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
+        }
         e.Handled=true;
     }
     void HandleSection(SectionRow section){
@@ -344,7 +372,7 @@ internal sealed partial class GeneralModWindow : Form {
     }
     void RemoveEntry(){
         var item=FocusedEntry();if(item==null||working||scanning)return;
-        if(MessageBox.Show(this,T("Tirar da lista sem desinstalar?","Remove from the list without uninstalling?")+"\n"+item.Name,T("Tirar da lista","Remove from list"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
+        if(GeneralDialog.Message(this,T("Tirar da lista sem desinstalar?","Remove from the list without uninstalling?")+"\n"+item.Name,T("Tirar da lista","Remove from list"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
         state.List.Mods.Remove(item);state.ChosenVariants.Remove(item.Id);foreach(var p in state.List.Presets)p.ModIds.Remove(item.Id);marked.Remove(item.Id);Persist();DrawRows();
     }
     void Busy(bool value){foreach(var control in idle)control.Enabled=!value;if(next!=null){next.Visible=working||scanning;next.Enabled=working||scanning;}}
@@ -353,3 +381,4 @@ internal sealed partial class GeneralModWindow : Form {
         using(var bmp=new Bitmap(Width,Height)){DrawToBitmap(bmp,new Rectangle(0,0,Width,Height));bmp.Save(path,System.Drawing.Imaging.ImageFormat.Png);}Close();
     }
 }
+

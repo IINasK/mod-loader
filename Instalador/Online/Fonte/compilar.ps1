@@ -57,6 +57,10 @@ $extensions += Join-Path $PSScriptRoot 'OnlineFPVDefaultsTests.cs'
 $extensions += @('GeneralModLibrary.cs','GeneralModLibraryV2Tests.cs','GeneralModDownload.cs','GeneralModInstaller.cs','GeneralModInstallerTests.cs','GeneralModEditor.cs','GeneralModWindow.cs','GeneralModRun.cs','GeneralModTests.cs','GeneralModMenus.cs','GeneralModProgressTests.cs','GeneralModUiTests.cs','GeneralStyle.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += '/resource:'+(Join-Path $PSScriptRoot 'Assets\Jost.ttf')+',ModLoader.Jost.ttf'
 $extensions += Join-Path $PSScriptRoot 'GeneralButtonPaintTests.cs'
+$extensions += @('GeneralFloating.cs','GeneralOptionsDialog.cs','GeneralStatusPresentation.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
+$extensions += '/resource:'+(Join-Path $PSScriptRoot 'Assets\Lucide.ttf')+',ModLoader.Lucide.ttf'
+$extensions += '/resource:'+(Join-Path $PSScriptRoot 'Assets\Lucide-LICENSE.txt')+',ModLoader.Lucide-LICENSE.txt'
+$extensions += Join-Path $PSScriptRoot 'GeneralFloatingTests.cs'
 $extensions += '/resource:'+(Join-Path $PSScriptRoot 'Assets\Jost-OFL.txt')+',ModLoader.Jost-OFL.txt'
 & $compiler /nologo /target:winexe /main:OnlineProgram /platform:x64 /optimize+ /codepage:65001 ('/win32manifest:'+(Join-Path $shared 'app.manifest')) ('/out:'+(Join-Path $out 'Cyberpunk Coop.exe')) /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Core.dll /reference:System.Security.dll ('/reference:'+(Join-Path $framework 'System.Web.Extensions.dll')) ('/reference:'+(Join-Path $framework 'System.IO.Compression.dll')) ('/reference:'+(Join-Path $framework 'System.IO.Compression.FileSystem.dll')) (Join-Path $shared 'Installer.cs') (Join-Path $shared 'SelfTests.cs') (Join-Path $shared 'PackageIdentity.cs') (Join-Path $PSScriptRoot 'OnlineIdentity.cs') (Join-Path $PSScriptRoot 'OnlineCore.cs') (Join-Path $PSScriptRoot 'OnlineWindow.cs') (Join-Path $PSScriptRoot 'OnlineTests.cs') @extensions
 if($LASTEXITCODE -ne 0){throw 'Compilação falhou'}
