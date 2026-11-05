@@ -13,7 +13,8 @@ using System.Xml;
 
 internal sealed class P2PInvite {
     public int Schema=1;
-    public string Kind, Device, Folder, ManifestHash, Name;
+    public string Kind, Device, Folder, ManifestHash, Name, Mode;
+    public long Size;
     internal string Encode(){Validate();return "ML-P2P1:"+Convert.ToBase64String(Encoding.UTF8.GetBytes(Safe.Json.Serialize(this)));}
     internal static P2PInvite Decode(string code){
         try{
@@ -23,6 +24,8 @@ internal sealed class P2PInvite {
         }catch(FormatException ex){throw new IOException("Convite P2P inválido.",ex);}catch(ArgumentException ex){throw new IOException("Convite P2P inválido.",ex);}
     }
     internal void Validate(){
+        if(Mode!=null&&Mode!="installed-zip")throw new IOException("Formato de compartilhamento desconhecido.");
+        if(Mode=="installed-zip"&&(Size<=0||Size>P2PPack.MaxTotal))throw new IOException("Tamanho de pacote instalado inválido.");
         if(Schema!=1||(Kind!="offer"&&Kind!="accept")||!DeviceValid(Device)||Folder==null||!Regex.IsMatch(Folder,"\\Aml-[a-f0-9]{32}\\z")||!P2PPack.HashValid(ManifestHash)||String.IsNullOrWhiteSpace(Name)||Name.Length>300||Name.Any(Char.IsControl))throw new IOException("Convite P2P inválido.");
     }
     internal static bool DeviceValid(string device){return device!=null&&Regex.IsMatch(device,"\\A[A-Z2-7]{7}(?:-[A-Z2-7]{7}){7}\\z");}
@@ -39,6 +42,7 @@ internal sealed class SyncthingEngine : IDisposable {
     Process process;
     FileStream lease;
     internal string Device {get;private set;}
+    internal string Executable {get;private set;}
     internal int ListenPort {get;private set;}
     internal bool Running {get{return process!=null&&!process.HasExited;}}
     internal SyncthingEngine(string home,bool localOnly=false){this.home=Path.GetFullPath(home);this.localOnly=localOnly;Safe.NoLinks(this.home);}
@@ -68,7 +72,7 @@ internal sealed class SyncthingEngine : IDisposable {
     static int Port(){var listener=new TcpListener(IPAddress.Loopback,0);listener.Start();int port=((IPEndPoint)listener.LocalEndpoint).Port;listener.Stop();return port;}
     ProcessStartInfo Launch(string exe,string args){return new ProcessStartInfo(exe,args){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden,WorkingDirectory=Path.GetDirectoryName(exe)};}
     internal void Start(string exe){
-        if(Running)return;Dispose();Safe.NoLinks(exe);if(Safe.Hash(exe)!=ExeHash)throw new IOException("Versão do Syncthing não reconhecida.");
+        if(Running)return;Dispose();Safe.NoLinks(exe);if(Safe.Hash(exe)!=ExeHash)throw new IOException("Versão do Syncthing não reconhecida.");Executable=Path.GetFullPath(exe);
         Directory.CreateDirectory(home);lease=new FileStream(Safe.In(home,"engine.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None);
         try{
             string config=Safe.In(home,"config.xml");
@@ -122,8 +126,8 @@ internal sealed class SyncthingEngine : IDisposable {
         folder["devices"]=peer==null?new object[0]:new object[]{new{deviceID=peer,encryptionPassword=""}};
         Request("PUT","config/folders/"+id,folder);
     }
-    internal void Pause(string id,bool value){Request("PATCH","config/folders/"+id,new{paused=value});}
-    internal void RemoveFolder(string id){Request("DELETE","config/folders/"+id,null);}
+    internal void Pause(string id,bool value){try{Request("PATCH","config/folders/"+id,new{paused=value});}catch(WebException ex){var response=ex.Response as HttpWebResponse;if(response==null||response.StatusCode!=HttpStatusCode.NotFound)throw;response.Dispose();}}
+    internal void RemoveFolder(string id){try{Request("DELETE","config/folders/"+id,null);}catch(WebException ex){var response=ex.Response as HttpWebResponse;if(response==null||response.StatusCode!=HttpStatusCode.NotFound)throw;response.Dispose();}}
     public void Dispose(){
         if(process!=null){try{if(!process.HasExited){try{Request("POST","system/shutdown",null);}catch(Exception){}if(!process.WaitForExit(4000))process.Kill();}}finally{process.Dispose();process=null;}}
         if(lease!=null){lease.Dispose();lease=null;}

@@ -6,7 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Web.Script.Serialization;
 
-public sealed class GeneralModInstaller {
+public sealed partial class GeneralModInstaller {
     public const string Installed = "Instalado";
     public const string Missing = "Não instalado";
     public const string Partial = "Instalação parcial";

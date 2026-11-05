@@ -48,6 +48,7 @@ internal sealed class GeneralModDownload : IDisposable {
         string extension = Path.GetExtension(path);
         return new[] { ".zip", ".rar", ".7z" }.Contains(extension, StringComparer.OrdinalIgnoreCase);
     }
+    internal static bool IsInstalledSource(string source){return source!=null&&Regex.IsMatch(source,@"\Ainstalled://[A-Za-z0-9_-]{1,120}/[A-Za-z0-9_-]{1,120}\z");}
 
     static Uri ParseWebSource(string source) {
         Uri uri;

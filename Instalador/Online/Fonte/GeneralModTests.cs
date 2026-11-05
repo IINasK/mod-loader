@@ -105,6 +105,7 @@ internal sealed partial class GeneralModWindow {
         GeneralButtonPaintTests.Run(root);
         GeneralP2PTests.Run(root);
         GeneralP2PUiTests.Run(root);
+        InstalledSnapshotTests.Run(root);InstalledSnapshotInstallerTests.Run(root);
         GeneralStatusPresentationTests.Run(root);
         RunFloatingTests(root);GeneralCategoryDeleteTests.Run(root);GeneralTableDialogTests.Run(root);RunRedesignTests(root);
         Safe.WriteJson(Path.Combine(root,"resultado-loader-geral.json"),new{Passed=true,Tests=checks,ArchiveChecks=archiveChecks,LibraryChecks=libraryChecks,RealGameTouched=false,NetworkUsed=false});

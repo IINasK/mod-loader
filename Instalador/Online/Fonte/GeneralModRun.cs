@@ -27,6 +27,7 @@ internal sealed partial class GeneralModWindow {
     string association;
     Action<string> launch=GeneralModDownload.OpenSource;
     GeneralModInstaller Generic(string root){return new GeneralModInstaller(root,Path.Combine(data,"Instalacoes"));}
+    InstalledSnapshotInstaller Snapshot(string root){return new InstalledSnapshotInstaller(root,data,catalog,testMode);}
     FixedInstaller Cyberpunk(string root){return new FixedInstaller(catalog,cache,root,testMode?Path.Combine(data,"fixture-saves"):Discovery.Saves(),testMode);}
     static bool IsCyberpunk(string root){return !String.IsNullOrEmpty(root)&&File.Exists(Path.Combine(root,"bin","x64","Cyberpunk2077.exe"));}
     FixedMod Recipe(Work work){return catalog.Packages.Single(m=>m.Id==work.Variant.CyberpunkId);}
@@ -64,6 +65,7 @@ internal sealed partial class GeneralModWindow {
         totalProgress.Indeterminate=false;totalProgress.Invalidate();
     }
     string Root(){
+        if(p2p!=null&&p2p.Installing)throw new IOException(T("Aguarde a instalação do pacote recebido terminar.","Wait for the received pack installation to finish."));
         if(String.IsNullOrWhiteSpace(state.Destination)||!Directory.Exists(state.Destination))throw new IOException(T("Escolha a pasta de instalação primeiro.","Choose the installation folder first."));
         string root=Path.GetFullPath(state.Destination);Safe.NoLinks(root);
         return root;
@@ -83,6 +85,11 @@ internal sealed partial class GeneralModWindow {
         if(working||scanning)UpdateFlow(work,status,pct);
     }
     string Status(Work work,string root){
+        string snapshot;
+        if(root!=null&&Directory.Exists(root)&&state.SnapshotReceipts.TryGetValue(work.Key,out snapshot)){
+            string found=Snapshot(root).Status(snapshot,work.Key);
+            if(found!=GeneralModInstaller.Missing||work.Variant.CyberpunkId==null)return found;
+        }
         if(work.Variant.CyberpunkId!=null){
             if(!IsCyberpunk(root))return "Requer Cyberpunk 2077";
             var recipe=Recipe(work);
@@ -178,6 +185,9 @@ internal sealed partial class GeneralModWindow {
             skipRequests.Remove(work);
             RowStatus(work,"Verificando",null,work.Entry.Name+T(": verificando arquivos…",": checking files…"));
             OnlineDiagnostics.Record("general.install.begin",work.Entry.Id,"Iniciando item da fila.",new{Variant=work.Variant.Id});
+            string snapshot;
+            if(state.SnapshotReceipts.TryGetValue(work.Key,out snapshot)&&Snapshot(root).Status(snapshot,work.Key)==GeneralModInstaller.Installed){RowStatus(work,"Instalado",100);return;}
+            if(work.Variant.Sources.Any(GeneralModDownload.IsInstalledSource))throw new IOException(T("Este mod veio de um pacote instalado. Para reparar, receba um novo pacote do remetente.","This mod came from an installed pack. Receive a new pack from the sender to repair it."));
             if(work.Variant.CyberpunkId!=null)await InstallKnown(work,root);
             else await InstallGeneral(work,root);
             var final=await Task.Run(()=>Status(work,root));
@@ -362,6 +372,8 @@ internal sealed partial class GeneralModWindow {
                     if(ids.Count>0){if(!IsCyberpunk(root))throw new IOException("Selecione a pasta do Cyberpunk 2077.");notes.Add(Cyberpunk(root).DeactivateMany(ids,Report));}
                     bool cyberpunk=IsCyberpunk(root);var engine=cyberpunk?null:Generic(root);
                     foreach(var work in jobs.Where(w=>w.Variant.CyberpunkId==null))
+                        if(state.SnapshotReceipts.ContainsKey(work.Key))notes.Add(Snapshot(root).Remove(state.SnapshotReceipts[work.Key],new[]{work.Key},Report));
+                        else
                         for(int i=work.Variant.Sources.Count-1;i>=0;i--){
                             if(!cyberpunk){notes.Add(engine.Remove(work.Receipt(i)));continue;}
                             string id=CyberpunkImportId(work,i);

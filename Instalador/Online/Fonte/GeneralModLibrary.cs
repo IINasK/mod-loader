@@ -39,6 +39,7 @@ public sealed class GeneralModState {
     public Dictionary<string, string> ChosenVariants = new Dictionary<string, string>();
     public Dictionary<string, string> ResolvedDownloads = new Dictionary<string, string>();
     public Dictionary<string, string> CyberpunkImports = new Dictionary<string, string>();
+    public Dictionary<string, string> SnapshotReceipts = new Dictionary<string, string>();
 }
 
 public sealed class GeneralModLibrary {
@@ -168,6 +169,7 @@ public sealed class GeneralModLibrary {
 
     public static string ValidateSource(string source) {
         string value = RequiredText(source, 4096, "Fonte do mod");
+        if(GeneralModDownload.IsInstalledSource(value))return value;
         if (GeneralModDownload.IsArchivePath(value)) return Path.GetFullPath(value);
         if (!GeneralModDownload.IsWebSource(value))
             throw new IOException("Use o caminho completo de um ZIP, RAR ou 7z, ou um link HTTPS público.");
@@ -192,7 +194,7 @@ public sealed class GeneralModLibrary {
         return true;
     }
 
-    static void ValidateList(GeneralModList list, bool trustRecipes) {
+    internal static void ValidateList(GeneralModList list, bool trustRecipes) {
         if (list == null || list.Schema != 1 || list.Mods == null || list.Mods.Count > 1000 || list.Categories == null || list.Categories.Count > 1000)
             throw new IOException("A lista de mods está inválida ou excede o limite.");
         list.UncategorizedName = String.IsNullOrWhiteSpace(list.UncategorizedName) ? "Sem categoria" : RequiredText(list.UncategorizedName, 120, "Nome do grupo sem categoria");
@@ -265,6 +267,8 @@ public sealed class GeneralModLibrary {
         if (state.ChosenVariants == null) state.ChosenVariants = new Dictionary<string, string>();
         if (state.ResolvedDownloads == null) state.ResolvedDownloads = new Dictionary<string, string>();
         if (state.CyberpunkImports == null) state.CyberpunkImports = new Dictionary<string, string>();
+        if (state.SnapshotReceipts == null) state.SnapshotReceipts = new Dictionary<string, string>();
+        if(state.SnapshotReceipts.Count>5000||state.SnapshotReceipts.Any(pair=>!Regex.IsMatch(pair.Key??"",@"\A[A-Za-z0-9_-]{1,120}/[A-Za-z0-9_-]{1,120}\z")||!Regex.IsMatch(pair.Value??"",@"\A[a-f0-9]{32}\z")))throw new IOException("Referência de pacote instalado inválida.");
         foreach(var id in state.CyberpunkImports.Values)
             if(id==null||!Regex.IsMatch(id,@"\Afile-[a-f0-9]{64}\z"))throw new IOException("Registro de importação local inválido.");
         foreach(var path in state.ResolvedDownloads.Values)

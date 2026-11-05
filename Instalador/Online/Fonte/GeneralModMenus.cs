@@ -26,7 +26,7 @@ internal sealed partial class GeneralModWindow {
         }
     }
     async void Replace(GeneralModList list){await ReplaceList(list);}
-    async Task<bool> ReplaceList(GeneralModList list,bool clearBindings=false){
+    async Task<bool> ReplaceList(GeneralModList list,bool clearBindings=false,string snapshotReceipt=null,string newDestination=null){
         if(working||scanning||list==null)return false;
         if(state.List.Mods.Count!=0&&GeneralDialog.Message(this,T("Trocar a lista atual? Exporte primeiro se quiser guardar uma cópia. Os arquivos instalados permanecem no lugar.","Replace the current list? Export it first to keep a copy. Installed files will stay in place."),T("Trocar lista","Replace list"),MessageBoxButtons.OKCancel,MessageBoxIcon.Question)!=DialogResult.OK)return false;
         try{
@@ -34,7 +34,10 @@ internal sealed partial class GeneralModWindow {
             if(clearBindings){
                 foreach(string key in state.ResolvedDownloads.Keys.Where(key=>list.Mods.Any(mod=>key.StartsWith(mod.Id+"/",StringComparison.Ordinal))).ToArray())state.ResolvedDownloads.Remove(key);
                 foreach(string key in state.CyberpunkImports.Keys.Where(key=>list.Mods.Any(mod=>key.StartsWith(mod.Id+"/",StringComparison.Ordinal))).ToArray())state.CyberpunkImports.Remove(key);
+                foreach(string key in state.SnapshotReceipts.Keys.Where(key=>list.Mods.Any(mod=>key.StartsWith(mod.Id+"/",StringComparison.Ordinal))).ToArray())state.SnapshotReceipts.Remove(key);
             }
+            if(snapshotReceipt!=null)foreach(var mod in list.Mods)state.SnapshotReceipts[mod.Id+"/"+mod.DefaultVariant]=snapshotReceipt;
+            if(newDestination!=null){state.Destination=newDestination;destination.Text=newDestination;}
             Persist();RebuildPresets();await Scan();return true;
         }catch(Exception ex){ShowError(ex);return false;}
     }

@@ -4,7 +4,7 @@ Repositório privado: [IINasK/mod-loader-cyberpunk-coop](https://github.com/IINa
 
 Mod Loader geral para Windows, com listas/presets/categorias editáveis e pacote fixado de Cyberpunk2077 2.5. Mantém downloads oficiais, identificação por SHA256, monitor da pasta Downloads, backup e desfazer. O usuário conclui os downloads gratuitos Manual/Slow no Nexus; o aplicativo confere o arquivo original e continua a fila autorizada.
 
-A versão1.1.4 acrescenta **Compartilhar P2P** ao menu principal. O Syncthing oficial é obtido e conferido no primeiro uso, em perfil próprio. Um convite e uma resposta autorizam a transferência de um snapshot do preset e dos arquivos originais disponíveis. O destinatário confere os arquivos e carrega a lista ou solicita instalação pela fila existente. Não sincroniza pastas de jogo, saves ou contas. Consulte [uso, limites, armazenamento e fontes](Conhecimento/Compartilhamento-P2P-1.1.4.md). A interface e manutenção de1.1.3 estão em [Interface-1.1.3](Conhecimento/Interface-1.1.3.md).
+A versão1.1.5 oferece **Compartilhar P2P > Exportar mods instalados**: um ZIP temporário com os arquivos do preset identificados no jogo, dependências e configurações permitidas. Funciona depois de excluir os downloads originais. O destinatário autoriza a pasta local, recebe, confere e instala automaticamente; os ZIPs são removidos após sucesso, sem cache permanente do pacote. Registros e backups locais permitem reconhecer, remover e reexportar os mods instalados. Não sincroniza a pasta inteira do jogo, saves ou contas. Consulte [uso e limites atuais](Conhecimento/Pacotes-instalados-1.1.5.md), [motor P2P e fontes](Conhecimento/Compartilhamento-P2P-1.1.4.md) e [interface1.1.3](Conhecimento/Interface-1.1.3.md).
 
 ## Organização
 

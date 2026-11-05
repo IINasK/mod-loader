@@ -121,7 +121,7 @@ public static class ModDefaults {
         return sections;
     }
     static Dictionary<string,object> ParseObject(string content){try{var value=Safe.Json.DeserializeObject(content) as Dictionary<string,object>;if(value==null)throw new IOException("Configuração deve conter um objeto de dados.");return value;}catch(ArgumentException ex){throw new IOException("Dados de configuração inválidos.",ex);}catch(InvalidOperationException ex){throw new IOException("Dados de configuração inválidos.",ex);}}
-    static void CheckData(object value,int depth){
+    internal static void CheckData(object value,int depth){
         if(depth>32)throw new IOException("Configuração contém dados profundos demais.");
         var map=value as Dictionary<string,object>;if(map!=null){foreach(var pair in map){if(pair.Key.Length>256||Regex.IsMatch(pair.Key,"password|passwd|secret|credential|oauth|cookie|bearer|authorization|access.?token|refresh.?token|client.?id|api.?key|^token$",RegexOptions.IgnoreCase))throw new IOException("Dados pessoais não são aceitos em padrões compartilhados.");CheckData(pair.Value,depth+1);}return;}
         var array=value as object[];if(array!=null){foreach(var item in array)CheckData(item,depth+1);return;}

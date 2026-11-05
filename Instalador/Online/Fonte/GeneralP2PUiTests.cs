@@ -89,6 +89,11 @@ internal static class GeneralP2PUiTests {
     static void CheckDialog(GeneralP2PDialog dialog,string label,Action<bool,string> check) {
         check(dialog.Visible&&dialog.IsHandleCreated,label+": formulário real mostrado e layout executado.");
         check(dialog.Font.FontFamily.Name.IndexOf("Jost",StringComparison.OrdinalIgnoreCase)>=0,label+": fonte Jost compartilhada em uso.");
+        var intro=(Label)dialog.Content.Controls.Find("p2p-intro",true).Single();
+        int introHeight=TextRenderer.MeasureText(intro.Text,intro.Font,new Size(intro.ClientSize.Width,Int32.MaxValue),TextFormatFlags.WordBreak).Height;
+        check(intro.ClientSize.Height>=introHeight,label+": instruções do pacote instalado completas.");
+        var settings=(CheckBox)dialog.Content.Controls.Find("p2p-settings",true).Single();
+        check(InsideAncestors(settings,dialog.Content)&&settings.Height>=settings.Font.Height+4,label+": opção de configurações sem recorte.");
         var buttons=Descendants(dialog.Content).OfType<Button>().Where(b=>b.Visible).ToArray();
         check(buttons.Length==10,label+": dez ações disponíveis no corpo do diálogo.");
         foreach(var button in buttons) {

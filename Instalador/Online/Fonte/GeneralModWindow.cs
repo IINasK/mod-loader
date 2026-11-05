@@ -56,15 +56,17 @@ internal sealed partial class GeneralModWindow : Form {
         if(state.ResolvedDownloads==null)state.ResolvedDownloads=new Dictionary<string,string>();
         if(state.CyberpunkImports==null)state.CyberpunkImports=new Dictionary<string,string>();
         if(state.ChosenVariants==null)state.ChosenVariants=new Dictionary<string,string>();
+        if(state.SnapshotReceipts==null)state.SnapshotReceipts=new Dictionary<string,string>();
         if(state.List.Presets.Count==0&&state.List.Mods.Any(m=>m.Id=="NightCoop")){
             var ids=new HashSet<string>(state.List.Mods.Select(m=>m.Id),StringComparer.Ordinal);
             foreach(var original in seed.Presets)state.List.Presets.Add(new GeneralModPreset{Id=original.Id,Name=original.Name,ModIds=original.ModIds.Where(ids.Contains).ToList()});
         }
         if(String.IsNullOrWhiteSpace(state.DownloadFolder))state.DownloadFolder=OnlineDownloadWatch.DefaultFolder();
         if(state.SelectedPreset==null&&state.List.Presets.Any(p=>p.Id=="all"))state.SelectedPreset="all";
-        Text="Mod Loader 1.1.4";ClientSize=new Size(1240,820);MinimumSize=new Size(1000,680);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
+        Text="Mod Loader 1.1.5";ClientSize=new Size(1240,820);MinimumSize=new Size(1000,680);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
         BuildInterface();
         FormClosing+=(s,e)=>{
+            if(p2p!=null&&p2p.Installing){e.Cancel=true;detail.Text=T("Aguarde a instalação do pacote recebido terminar antes de fechar.","Wait for the received pack installation to finish before closing.");return;}
             if(working){RequestSkip();normal.Clear();priority.Clear();e.Cancel=true;detail.Text=T("Aguarde a operação atual terminar antes de fechar.","Wait for the current operation to finish before closing.");}
             else if(scanning){RequestSkip();e.Cancel=true;}
         };
@@ -329,7 +331,7 @@ internal sealed partial class GeneralModWindow : Form {
             }
             foreach(var old in before.Variants){
                 var replacement=after.Variants.FirstOrDefault(v=>v.Id==old.Id);
-                if(replacement==null||!replacement.Sources.SequenceEqual(old.Sources,StringComparer.Ordinal)){statuses.Remove(Key(before,old));progress.Remove(Key(before,old));}
+                if(replacement==null||!replacement.Sources.SequenceEqual(old.Sources,StringComparer.Ordinal)){statuses.Remove(Key(before,old));progress.Remove(Key(before,old));state.SnapshotReceipts.Remove(Key(before,old));}
             }
             if(working)UpdateFlow(null,"");
         }

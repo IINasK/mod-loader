@@ -684,6 +684,8 @@ static class OnlineProgram {
     [STAThread]static int Main(string[] args){try{System.Net.ServicePointManager.SecurityProtocol=System.Net.SecurityProtocolType.Tls12;
         if(args.Length==2&&args[0]=="--self-test"){OnlineTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-p2p"){GeneralP2PTests.Run(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--self-test-snapshot"){InstalledSnapshotTests.Run(args[1]);InstalledSnapshotInstallerTests.Run(args[1]);return 0;}
+        if(args.Length==3&&args[0]=="--self-test-snapshot-network"){InstalledSnapshotP2PTests.RunNetwork(args[1],args[2]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-p2p-helper"){GeneralP2PTests.RunHelper(args[1]);return 0;}
         if(args.Length==3&&args[0]=="--self-test-p2p-network"){GeneralP2PTests.RunNetwork(args[1],args[2]);return 0;}
         var c=FixedData.Load();

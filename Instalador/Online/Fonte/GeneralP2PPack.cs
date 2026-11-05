@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 internal sealed class P2PBlob { public string Hash, Extension; public long Size; public string File { get { return Hash+Extension; } } }
 internal sealed class P2PBinding { public string Mod, Variant, File; public int Index; }
@@ -90,7 +91,10 @@ internal static class P2PPack {
         Safe.NoLinks(folder);if(!Directory.Exists(folder))return;
         var todo=new Stack<string>();todo.Push(folder);
         while(todo.Count>0){string path=todo.Pop();Safe.NoLinks(path);foreach(string file in Directory.GetFiles(path))Safe.NoLinks(file);foreach(string dir in Directory.GetDirectories(path))todo.Push(dir);}
-        Directory.Delete(folder,true);
+        for(int attempt=0;;attempt++){
+            try{Directory.Delete(folder,true);break;}
+            catch(IOException){if(attempt>=30)throw;Thread.Sleep(100);Safe.NoLinks(folder);if(!Directory.Exists(folder))break;}
+        }
     }
     internal static P2PManifest Read(string folder,string expectedHash){
         string path=Safe.In(folder,"pack.json");
