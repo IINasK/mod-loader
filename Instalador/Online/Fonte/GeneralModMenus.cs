@@ -13,7 +13,7 @@ internal sealed partial class GeneralModWindow {
         string action;
         using(var menu=new GeneralActionsMenu()){menu.AnchorTo(optionsButton);if(menu.ShowDialog(this)!=DialogResult.OK)return;action=menu.ActionId;}
         if(action=="new")CreateList();else if(action=="import")Guard(ImportList);else if(action=="export")Guard(ExportList);
-        else if(action=="new-preset")SavePresetSelection(true);else if(action=="edit-preset")SavePresetSelection(false);else if(action=="delete-preset")Guard(DeletePreset);else if(action=="options")ShowOptions();
+        else if(action=="new-preset")SavePresetSelection(true);else if(action=="edit-preset")SavePresetSelection(false);else if(action=="delete-preset")Guard(DeletePreset);else if(action=="options")ShowOptions();else if(action=="p2p")ShowP2P();
     }
     void ShowPackages(){
         if(working||scanning)return;
@@ -25,13 +25,18 @@ internal sealed partial class GeneralModWindow {
             var list=new GeneralModList();list.Presets.Add(new GeneralModPreset{Id="preset-"+Guid.NewGuid().ToString("N"),Name=name.ResultName});Replace(list);
         }
     }
-    async void Replace(GeneralModList list){
-        if(working||scanning||list==null)return;
-        if(state.List.Mods.Count!=0&&GeneralDialog.Message(this,T("Trocar a lista atual? Exporte primeiro se quiser guardar uma cópia. Os arquivos instalados permanecem no lugar.","Replace the current list? Export it first to keep a copy. Installed files will stay in place."),T("Trocar lista","Replace list"),MessageBoxButtons.OKCancel,MessageBoxIcon.Question)!=DialogResult.OK)return;
+    async void Replace(GeneralModList list){await ReplaceList(list);}
+    async Task<bool> ReplaceList(GeneralModList list,bool clearBindings=false){
+        if(working||scanning||list==null)return false;
+        if(state.List.Mods.Count!=0&&GeneralDialog.Message(this,T("Trocar a lista atual? Exporte primeiro se quiser guardar uma cópia. Os arquivos instalados permanecem no lugar.","Replace the current list? Export it first to keep a copy. Installed files will stay in place."),T("Trocar lista","Replace list"),MessageBoxButtons.OKCancel,MessageBoxIcon.Question)!=DialogResult.OK)return false;
         try{
             GeneralModLibrary.RestoreKnownMappings(list,seed);state.List=list;state.SelectedPreset=list.Presets.FirstOrDefault()==null?null:list.Presets[0].Id;state.ChosenVariants.Clear();marked.Clear();statuses.Clear();progress.Clear();ResetColumnFilters();
-            Persist();RebuildPresets();await Scan();
-        }catch(Exception ex){ShowError(ex);}
+            if(clearBindings){
+                foreach(string key in state.ResolvedDownloads.Keys.Where(key=>list.Mods.Any(mod=>key.StartsWith(mod.Id+"/",StringComparison.Ordinal))).ToArray())state.ResolvedDownloads.Remove(key);
+                foreach(string key in state.CyberpunkImports.Keys.Where(key=>list.Mods.Any(mod=>key.StartsWith(mod.Id+"/",StringComparison.Ordinal))).ToArray())state.CyberpunkImports.Remove(key);
+            }
+            Persist();RebuildPresets();await Scan();return true;
+        }catch(Exception ex){ShowError(ex);return false;}
     }
     void ImportList(){using(var dialog=new OpenFileDialog{Filter=T("Lista do Mod Loader|*.json","Mod Loader list|*.json")})if(dialog.ShowDialog(this)==DialogResult.OK)Replace(library.Import(dialog.FileName));}
     void ExportList(){

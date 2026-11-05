@@ -11,6 +11,8 @@ Indice interno de138componentes ativos do instalador. Revisao de05/11/2026; font
 
 ## Consulta
 
+- Gerenciador e compartilhamento: [P2P1.1.4](Compartilhamento-P2P-1.1.4.md), [interface e armazenamento1.1.3](Interface-1.1.3.md).
+
 Busque nome ou ID em mods.json ou nesta lista. Cada ficha tem funcao, uso, dependencias com versoes, DLC, conflitos, evidencia coop, caminhos relativos e fontes. Os requisitos do autor e as dependencias fixadas pelo pacote podem diferir; a ficha distingue ambos.
 
 | Mod | Versao fixa | Phantom Liberty | Situacao |

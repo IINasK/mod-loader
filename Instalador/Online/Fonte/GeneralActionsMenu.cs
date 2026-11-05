@@ -17,7 +17,7 @@ internal sealed class GeneralActionsMenu : GeneralDialog {
             Add(body,"new","Nova lista","New list",0,0);Add(body,"import","Importar lista","Import list",1,0);
             Add(body,"export","Exportar lista","Export list",0,1);Add(body,"new-preset","Novo preset","New preset",1,1);
             Add(body,"edit-preset","Atualizar preset","Update preset",0,2);Add(body,"delete-preset","Excluir preset","Delete preset",1,2);
-            Add(body,"options","Opções","Options",0,3);body.SetColumnSpan(body.GetControlFromPosition(0,3),2);
+            Add(body,"p2p","Compartilhar P2P","Share over P2P",0,3);Add(body,"options","Opções","Options",1,3);
         }
         GeneralStyle.Apply(this,GeneralStyle.Dark);
     }

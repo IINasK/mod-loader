@@ -683,12 +683,17 @@ public sealed class DownloadBarCell:DataGridViewTextBoxCell {
 static class OnlineProgram {
     [STAThread]static int Main(string[] args){try{System.Net.ServicePointManager.SecurityProtocol=System.Net.SecurityProtocolType.Tls12;
         if(args.Length==2&&args[0]=="--self-test"){OnlineTests.Run(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--self-test-p2p"){GeneralP2PTests.Run(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--self-test-p2p-helper"){GeneralP2PTests.RunHelper(args[1]);return 0;}
+        if(args.Length==3&&args[0]=="--self-test-p2p-network"){GeneralP2PTests.RunNetwork(args[1],args[2]);return 0;}
         var c=FixedData.Load();
         if(args.Length==3&&args[0]=="--inspect"){string game=Path.GetFullPath(args[1]).TrimEnd('\\'),output=Path.GetFullPath(args[2]);if(output.StartsWith(game+"\\",StringComparison.OrdinalIgnoreCase))throw new IOException("O relatório deve ficar fora do jogo.");var report=c.Packages.Select(m=>FixedData.Scan(m,game)).ToList();string issue=null;try{FixedData.ValidateGame(game,c.Packages,c.GameFileVersion);}catch(IOException ex){issue=ex.Message;}Safe.WriteJson(output,new{GameVersion=FixedData.GameVersion(game),Build=FixedData.GameBuild(game),VersionAndRequirementsMatch=issue==null,Issue=issue,Mods=report});return 0;}
         if(args.Length==3&&args[0]=="--verify-local-sources"){OnlineTests.VerifySources(c,args[1],args[2]);return 0;}
         var cache=new DownloadCache(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CyberpunkCoop","Downloads"));
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
         if(args.Length==2&&args[0]=="--self-test-general"){GeneralModWindow.RunGeneralTests(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--self-test-p2p-ui"){GeneralP2PUiTests.Run(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--preview-p2p"){GeneralP2PUiTests.Preview(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--preview"){using(var f=new OnlineWindow(c,cache,true))f.Preview(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--preview-general"){
             var fixture=new GeneralModState{List=GeneralModLibrary.Seed(c,new ModImportItem[0]),Destination=@"D:\Jogos\Cyberpunk 2077"};

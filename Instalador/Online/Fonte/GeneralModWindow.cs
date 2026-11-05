@@ -62,7 +62,7 @@ internal sealed partial class GeneralModWindow : Form {
         }
         if(String.IsNullOrWhiteSpace(state.DownloadFolder))state.DownloadFolder=OnlineDownloadWatch.DefaultFolder();
         if(state.SelectedPreset==null&&state.List.Presets.Any(p=>p.Id=="all"))state.SelectedPreset="all";
-        Text="Mod Loader 1.1.3";ClientSize=new Size(1240,820);MinimumSize=new Size(1000,680);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
+        Text="Mod Loader 1.1.4";ClientSize=new Size(1240,820);MinimumSize=new Size(1000,680);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
         BuildInterface();
         FormClosing+=(s,e)=>{
             if(working){RequestSkip();normal.Clear();priority.Clear();e.Cancel=true;detail.Text=T("Aguarde a operação atual terminar antes de fechar.","Wait for the current operation to finish before closing.");}
