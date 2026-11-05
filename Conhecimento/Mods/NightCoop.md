@@ -53,3 +53,5 @@ Caminhos relativos a pasta do jogo. Lista completa de pacotes, hashes e tamanhos
 - https://nightcoop.net/docs.html
 
 Consulta:29/10/2026. Nao ampliar esta conclusao a versoes ou corpos novos sem revisar.
+## Reconfirmação em 02/11/2026
+FAQ oficial consultada no navegador integrado: não exige Phantom Liberty. Convidado sem DLC pode entrar após o anfitrião usar o reinício sem expansão oferecido pelo mod; saves feitos com a expansão não carregam nesse modo. A auditoria do perfil do loader 1.0.28 confirmou 84 itens visíveis e 25 testes focados em ambiente isolado. Ver ../Configuracoes/perfil-sem-phantom-liberty-1.0.28.md. Não foi feito ensaio runtime em jogo sem DLC.

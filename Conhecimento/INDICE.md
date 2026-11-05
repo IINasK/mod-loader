@@ -1,11 +1,11 @@
 # Conhecimento dos mods
 
-Indice interno de85componentes do instalador. Revisao de30/10/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
+Indice interno de95componentes do instalador. Revisao de30/10/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
 
 ## Perfis Phantom Liberty
 
-- Com Phantom Liberty:85registros,83visiveis; BMW e Yamaha continuamretidos.
-- Sem Phantom Liberty:78registros elegiveis,76visiveis. ITP eNightCityAlive exigemDLC; Allies,Cyberpsycho,EconomyPunk,EXtra eNightCityFPV ficaram fora desse perfil por evidencia insuficiente para a receita exata.
+- Com Phantom Liberty:95registros,93visiveis; BMW e Yamaha continuamretidos.
+- Sem Phantom Liberty:86registros elegiveis,84visiveis. ITP eNightCityAlive exigemDLC; Allies,Cyberpsycho,EconomyPunk,EXtra eNightCityFPV ficaram fora desse perfil por evidencia insuficiente para a receita exata.
 - A base NightCoop nao exige DLC segundo aFAQoficial; o anfitriao pode reiniciar sem a expansao pelo fluxo oferecido pelo proprio mod. Nao apagar arquivos de expansao nem converter saves automaticamente.
 - Esta separacao e documental/estatica. Nao foi executado um jogo semDLC para validar aparencia, gameplay ou rede. Confirmacoescoop anteriores do usuario continuam atribuidas a ele.
 
@@ -100,3 +100,90 @@ Busque nome ou ID em mods.json ou nesta lista. Cada ficha tem funcao, uso, depen
 | [Unlimited Attribute Reset](Mods/mod-36378.md) | 1.0.1 | not-required | Disponivel para teste |
 | [No-Clip (Fly Through Walls)](Mods/mod-35886.md) | 1.0.1 | not-required | Disponivel para teste |
 | [Night City FPV](Mods/mod-31642.md) | 1.31.4 | unverified | Disponivel para teste comPL |
+
+## Candidatos revisados em 01/11/2026
+
+- [Vehicle Interior RT and Mirrors](Candidatos/mod-29619.md): compatibilidade documental favorável, com ressalvas de variantes e cobertura dos carros adicionais.
+- [Realistic Map](Candidatos/mod-17811.md): sem conflito documental direto identificado; relatos recentes exigem ensaio visual antes de integrar.
+
+São fichas de avaliação, fora dos 85 componentes ativos. Catálogo e executável inalterados; pacotes ainda não inspecionados.
+
+## Adições da versão1.0.26 — 02/11/2026
+
+| Mod | Versão | Perfil |
+| --- | --- | --- |
+| [Vehicle Interior RT and Mirrors](Mods/mod-29619.md) |4.1.0 HQ central + LQ laterais|ComPL; semPL não documentado|
+| [Realistic Map](Mods/mod-17811.md) |1.0.0 8K|ComPL; semPL não documentado|
+| [Better Loot Markers](Mods/mod-3486.md) |1.4.1|Com e semPL, por escopo do HUD|
+
+As sete adições Nola foram promovidas ao catálogo na1.0.27; consulte a seção seguinte. Fichas candidatas anteriores são histórico, não estado atual.
+
+## Roupas e lojasNola — versão1.0.27
+
+| Mod | Versão fixa | Perfil |
+| --- | --- | --- |
+| [Nola · Virtual Boutique feminina](Mods/mod-5114.md) | 7.6 | Com e semPL por escopo estático |
+| [Nola · Loja de acessórios](Mods/mod-14299.md) | 1.8 | Com e semPL por escopo estático |
+| [Nola · Follow Your Passion (loja)](Mods/mod-12642.md) | 1.8 | Com e semPL por escopo estático |
+| [Nola x Aquelyras · Atelier feminino](Mods/mod-8704.md) | 3.2 | Com e semPL por escopo estático |
+| [Nola · Stockings Collection (FemV padrão, 2K)](Mods/mod-12572.md) | 1.5 | Com e semPL por escopo estático |
+| [Nola · Pack 1 (FemV padrão + Equipment-EX)](Mods/mod-5093.md) | 1.0 | Com e semPL por escopo estático |
+| [Nola x Aquelyras · Goth Outfit (FemV padrão)](Mods/mod-11609.md) | 1.2 | Com e semPL por escopo estático |
+
+SelecionarStockings incluiFollowYourPassion;Pack1incluiVirtualBoutique;GothincluiAquelyrasAtelier. EquipmentEXexistente é incluído para as roupas. As lojas não baixam o restante de suas vitrines. Avisos de2.5 são informativos, sem bloqueio de instalação. Teste visual permanece distinto do teste de instalação.
+
+## FPV nativo — 1.0.28
+Night City FPV agora inclui os três ajustes NASK aprovados e o perfil final. Fonte oficial mantida; o falso conflito da personalização conhecida foi corrigido. Ver [configuração atual](Configuracoes/fpv-nativo-1.0.28.md). Catálogo com 95 componentes, outras 94 receitas preservadas.
+
+## Arquivos divergentes — 1.0.29
+Identificação do mod/pacote/entrada em falhas, aceite explícito de identidades extraídas divergentes, aviso por linha e remoção rastreável. Ver [comportamento e limites](Configuracoes/arquivos-divergentes-1.0.29.md). Catálogo de 95 componentes preservado.
+
+## Pular mods — 1.0.30
+Botão Pular e continuar na falha de preparação, dependentes identificados e retomada da fila original. Botão Auditar seleção retirado da barra superior. Ver [comportamento e testes](Configuracoes/pular-mods-1.0.30.md).
+
+## Leitor incorporado — 1.0.31
+RAR/7z/LZMA/PPMd lidos pelo 7-Zip oficial incluído no único EXE, com licenças/fonte e sem dependência do tar do Windows. Ver [diagnóstico, funcionamento e testes](Configuracoes/leitor-incorporado-1.0.31.md). Receitas dos 95 componentes preservadas.
+
+## Pular download atual — 1.0.32
+Botão na barra inferior para desistir do mod aguardado e continuar a fila original, com dependentes e downloads tardios tratados. Ver [funcionamento e testes](Configuracoes/pular-download-1.0.32.md). Catálogo e motor preservados.
+
+## 1.0.33 — Limpeza e complementos
+O botão Limpar mods fora da lista mostra os arquivos detectados e pede duas confirmações antes de guardá-los. Desfazer última operação restaura a limpeza. Novas fichas: mod-30316, mod-30304, mod-7665, mod-7822, mod-18823, mod-11824, mod-14371, mod-24104, mod-8209, mod-20058, mod-26845, mod-32674, mod-33404.
+
+## 1.0.34 — Veículos e interação
+
+- [Vehicle Speed Unlimiter](Mods/mod-22155.md) 1.0.2, retirado da lista na versão 1.0.35 após falha na abertura do jogo.
+- [Sit Anywhere](Mods/mod-7299.md) 1.4, CET e Native Settings UI opcional.
+
+- [Togglable Feet FemV](Mods/mod-7049.md) 1.0, adicionado na 1.0.36 para V feminina com corpo padrão.
+
+## 1.0.37 — Roupas, lojas e veículos
+
+- [Veegee Shop 1](Mods/mod-8183.md) 2.2
+- [Veegee Shop 2](Mods/mod-13870.md) 2.3.0
+- [Veegee Shop 3](Mods/mod-18890.md) 1.5.2
+- [Veegee Shop 4](Mods/mod-30021.md) 1.1.3
+- [Veegee Jewelry Atelier](Mods/mod-8688.md) 1.23
+- [Casual Style Outfit Pt7 (Vanilla Arms)](Mods/mod-15712.md) 1.0
+- [Casual Style Outfit Pt8 (Vanilla Arms)](Mods/mod-16345.md) 1.0
+- [Casual Style Outfit Pt14](Mods/mod-17501.md) 1.01
+- [Casual Style Outfit Pt19](Mods/mod-18353.md) 1.0
+- [Casual Style Outfit Pt20](Mods/mod-18849.md) 1.0
+- [Casual Style Outfit Pt23 (Both V)](Mods/mod-19684.md) 1.01
+- [Casual Style Outfit Pt28](Mods/mod-21395.md) 1.0
+- [Tactical Style Outfit Pt3](Mods/mod-23301.md) 1.01
+- [Kawasaki Ninja H2R](Mods/mod-14162.md) 1.0
+- [BMW S1000RR](Mods/mod-10445.md) 1.2
+- [Ducati Panigale V4R (Livery 2)](Mods/mod-17158.md) 1.0
+- [Lexus SC300](Mods/mod-13847.md) 1.2
+- [Mercedes Brabus G 900 Rocket Edition](Mods/mod-35848.md) 1.0.1
+- [Photomode Facial Expression Mega Pack](Mods/mod-7912.md) 2.1
+- [VOIDWEAR Virtual Atelier](Mods/mod-12637.md) 0.85
+- [Kwek's Sartorial Omnibus Shop](Mods/mod-6779.md) 1.1.5
+- [Kwek's Seawright Optometry Shop](Mods/mod-6505.md) 1.1.0
+- [Kwek's Family Jewels Shop](Mods/mod-6985.md) 1.0.9
+- [VOIDWEAR Round Glasses (FemV)](Mods/mod-15702.md) 1.2
+- [Kwek's Parasol Oversized Round Glasses](Mods/mod-6536.md) 1.1.2
+- [Kwek's Big Round Hoop Earrings](Mods/mod-7017.md) 1.1
+- [Kwek's Head Sporty Glasses (FemV)](Mods/mod-7435.md) 1.0.0
+- [Kwek's Nose Aviator Glasses (MascV)](Mods/mod-7640.md) 1.0.0

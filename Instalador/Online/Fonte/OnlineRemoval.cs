@@ -23,12 +23,12 @@ public sealed partial class FixedInstaller {
             foreach(var mod in mods) {
                 var scan=FixedData.Scan(mod,game,false);
                 if(scan.IsConflict)throw new IOException(mod.Name+": há arquivos diferentes ou não verificáveis. Seus arquivos foram preservados; resolva a divergência antes de remover o lote.");
-                if(scan.Correct>0)present.Add(mod);
+                if(scan.Correct+scan.Original>0)present.Add(mod);
             }
             if(present.Count==0)return "Os complementos selecionados não estão instalados. Nada foi alterado."+baseNote;
             var removing=new HashSet<string>(present.Select(m=>m.Id),StringComparer.Ordinal);
             var outside=catalog.Packages.Where(m=>!selected.Contains(m.Id)&&FixedData.Expand(catalog,new[]{m.Id}).Any(d=>removing.Contains(d.Id)))
-                .Where(m=>{var scan=FixedData.Scan(m,game);return scan.Correct+scan.Different>0||scan.State=="Não verificável";}).Select(m=>m.Name).ToList();
+                .Where(m=>{var scan=FixedData.Scan(m,game);return scan.Correct+scan.Original+scan.Different>0||scan.State=="Não verificável";}).Select(m=>m.Name).ToList();
             if(outside.Count>0)throw new IOException("A seleção deixaria dependências faltando para: "+String.Join(", ",outside)+". Selecione esses mods também ou remova-os primeiro. Nenhum arquivo do lote foi removido.");
             var receipt=new OnlineReceipt{Id=Guid.NewGuid().ToString("N"),CatalogId=catalog.Id,CreatedUtc=DateTime.UtcNow.ToString("o"),Status="desativando",Operation="deactivate",BackupLayout="flat-v1",Mods=present.Select(m=>m.Id).ToList()};
             string ledger=Safe.In(Data,receipt.Id+".json");Save(ledger,receipt);
@@ -37,9 +37,10 @@ public sealed partial class FixedInstaller {
                 foreach(var mod in present)foreach(var file in mod.Files.Where(f=>!f.UserData)) {
                     Closed();string source=Safe.In(game,file.Path);
                     if(!File.Exists(source)){if(Directory.Exists(source))throw new IOException("Uma pasta ocupa o arquivo do mod: "+file.Path);continue;}
-                    if(new FileInfo(source).Length!=file.Size||Safe.Hash(source)!=file.Sha256)throw new IOException("Arquivo alterado após a conferência: "+file.Path);
+                    long size=new FileInfo(source).Length;string hash=Safe.Hash(source);
+                    if(!FpvCustomization.MatchesFile(file,size,hash))throw new IOException("Arquivo alterado após a conferência: "+file.Path);
                     string backup=DisabledPath(receipt,file.Path);Directory.CreateDirectory(Path.GetDirectoryName(backup));Safe.NoLinks(backup);
-                    var change=new OwnedChange{Path=file.Path,Before=file.Sha256};receipt.Files.Add(change);Save(ledger,receipt);
+                    var change=new OwnedChange{Path=file.Path,Before=hash};receipt.Files.Add(change);Save(ledger,receipt);
                     File.Move(source,backup);change.Applied=true;Save(ledger,receipt);moved++;
                     if(failAfter>=0&&moved>=failAfter)throw new IOException("Falha de teste na remoção em lote.");
                     report("Removido e guardado: "+mod.Name);

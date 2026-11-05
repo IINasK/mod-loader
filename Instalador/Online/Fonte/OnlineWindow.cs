@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -23,7 +23,7 @@ public sealed partial class OnlineWindow:Form {
     readonly Label status=new Label();
     readonly Label summary=new Label{AutoSize=true,Padding=new Padding(12,11,0,0)};
     readonly Label installGuide=new Label{Dock=DockStyle.Top,AutoSize=false,Height=106,Margin=new Padding(0,10,0,5),ForeColor=Color.DimGray};
-    readonly CheckBox selectAllHeader=new CheckBox{Size=new Size(16,16),AccessibleName="Selecionar todos os mods",TabStop=true};
+    readonly CheckBox selectAllHeader=new CheckBox{Size=new Size(16,16),AccessibleName="Selecionar todos os mods visíveis",TabStop=true};
     readonly ProgressBar activity=new ProgressBar();
     readonly Label downloadFolderLabel=new Label();
     readonly Timer downloadWatchTimer=new Timer{Interval=2000};
@@ -69,8 +69,8 @@ public sealed partial class OnlineWindow:Form {
         downloadFolder=LoadDownloadFolder();
         Text="";Font=new Font("Segoe UI",10);BackColor=Color.White;
         ClientSize=new Size(1180,740);MinimumSize=new Size(1040,620);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Font;
-        var layout=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(20),ColumnCount=1,RowCount=9};Controls.Add(layout);
-        for(int i=0;i<9;i++)layout.RowStyles.Add(new RowStyle(i==5?SizeType.Percent:SizeType.AutoSize,i==5?100:0));
+        var layout=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(20),ColumnCount=1,RowCount=10};Controls.Add(layout);
+        for(int i=0;i<10;i++)layout.RowStyles.Add(new RowStyle(i==6?SizeType.Percent:SizeType.AutoSize,i==6?100:0));
         layout.Controls.Add(new Label{Text="Cyberpunk Coop · Mods",Font=new Font("Segoe UI",22,FontStyle.Bold),AutoSize=true,Margin=new Padding(0,0,0,4)},0,0);
         layout.Controls.Add(new Label{Text="Criado por Nask e Codex. Se achou ruim, faz você.",AutoSize=true,Margin=new Padding(0,0,0,12)},0,1);
         var pathRow=new TableLayoutPanel{ColumnCount=2,Dock=DockStyle.Top,AutoSize=true};
@@ -82,7 +82,6 @@ public sealed partial class OnlineWindow:Form {
         AddEditionControls(tools);
         tools.Controls.Add(Button("Densidade de NPCs…",ChooseDensityProfile));
         var facialButton=Button("Conjunto facial…",ChooseFacialDownloads);facialButton.Name="FacialDownloads";tools.Controls.Add(facialButton);
-        tools.Controls.Add(Button("Auditar seleção",()=>AuditMods(Chosen(),CurrentPending())));
         tools.Controls.Add(Button("Abrir registros",OpenDiagnosticFolder));
         tools.Controls.Add(summary);
         tools.SetFlowBreak(summary,true);tools.Controls.Add(editionNotice);
@@ -91,6 +90,8 @@ public sealed partial class OnlineWindow:Form {
         folders.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));folders.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         downloadFolderLabel.Text="Downloads monitorados: "+downloadFolder;downloadFolderLabel.AutoEllipsis=true;downloadFolderLabel.Dock=DockStyle.Fill;downloadFolderLabel.TextAlign=ContentAlignment.MiddleLeft;
         folders.Controls.Add(downloadFolderLabel,0,0);folders.Controls.Add(Button("Pasta de downloads…",ChooseDownloadFolder),1,0);layout.Controls.Add(folders,0,4);
+        var filters=new FlowLayoutPanel{Dock=DockStyle.Top,AutoSize=true,WrapContents=false,Margin=new Padding(0,0,0,7)};
+        AddCategoryControls(filters);layout.Controls.Add(filters,0,5);
 
         grid.Dock=DockStyle.Fill;grid.AllowUserToAddRows=false;grid.AllowUserToDeleteRows=false;grid.RowHeadersVisible=false;
         grid.BackgroundColor=Color.White;grid.BorderStyle=BorderStyle.FixedSingle;grid.SelectionMode=DataGridViewSelectionMode.FullRowSelect;grid.MultiSelect=false;
@@ -104,6 +105,7 @@ public sealed partial class OnlineWindow:Form {
         grid.Columns.Add(new DataGridViewTextBoxColumn{Name="Notes",HeaderText="Observações",ReadOnly=true,Visible=false});
         grid.Columns["Mod"].AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill;grid.Columns["Mod"].MinimumWidth=205;
         foreach(var m in catalog.Packages.Where(m=>!IsBlocked(m))){
+            rowCategories.Add(m.Id,ModCategories.CategoryOf(m.Id,m.Profile));
             int row=grid.Rows.Add(false,m.Name,m.Version,"A verificar","A verificar",0,"—",m.ThirdPerson??"—",m.Warning);
             var r=grid.Rows[row];r.Tag=m.Id;r.Cells["Mod"].ToolTipText=m.Id;r.Cells["TPP"].ToolTipText=m.ThirdPersonNotes;r.Cells["Notes"].ToolTipText=m.Warning;
             MarkBlocked(r,m);
@@ -119,15 +121,16 @@ public sealed partial class OnlineWindow:Form {
         official.Click+=async(s,e)=>await OpenOfficial(CurrentMod());
         audit.Click+=(s,e)=>AuditMods(CurrentIds(),CurrentPending());
         download.Click+=async(s,e)=>await DownloadSelection(CurrentIds());
-        install.Click+=(s,e)=>Install(CurrentIds(),false);
+        install.Click+=(s,e)=>{var item=CurrentPending();if(item!=null)ShowImportedInstall(item);else Install(CurrentIds(),false);};
         deactivate.Click+=(s,e)=>DeactivateMod(CurrentMod());
         pause.Click+=(s,e)=>TogglePause(CurrentMod());cancel.Click+=(s,e)=>CancelDownload(CurrentMod());undo.Click+=(s,e)=>Undo();
         menu.Items.AddRange(new ToolStripItem[]{official,audit,download,install,deactivate,new ToolStripSeparator(),pause,cancel,new ToolStripSeparator(),undo});
+        var licenses=new ToolStripMenuItem("Sobre e licenças…");licenses.Click+=(s,e)=>{using(var dialog=new ArchiveLicensesWindow())dialog.ShowDialog(this);};menu.Items.Add(new ToolStripSeparator());menu.Items.Add(licenses);
         menu.Opening+=(s,e)=>{
             var m=CurrentMod();var p=CurrentPending();var facial=CurrentFacial();DownloadControl control;bool active=downloadPhase&&m!=null&&!completedDownloads.Contains(m.Id)&&downloads.TryGetValue(m.Id,out control);
             official.Enabled=!busy&&!automaticFlow&&(m!=null||facial!=null||p!=null&&IsNexusUrl(p.Source));
             audit.Enabled=!busy&&!automaticFlow&&(m!=null||p!=null);
-            download.Enabled=!busy&&!automaticFlow&&(m!=null&&IsSelectable(m.Id)||facial!=null&&IsSelectable(facial.Id));install.Enabled=!busy&&!automaticFlow&&m!=null&&IsSelectable(m.Id);deactivate.Enabled=!busy&&!automaticFlow&&m!=null&&!m.Immutable;
+            download.Enabled=!busy&&!automaticFlow&&(m!=null&&IsSelectable(m.Id)||facial!=null&&IsSelectable(facial.Id));install.Enabled=p!=null||!busy&&!automaticFlow&&m!=null&&IsSelectable(m.Id);deactivate.Enabled=!busy&&!automaticFlow&&m!=null&&!m.Immutable;
             pause.Enabled=active;cancel.Enabled=facialQueue!=null&&facialQueue.IsArmed||active||downloadWatch!=null&&downloadWatch.IsArmed||!busy&&!automaticFlow&&(automaticQueue.Count>0||pendingDensityId!=null);
             pause.Text=active&&downloads[m.Id].IsPaused?"Continuar download":"Pausar download";
             cancel.Text=facialQueue!=null&&facialQueue.IsArmed?"Cancelar fila de downloads":active?"Cancelar download e instalação na fila":"Cancelar instalação na fila";
@@ -138,16 +141,18 @@ public sealed partial class OnlineWindow:Form {
         grid.CellBeginEdit+=(s,e)=>{if(busy||automaticFlow)e.Cancel=true;};
         grid.CellContentClick+=(s,e)=>{if(e.RowIndex>=0&&e.ColumnIndex==grid.Columns["Pause"].Index)TogglePause(ModAt(e.RowIndex));};
         grid.CellDoubleClick+=(s,e)=>{if(e.RowIndex>=0&&e.ColumnIndex!=grid.Columns["Pause"].Index&&e.ColumnIndex!=grid.Columns["Select"].Index)ShowDetails(e.RowIndex);};
-        layout.Controls.Add(grid,0,5);
-        installGuide.Text=NormalDownloadGuide;layout.Controls.Add(installGuide,0,6);
+        layout.Controls.Add(grid,0,6);
+        installGuide.Text=NormalDownloadGuide;layout.Controls.Add(installGuide,0,7);
         var bottom=new TableLayoutPanel{AutoSize=true,Dock=DockStyle.Top,RowCount=2,ColumnCount=1};
         activity.Dock=DockStyle.Top;activity.Height=5;activity.Style=ProgressBarStyle.Marquee;activity.Visible=false;bottom.Controls.Add(activity);
-        status.AutoSize=false;status.Dock=DockStyle.Top;status.Height=40;status.Text="A lista é conferida ao abrir. Use Atualizar lista para verificar os mods novamente.";bottom.Controls.Add(status);layout.Controls.Add(bottom,0,7);
+        status.AutoSize=false;status.Dock=DockStyle.Top;status.Height=40;status.Text="A lista é conferida ao abrir. Use Atualizar lista para verificar os mods novamente.";bottom.Controls.Add(status);layout.Controls.Add(bottom,0,8);
         var footer=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.RightToLeft,WrapContents=false,Margin=new Padding(0)};
-        mainInstallButton=Button("Baixar e instalar",()=>Install(Chosen(),true));footer.Controls.Add(mainInstallButton);
-        footer.Controls.Add(Button("Atualizar lista",async()=>{await Run(()=>RefreshAll());await RefreshFacialInventory();}));layout.Controls.Add(footer,0,8);
+        mainInstallButton=Button("Baixar e instalar",InstallSelection);footer.Controls.Add(mainInstallButton);
+        skipCurrentModButton.Click+=async(s,e)=>await SkipCurrentDownload();footer.Controls.Add(skipCurrentModButton);
+        footer.Controls.Add(Button("Atualizar lista",async()=>{await Run(()=>RefreshAll());await RefreshFacialInventory();}));layout.Controls.Add(footer,0,9);
         var remove=Button("Remover selecionados",async()=>await RemoveSelected());remove.BackColor=Color.Firebrick;remove.ForeColor=Color.White;remove.FlatStyle=FlatStyle.Flat;remove.UseVisualStyleBackColor=false;footer.Controls.Add(remove);
-        downloadWatchTimer.Tick+=async(s,e)=>{await CheckFacialDownload();await CheckWatchedDownload();};
+        footer.Controls.Add(Button("Limpar mods fora da lista",async()=>await CleanExtras()));
+        downloadWatchTimer.Tick+=async(s,e)=>{await ProcessPriorityImports(false);await FlushDeferredDrops(false);await CheckFacialDownload();await CheckWatchedDownload();};
         if(!preview)downloadWatchTimer.Start();
         EnableDrops(this);
         FormClosing+=(s,e)=>{if(busy||automaticFlow){e.Cancel=true;status.Text="Há uma operação em andamento. Cancele o download pelo menu da linha ou aguarde a conclusão.";}else nexus.Disconnect();};
@@ -187,7 +192,7 @@ public sealed partial class OnlineWindow:Form {
             }catch(Exception ex){status.Text=Friendly(ex);}
         }
     }
-    void StopDownloadWatch(){CancelFacialQueue();if(downloadWatch!=null)downloadWatch.Cancel();downloadWatch=null;waitingTab=null;waitingMod=null;waitingAsset=null;watchedGame=null;waitingPageSent=false;watchedSinceUtc=DateTime.MinValue;}
+    void StopDownloadWatch(){CancelFacialQueue();if(downloadWatch!=null)downloadWatch.Cancel();downloadWatch=null;waitingTab=null;waitingMod=null;waitingAsset=null;watchedGame=null;waitingPageSent=false;watchedSinceUtc=DateTime.MinValue;UpdateDownloadSkipButton();}
     void BrowserOutcome(FixedMod mod,string stage,string message){
         if(mod!=null){browserNotes[mod.Id]=message;var row=Row(mod.Id);if(row!=null)ApplyBrowserNote(row,mod.Warning);}
         try{
@@ -208,7 +213,7 @@ public sealed partial class OnlineWindow:Form {
         try{
             string folder=Path.GetFullPath(downloadFolder).TrimEnd('\\'),gamePath=Path.GetFullPath(root).TrimEnd('\\');
             if(folder.Equals(gamePath,StringComparison.OrdinalIgnoreCase)||folder.StartsWith(gamePath+"\\",StringComparison.OrdinalIgnoreCase))throw new IOException("A pasta monitorada precisa ficar fora do jogo.");
-            var watch=new OnlineDownloadWatch(folder);watch.Arm(new[]{asset});watch.Poll();downloadWatch=watch;waitingMod=mod;waitingAsset=asset;watchedGame=root;watchedGeneration=automaticGeneration;continueWatchedQueue=resumeQueue;watchedSinceUtc=DateTime.UtcNow;waitingPageSent=false;OnlineDiagnostics.Record("watch.armed",mod.Id,"Monitor do download autorizado iniciado.",new{Game=root,Folder=folder,Asset=asset.Id,Sha256=asset.Sha256,Size=asset.Size,ResumeInstall=resumeQueue,Queue=automaticQueue.ToArray(),Generation=automaticGeneration});return true;
+            var watch=new OnlineDownloadWatch(folder);watch.Arm(new[]{asset});watch.Poll();downloadWatch=watch;waitingMod=mod;waitingAsset=asset;watchedGame=root;watchedGeneration=automaticGeneration;continueWatchedQueue=resumeQueue;watchedSinceUtc=DateTime.UtcNow;waitingPageSent=false;OnlineDiagnostics.Record("watch.armed",mod.Id,"Monitor do download autorizado iniciado.",new{Game=root,Folder=folder,Asset=asset.Id,Sha256=asset.Sha256,Size=asset.Size,ResumeInstall=resumeQueue,Queue=automaticQueue.ToArray(),Generation=automaticGeneration});UpdateDownloadSkipButton();return true;
         }catch(Exception ex){status.Text="Monitor indisponível: "+Friendly(ex)+" Use Pasta de downloads ou importe o arquivo original.";return false;}
     }
     async Task EnsureWatchedPage(){
@@ -226,7 +231,7 @@ public sealed partial class OnlineWindow:Form {
     }
     async Task CheckWatchedDownload(){
         if(pollingDownload||busy||automaticFlow||densityDialogOpen||downloadWatch==null||!downloadWatch.IsArmed)return;
-        pollingDownload=true;
+        pollingDownload=true;UpdateDownloadSkipButton();
         var watch=downloadWatch;var mod=waitingMod;var asset=waitingAsset;DateTime since=watchedSinceUtc;var tab=waitingTab;string root=watchedGame;int generation=watchedGeneration;bool resumeQueue=continueWatchedQueue;
         try{
             DownloadWatchMatch match=null;BrowserDownloadSnapshot progress=null;
@@ -245,7 +250,7 @@ public sealed partial class OnlineWindow:Form {
             else if(resumeQueue&&automaticQueue.Count>0)await ProcessAutomaticQueue(root);
             else status.Text="Download importado e conferido. Use Instalar para aplicar; nenhum arquivo foi instalado por esta ação de baixar.";
         }catch(Exception ex){StopDownloadWatch();status.Text=Friendly(ex)+" Arraste o arquivo baixado para continuar manualmente.";}
-        finally{pollingDownload=false;}
+        finally{pollingDownload=false;UpdateDownloadSkipButton();}
     }
     void ChooseGame(){using(var d=new FolderBrowserDialog{Description="Pasta Cyberpunk 2077 que contém bin e archive",ShowNewFolderButton=false})if(d.ShowDialog(this)==DialogResult.OK)game.Text=d.SelectedPath;}
     void ChooseFacialDownloads(){
@@ -261,7 +266,7 @@ public sealed partial class OnlineWindow:Form {
     }
     async void ChooseDensityProfile(){
         if(busy||automaticFlow||pollingDownload||densityDialogOpen)return;
-        string selected=null,root=null;densityDialogOpen=true;
+        string selected=null,root=null;densityDialogOpen=true;UpdateDownloadSkipButton();
         try{
             var mod=DensityMod();if(mod==null)throw new IOException("Este catálogo ainda não possui os perfis de densidade do Night City Alive.");
             if(!EditionGuard(new[]{mod.Id}))return;
@@ -283,14 +288,14 @@ public sealed partial class OnlineWindow:Form {
                 if(f.ShowDialog(this)==DialogResult.OK)selected=ids[choice.SelectedIndex];
             }
         }catch(Exception ex){status.Text=Friendly(ex);}
-        finally{densityDialogOpen=false;}
+        finally{densityDialogOpen=false;UpdateDownloadSkipButton();}
         if(selected==null)return;
         ClearAutomaticQueue();pendingDensityId=selected;pendingDensityRoot=root;pendingDensityGeneration=automaticGeneration;
         await ContinueDensityProfile();
     }
     async Task ContinueDensityProfile(){
         if(busy||automaticFlow||pendingDensityId==null)return;
-        string id=pendingDensityId,root=pendingDensityRoot;int generation=pendingDensityGeneration;automaticFlow=true;
+        string id=pendingDensityId,root=pendingDensityRoot;int generation=pendingDensityGeneration;automaticFlow=true;UpdateDownloadSkipButton();
         try{
             if(generation!=automaticGeneration||!String.Equals(GameRoot(),root,StringComparison.OrdinalIgnoreCase))throw new IOException("A troca de densidade foi cancelada porque a seleção ou a pasta do jogo mudou.");
             FixedMod target=null;FixedAsset manual=null;bool needsFiles=true;
@@ -320,28 +325,32 @@ public sealed partial class OnlineWindow:Form {
             });}finally{if(needsFiles)EndDownloads();}
             ClearAutomaticQueue();if(!applied)return;
         }catch(Exception ex){ClearAutomaticQueue();status.Text=Friendly(ex);}
-        finally{automaticFlow=false;foreach(var a in actions)a.Enabled=true;game.Enabled=true;activity.Visible=false;}
+        finally{automaticFlow=false;foreach(var a in actions)a.Enabled=true;game.Enabled=true;activity.Visible=false;UpdateDownloadSkipButton();}
     }
     FixedMod ModAt(int row){return row<0?null:catalog.Packages.FirstOrDefault(x=>x.Id==(string)grid.Rows[row].Tag);}
     FixedMod CurrentMod(){return grid.CurrentRow==null?null:ModAt(grid.CurrentRow.Index);}
-    ModImportItem CurrentPending(){ModImportItem value;return grid.CurrentRow!=null&&pending.TryGetValue((string)grid.CurrentRow.Tag,out value)?value:null;}
+    ModImportItem CurrentPending(){return grid.CurrentRow==null?null:PendingAt(grid.CurrentRow.Index);}
     List<string> CurrentIds(){var m=CurrentMod();var facial=CurrentFacial();return m!=null?new List<string>{m.Id}:facial!=null?new List<string>{facial.Id}:new List<string>();}
     List<string> Chosen(){if(InvokeRequired)return operationIds.Where(IsSelectable).ToList();grid.EndEdit();return grid.Rows.Cast<DataGridViewRow>().Where(r=>r.Visible&&IsSelectable((string)r.Tag)&&Convert.ToBoolean(r.Cells["Select"].Value)).Select(r=>(string)r.Tag).ToList();}
     void SelectAll(){
         if(busy||automaticFlow)return;bool selected=selectAllHeader.Checked;grid.EndEdit();
-        foreach(DataGridViewRow row in grid.Rows)row.Cells["Select"].Value=selected&&row.Visible&&IsSelectable((string)row.Tag);
+                foreach(DataGridViewRow row in grid.Rows){
+            var mod=ModAt(row.Index);
+            if(selected&&(mod!=null&&mod.ManualSelection||PendingAt(row.Index)!=null))continue;
+            row.Cells["Select"].Value=selected&&row.Visible&&IsSelectable((string)row.Tag);
+        }
         UpdateSelectAll();
-        var selectedIds=Chosen();status.Text=selectedIds.Any(id=>FacialById(id)!=null)?selectedIds.Count+" itens selecionados. Baixar selecionados inicia somente a fila dos arquivos Rosto. Os outros mods ficam preservados.":selectedIds.Count+" itens selecionados. Itens que precisam de revisão ficaram desmarcados. Nada foi instalado.";
+        var selectedIds=Chosen();status.Text=selectedIds.Any(id=>FacialById(id)!=null)?selectedIds.Count+" itens selecionados. Baixar selecionados inicia somente a fila dos arquivos Rosto. Os outros mods ficam preservados.":selectedIds.Count+" itens selecionados. Itens que exigem seleção manual ficam fora da seleção em massa. Nada foi instalado.";
     }
     void PositionSelectAll(){selectAllHeader.Location=new Point(1+(grid.Columns[0].Width-selectAllHeader.Width)/2-grid.HorizontalScrollingOffset,1+(grid.ColumnHeadersHeight-selectAllHeader.Height)/2);}
     void UpdateSelectAll(){
-        var rows=grid.Rows.Cast<DataGridViewRow>().Where(r=>r.Visible&&IsSelectable((string)r.Tag)).ToList();
+        var rows=grid.Rows.Cast<DataGridViewRow>().Where(r=>r.Visible&&IsSelectable((string)r.Tag)).Where(r=>{var mod=ModAt(r.Index);return mod==null||!mod.ManualSelection;}).ToList();
         int selected=rows.Count(r=>Convert.ToBoolean(r.Cells["Select"].Value));selectAllHeader.CheckState=selected==0?CheckState.Unchecked:selected==rows.Count?CheckState.Checked:CheckState.Indeterminate;
     }
     void UpdateSummary(){
         var rows=grid.Rows.Cast<DataGridViewRow>().Where(r=>r.Visible).ToList();int installed=rows.Count(r=>Convert.ToString(r.Cells["Installed"].Value)=="Instalado correto");int failed=rows.Count(r=>Convert.ToString(r.Cells["State"].Value)=="Falhou");
-        summary.Text="Mods na lista: "+rows.Count+"   |   Instalados: "+installed+"   |   Falhas: "+failed;
-        if(mainInstallButton!=null){var selected=rows.Where(r=>Convert.ToBoolean(r.Cells["Select"].Value)&&IsSelectable((string)r.Tag)).ToList();bool hasFacial=selected.Any(r=>FacialById((string)r.Tag)!=null);mainInstallButton.Text=hasFacial?"Baixar selecionados":"Baixar e instalar";installGuide.Text=hasFacial?FacialDownloadGuide:NormalDownloadGuide;}
+        int skipped=rows.Count(r=>Convert.ToString(r.Cells["State"].Value)=="Pulado");summary.Text="Mods na lista: "+rows.Count+"   |   Instalados: "+installed+"   |   Falhas: "+failed+(skipped==0?"":"   |   Pulados: "+skipped);
+        if(mainInstallButton!=null){var selected=rows.Where(r=>Convert.ToBoolean(r.Cells["Select"].Value)&&IsSelectable((string)r.Tag)).ToList();bool hasFacial=selected.Any(r=>FacialById((string)r.Tag)!=null);bool localOnly=selected.Count==0&&rows.Any(r=>Convert.ToBoolean(r.Cells["Select"].Value)&&PendingAt(r.Index)!=null);mainInstallButton.Text=hasFacial?"Baixar selecionados":localOnly?"Instalar selecionados":"Baixar e instalar";installGuide.Text=hasFacial?FacialDownloadGuide:NormalDownloadGuide;}
     }
     string GameRoot(){string text=InvokeRequired?operationGame:game.Text.Trim();if(String.IsNullOrWhiteSpace(text))throw new IOException("Escolha a pasta do Cyberpunk 2077.");return Path.GetFullPath(text);}
     void Post(Action action){if(!IsDisposed&&IsHandleCreated)BeginInvoke(new Action(()=>{if(!IsDisposed)action();}));}
@@ -359,17 +368,38 @@ public sealed partial class OnlineWindow:Form {
         row.Cells["Mod"].ToolTipText=mod.Id+"\n"+reason;
         row.DefaultCellStyle.BackColor=Color.FromArgb(255,246,226);row.Cells["State"].Style.ForeColor=Color.FromArgb(135,83,0);
     }
-    void SetStatus(string id,string state,int percent){Post(()=>{var row=Row(id);if(row==null)return;row.Cells["State"].Value=state;row.Cells["Progress"].Value=percent;row.Cells["State"].Style.ForeColor=state=="Falhou"?Color.Firebrick:Color.Black;if(state!="Falhou"&&state!="Cancelado")row.Cells["State"].ToolTipText="";var mod=catalog.Packages.FirstOrDefault(m=>m.Id==id);if(IsBlocked(mod)){MarkBlocked(row,mod);row.Cells["State"].ToolTipText+="\nDownload: "+state;}});}
+    void SetStatus(string id,string state,int percent){Post(()=>{var row=Row(id);if(row==null||skippedThisQueue.Contains(id))return;row.Cells["State"].Value=state;row.Cells["Progress"].Value=percent;row.Cells["State"].Style.ForeColor=state=="Falhou"?Color.Firebrick:Color.Black;if(state!="Falhou"&&state!="Cancelado")row.Cells["State"].ToolTipText="";var mod=catalog.Packages.FirstOrDefault(m=>m.Id==id);if(IsBlocked(mod)){MarkBlocked(row,mod);row.Cells["State"].ToolTipText+="\nDownload: "+state;}});}
     static string Friendly(Exception ex){return ex is UnauthorizedAccessException?"Sem permissão para acessar a pasta. Para instalar em Program Files, abra o programa como administrador pelo Windows.":ex.Message;}
+    void ShowPreparationFailure(ModPreparationException failure){
+        if(failure==null)return;
+        var row=Row(failure.ModId);
+        if(row!=null){row.Cells["State"].Value="Falhou";row.Cells["State"].Style.ForeColor=Color.Firebrick;row.Cells["State"].ToolTipText=failure.Message;if(row.Visible){grid.ClearSelection();row.Selected=true;grid.CurrentCell=row.Cells["Mod"];grid.FirstDisplayedScrollingRowIndex=row.Index;}}
+        status.Text="Falhou: "+failure.ModName+". "+failure.InnerException.Message;
+        UpdateSummary();
+        OfferPreparationSkip(failure);
+    }
+    Func<FileApprovalRequest,bool> confirmFileMismatch=null;
+    bool ApprovePreparationFailure(ModPreparationException failure){
+        var request=failure==null?null:failure.InnerException as FileApprovalRequest;
+        if(request==null||String.IsNullOrWhiteSpace(operationGame))return false;
+        string destination=Safe.In(operationGame,request.Path);Safe.NoLinks(destination);
+        if(File.Exists(destination)||Directory.Exists(destination))return false;
+        string warning=failure.Message+"\r\n\r\nO tamanho ou conteúdo não corresponde ao catálogo. Isso pode causar falhas no jogo.\r\n\r\nInstalar mesmo assim? Esta aprovação vale apenas para este arquivo e este jogo. A instalação será registrada para remoção posterior pelo botão Remover selecionados.";
+        bool accepted=confirmFileMismatch!=null?confirmFileMismatch(request):!preview&&MessageBox.Show(this,warning,"Arquivo diferente — instalar mesmo assim?",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)==DialogResult.Yes;
+        if(!accepted)return false;
+        UserFileApprovals.Approve(catalog,operationGame,request);
+        OnlineDiagnostics.Record("stage.approval.accepted",request.ModId,"Usuário aprovou a identidade extraída diferente do catálogo.",new{Game=operationGame,Asset=request.AssetName,Entry=request.Entry,ExpectedSize=request.ExpectedSize,ActualSize=request.ActualSize,ActualSha256=request.ActualSha256});
+        return true;
+    }
 
     async Task<bool> Run(Func<string> work){
-        if(busy)return false;operationGame=game.Text.Trim();operationIds=Chosen();busy=true;
+        if(busy)return false;operationGame=game.Text.Trim();operationIds=Chosen();busy=true;UpdateDownloadSkipButton();
         OnlineDiagnostics.Record("action.begin",null,"Tarefa do aplicativo iniciada.",new{Game=operationGame,Selected=operationIds,Queue=automaticQueue.ToArray()});
         foreach(var a in actions)a.Enabled=false;game.Enabled=false;activity.Visible=true;
         bool success=false;
-        try{status.Text=await Task.Run(work);success=true;OnlineDiagnostics.Record("action.complete",null,"Tarefa concluída.",new{Game=operationGame});}
-        catch(Exception ex){OnlineDiagnostics.Record("action.failed",null,"Tarefa falhou.",new{Game=operationGame,ErrorType=ex.GetType().Name});status.Text=Friendly(ex);}
-        finally{busy=false;foreach(var a in actions)a.Enabled=!automaticFlow;game.Enabled=!automaticFlow;activity.Visible=automaticFlow;}
+        try{var approved=new HashSet<string>();while(true){try{status.Text=await Task.Run(work);success=true;OnlineDiagnostics.Record("action.complete",null,"Tarefa concluída.",new{Game=operationGame});break;}catch(Exception ex){var failure=ex as ModPreparationException;OnlineDiagnostics.Record("action.failed",failure==null?null:failure.ModId,"Tarefa falhou.",new{Game=operationGame,ErrorType=ex.GetType().Name,Error=Friendly(ex)});status.Text=Friendly(ex);string key=failure==null?null:failure.ModId+"/"+failure.Entry;if(key!=null&&!approved.Contains(key)&&ApprovePreparationFailure(failure)){approved.Add(key);continue;}ShowPreparationFailure(failure);break;}}}
+        catch(Exception ex){status.Text=Friendly(ex);OnlineDiagnostics.Record("stage.approval.failed",null,"Não foi possível registrar a aprovação local.",new{Error=ex.Message});}
+        finally{busy=false;foreach(var a in actions)a.Enabled=!automaticFlow;game.Enabled=!automaticFlow;activity.Visible=automaticFlow;UpdateDownloadSkipButton();}
         return success;
     }
     string RefreshAll(){
@@ -381,9 +411,9 @@ public sealed partial class OnlineWindow:Form {
     void RefreshMods(IEnumerable<FixedMod> mods,string root){
         foreach(var m in mods.Where(m=>!IsBlocked(m))){
             Report("Verificando "+m.Name);var scan=FixedData.Scan(m,root);bool cached=m.Assets.All(cache.Contains);string note=m.Warning;
-            string localNote=DensityNote(m,root,note);
+            string localNote=DensityNote(m,root,note);string approvedWarning=UserFileApprovals.GetWarning(m,root);
             OnlineDiagnostics.Record("ui.scan.enqueue",m.Id,"Resultado de conferência enviado para a lista.",new{Game=root,State=scan.State,Correct=scan.Correct,Missing=scan.Missing,Different=scan.Different,Cached=cached});
-            Post(()=>{var r=Row(m.Id);if(r==null)return;r.Cells["Installed"].Value=scan.State;r.Cells["Installed"].ToolTipText=scan.Detail;ApplyBrowserNote(r,localNote);if(!downloads.ContainsKey(m.Id)){r.Cells["State"].Value=scan.IsCorrect?"Já instalado":cached?"Pronto para instalar":m.Id.StartsWith("face-",StringComparison.Ordinal)?"Não iniciado":"A baixar";r.Cells["Progress"].Value=cached||scan.IsCorrect?100:0;r.Cells["State"].Style.ForeColor=Color.Black;r.Cells["State"].ToolTipText="";}MarkBlocked(r,m);});
+            Post(()=>{var r=Row(m.Id);if(r==null||skippedThisQueue.Contains(m.Id))return;r.Cells["Installed"].Value=scan.State;r.Cells["Installed"].ToolTipText=scan.Detail;r.Cells["Installed"].ErrorText=approvedWarning??"";ApplyBrowserNote(r,localNote);if(!String.IsNullOrEmpty(approvedWarning))r.Cells["Notes"].Value=approvedWarning+"\r\n"+localNote;if(!downloads.ContainsKey(m.Id)){r.Cells["State"].Value=scan.IsCorrect?"Já instalado":cached?"Pronto para instalar":m.Id.StartsWith("face-",StringComparison.Ordinal)?"Não iniciado":"A baixar";r.Cells["Progress"].Value=cached||scan.IsCorrect?100:0;r.Cells["State"].Style.ForeColor=Color.Black;r.Cells["State"].ToolTipText="";}MarkBlocked(r,m);});
         }
     }
 
@@ -408,23 +438,23 @@ public sealed partial class OnlineWindow:Form {
 
     void EnableDrops(Control control){
         control.AllowDrop=true;
-        control.DragEnter+=(s,e)=>e.Effect=!busy&&!automaticFlow&&e.Data.GetDataPresent(DataFormats.FileDrop)?DragDropEffects.Copy:DragDropEffects.None;
+        control.DragEnter+=(s,e)=>e.Effect=e.Data.GetDataPresent(DataFormats.FileDrop)?DragDropEffects.Copy:DragDropEffects.None;
         control.DragDrop+=(s,e)=>{
-            if(busy||automaticFlow)return;
             if(e.Data.GetDataPresent(DataFormats.FileDrop)){ImportInputs((string[])e.Data.GetData(DataFormats.FileDrop));return;}
         };
         foreach(Control child in control.Controls)EnableDrops(child);
     }
-    async void ImportInputs(string[] values){
-        if(busy||automaticFlow)return;
+    async void ImportInputs(string[] values){await ImportFiles(values,false);}
+    async Task ImportFiles(string[] values,bool fromAutomaticQueue){
+        if(busy||automaticFlow&&!fromAutomaticQueue){deferredDrops.AddRange(values);status.Text="Arquivo recebido. Ele aparece na lista assim que a operação atual terminar.";return;}
         OnlineDiagnostics.Record("ui.import.request",null,"Importação solicitada pelo usuário.",new{Count=values.Length,Game=game.Text,Queue=automaticQueue.ToArray()});
         var importedIds=new HashSet<string>(StringComparer.Ordinal);
         var watch=downloadWatch;var asset=waitingAsset;var mod=waitingMod;var tab=waitingTab;int generation=automaticGeneration;bool closeTab=false;
         bool imported=await Run(()=>{
-            var messages=new List<string>();
-            foreach(string value in values){try{var result=importer.Import(value.Trim());messages.Add(result.Message);var ids=result.SelectedIds??new string[0];foreach(string id in ids){var m=catalog.Packages.Single(x=>x.Id==id);if(IsBlocked(m)){messages.Add(m.Name+" foi retirado da lista: "+m.BlockedReason);continue;}if(!EditionEligible(id)){messages.Add(m.Name+": arquivo conferido no cache, sem instalação automática neste perfil.");continue;}importedIds.Add(id);Post(()=>{var r=Row(id);if(r!=null)r.Cells["Select"].Value=true;});}}catch(IOException ex){messages.Add(ex.Message);}}
+            var messages=new List<string>();bool revealImport=false;
+            foreach(string value in values){try{var result=importer.Import(value.Trim());messages.Add(result.Message);revealImport|=result.Pending;var ids=result.SelectedIds??new string[0];foreach(string id in ids){var m=catalog.Packages.Single(x=>x.Id==id);if(IsBlocked(m)){messages.Add(m.Name+" foi retirado da lista: "+m.BlockedReason);continue;}if(!EditionEligible(id)){messages.Add(m.Name+": arquivo conferido no cache, sem instalação automática neste perfil.");continue;}importedIds.Add(id);Post(()=>{var r=Row(id);if(r!=null)r.Cells["Select"].Value=true;});}}catch(IOException ex){messages.Add(ex.Message);}}
             if(mod!=null&&asset!=null&&importedIds.Contains(mod.Id))closeTab=cache.Contains(asset);
-            LoadPending();return String.Join("  ",messages);
+            LoadPendingRows(revealImport);return String.Join("  ",messages);
         });
         if(!imported||importedIds.Count==0||generation!=automaticGeneration)return;
         if(closeTab&&downloadWatch==watch){StopDownloadWatch();await CloseDownloadTab(mod,tab);}
@@ -434,15 +464,30 @@ public sealed partial class OnlineWindow:Form {
             if(densityMod!=null&&importedIds.Contains(densityMod.Id)){await ContinueDensityProfile();return;}
             ClearAutomaticQueue();
         }
-        try{string root=GameRoot();AuthorizeAutomatic(importedIds,root,false);await ProcessAutomaticQueue(root);}
+        try{string root=GameRoot();AuthorizeAutomatic(importedIds,root,false);if(!fromAutomaticQueue)await ProcessAutomaticQueue(root);}
         catch(Exception ex){ClearAutomaticQueue();status.Text=Friendly(ex);}
     }
-    void LoadPending(){
+    void LoadPending(){LoadPendingRows(false);}
+    void LoadPendingRows(bool revealImport){
         var faceHashes=new HashSet<string>(facialItems.Values.Select(i=>facialAssetResolver(i).Sha256));var rows=importer.ReadPending().Where(p=>!faceHashes.Contains(p.Sha256)).ToList();
+        var installed=new HashSet<string>(StringComparer.Ordinal);
+        string root=InvokeRequired?operationGame:game.Text.Trim();
+        if(rows.Count>0&&!String.IsNullOrWhiteSpace(root)){
+            try{installed=createRemovalInstaller(root).InstalledImports();}catch(IOException){}catch(UnauthorizedAccessException){}
+        }
         Post(()=>{
+            var marked=new HashSet<string>(grid.Rows.Cast<DataGridViewRow>().Where(r=>PendingAt(r.Index)!=null&&Convert.ToBoolean(r.Cells["Select"].Value)).Select(r=>(string)r.Tag),StringComparer.Ordinal);
             foreach(DataGridViewRow old in grid.Rows.Cast<DataGridViewRow>().Where(r=>pending.ContainsKey((string)r.Tag)).ToList())grid.Rows.Remove(old);
             pending.Clear();
-            foreach(var p in rows){string key="pending:"+p.Id;pending[key]=p;int index=grid.Rows.Add(false,p.Name,"—","Não verificado","Revisão necessária",0,"—","Não analisado","Importado · revisão necessária");var row=grid.Rows[index];row.Tag=key;row.ReadOnly=true;row.DefaultCellStyle.BackColor=Color.FromArgb(248,246,239);row.Cells["Notes"].ToolTipText=p.Source;}
+            foreach(var p in rows){
+                string key="pending:"+p.Id;pending[key]=p;
+                bool done=installed.Contains(p.Id);
+                string state=done?"Já instalado":priorityImports.Any(request=>request.Item.Id==p.Id)?"Na fila prioritária":"Pronto para instalar";
+                int index=grid.Rows.Add(marked.Contains(key),p.Name,"—",done?"Instalado correto":"Não registrado",state,done?100:0,"—","—","Arquivo local");
+                var row=grid.Rows[index];row.Tag=key;row.DefaultCellStyle.BackColor=Color.FromArgb(248,246,239);row.Cells["Mod"].ToolTipText=p.Source;
+            }
+            if(revealImport&&categoryFilter.SelectedIndex!=(int)ModCategory.All)categoryFilter.SelectedIndex=(int)ModCategory.Imported;
+            ApplyListFilters();
         });
     }
 
@@ -494,7 +539,7 @@ public sealed partial class OnlineWindow:Form {
         finally{EndDownloads();}
         }catch(Exception ex){status.Text=Friendly(ex);}
     }
-    void ClearAutomaticQueue(){OnlineDiagnostics.Record("queue.cleared",null,"Fila de instalação encerrada ou cancelada.",new{Game=automaticGame,Mods=automaticQueue.ToArray(),Generation=automaticGeneration});StopDownloadWatch();automaticQueue.Clear();automaticGame=null;pendingDensityId=null;pendingDensityRoot=null;pendingDensityGeneration=0;automaticGeneration++;}
+    void ClearAutomaticQueue(){OnlineDiagnostics.Record("queue.cleared",null,"Fila de instalação encerrada ou cancelada.",new{Game=automaticGame,Mods=automaticQueue.ToArray(),Generation=automaticGeneration});StopDownloadWatch();automaticQueue.Clear();skippedThisQueue.Clear();preparationWasSkipped=false;automaticGame=null;pendingDensityId=null;pendingDensityRoot=null;pendingDensityGeneration=0;automaticGeneration++;}
     void AuthorizeAutomatic(IEnumerable<string> ids,string root,bool replace){
         ids=ids.ToList();RequireEdition(ids);
         var allowed=ids.Distinct().Where(id=>catalog.Packages.Any(m=>m.Id==id&&!IsBlocked(m))).ToList();
@@ -508,28 +553,32 @@ public sealed partial class OnlineWindow:Form {
             OnlineDiagnostics.Record("ui.plan.enqueue",m.Id,"Plano conferido enviado para a lista.",new{Game=automaticGame,State=scan.State,Correct=scan.Correct,Missing=scan.Missing,Different=scan.Different,Cached=cached});
             string note=m.Warning;
             string localNote=DensityNote(m,GameRoot(),note);
-            Post(()=>{var row=Row(m.Id);if(row==null)return;row.Cells["Installed"].Value=scan.State;row.Cells["Installed"].ToolTipText=scan.Detail;ApplyBrowserNote(row,localNote);row.Cells["State"].Value=scan.IsCorrect?(plan.MissingMods.Any(x=>x.Id==m.Id)?"Aplicar padrão":"Já instalado"):cached?"Pronto para instalar":"A baixar";row.Cells["Progress"].Value=scan.IsCorrect||cached?100:0;row.Cells["State"].Style.ForeColor=Color.Black;row.Cells["State"].ToolTipText="";});
+            Post(()=>{var row=Row(m.Id);if(row==null||skippedThisQueue.Contains(m.Id))return;row.Cells["Installed"].Value=scan.State;row.Cells["Installed"].ToolTipText=scan.Detail;ApplyBrowserNote(row,localNote);row.Cells["State"].Value=scan.IsCorrect?(plan.MissingMods.Any(x=>x.Id==m.Id)?"Aplicar padrão":"Já instalado"):cached?"Pronto para instalar":"A baixar";row.Cells["Progress"].Value=scan.IsCorrect||cached?100:0;row.Cells["State"].Style.ForeColor=Color.Black;row.Cells["State"].ToolTipText="";});
         }
     }
     async Task ProcessAutomaticQueue(string root){
-        if(busy||automaticFlow)return;automaticFlow=true;
+        if(busy||automaticFlow)return;automaticFlow=true;UpdateDownloadSkipButton();
         try{
             while(automaticQueue.Count>0){
+                await ProcessPriorityImports(true);
+                await FlushDeferredDrops(true);
+                if(automaticQueue.Count==0)return;
                 var ids=automaticQueue.ToList();if(!EditionGuard(ids)){ClearAutomaticQueue();return;}int generation=automaticGeneration;AutoInstallPlan plan=null;
                 bool checkedOk=await Run(()=>{plan=AutoInstallPlan.Build(catalog,ids,root,cache,nexus.Premium);ShowPlan(plan);return "Itens autorizados e dependências conferidos.";});
                 if(!checkedOk){ClearAutomaticQueue();return;}
                 if(generation!=automaticGeneration)return;
-                if(plan.Complete){ClearAutomaticQueue();status.Text="Processo concluído. Os mods autorizados e suas dependências estão corretos; arquivos anteriores foram preservados.";return;}
+                if(priorityImports.Count>0||deferredDrops.Count>0)continue;
+                if(plan.Complete){status.Text=CompleteAutomaticQueue("Processo concluído. Os mods autorizados e suas dependências estão corretos; arquivos anteriores foram preservados.");return;}
                 if(plan.ReadyMods.Count>0){
                     var ready=plan.ReadyMods;var readyIds=ready.Select(m=>m.Id).ToList();PrepareDownloads(ready);
-                    bool applied;
+                    bool applied;preparationWasSkipped=false;
                     try{applied=await Run(()=>{
                         DownloadMods(ready,root);
                         if(generation!=automaticGeneration)throw new OperationCanceledException("Instalação na fila cancelada; nenhuma nova cópia foi iniciada.");
                         foreach(var item in ready)SetStatus(item.Id,"Instalando",100);string result=createInstaller(root).Install(readyIds,true,Report);
                         RefreshMods(plan.ExpandedMods,root);return result;
                     });}finally{EndDownloads();}
-                    if(!applied){ClearAutomaticQueue();return;}
+                    if(!applied){if(preparationWasSkipped){preparationWasSkipped=false;continue;}ClearAutomaticQueue();return;}
                     continue;
                 }
                 if(plan.ManualMod!=null){
@@ -540,8 +589,8 @@ public sealed partial class OnlineWindow:Form {
                 }
                 status.Text="Aguardando os arquivos conferidos das dependências da seleção autorizada.";return;
             }
-            ClearAutomaticQueue();status.Text="Processo concluído. Os mods autorizados foram instalados ou já estavam corretos.";
-        }finally{automaticFlow=false;foreach(var a in actions)a.Enabled=true;game.Enabled=true;activity.Visible=false;}
+            status.Text=CompleteAutomaticQueue("Processo concluído. Os mods autorizados foram instalados ou já estavam corretos.");
+        }finally{automaticFlow=false;foreach(var a in actions)a.Enabled=true;game.Enabled=true;activity.Visible=false;UpdateDownloadSkipButton();}
     }
     async void Install(List<string> ids,bool withDownload){
         if(!EditionGuard(ids))return;
@@ -558,7 +607,8 @@ public sealed partial class OnlineWindow:Form {
             if(!checkedOk)return;if(plan.Complete){ClearAutomaticQueue();status.Text="Os itens selecionados já estão corretos. Nada foi alterado.";return;}
             if(!withDownload&&missingCache){status.Text="Há arquivos ausentes no cache. Use Baixar e instalar ou importe os arquivos originais.";return;}
             string names=String.Join("\n",plan.MissingMods.Take(18).Select(m=>"• "+m.Name+" "+m.Version))+(plan.MissingMods.Count>18?"\n… e mais "+(plan.MissingMods.Count-18)+" componente(s).":"");
-            if(!confirmInstallation((withDownload?"Baixar e instalar":"Instalar")+" "+plan.MissingMods.Count+" componente(s) em:\n"+root+"\n\n"+names+"\n\nOs itens prontos serão instalados; arquivos corretos serão preservados.\nNa conta gratuita, conclua cada download oficial na pasta monitorada; o aplicativo confere e continua automaticamente.\nSerá feito backup dos saves. Continuar?"))return;
+            var manualNotes=String.Join("\n",plan.MissingMods.Where(m=>m.ManualSelection).Select(m=>m.Name+" — "+m.Warning));
+            if(!confirmInstallation((withDownload?"Baixar e instalar":"Instalar")+" "+plan.MissingMods.Count+" componente(s) em:\n"+root+"\n\n"+names+(String.IsNullOrEmpty(manualNotes)?"":"\n\n"+manualNotes)+"\n\nOs itens prontos serão instalados; arquivos corretos serão preservados.\nNa conta gratuita, conclua cada download oficial na pasta monitorada; o aplicativo confere e continua automaticamente.\nSerá feito backup dos saves. Continuar?"))return;
             OnlineDiagnostics.Record("ui.install.confirmed",null,"Plano de instalação confirmado na interface.",new{Game=root,Mods=ids});AuthorizeAutomatic(ids,root,true);await ProcessAutomaticQueue(root);
         }catch(Exception ex){ClearAutomaticQueue();status.Text=Friendly(ex);}
     }
@@ -584,9 +634,9 @@ public sealed partial class OnlineWindow:Form {
     }
     void Undo(){
         if(busy||automaticFlow)return;
-        if(MessageBox.Show(this,"Desfazer a última instalação ou desativação feita por esta edição?\nArquivos anteriores ou alterados depois serão preservados.","Desfazer operação",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes)return;
+        if(MessageBox.Show(this,"Desfazer a última instalação, remoção ou limpeza feita por este gerenciador?\nArquivos anteriores ou alterados depois serão preservados.","Desfazer operação",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes)return;
         ClearAutomaticQueue();
-        var ignored=Run(()=>{string root=GameRoot();string result=new FixedInstaller(catalog,cache,root,null).Undo(Report);RefreshMods(catalog.Packages,root);return result;});
+        var ignored=Run(()=>{string root=GameRoot();string result=new FixedInstaller(catalog,cache,root,null).Undo(Report);RefreshMods(catalog.Packages,root);LoadPending();return result;});
     }
     async void AuditMods(List<string> ids,ModImportItem imported){
         if(busy||automaticFlow)return;
@@ -598,10 +648,11 @@ public sealed partial class OnlineWindow:Form {
         using(var window=new ModAuditWindow(report))window.ShowDialog(this);
     }
     async void ShowDetails(int row){
+        var imported=PendingAt(row);if(imported!=null){ShowImportedInstall(imported);return;}
         if(busy||automaticFlow)return;
         OnlineDiagnostics.Record("ui.details.request",Convert.ToString(grid.Rows[row].Tag),"Duplo clique abriu detalhes do mod.",new{Game=game.Text});
         var facial=FacialById((string)grid.Rows[row].Tag);if(facial!=null){ShowFacialDetails(facial);return;}
-        var m=ModAt(row);if(m==null){var p=CurrentPending();if(p!=null)AuditMods(new List<string>(),p);return;}
+        var m=ModAt(row);if(m==null)return;
         string root=game.Text.Trim(),notes=Convert.ToString(grid.Rows[row].Cells["Notes"].Value);ModDetailsInfo info=null;
         if(!await Run(()=>{info=ModDetailsInfo.Read(m,root,notes,catalog);return "Detalhes de "+m.Name+" conferidos.";}))return;
         using(var details=new ModDetailsWindow(info,launchBrowser))details.ShowDialog(this);
@@ -637,9 +688,14 @@ static class OnlineProgram {
         if(args.Length==3&&args[0]=="--verify-local-sources"){OnlineTests.VerifySources(c,args[1],args[2]);return 0;}
         var cache=new DownloadCache(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CyberpunkCoop","Downloads"));
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--self-test-general"){GeneralModWindow.RunGeneralTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--preview"){using(var f=new OnlineWindow(c,cache,true))f.Preview(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--preview-general"){
+            var fixture=new GeneralModState{List=GeneralModLibrary.Seed(c,new ModImportItem[0]),Destination=@"D:\Jogos\Cyberpunk 2077"};
+            using(var f=new GeneralModWindow(c,cache,Path.GetTempPath(),fixture))f.Preview(args[1]);return 0;
+        }
         if(args.Length!=0)throw new IOException("Argumento não reconhecido. A instalação exige confirmação na interface.");
         OnlineDiagnostics.Start(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CyberpunkCoop","Logs"));string exeHash=null;try{if(OnlineDiagnostics.Enabled)exeHash=Safe.Hash(Application.ExecutablePath);}catch(Exception){}OnlineDiagnostics.Record("app.start",null,"Aplicativo iniciado com diagnóstico ativo.",new{Executable=Path.GetFileName(Application.ExecutablePath),ExecutableSha256=exeHash,Catalog=c.Id,CatalogSha256=OnlineIdentity.CatalogHash});
-        Application.Run(new OnlineWindow(c,cache));OnlineDiagnostics.Stop();return 0;
+        Application.Run(new GeneralModWindow(c,cache,Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"ModLoaderGeral")));OnlineDiagnostics.Stop();return 0;
     }catch(Exception ex){if(args.Length>0){File.WriteAllText(Path.Combine(Path.GetTempPath(),"CyberpunkCoopOnline-erro.txt"),ex.ToString());return 1;}MessageBox.Show(ex.Message,"Não foi possível abrir o programa",MessageBoxButtons.OK,MessageBoxIcon.Error);return 1;}}
 }

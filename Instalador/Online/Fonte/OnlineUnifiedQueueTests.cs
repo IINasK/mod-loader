@@ -98,6 +98,47 @@ public static class OnlineUnifiedQueueTests {
             var engine=new FixedInstaller(f.Catalog,f.Cache,f.Game,f.Saves,true);engine.Undo(message=>{});engine.Undo(message=>{});
             check(!File.Exists(Safe.In(f.Game,f.A.Files[0].Path))&&!File.Exists(Safe.In(f.Game,f.B.Files[0].Path))&&Safe.Hash(f.Foreign)==foreignHash&&Safe.Hash(f.SaveFile)==saveHash&&f.BaseHashes.All(pair=>Safe.Hash(Safe.In(f.Game,pair.Key))==pair.Value)&&sourceHashes.All(pair=>Safe.Hash(pair.Key)==pair.Value)&&downloadHashes.All(pair=>Safe.Hash(pair.Key)==pair.Value),"Desfazer duas operacoes retira somenteA/B e preserva base, alheio, saves atuais e originais");
         }
+        RunDownloadSkipCases(parent);
         Safe.WriteJson(Path.Combine(root,"resultado-unified.json"),new{Passed=passed.Count,Tests=passed,RealMonitor=true,RealImporter=true,RealInstallerInFixture=true,RealGameTouched=false,NetworkUsed=false,BrowserSimulated=true});File.WriteAllText(Path.Combine(parent,"ultimo-teste-unified-queue.txt"),root);return passed.Count;
+    }
+    static void RunDownloadSkipCases(string parent){
+        string root=Path.Combine(Path.GetFullPath(parent),"online-testes-"+Guid.NewGuid().ToString("N"));
+        var passed=new List<string>();Action<bool,string> check=(ok,name)=>{if(!ok)throw new Exception("TESTE PULAR DOWNLOAD FALHOU: "+name);passed.Add(name);};
+        using(var f=new Fixture(Path.Combine(root,"continue"),false)){
+            var window=f.Window;var skip=(Button)Get(window,"skipCurrentModButton");
+            string saveHash=Safe.Hash(f.SaveFile),foreignHash=Safe.Hash(f.Foreign);var sources=Directory.GetFiles(f.Sources).ToDictionary(p=>p,Safe.Hash);
+            check(!skip.Enabled,"Pular mod atual fica desabilitado sem download autorizado");
+            f.Unselected.Dependencies=new[]{f.A.Id};FixedData.Validate(f.Catalog);
+            foreach(var mod in new[]{f.A,f.B,f.Unselected})f.Row(mod).Cells["Select"].Value=true;
+            Call(window,"AuthorizeAutomatic",new[]{f.A.Id,f.B.Id,f.Unselected.Id},f.Game,true);Pump((Task)Call(window,"ProcessAutomaticQueue",f.Game));
+            check(skip.Enabled&&f.Opened.SequenceEqual(new[]{f.A.Assets[0].Url})&&f.InstallerCalls==0,"Espera pelo primeiro download oferece botão sem precisar de falha");
+            foreach(string flag in new[]{"busy","automaticFlow","pollingDownload","densityDialogOpen"}){
+                Set(window,flag,true);Call(window,"UpdateDownloadSkipButton");Pump((Task)Call(window,"SkipCurrentDownload"));
+                check(!skip.Enabled&&Get(window,"waitingMod")==f.A&&f.Opened.Count==1,"Pulo não interfere com operação ativa: "+flag);
+                Set(window,flag,false);
+            }
+            Set(window,"continueWatchedQueue",false);Call(window,"UpdateDownloadSkipButton");check(!skip.Enabled,"Download avulso sem autorização de instalação não ganha uma fila ao pular");Set(window,"continueWatchedQueue",true);Call(window,"UpdateDownloadSkipButton");
+            var oldWatch=(OnlineDownloadWatch)Get(window,"downloadWatch");int generation=(int)Get(window,"automaticGeneration");skip.PerformClick();Wait(()=>Idle(window)&&Get(window,"waitingMod")==f.B);
+            check(f.Opened.SequenceEqual(new[]{f.A.Assets[0].Url,f.B.Assets[0].Url})&&skip.Enabled,"Clique no botão abre somente o próximo mod usando a fila original");
+            check(((HashSet<string>)Get(window,"automaticQueue")).SetEquals(new[]{f.B.Id})&&!oldWatch.IsArmed&&(int)Get(window,"automaticGeneration")>generation,"Pulo retira raízes dependentes e invalida o monitor anterior");
+            check(new[]{f.A,f.Unselected}.All(m=>Convert.ToString(f.Row(m).Cells["State"].Value)=="Pulado"&&!Convert.ToBoolean(f.Row(m).Cells["Select"].Value))&&Convert.ToBoolean(f.Row(f.B).Cells["Select"].Value),"Mod pulado e dependente ficam identificados e desmarcados; independente permanece");
+            check(f.Row(f.Unselected).Cells["State"].ToolTipText.Contains(f.A.Name),"Dependente informa por que ficou fora desta tentativa");
+            f.Download(f.A);Tick(window);Wait(()=>Idle(window));
+            check(!f.Cache.Contains(f.A.Assets[0])&&!FixedData.Scan(f.A,f.Game).IsCorrect&&Get(window,"waitingMod")==f.B&&f.InstallerCalls==0&&f.ReceiptFiles().Length==0,"Arquivo do mod pulado que termina depois não é importado nem instalado");
+            f.Complete(f.B,false);
+            check(FixedData.Scan(f.B,f.Game).IsCorrect&&!FixedData.Scan(f.A,f.Game).IsCorrect&&!FixedData.Scan(f.Unselected,f.Game).IsCorrect&&f.InstallerCalls==1&&f.ReceiptFiles().Length==1,"Monitor real instala somente o mod independente e preserva exclusões da tentativa");
+            check(!skip.Enabled&&Get(window,"downloadWatch")==null&&((HashSet<string>)Get(window,"automaticQueue")).Count==0&&((Label)Get(window,"status")).Text.Contains("2 mod(s) pulado(s)"),"Conclusão informa pulados e desabilita o botão sem deixar autorização residual");
+            check(f.BaseHashes.All(p=>Safe.Hash(Safe.In(f.Game,p.Key))==p.Value)&&Safe.Hash(f.SaveFile)==saveHash&&Safe.Hash(f.Foreign)==foreignHash&&sources.All(p=>Safe.Hash(p.Key)==p.Value),"Pular preserva base, save, arquivos alheios e pacotes originais");
+            f.Row(f.A).Cells["Select"].Value=true;Call(window,"AuthorizeAutomatic",new[]{f.A.Id},f.Game,true);Pump((Task)Call(window,"ProcessAutomaticQueue",f.Game));
+            check(((HashSet<string>)Get(window,"skippedThisQueue")).Count==0&&f.Opened.Count==2,"Nova seleção explícita libera o mod pulado e reutiliza download já concluído sem nova aba");
+            f.Complete(f.A,true);
+            check(f.InstallerCalls==2&&f.ReceiptFiles().Length==2&&!skip.Enabled,"Nova tentativa instala normalmente o download que antes foi pulado");
+        }
+        using(var f=new Fixture(Path.Combine(root,"last"),false)){
+            var window=f.Window;Call(window,"AuthorizeAutomatic",new[]{f.A.Id},f.Game,true);Pump((Task)Call(window,"ProcessAutomaticQueue",f.Game));
+            ((Button)Get(window,"skipCurrentModButton")).PerformClick();Wait(()=>Idle(window));
+            check(((HashSet<string>)Get(window,"automaticQueue")).Count==0&&Get(window,"downloadWatch")==null&&f.InstallerCalls==0&&f.Opened.Count==1&&!((Button)Get(window,"skipCurrentModButton")).Enabled&&((Label)Get(window,"status")).Text.Contains("1 mod(s) pulado(s)"),"Pular o último encerra a tentativa sem instalar nada nem reabrir a página");
+        }
+        Safe.WriteJson(Path.Combine(root,"resultado-skip-download.json"),new{Passed=passed.Count,Tests=passed,RealMonitor=true,RealImporter=true,RealInstallerInFixture=true,RealGameTouched=false,NetworkUsed=false,BrowserSimulated=true});
     }
 }

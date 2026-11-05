@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -52,7 +52,7 @@ public static class ModAuditTests {
         string rar=Path.Combine(root,"source.rar");File.WriteAllText(rar,"rarfixture");check(Has(ModAudit.Build(catalog,new string[0],game,new ModImportItem{Kind="Arquivo",Name="rar",Source=rar,Size=new FileInfo(rar).Length,Sha256=Safe.Hash(rar)}),"format","Informação"),"RAR/7z nao sao executados nem recebem inspecao inventada");
         File.AppendAllText(package.Source,"modified");check(Has(ModAudit.Build(catalog,new string[0],game,package),"changed-import","Problema"),"Arquivo alterado desde a importacao nao recebe inventario de outra identidade");
         check(Has(ModAudit.Build(catalog,new[]{"Extra"},@"\\invalid-server\share"),"root","Problema"),"Auditoria recusa caminho de rede antes de consultar arquivos remotos");
-        var real=FixedData.Load();var active=real.Packages.Where(m=>String.IsNullOrWhiteSpace(m.BlockedReason)).Select(m=>m.Id).ToList();string identity=Identity(real);var full=ModAudit.Build(real,active,"");
+        var real=FixedData.Load();var active=real.Packages.Where(m=>String.IsNullOrWhiteSpace(m.BlockedReason)&&!m.ManualSelection).Select(m=>m.Id).ToList();string identity=Identity(real);var full=ModAudit.Build(real,active,"");
         string afterIdentity=Identity(real),auditJson=Safe.Json.Serialize(full);
         if(afterIdentity!=identity)Safe.WriteJson(Path.Combine(root,"catalog-difference.json"),new{Before=identity,After=afterIdentity});
         check(Has(full,"wardrobe")&&afterIdentity==identity&&!auditJson.Contains("coop pendente")&&!auditJson.Contains("experimental"),"Receitas atuais preservam confirmacao coop e notas reais sem alterar catalogo; wardrobe="+Has(full,"wardrobe")+" identity="+(afterIdentity==identity)+" pending="+auditJson.Contains("coop pendente")+" experimental="+auditJson.Contains("experimental"));

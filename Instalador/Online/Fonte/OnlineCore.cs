@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -13,7 +13,7 @@ public sealed class FixedCatalog { public int Schema; public string Id,GameVersi
 public sealed class FixedMod {
     public string Id,Name,Version,Profile,GameVersion,Warning,ThirdPerson,ThirdPersonNotes,ThirdPersonSource,BlockedReason;
     public string PhantomLibertyStatus,PhantomLibertyNotes,PhantomLibertySource;
-    public bool RequiresPL,RequiresRedmod,Immutable;
+    public bool RequiresPL,RequiresRedmod,Immutable,ManualSelection;
     public string[] Dependencies;
     public string[] IncompatiblePaths,ExclusiveCodeDirectories;
     public int NexusModId,NexusFileId;
@@ -22,15 +22,24 @@ public sealed class FixedMod {
     public List<FixedDensityProfile> DensityProfiles;
 }
 public sealed class FixedAsset { public string Id,Name,Sha256,Format,Url; public long Size; public int ModId,FileId; }
-public sealed class FixedFile { public string Asset,Entry,Path,Sha256; public long Size; public bool UserData; }
+public sealed class FixedFile { public string Asset,Entry,Path,Sha256; public long Size; public bool UserData; public FixedTextPatch Patch; public string CanonicalSha256; public long CanonicalSize; public string[] PriorApprovedHashes; }
 public sealed class ModScan {
-    public string Id,State,Detail; public int Correct,Missing,Different;
+    public string Id,State,Detail; public int Correct,Missing,Different,Original;
     public bool IsCorrect { get { return State=="Instalado correto"; } }
     public bool IsConflict { get { return Different>0 || State=="Não verificável"; } }
 }
 public sealed class OwnedChange { public string Path,Before,After; public bool Applied,UndoStarted,Reverted; }
 public sealed class OnlineReceipt { public string Id,CatalogId,Status,CreatedUtc,Operation,DensityBefore,DensityAfter,BackupLayout; public List<string> Mods=new List<string>(); public List<OwnedChange> Files=new List<OwnedChange>(); }
 public sealed class ReceiptEnvelope { public string Protected; }
+public sealed class ModPreparationException : IOException {
+    public readonly string ModId,ModName,AssetName,Entry;
+    public ModPreparationException(FixedMod mod,FixedAsset asset,string entry,IOException cause)
+        :base("Mod: "+mod.Name+"\r\nPacote: "+asset.Name+(String.IsNullOrEmpty(entry)?"":"\r\nArquivo: "+entry)+"\r\n\r\n"+cause.Message,cause){ModId=mod.Id;ModName=mod.Name;AssetName=asset.Name;Entry=entry;}
+}
+public sealed class FileContentMismatchException : IOException {
+    public readonly long ActualSize; public readonly string ActualSha256;
+    public FileContentMismatchException(FixedFile file,long size,string hash):base((size>file.Size?"Arquivo excede o tamanho fixado.":size<file.Size?"Arquivo menor que o tamanho fixado.":"Conteúdo diferente do catálogo.")+" Esperado: "+file.Size+" bytes; encontrado: "+size+" bytes. Arquivo: "+file.Path){ActualSize=size;ActualSha256=hash;}
+}
 
 public static class FixedData {
     public static FixedCatalog Load() {
@@ -62,6 +71,7 @@ public static class FixedData {
             foreach(var f in m.Files) {
                 if(f==null||!assets.Contains(f.Asset)||!HashValid(f.Sha256)||f.Size<0||f.Size>8L*1024*1024*1024||!Safe.Allowed(f.Path)||!paths.Add(f.Path)) throw new IOException("Colisão ou receita inválida no catálogo.");
                 if(f.UserData&&(m.Immutable||!f.Path.StartsWith("bin/x64/plugins/cyber_engine_tweaks/mods/",StringComparison.Ordinal)||!f.Path.EndsWith(".json",StringComparison.OrdinalIgnoreCase)))throw new IOException("Perfil personalizável inválido.");
+                FpvCustomization.Validate(m,f);
                 Safe.In(Path.GetTempPath(),f.Path); if(f.Entry!="") Safe.In(Path.GetTempPath(),f.Entry);
                 if(m.Immutable) immutable.Add(f.Path);
             }
@@ -87,6 +97,7 @@ public static class FixedData {
     public static ModScan Scan(FixedMod mod,string game,bool checkIncompatibilities=true) {
         var s=new ModScan{Id=mod.Id};
         try {
+            mod=UserFileApprovals.Resolve(mod,game);
             Safe.NoLinks(game);
             string conflict=checkIncompatibilities?Incompatibility(mod,game):null;
             if(conflict!=null){s.State="Incompatível";s.Different=1;s.Detail=conflict;return s;}
@@ -94,14 +105,14 @@ public static class FixedData {
             foreach(var f in mod.Files.Where(f=>!f.UserData)) {
                 string p=Safe.In(game,f.Path);
                 if(!File.Exists(p)) { if(Directory.Exists(p)) s.Different++; else s.Missing++;OnlineDiagnostics.Record("scan.file",mod.Id,"Arquivo não encontrado.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,Present=false}); }
-                else {var info=new FileInfo(p);string hash=info.Length==f.Size?Safe.Hash(p):null;bool correct=info.Length==f.Size&&hash==f.Sha256;if(correct)s.Correct++;else s.Different++;OnlineDiagnostics.Record("scan.file",mod.Id,correct?"Arquivo conferido.":"Arquivo divergente.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,ActualSize=info.Length,ActualSha256=hash,WrittenUtc=info.LastWriteTimeUtc.ToString("o"),Present=true,Correct=correct});}
+                else {var info=new FileInfo(p);string hash=(info.Length==f.Size||f.CanonicalSha256!=null||(f.Patch!=null&&info.Length==f.Patch.SourceSize))?Safe.Hash(p):null;bool correct=FpvCustomization.MatchesFile(f,info.Length,hash)&&!FpvCustomization.IsOriginal(f,info.Length,hash);bool original=FpvCustomization.IsOriginal(f,info.Length,hash);if(correct)s.Correct++;else if(original)s.Original++;else s.Different++;OnlineDiagnostics.Record("scan.file",mod.Id,correct?"Arquivo conferido.":original?"Original oficial reconhecido; setup NASK disponível.":"Arquivo divergente.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,ActualSize=info.Length,ActualSha256=hash,WrittenUtc=info.LastWriteTimeUtc.ToString("o"),Present=true,Correct=correct,OfficialOriginal=original});}
             }
-            s.State=s.Different>0?"Diferente/alterado":s.Missing==0?"Instalado correto":s.Correct==0?"Não instalado":"Parcial";
-            s.Detail=s.Correct+" corretos; "+s.Missing+" ausentes; "+s.Different+" diferentes";
+            s.State=s.Different>0?"Diferente/alterado":s.Missing==0?(s.Original>0?"Setup NASK disponível":"Instalado correto"):s.Correct+s.Original==0?"Não instalado":"Parcial";
+            s.Detail=s.Correct+" corretos; "+s.Original+" originais oficiais; "+s.Missing+" ausentes; "+s.Different+" diferentes";
             if(mod.Files.Any(f=>f.UserData))s.Detail+="; arquivos de perfil preservados, fora da verificação de versão";
         }catch(IOException){s.State="Não verificável";s.Detail="Não foi possível ler o caminho com segurança.";}
         catch(UnauthorizedAccessException){s.State="Não verificável";s.Detail="Sem permissão para ler os arquivos.";}
-        finally{OnlineDiagnostics.Record("scan.result",mod.Id,"Conferência dos arquivos do jogo.",new{Game=game,State=s.State,Correct=s.Correct,Missing=s.Missing,Different=s.Different,Detail=s.Detail});}
+        finally{OnlineDiagnostics.Record("scan.result",mod.Id,"Conferência dos arquivos do jogo.",new{Game=game,State=s.State,Correct=s.Correct,Original=s.Original,Missing=s.Missing,Different=s.Different,Detail=s.Detail});}
         return s;
     }
     public static string Incompatibility(FixedMod mod,string game) {
@@ -171,6 +182,8 @@ public sealed class DownloadCache {
     }
     public void Stage(FixedMod mod,string stage,Action<string> report) {
         foreach(var a in mod.Assets) {
+            string currentEntry=null;
+            try {
             if(!Contains(a))throw new IOException("Baixe ou importe o arquivo exato: "+a.Name);
             string source=PathFor(a);var files=mod.Files.Where(x=>x.Asset==a.Id).ToList();
             if(a.Format=="zip") {
@@ -183,38 +196,32 @@ public sealed class DownloadCache {
                         if(((e.ExternalAttributes>>16)&0xF000)==0xA000||entries.ContainsKey(e.FullName))throw new IOException("Link ou entrada duplicada no ZIP.");
                         entries.Add(e.FullName,e);
                     }
-                    foreach(var f in files){ZipArchiveEntry e;if(!entries.TryGetValue(f.Entry,out e)||e.Length!=f.Size)throw new IOException("Receita não corresponde ao arquivo.");using(var s=e.Open())WriteVerified(s,stage,f);report(mod.Name);}
+                    foreach(var f in files){currentEntry=f.Entry;ZipArchiveEntry e;if(!entries.TryGetValue(f.Entry,out e))throw new IOException("Arquivo previsto não encontrado dentro do pacote.");if(e.Length>8L*1024*1024*1024)throw new IOException("Arquivo ultrapassa o limite de leitura segura de 8 GiB.");using(var s=e.Open())WritePrepared(s,stage,f);report(mod.Name);}
                 }
-            } else if(a.Format=="raw") {foreach(var f in files)using(var s=File.OpenRead(source))WriteVerified(s,stage,f);}
+            } else if(a.Format=="raw") {foreach(var f in files){currentEntry=f.Path;using(var s=File.OpenRead(source))WriteVerified(s,stage,f);}}
             else {
-                foreach(var f in files) {
-                    // tar only streams an allowlisted entry to stdout; it never receives an extraction directory.
-                    var listInfo=new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),"tar.exe"),"-tvf \""+source+"\" \""+f.Entry+"\""){UseShellExecute=false,RedirectStandardOutput=true,RedirectStandardError=true,CreateNoWindow=true};
-                    if(!File.Exists(listInfo.FileName))throw new IOException("Este Windows não possui tar para ler RAR/7z.");
-                    using(var listing=Process.Start(listInfo)) {
-                        var linesTask=listing.StandardOutput.ReadToEndAsync();var errTask=listing.StandardError.ReadToEndAsync();
-                        if(!listing.WaitForExit(30000)){listing.Kill();throw new IOException("Tempo esgotado na inspeção do arquivo.");}
-                        string[] lines=linesTask.Result.Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries);
-                        if(listing.ExitCode!=0||lines.Length!=1||!lines[0].StartsWith("-",StringComparison.Ordinal))throw new IOException("Entrada RAR/7z não é um arquivo regular único; links são recusados.");errTask.Wait();
-                    }
-                    var psi=new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),"tar.exe"),"-xOf \""+source+"\" \""+f.Entry+"\""){UseShellExecute=false,RedirectStandardOutput=true,RedirectStandardError=true,CreateNoWindow=true};
-                    if(!File.Exists(psi.FileName))throw new IOException("Este Windows não possui tar para ler RAR/7z. Não foi instalado nenhum programa adicional.");
-                    using(var p=Process.Start(psi)) {
-                        var error=p.StandardError.ReadToEndAsync();
-                        try{WriteVerified(p.StandardOutput.BaseStream,stage,f);}catch{try{p.Kill();}catch{}throw;}
-                        if(!p.WaitForExit(30000)){p.Kill();throw new IOException("Tempo esgotado ao ler o arquivo.");}
-                        if(p.ExitCode!=0)throw new IOException("Não foi possível ler a entrada RAR/7z.");error.Wait();
-                    }
-                }
+                using(var reader=BundledArchiveReader.Open(source,a.Size,a.Sha256))foreach(var f in files){currentEntry=f.Entry;reader.CopyEntry(f.Entry,s=>WriteVerified(s,stage,f));report(mod.Name);}
+            }
+            } catch(IOException ex) {
+                var mismatch=ex as FileContentMismatchException;var file=filesForFailure(mod,a,currentEntry);
+                if(mismatch!=null&&file!=null&&!mod.Immutable&&!file.UserData&&file.Patch==null&&mod.DensityProfiles==null)ex=new FileApprovalRequest(mod,a,file,mismatch.ActualSize,mismatch.ActualSha256);
+                var failure=new ModPreparationException(mod,a,currentEntry,ex);
+                OnlineDiagnostics.Record("stage.failed",mod.Id,"Falha ao preparar arquivo do pacote.",new{ModName=mod.Name,Asset=a.Name,Entry=currentEntry,ExpectedAssetBytes=a.Size,AssetSha256=a.Sha256,Error=ex.Message});
+                throw failure;
             }
         }
+    }
+    static FixedFile filesForFailure(FixedMod mod,FixedAsset asset,string entry){return mod.Files.FirstOrDefault(f=>f.Asset==asset.Id&&(f.Entry==entry||f.Path==entry));}
+    static void WritePrepared(Stream input,string stage,FixedFile file) {
+        if(file.Patch==null){WriteVerified(input,stage,file);return;}
+        using(var prepared=FpvCustomization.Apply(input,file))WriteVerified(prepared,stage,file);
     }
     static void WriteVerified(Stream input,string stage,FixedFile f) {
         string dest=Safe.In(stage,f.Path);Directory.CreateDirectory(Path.GetDirectoryName(dest));
         using(var output=new FileStream(dest,FileMode.CreateNew,FileAccess.Write,FileShare.None))using(var sha=SHA256.Create()){
             var buffer=new byte[65536];long total=0;int n;
-            while((n=input.Read(buffer,0,buffer.Length))>0){total+=n;if(total>f.Size)throw new IOException("Arquivo excede o tamanho fixado.");output.Write(buffer,0,n);sha.TransformBlock(buffer,0,n,buffer,0);}
-            sha.TransformFinalBlock(new byte[0],0,0);if(total!=f.Size||Safe.Hex(sha.Hash)!=f.Sha256)throw new IOException("Conteúdo extraído diferente do catálogo: "+f.Path);
+            while((n=input.Read(buffer,0,buffer.Length))>0){total+=n;if(total>8L*1024*1024*1024)throw new IOException("Arquivo ultrapassa o limite de leitura segura de 8 GiB: "+f.Path);output.Write(buffer,0,n);sha.TransformBlock(buffer,0,n,buffer,0);}
+            sha.TransformFinalBlock(new byte[0],0,0);string hash=Safe.Hex(sha.Hash);if(!FpvCustomization.MatchesFile(f,total,hash))throw new FileContentMismatchException(f,total,hash);
         }
     }
 }
@@ -262,24 +269,32 @@ public sealed partial class NexusClient {
 public sealed partial class FixedInstaller {
     readonly FixedCatalog catalog; readonly DownloadCache cache; readonly string game,saves; readonly bool fixture;
     public FixedInstaller(FixedCatalog c,DownloadCache downloads,string gameRoot,string saveRoot,bool isFixture=false) {
-        catalog=c;cache=downloads;game=Path.GetFullPath(gameRoot).TrimEnd('\\');saves=saveRoot;
+        cache=downloads;game=Path.GetFullPath(gameRoot).TrimEnd('\\');saves=saveRoot;
         if(game.Length<=3||game.StartsWith(@"\\"))throw new IOException("Escolha uma pasta local do jogo.");Safe.NoLinks(game);
         if(cache.Root.StartsWith(game+"\\",StringComparison.OrdinalIgnoreCase)||cache.Root.Equals(game,StringComparison.OrdinalIgnoreCase))throw new IOException("O cache precisa ficar fora da pasta do jogo.");
         fixture=isFixture;
         if(fixture&&(!File.Exists(Path.Combine(game,".fixture-only"))||!Regex.IsMatch(game,@"(?i)[\\/]online-testes-[a-f0-9]{32}[\\/]")))throw new IOException("Exceção de teste permitida apenas dentro de uma fixture isolada.");
+        catalog=UserFileApprovals.ResolveCatalog(c,game);
     }
     string Data { get{return Safe.In(game,".CoopModsOnline");} }
     void Closed(){if(fixture)return;foreach(var p in Process.GetProcessesByName("Cyberpunk2077")){p.Dispose();throw new IOException("Feche o jogo antes de instalar ou desfazer.");}}
     public string Install(IEnumerable<string> chosen,bool acceptPlan,Action<string> report,int failAfter=-1) {
         if(!acceptPlan)throw new IOException("Confirme o plano de instalação.");
         var mods=FixedData.Expand(catalog,chosen).Select(m=>NightCityDensity.ForInstall(m,game)).ToList();if(mods.Count==0)throw new IOException("Marque pelo menos um mod.");
-        OnlineDiagnostics.Record("install.request",null,"Motor de instalação acionado.",new{Game=game,Mods=mods.Select(m=>m.Id).ToArray(),Accepted=acceptPlan,Fixture=fixture});
+        return InstallTransaction(mods,report,failAfter,false);
+    }
+    string InstallTransaction(List<FixedMod> mods,Action<string> report,int failAfter,bool localImport) {
+        OnlineDiagnostics.Record("install.request",null,"Motor de instalação acionado.",new{Game=game,Mods=mods.Select(m=>m.Id).ToArray(),Accepted=true,Fixture=fixture});
         FixedData.RequireInstallable(mods);
         FixedData.ValidateGame(game,mods,catalog.GameFileVersion);Closed();
         foreach(var m in mods){var scan=FixedData.Scan(m,game);if(scan.IsConflict)throw new IOException(m.Name+": "+scan.State+". Resolva o conflito antes de instalar.");}
         Directory.CreateDirectory(Data);
         using(var mutex=new FileStream(Safe.In(Data,"operacao.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None)) {
             EnsureNoIncomplete();
+            if(localImport)foreach(var f in mods.SelectMany(m=>m.Files)){
+                string dest=Safe.In(game,f.Path);Safe.NoLinks(dest);
+                if(File.Exists(dest)||Directory.Exists(dest))throw new IOException("O destino foi ocupado: "+f.Path+". O arquivo existente foi preservado.");
+            }
             var pending=mods.Where(m=>!FixedData.Scan(m,game).IsCorrect).ToList();
             if(pending.Count==0){
                 if(!mods.Any(m=>ModDefaults.Needs(catalog,m.Id,game)))return "Todos os mods selecionados já estão corretos. Nada foi alterado.";
@@ -289,9 +304,17 @@ public sealed partial class FixedInstaller {
             long bytes=pending.SelectMany(x=>x.Files).Sum(x=>x.Size);
             if(new DriveInfo(Path.GetPathRoot(game)).AvailableFreeSpace<bytes*2+100L*1024*1024||new DriveInfo(Path.GetPathRoot(cache.Root)).AvailableFreeSpace<bytes+100L*1024*1024)throw new IOException("Espaço insuficiente para preparação e backup.");
             string id=Guid.NewGuid().ToString("N"),stage=Safe.In(cache.Root,"preparacao/"+id);Directory.CreateDirectory(stage);
-            foreach(var m in pending){report("Preparando "+m.Name);cache.Stage(m,stage,report);}
-            var receipt=new OnlineReceipt{Id=id,CatalogId=catalog.Id,Status="preparando",CreatedUtc=DateTime.UtcNow.ToString("o"),Mods=mods.Select(x=>x.Id).ToList()};
-            string ledger=Safe.In(Data,id+".json");Save(ledger,receipt);
+            try{foreach(var m in pending){report("Preparando "+m.Name);cache.Stage(m,stage,report);}}
+            catch{
+                try{
+                    if(!Path.GetFullPath(stage).Equals(Safe.In(cache.Root,"preparacao/"+id),StringComparison.OrdinalIgnoreCase))throw new IOException("Pasta temporária inesperada.");
+                    var todo=new Stack<string>();todo.Push(stage);while(todo.Count>0){string dir=todo.Pop();Safe.NoLinks(dir);foreach(string sub in Directory.GetDirectories(dir)){Safe.NoLinks(sub);todo.Push(sub);}foreach(string file in Directory.GetFiles(dir))Safe.NoLinks(file);}
+                    Directory.Delete(stage,true);
+                }catch(Exception cleanup){OnlineDiagnostics.Record("stage.cleanup.failed",null,"Não foi possível limpar a preparação interrompida.",new{ErrorType=cleanup.GetType().Name});}
+                throw;
+            }
+            var receipt=new OnlineReceipt{Id=id,CatalogId=catalog.Id,Status="preparando",CreatedUtc=DateTime.UtcNow.ToString("o"),Mods=mods.Select(x=>x.Id).ToList(),Operation=localImport?LocalModPackage.ReceiptOperation:null};
+            string ledger=Safe.In(Data,(localImport?"importados/":"")+id+".json");Save(ledger,receipt);
             OnlineDiagnostics.Record("install.begin",null,"Pacotes preparados; iniciando cópia para o jogo.",new{Game=game,Receipt=id,Mods=pending.Select(m=>m.Id).ToArray(),Files=pending.Sum(m=>m.Files.Count)});
             try {
                 BackupSaves(Safe.In(Data,"backups/"+id+"/saves"));
@@ -299,15 +322,28 @@ public sealed partial class FixedInstaller {
                 foreach(var m in pending)foreach(var f in m.Files) {
                     Closed();string dest=Safe.In(game,f.Path);Safe.NoLinks(dest);
                     if(f.UserData&&File.Exists(dest))continue;
-                    if(File.Exists(dest)){if(new FileInfo(dest).Length==f.Size&&Safe.Hash(dest)==f.Sha256)continue;throw new IOException("Arquivo mudou após a conferência: "+f.Path);}
+                    if(File.Exists(dest)){
+                        if(localImport)throw new IOException("O destino foi ocupado: "+f.Path+". O arquivo existente foi preservado.");
+                        long size=new FileInfo(dest).Length;string hash=Safe.Hash(dest);
+                        if(FpvCustomization.MatchesFile(f,size,hash)&&!FpvCustomization.IsOriginal(f,size,hash))continue;
+                        if(!FpvCustomization.IsOriginal(f,size,hash))throw new IOException("Arquivo mudou após a conferência: "+f.Path);
+                    }
                     if(Directory.Exists(dest))throw new IOException("Uma pasta ocupa o destino: "+f.Path);
-                    var change=new OwnedChange{Path=f.Path,Before=null,After=f.Sha256};receipt.Files.Add(change);Save(ledger,receipt);
-                    OnlineDiagnostics.Record("install.file.begin",m.Id,"Copiando arquivo para a pasta do jogo.",new{Game=game,Receipt=id,Path=f.Path,Sha256=f.Sha256});
+                    string before=File.Exists(dest)?Safe.Hash(dest):null;
+                    if(before!=null){
+                        if(!FpvCustomization.IsOriginal(f,new FileInfo(dest).Length,before))throw new IOException("Origem FPV mudou antes do backup.");
+                        receipt.BackupLayout="fpv-flat-v1";string backup=UpgradeBackup(receipt,f.Path);
+                        Directory.CreateDirectory(Path.GetDirectoryName(backup));Safe.NoLinks(backup);File.Copy(dest,backup,false);
+                        if(Safe.Hash(backup)!=before)throw new IOException("Backup do FPV original não conferiu.");
+                    }
+                    string prepared=Safe.In(stage,f.Path);string after=Safe.Hash(prepared);if(!FpvCustomization.MatchesFile(f,new FileInfo(prepared).Length,after))throw new IOException("Arquivo preparado mudou antes da cópia: "+f.Path);
+                    var change=new OwnedChange{Path=f.Path,Before=before,After=after};receipt.Files.Add(change);Save(ledger,receipt);
+                    OnlineDiagnostics.Record("install.file.begin",m.Id,"Copiando arquivo para a pasta do jogo.",new{Game=game,Receipt=id,Path=f.Path,Sha256=after});
                     Directory.CreateDirectory(Path.GetDirectoryName(dest));Safe.NoLinks(dest);
                     string tmp=dest+".coop-"+id+".tmp";
-                    try {File.Copy(Safe.In(stage,f.Path),tmp,false);if(Safe.Hash(tmp)!=f.Sha256)throw new IOException("Cópia divergente.");Safe.NoLinks(dest);File.Move(tmp,dest);}finally{if(File.Exists(tmp)){Safe.NoLinks(tmp);File.Delete(tmp);}}
+                    try {File.Copy(prepared,tmp,false);if(Safe.Hash(tmp)!=after)throw new IOException("Cópia divergente.");Safe.NoLinks(dest);string current=File.Exists(dest)?Safe.Hash(dest):null;if(current!=before)throw new IOException("Destino mudou durante a preparação; arquivo preservado.");if(before==null)File.Move(tmp,dest);else File.Replace(tmp,dest,null);}finally{if(File.Exists(tmp)){Safe.NoLinks(tmp);File.Delete(tmp);}}
                     change.Applied=true;Save(ledger,receipt);
-                    OnlineDiagnostics.Record("install.file.applied",m.Id,"Arquivo copiado e registrado.",new{Game=game,Receipt=id,Path=f.Path,Sha256=f.Sha256});
+                    OnlineDiagnostics.Record("install.file.applied",m.Id,"Arquivo copiado e registrado.",new{Game=game,Receipt=id,Path=f.Path,Sha256=after});
                     written++;if(failAfter>=0&&written>=failAfter)throw new IOException("Falha de teste após a cópia.");report("Instalado: "+m.Name);
                 }
                 Closed();ModDefaults.Apply(catalog,mods,game,Safe.In(Data,"defaults-backups/"+id),report,-1,new HashSet<string>(receipt.Files.Where(f=>f.Applied).Select(f=>f.Path),StringComparer.OrdinalIgnoreCase));
@@ -325,19 +361,27 @@ public sealed partial class FixedInstaller {
         try{var envelope=Safe.Json.Deserialize<ReceiptEnvelope>(File.ReadAllText(path));r=Safe.Json.Deserialize<OnlineReceipt>(Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(envelope.Protected),null,DataProtectionScope.CurrentUser)));}
         catch(Exception ex){if(ex is OutOfMemoryException)throw;throw new IOException("Registro alterado, corrompido ou criado por outra conta do Windows. Nenhum arquivo será removido.");}
         if(r==null||r.CatalogId!=catalog.Id||!Regex.IsMatch(r.Id??"","^[a-f0-9]{32}$")||Path.GetFileName(path)!=r.Id+".json"||r.Files==null||r.Files.Count>20000||r.Mods==null)throw new IOException("Registro inválido. Não foi alterado nenhum arquivo.");
+        if(r.Operation==ExtraResetOperation){ValidateExtraResetReceipt(r,path);return r;}
+        if(r.Operation==LocalModPackage.ReceiptOperation){
+            if(!String.Equals(Path.GetDirectoryName(path),Safe.In(Data,"importados"),StringComparison.OrdinalIgnoreCase))throw new IOException("Pasta de registro de importação inválida.");
+            LocalModPackage.ValidateReceipt(r);foreach(var file in r.Files)Safe.In(game,file.Path);return r;
+        }
         bool disabling=r.Operation=="deactivate";
-        if(r.BackupLayout!=null&&(!disabling||r.BackupLayout!="flat-v1"))throw new IOException("Formato de backup desconhecido no registro.");
+        if(r.BackupLayout!=null&&!(disabling?r.BackupLayout=="flat-v1":r.BackupLayout=="fpv-flat-v1"))throw new IOException("Formato de backup desconhecido no registro.");
         if(r.Operation=="density"){NightCityDensity.ValidateReceipt(catalog,r);return r;}
         if(r.Operation!=null&&r.Operation!="install"&&!disabling)throw new IOException("Operação desconhecida no registro.");
         var mods=FixedData.Expand(catalog,r.Mods);
         if(disabling&&(r.Mods.Count==0||r.Mods.Count!=r.Mods.Distinct().Count()||catalog.Packages.Any(m=>r.Mods.Contains(m.Id)&&m.Immutable)))throw new IOException("Registro de desativação inválido.");
         var allowed=(disabling?catalog.Packages.Where(m=>r.Mods.Contains(m.Id)).SelectMany(m=>NightCityDensity.KnownFiles(m)):mods.SelectMany(x=>NightCityDensity.KnownFiles(x))).ToList();var seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach(var f in r.Files){if(f==null||!seen.Add(f.Path)||!allowed.Any(known=>known.Path==f.Path&&known.Sha256==(disabling?f.Before:f.After))||(disabling?f.After!=null:f.Before!=null))throw new IOException("Registro não corresponde ao catálogo.");Safe.In(game,f.Path);}return r;
+        foreach(var f in r.Files){
+            if(f==null||!seen.Add(f.Path)||!allowed.Any(known=>known.Path==f.Path&&FpvCustomization.KnownHash(known,disabling?f.Before:f.After))||(disabling?f.After!=null:f.Before!=null&&(r.BackupLayout!="fpv-flat-v1"||!allowed.Any(known=>known.Path==f.Path&&FpvCustomization.UpgradePair(known,f.Before,f.After)))))throw new IOException("Registro não corresponde ao catálogo.");
+            Safe.In(game,f.Path);
+        }return r;
     }
     public string Undo(Action<string> report) {
         Closed();Safe.NoLinks(Data);if(!Directory.Exists(Data))return "Nenhuma instalação deste programa para desfazer.";
         using(var mutex=new FileStream(Safe.In(Data,"operacao.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None)) {
-            var candidates=Directory.GetFiles(Data,"*.json").Select(p=>new{Path=p,Receipt=ReadReceipt(p)}).Where(x=>x.Receipt.Status!="desfeito"&&x.Receipt.Status!="desfeito_com_preservados").OrderByDescending(x=>x.Receipt.CreatedUtc).ToList();
+            var candidates=AllReceiptPaths().Select(p=>new{Path=p,Receipt=ReadReceipt(p)}).Where(x=>x.Receipt.Status!="desfeito"&&x.Receipt.Status!="desfeito_com_preservados").OrderByDescending(x=>x.Receipt.CreatedUtc).ToList();
             if(candidates.Count==0)return "Nenhuma operação deste programa para desfazer.";var last=candidates[0];
             if(last.Receipt.Operation=="deactivate"){
                 var restoring=catalog.Packages.Where(m=>last.Receipt.Mods.Contains(m.Id)).ToList();FixedData.RequireInstallable(restoring);
@@ -348,11 +392,38 @@ public sealed partial class FixedInstaller {
     }
     string UndoReceipt(OnlineReceipt r,string ledger,Action<string> report) {
         if(r.Operation=="density")return UndoDensity(r,ledger,report);
-        if(r.Operation=="deactivate")return UndoDeactivation(r,ledger,report);
+        if(r.Operation=="deactivate"||r.Operation==ExtraResetOperation)return UndoDeactivation(r,ledger,report);
         int preserved=0;r.Status="desfazendo";Save(ledger,r);
-        foreach(var f in r.Files.AsEnumerable().Reverse()){Closed();string p=Safe.In(game,f.Path);if(!File.Exists(p))continue;if(!f.Applied||Safe.Hash(p)!=f.After){preserved++;continue;}File.Delete(p);report("Retirado: "+f.Path);}
+        foreach(var f in r.Files.AsEnumerable().Reverse()){
+            Closed();string p=Safe.In(game,f.Path);if(Directory.Exists(p)){preserved++;continue;}
+            string current=File.Exists(p)?Safe.Hash(p):null;
+            if(f.Before!=null){
+                if(current==f.Before)continue;
+                if(current!=null&&current!=f.After){preserved++;continue;}
+                string backup=UpgradeBackup(r,f.Path);
+                if(!File.Exists(backup)||Safe.Hash(backup)!=f.Before){preserved++;continue;}
+                RestoreUpgrade(backup,p,f.Before,current);report("FPV original restaurado: "+f.Path);
+            }else{
+                if(current==null)continue;
+                if(!f.Applied||current!=f.After){preserved++;continue;}
+                File.Delete(p);report("Retirado: "+f.Path);
+            }
+        }
         r.Status=preserved==0?"desfeito":"desfeito_com_preservados";Save(ledger,r);
         return preserved==0?"Instalação desfeita. Arquivos anteriores e saves atuais foram preservados.":"Instalação desfeita; "+preserved+" arquivo(s) alterado(s) depois foram preservados.";
+    }
+    static void RestoreUpgrade(string source,string destination,string desired,string expectedCurrent) {
+        Safe.NoLinks(source);Safe.NoLinks(destination);Directory.CreateDirectory(Path.GetDirectoryName(destination));
+        string temp=destination+".fpv-"+Guid.NewGuid().ToString("N")+".tmp";
+        try {
+            File.Copy(source,temp,false);if(Safe.Hash(temp)!=desired)throw new IOException("Backup FPV mudou durante a restauração.");
+            Safe.NoLinks(destination);string current=File.Exists(destination)?Safe.Hash(destination):null;
+            if(current!=expectedCurrent)throw new IOException("Destino mudou durante a restauração do FPV; alteração preservada.");
+            if(expectedCurrent==null)File.Move(temp,destination);else File.Replace(temp,destination,null);
+        }finally{if(File.Exists(temp)){Safe.NoLinks(temp);File.Delete(temp);}}
+    }
+    string UpgradeBackup(OnlineReceipt receipt,string relative) {
+        using(var sha=SHA256.Create())return Safe.In(Data,"backups/"+receipt.Id+"/fpv-originais/"+Safe.Hex(sha.ComputeHash(Encoding.UTF8.GetBytes(relative)))+".bin");
     }
     void BackupSaves(string dest) {
         if(String.IsNullOrEmpty(saves)||!Directory.Exists(saves))return;Safe.NoLinks(saves);var dirs=new Stack<string>();dirs.Push(saves);

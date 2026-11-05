@@ -1,0 +1,12 @@
+{
+  "Version": "1.0.36",
+  "Added": "mod-7049",
+  "Sha256": "57F79D308287A41FCAEB948F4B652B1DC7094566CBAB3EE1A63B1B8EF0655460",
+  "Checks": [
+    "Importação e extração do ZIP oficial",
+    "Lista",
+    "Elegibilidade sem DLC",
+    "Detecção de instalação e plano sem reinstalação"
+  ],
+  "FullSuiteRun": false
+}

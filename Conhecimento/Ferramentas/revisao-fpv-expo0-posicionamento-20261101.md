@@ -1,0 +1,17 @@
+# FPV — teste Expo 0 e erros de posicionamento, 01/11/2026 21:43
+
+Usuário avisou que houve erros e ofereceu regravar se comprometessem a análise. Em pergunta específica respondeu "Drone bateu ou começou fora de posição". Não interpretar como falha de captura digital nem atribuir uma batida a um frame exato sem evidência.
+
+Sessão completa útil: 20261101-214320-Serie-Cyberpunk-2f7da25d/02-Cyberpunk, ID14; 13 clipes, 1.568 frames, zero erros/duplicatas reportados; complete.json terminou21:45:25. Sessão anterior21:43:14 ID13 contém somente vertical108frames semcomplete; posterior21:45:28 ID15 sóvertical631frames/3duplicatas semcomplete. Preservadas; não misturar essas verticais com a série completa nem declarar perda dos clipes de roll.
+
+Ensaio segue orientação de SOMENTE Roll Expo0,40->0,00, Center250, Max660, Feedforward100, Tightness100, demais eixos preservados. Valores em execução inferidos da sequência, não lidos como telemetria. SavedOnly de ID14 ainda contém Roll Center200/Expo0,40; não usar isso para acusar falha do usuário ou presumir que o novo ensaio não aplicou a mudança. O limite de Center250 foi confirmado no painel E no carregamento do perfil; recomendação antiga400 continua cancelada.
+
+Comandos roll25: pulso clock13302,973603..13304,473648, duração1,500045s, entrada0,25; roll50:13317,281347..13318,788502, duração1,507155s, entrada0,50. Capturas de ambos com0duplicatas/erro. Isso comprova o comando enviado, não ausência de colisão, prontidão da postura ou entrada efetivamente lida no voo.
+
+Validade: roll25 começa em condição visual diferente, apresenta deslocamento de orientação antes do pulso e passa muito próximo da parede. Com o relato de batida/posição incorreta, não há base para separar dinâmica de contato/postura inicial. Rejeitar este trecho para decidir se centro já calibrou ou para calcular o próximo parâmetro. A estimativa automática de~56graus fica registrada só como dado contaminável, não resultado validado de Expo0. Não dizer que a colisão foi detectada pelo programa.
+
+Roll50 visualmente aproveitável para comparação aproximada: a orientação acumulada na mesma janela f55..100 foi~165graus, contra~146graus no ensaio Center250/Expo0,40 e~225graus na referênciaUncrashed. São estimativas da câmera por quarto harmônico dos gradientes, não corpo/telemetria. Deslocamento do cenário, perspectiva e postura limitam precisão; não relatar ganho percentual exato ou igualdade. Trecho após liberação mostra acomodação, sem provar frenagem em condições idênticas.
+
+Resultado: não precisa descartar/regravar toda a série. O trecho roll50 permite dizer que a direção da mudança aparenta melhora, ainda aquém da referência. Para validar a região baixa, pedir repetição apenas do roll25 em espaço amplo e longe de paredes, com o drone inicialmente apoiado e reto, armado/pronto como combinado; o calibrador continua responsável pelo throttle inicial zero. Não inventar um seletor de etapa individual que a versão0.1.4 não tem; caso seja necessário executar a fila para alcançar o trecho, apenas ele será usado na nova comparação. Não mudar parâmetros antes dessa repetição: Roll250/0/660, Feedforward100/Tightness100. Nenhuma configuração do jogo ou EXE alterada.
+
+Ocorrência de análise: primeira adaptação do script de métricas encontrou string indexada como caractere no PowerShell e executou as referências antigas; esses resultados não foram usados como Expo0. Adaptação corrigida com coleção de linhas e conversão explícita, gerando E4/E0 separados e saída nos caminhos de auditoria. Originais intactos.

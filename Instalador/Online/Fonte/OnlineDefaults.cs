@@ -12,7 +12,7 @@ public sealed class FixedDefault {
 
 public static class ModDefaults {
     const string IniPath="red4ext/plugins/mod_settings/user.ini";
-    const string FpvProfile="bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/Nask 667.json";
+    const string FpvProfile="bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/NASK.json";
     const string FpvIndex="bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/FPVDrone_Profiles.json";
     const string CetBindings="bin/x64/plugins/cyber_engine_tweaks/bindings.json";
     static readonly UTF8Encoding Utf8=new UTF8Encoding(false,true);
@@ -57,7 +57,7 @@ public static class ModDefaults {
             }else if(entry.Format=="cet-bindings"){
                 if(entry.ModId!="mod-31642"||entry.Path!=CetBindings||entry.Section!="FPVDrone"||values.Count==0||values.Count>3||values.Any(p=>!new[]{"fpv_drone_toggle","fpv_drone_force_return_to_player","fpv_drone_clear_player_protection"}.Contains(p.Key)||Binding(p.Value)<=0))throw new IOException("Atalhos FPV não autorizados.");
             }else if(entry.Format=="fpv-index"){
-                if(entry.ModId!="mod-31642"||entry.Path!=FpvIndex||!String.IsNullOrEmpty(entry.Section)||collisions.Count!=1||values.Count!=3||!values.ContainsKey("activePath")||!Object.Equals(values["activePath"],"profiles/Nask 667.json")||!values.ContainsKey("indexVersion")||!Object.Equals(values["indexVersion"],5)||!values.ContainsKey("legacyMigrationComplete")||!Object.Equals(values["legacyMigrationComplete"],true)||!catalog.Defaults.Any(d=>d.ModId==entry.ModId&&d.Path==FpvProfile&&d.Format=="json"))throw new IOException("Seleção inicial do perfil FPV inválida.");
+                if(entry.ModId!="mod-31642"||entry.Path!=FpvIndex||!String.IsNullOrEmpty(entry.Section)||collisions.Count!=1||values.Count!=3||!values.ContainsKey("activePath")||!Object.Equals(values["activePath"],"profiles/NASK.json")||!values.ContainsKey("indexVersion")||!Object.Equals(values["indexVersion"],5)||!values.ContainsKey("legacyMigrationComplete")||!Object.Equals(values["legacyMigrationComplete"],true)||!catalog.Defaults.Any(d=>d.ModId==entry.ModId&&d.Path==FpvProfile&&d.Format=="json"))throw new IOException("Seleção inicial do perfil FPV inválida.");
             }else throw new IOException("Formato de configuração não suportado.");
             if(!targets.Add(target))throw new IOException("Destino de configuração repetido.");
         }

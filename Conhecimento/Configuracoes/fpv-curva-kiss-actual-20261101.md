@@ -1,0 +1,15 @@
+# Curva Uncrashed KISS e Actual Rates do Cyberpunk — 01/11/2026
+
+Nova foto explícita do Uncrashed: RC Rate1, Rate0,70, RC Curve0, máximo667 nos três eixos; seletor inferiorKiss, preset superior chamadoBetaflight default. Usuário lembrou que a curva não é linear e perguntou se precisa de Expo. Não tratar nome do preset como prova de modeloBetaflight selecionado. Fórmulas primárias de referência conferidas em https://raw.githubusercontent.com/betaflight/betaflight/master/src/main/fc/rc.c : applyKissRates e applyActualRates. Isso confirma o modelo de referência, não acesso ao código interno proprietário do Uncrashed.
+
+Com RC Curve0, a fórmula KISS de referência para esses valores é200x/(1-0,7|x|): já é não linear por causa deRate0,70. KISS eBetaflight clássico coincidem nesse caso particular de expozero/RCrate1. Não concluir que todoExpo0 élinear. No FPV instalado, Actual Rates éimplementado emfpv/utilities.lua e, mesmo comExpo0, permanece não linear quandoMax>Center: Cx+(M-C)x|x|. Expo sómodela a transição adicional.
+
+Revisão do conselho: Center400/Expo0/Max660 era uma tentativa empírica de compensar a resposta observada, não uma conversão fiel da curva de referência. Em25/50/100% pede116,25/265/660graus/s, contra60,61/153,85/666,67 na referência. Não apresentar essa combinação como calibração equivalente nem continuar aumentandoCenter com base apenas em imagens.
+
+A aproximação matemática original Actual200/Expo0,55/Max667 mantém o centro e o máximo próximos e foi conferida em20001pontos; Max660 do menu acrescenta~1% de diferença no endpoint. Com200/0,55/660 os valores em25/50/75/100% são62,9993/155,7031/311,4661/660graus/s. EmrefKISS60,6061/153,8462/315,7895/666,6667. Expo positivo faz sentido para aproximar essa forma, mas não porque zerarExpo torne a curva linear.
+
+Separar aproximação do setpoint (comando pedido) de rotação real/sensação. Se a curva matemática próxima ainda gira maisdevagar, conferir entrada efetiva, taxas vivas e dinâmica antes de modificar todos os controles. Não descartar orelato do usuário ou declararPIDcomo causa comprovada. Nenhum valor do jogo, perfil, física ou patchlimite600 alterado nesta revisão. Segurar nova gravação até combinar a referência do próximo teste; evitar mais rodadas cegas.
+
+## Gráfico entregue para o próximo teste
+
+A pedido do usuário, comparação interativa das duas curvas: KISS de referência1/0,70/0 versus Actual200/0,55/660, somenteRoll nesta etapa. Gráfico emC:/Users/Douglas/.codex/visualizations/2026/10/28/01a18356-ec78-7542-8b7b-f14ad797407a/fpv-curva-teste.html. Legendas, consulta exata ao longo do stick e ocultação independente das curvas. Conferidos valores25/50/100%, sintaxe e apresentação a736px e320px no navegador integrado. Não é telemetria nem aprovação da equivalência física. PreservarFeedforward100/Tightness100 como condições do ensaio e a física11,34/400g/TWR8,407243. Exigir conferência dos valores do menu eOverwriteProfile antes de interpretar a próxima gravação; não aplicar automaticamente nada ao jogo nesta entrega de gráfico. Limite600 permanece liberado nos scripts, embora a aproximação matemática indicada aqui useCenter200.

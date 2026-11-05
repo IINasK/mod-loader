@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 
 public sealed partial class OnlineWindow {
-    const string NormalDownloadGuide="COMO INSTALAR\n1. Para os mods da lista, feche o jogo, confira as pastas, marque os itens e clique em Baixar e instalar.\n2. Quando o site abrir, entre na sua conta do Nexus, se solicitado, e clique em Manual / Slow download.\n3. Os downloads autorizados da lista são conferidos e importados da pasta monitorada automaticamente.\n4. Para adicionar um arquivo seu, arraste o ZIP, RAR ou 7z já baixado para a janela. Links não são importados.";
+    const string NormalDownloadGuide="COMO INSTALAR\n1. Para os mods da lista, feche o jogo, confira as pastas, marque os itens e clique em Baixar e instalar.\n2. Quando o site abrir, entre na sua conta do Nexus, se solicitado, e clique em Manual / Slow download.\n3. Downloads concluídos são conferidos e instalados automaticamente. Para desistir do atual, clique em Pular mod atual.\n4. Para um ZIP, RAR ou 7z seu, arraste o arquivo, dê dois cliques na linha e escolha Instalar.";
     const string FacialDownloadGuide="COMO BAIXAR O CONJUNTO FACIAL\n1. Selecione os arquivos e clique em Baixar selecionados uma vez.\n2. No Nexus, entre na sua conta e clique em Manual / Slow download.\n3. Salve os ZIP/RAR/7z originais na pasta monitorada, sem extrair. O app confere, importa e abre o próximo automaticamente.\n4. Página aberta não confirma download. Esta etapa não instala. Para interromper, clique direito > Cancelar fila de downloads.";
     readonly Dictionary<string,FacialDownload> facialItems=new Dictionary<string,FacialDownload>(StringComparer.Ordinal);
     Button mainInstallButton;
@@ -24,6 +24,7 @@ public sealed partial class OnlineWindow {
         foreach(var item in FacialDownload.List()){
             if(catalog.Packages.Any(m=>m.Id==item.Id))continue;
             facialItems.Add(item.Id,item);
+            rowCategories.Add(item.Id,ModCategory.Appearance);
             int index=grid.Rows.Add(false,"Rosto · "+item.Name,item.Variant,"Somente download","Não iniciado","—","—","Fonte oficial","Conjunto facial17331 · download pelo Nexus; pacote ainda sem receita de instalação aprovada.");
             var row=grid.Rows[index];row.Tag=item.Id;row.DefaultCellStyle.BackColor=Color.FromArgb(238,247,252);
             row.Cells["Mod"].ToolTipText="Conjunto facial17331\n"+item.Url;row.Cells["Installed"].ToolTipText="O monitor confere o pacote pelo hash oficial e guarda no cache. Esta preparação não instala no jogo.";
@@ -31,6 +32,8 @@ public sealed partial class OnlineWindow {
         }
     }
     void SelectFacialRows(){
+        if (categoryFilter.SelectedIndex != (int)ModCategory.All && categoryFilter.SelectedIndex != (int)ModCategory.Appearance)
+            categoryFilter.SelectedIndex = (int)ModCategory.Appearance;
         var ids=new HashSet<string>(FacialDownload.List().Select(item=>item.Id));var rows=grid.Rows.Cast<DataGridViewRow>().Where(r=>r.Visible&&IsSelectable((string)r.Tag)&&ids.Contains((string)r.Tag)).ToList();
         if(rows.Count==0){status.Text="Este catálogo não contém a preparação facial.";return;}
         foreach(DataGridViewRow row in grid.Rows)row.Cells["Select"].Value=row.Visible&&IsSelectable((string)row.Tag)&&ids.Contains((string)row.Tag);
@@ -72,7 +75,8 @@ public sealed partial class OnlineWindow {
         try{
             BrowserRequest(asset.Url);launchBrowser(asset.Url);
             row.Cells["State"].Value="Aguardando download";row.Cells["Progress"].Value="—";row.Cells["State"].Style.ForeColor=Color.Black;row.Cells["State"].ToolTipText="Página enviada ao navegador; ainda não comprova recebimento do pacote.";
-            grid.CurrentCell=row.Cells["Mod"];OnlineDiagnostics.Record("face-download.open.dispatched",asset.Id,"Página oficial aberta; monitor aguardando pacote, sem instalação.",new{ModId=asset.ModId,FileId=asset.FileId,Install=false});
+            if(row.Visible)grid.CurrentCell=row.Cells["Mod"];
+            OnlineDiagnostics.Record("face-download.open.dispatched",asset.Id,"Página oficial aberta; monitor aguardando pacote, sem instalação.",new{ModId=asset.ModId,FileId=asset.FileId,Install=false});
         }catch{row.Cells["State"].Value="Falhou";UpdateSummary();throw;}
     }
     void FacialQueueFailure(Exception ex){

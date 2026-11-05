@@ -1,0 +1,19 @@
+# FPV — Pitch500 confirmado — 02/11/2026
+
+Douglas informou “feito” após orientação dePitch500/0/660. Série20261102-003331-Serie-Cyberpunk-50e57805/02-Cyberpunk/ID9, completa00:35:34(-03). NASKsalvo00:33:02 e session.json confirmam Pitch500/0/660, Roll500/0/660 eYaw400/0/660. Não rotular Roll como400/0,50: ele não foi restaurado ao valor proposto. Feedforward100, TuneTightness100, câmera0/FOV125. Gravidade11,3400001526; massa400g; motor/referênciaTWR8,407243 preservados.
+
+13clipes,1792quadros,0duplicados/erros registrados. Commands.csv:365amostras comPitch enviado não zero; nenhuma delas temRoll ouYaw enviados não zero. Isso permite aproveitar o pulso isolado dePitch apesar da divergência do rate deRoll; não prova ausência de acoplamento físico, colisão ou entrada real recebida.
+
+Inspeção visual dePitch25/50 eYaw25/50 contra referênciaUncrashed20261031-040122/d9182a41/01-Uncrashed/ID1. Pitch50 apresenta progressão visual de inclinação mais próxima da referência que o ensaioPitch400/0 da série00:21; Pitch25 termina com piso dominando a imagem e não permite ajuste fino confiável de velocidade angular. Não declarar equivalência exata, porcentagem de ganho ou calibração final. A perspectiva, translação e desconhecimento instrumental doFOV da referência limitam a comparação dePitch/Yaw a partir do deslocamento do cenário. Não extrair novos rates exatos deYaw desta inspeção.
+
+Conclusão prática: manterPitch500/0/660 como base provisória e não subir para600 por estes vídeos. RestaurarRoll400/0,50/660, que era a base provisória anterior; manterYaw400/0/660. PreservarFeedforward100/Tightness100/câmera0 e física. SalvarOverwrite. Não exigir outra série completa só pela restauração deRoll: os pulsos dePitch foram aproveitados. Próximo feedback útil é voo manual curto e comparação de sensação de inclinação comUncrashed, antes de aumentar valores outra vez. Para medir a diferença exata será necessária telemetria deentrada/setpoint/bodyRates, ainda não implementada.
+
+Nenhuma escrita no jogo, profile, Lua, saves, RED4ext ou executável pelo agente. Folhas emC:/Users/Douglas/Desktop/Mods/Analise-Cyberpunk-20261102-003331. Snapshot privado e metadados emAuditoria/Comparacao-FPV-20261102/00-33-Pitch500, sem duplicar vídeos e sem enviar perfis pessoais aoGit. A análise não compara a física vertical deste ensaio; a captura vertical foi mais longa e não deve ser convertida automaticamente em tempo de queda/gravidade.
+
+## Conferência posterior de Roll/Yaw — 02/11/2026
+
+Douglas perguntou se os três eixos já estão aproximados, sem exigir equivalência exata. Reinspecionadas folhasRoll25/50 da série00:33/ID9, efetivamenteRoll500/Expo0/Max660 conforme foto e snapshot; não relabelar como400. NoRoll50 a progressão visual de giro é mais agressiva que a referência e que a base experimental400/0,50 da série00:21. A comparação segue qualitativa, sem percentuais/deg/s físicos derivados da imagem. Para aproximação deRoll, preferir a base400/0,50/660 já ensaiada, em vez de aceitar500/0como correspondência confirmada.
+
+Pitch500/0/660 segue uma aproximação experimental útil com melhor resposta no meio. Leitura atual doNASK mostra os três eixos500/0/660; contudo o último vídeo de rotação completo00:33/ID9 tinhaYaw400/0/660. OYaw500 aparece no snapshot do teste deaceleração15:53, em que não há pulso deYaw, portanto não foi validado emgiro. Série00:41/98d0b4c1 contém sósession.json/commands.csv semclipes e não preenche essa lacuna. Não declarar os três eixos como aprovados só porque seus valores são iguais ou o usuário pediu aproximação. Para concluir a aproximação deYaw500 bastam os trechosYaw25/50, não outra bateria de13etapas nem nova calibração da física. No0.1.5, desmarcar aceleração e Incluir subida e queda inicia pelos girosYaw; manter a subida breve dos giros e interromper após as duas primeiras etapas se desejado.
+
+Nenhum valor do jogo foi alterado durante esta conferência.

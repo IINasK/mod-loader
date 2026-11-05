@@ -1,0 +1,17 @@
+# FPV — teste com Feedforward 50, 01/11/2026 20:56
+
+Sessão 20261101-205602-Serie-Cyberpunk-da428c87/02-Cyberpunk, calibrador 0.1.4, ID8, completou 20:57:42: 13 clipes, 1.567 frames a 30 fps, zero erros/duplicatas reportados. Originais preservados; inventário e contatos locais em Auditoria/Comparacao-FPV-20261101/20-56.
+
+Usuário confirmou em resposta explícita: Feedforward 50 EM EXECUÇÃO, Tune Tightness 100, Actual Rates 200/0,40/660 nos três eixos. O perfil em disco continua Feedforward 0, embora as taxas salvas agora sejam 200/0,40/660. Não atribuir o ensaio a Feedforward 0 nem dizer que a confirmação do usuário foi ignorada; o arquivo não representa necessariamente a memória. Salvar os ajustes aprovados exige Overwrite Profile. Não sobrescrever automaticamente.
+
+Testes manuais anteriores mostraram Roll enviado 0,72 versus painel 0,71, e máximo -1,00 versus -1,00; usuário relatou comportamento equivalente no yaw. Isso reduz suspeita de grande perda de amplitude nesses pontos. Não afirmar que entrada 0,50 foi medida, nem que houve telemetria da entrada durante os vídeos.
+
+Fonte primária local: fpv/utilities.lua applyBetaflightActualRates e fpv/controller.lua calculateTargetRates aplicam a curva Actual Rates. Para 200/0,40/660, comando de meia alavanca pede 171,875 graus/s; a curva clássica 1/0,7/0 pede ~153,85. Assim, reduzir Expo não pode ser apresentado como correção matemática comprovada para a resposta mais lenta observada. Setpoint e rotação física são grandezas diferentes. controller.lua feedforwardScale multiplica o termo F; em zero este componente é desligado, mas o PID continua atuando. A interface descreve Feedforward 100 como referência freestyle de baixa latência; valores maiores podem acrescentar overshoot.
+
+Contatos visuais examinados: roll 25/50/75/100, yaw 50/100 e pitch 50/100, mais detalhes de parada do roll 50 e 100. Em roll 50 há indicação de início mais pronto e maior rotação acumulada que na sessão 20:16, mas cenários/posições diferentes impedem quantificar ganho ou atribuir toda a diferença ao Feedforward. Pulsos intermediários ainda não demonstram equivalência com o Uncrashed. Não relatar percentual de melhoria calculado.
+
+Máximo: repetição de cena em ~16–17 frames/volta e maior correlação em 33 frames por DUAS voltas nos três eixos; 720/(33/30) ≈ 655 graus/s, coerente com Max 660. Verificação visual necessária para não interpretar harmônico como uma volta. Não aumentar Max para corrigir o meio da curva.
+
+Comandos roll 50: pulso 10482,665751..10484,169572, duração ~1,504 s; captura começou 10480,798798. Roll 100: pulso 10495,738462..10497,238185, ~1,500 s; captura começou 10493,849051. Após liberação por volta de t=3,35 s, contatos até t=3,80 não mostram oscilação repetida evidente, mas a proximidade de piso/parede e ausência de telemetria de colisão limitam concluir sobre frenagem livre. Proximidade não prova impacto; não declarar colisão confirmada.
+
+Próximo experimento sugerido: somente Feedforward 50 -> 100, mantendo Tune Tightness 100, taxas 200/0,40/660, gravidade/motor/massa. Valor experimental baseado na referência do próprio mod, não ajuste calculado a partir do vídeo. Priorizar início/parada de roll com meia alavanca em espaço livre; não exigir outra série completa ou repetir Uncrashed. Se houver rebote/oscilações, voltar a 50. Nenhuma configuração, executável ou arquivo do jogo foi alterado nesta revisão.

@@ -1,0 +1,23 @@
+{
+  "Version": "1.0.33",
+  "Checks": 1043.0,
+  "Reports": 30,
+  "Added": [
+    "mod-30316",
+    "mod-30304",
+    "mod-7665",
+    "mod-7822",
+    "mod-18823",
+    "mod-11824",
+    "mod-14371",
+    "mod-24104",
+    "mod-8209",
+    "mod-20058",
+    "mod-26845",
+    "mod-32674",
+    "mod-33404"
+  ],
+  "GameFilesVerified": 77,
+  "ExtraCleanupTestedOnlyInFixtures": true,
+  "Sha256": "A0E3FFF8746E093309AE1BCF2ADB363C86AEF35EE9CAE329D79D0537419FDA32"
+}

@@ -1,0 +1,13 @@
+{
+  "Version": "1.0.38",
+  "ExecutableSha256": "6974BEDC48719DB4199240CB3D674AFBAC2085DAA40CD3A9CC6268286154FCD0",
+  "CatalogSha256": "87a1039ef472f6e64011a49f5ea9a84839458738f287030014626dea1e9283b8",
+  "Regression": {
+    "Reports": 31,
+    "Checks": 1058,
+    "Passed": true,
+    "ExecutableSha256": "6974BEDC48719DB4199240CB3D674AFBAC2085DAA40CD3A9CC6268286154FCD0"
+  },
+  "PreviewVerified": true,
+  "RealGameTouched": false
+}

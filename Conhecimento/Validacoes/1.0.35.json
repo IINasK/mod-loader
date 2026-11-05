@@ -1,0 +1,13 @@
+{
+  "Version": "1.0.35",
+  "FocusedChecks": [
+    "Interface",
+    "Importação do ZIP oficial",
+    "Recibos existentes",
+    "Plugin desativado"
+  ],
+  "FullSuitePassed": false,
+  "FullSuiteIssue": "O teste de autorização de arquivo requer o Cyberpunk fechado.",
+  "Blocked": "mod-22155",
+  "Sha256": "83798B38510AFDDC9030BEE31118B22E19AAD1BAF6C5EAE9296F5740714D7D89"
+}

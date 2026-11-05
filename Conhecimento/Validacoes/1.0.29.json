@@ -1,0 +1,19 @@
+{
+  "Version": "1.0.29",
+  "CheckedOn": "2026-11-03",
+  "GeneralChecks": 954.0,
+  "Reports": 26,
+  "FPVChecks": 136,
+  "ArchiveAssets": 12,
+  "ArchiveFiles": 65,
+  "CatalogComponents": 95,
+  "CatalogUnchanged": true,
+  "GameTouched": false,
+  "Red4extUpdated": false,
+  "ManualMismatchConsent": true,
+  "ApprovedUninstallTested": true,
+  "RemoteFriendPCReproduced": false,
+  "Sha256": "E421FC3B215E4C2CA5AB826DC9E60DBB82611CF30E5ADA7741720CD0F4F368AE",
+  "EmbeddedCatalogSha256": "a9636bba90dcf36a68ceb6263593ae846757a7b4075317709f000c85c134847d",
+  "Audit": "D:\\Projetos\\Mod Loader Cyberpunk coop\\Auditoria\\Loader-1.0.29-20261103-000516"
+}

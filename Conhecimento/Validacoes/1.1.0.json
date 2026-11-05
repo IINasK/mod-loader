@@ -1,0 +1,35 @@
+{
+  "Version": "1.1.0",
+  "ExecutableSha256": "0FDFEA79B4C99DD0C3DBC77E1AABAC66F1684F788F6BE240F78E52F32554C3F3",
+  "CatalogSha256": "87a1039ef472f6e64011a49f5ea9a84839458738f287030014626dea1e9283b8",
+  "Regression": {
+    "Passed": true,
+    "ExecutableSha256": "0FDFEA79B4C99DD0C3DBC77E1AABAC66F1684F788F6BE240F78E52F32554C3F3",
+    "Fixture": "D:\\T110-74dc",
+    "Checks": 1092.0,
+    "Reports": 33,
+    "General": {
+      "Passed": true,
+      "Tests": [
+        "Catálogo preservado com três densidades e Baixa principal.",
+        "Nome, categoria, principal e escolha atual sobrevivem à reabertura.",
+        "Exportação exclui pastas de destino, escolhas locais e receitas internas.",
+        "Exportação leva referências locais e organização.",
+        "Só fontes exatamente iguais ao catálogo recuperam a receita fixa.",
+        "A fila abre somente a primeira página.",
+        "Importado CET entra na frente sem aceitar parcial nem abrir outras páginas.",
+        "O ZIP completo instala, reaproveita o próximo já em Downloads e então avança.",
+        "Pular não grava o mod que está aguardando.",
+        "Instalação CET reconhecida pelo recibo legado.",
+        "Remoção direcionada de importado preserva os outros mods.",
+        "Link livre aguarda a associação explícita.",
+        "Arquivo associado instala na pasta genérica preservando a hierarquia.",
+        "Instalação existente é reconhecida sem reabrir o navegador."
+      ],
+      "ArchiveChecks": 11,
+      "RealGameTouched": false,
+      "NetworkUsed": false
+    }
+  },
+  "RealGameTouched": false
+}

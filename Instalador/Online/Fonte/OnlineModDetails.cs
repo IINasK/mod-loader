@@ -29,8 +29,9 @@ public sealed class ModDetailsInfo {
         bool hasRoot=!String.IsNullOrWhiteSpace(root);FixedMod filesMod=NightCityDensity.Default(mod);
         if(hasRoot){
             info.GameRoot=Path.GetFullPath(root);Safe.NoLinks(info.GameRoot);var scan=FixedData.Scan(mod,info.GameRoot);
-            info.State=scan.State;info.InstalledVersion=scan.IsCorrect?mod.Version:scan.State=="Não instalado"?"Não instalado":"Não identificada: arquivos incompletos ou diferentes";
+            info.State=scan.State;info.InstalledVersion=scan.Original>0&&scan.Missing==0&&scan.Different==0?mod.Version+" oficial · setup NASK disponível":scan.IsCorrect?mod.Version:scan.State=="Não instalado"?"Não instalado":"Não identificada: arquivos incompletos ou diferentes";
             info.Notes=scan.Detail+(String.IsNullOrWhiteSpace(info.Notes)?"":"\r\n"+info.Notes);
+            string approvedWarning=UserFileApprovals.GetWarning(mod,info.GameRoot);if(!String.IsNullOrEmpty(approvedWarning))info.Notes=approvedWarning+"\r\n"+info.Notes;
             if(mod.DensityProfiles!=null){
                 try{filesMod=NightCityDensity.Installed(mod,info.GameRoot);var density=NightCityDensity.Read(mod,info.GameRoot);if(!String.IsNullOrEmpty(density.Version))info.InstalledVersion=density.Version+" · "+density.Name;}
                 catch(IOException){filesMod=new FixedMod{Files=mod.Files.Concat(mod.DensityProfiles.SelectMany(p=>p.Files)).GroupBy(f=>f.Path,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()).ToList()};}

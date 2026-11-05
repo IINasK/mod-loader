@@ -1,0 +1,17 @@
+{
+  "CheckedOn": "2026-11-02",
+  "Version": "1.0.28",
+  "Catalog": 95,
+  "EligibleWithoutPL": 86,
+  "VisibleWithoutPL": 84,
+  "RequiredExcluded": 2,
+  "UnverifiedExcluded": 7,
+  "DependencyClosureValid": true,
+  "ActualUIValidated": true,
+  "FocusedChecks": 25,
+  "NightCoopRequiresPL": false,
+  "GameTouched": false,
+  "RuntimeWithoutPLTested": false,
+  "ExecutableChanged": false,
+  "Audit": "D:\\Projetos\\Mod Loader Cyberpunk coop\\Auditoria\\Perfil-sem-PL-20261102-221319"
+}

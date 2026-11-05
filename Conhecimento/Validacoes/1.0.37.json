@@ -1,0 +1,210 @@
+{
+  "Version": "1.0.37",
+  "ExecutableSha256": "37303DF90B4EA5976D17345F72CFBBCF3611C703A5EE5DEFFF7CDC980A01AE12",
+  "CatalogSha256": "87A1039EF472F6E64011A49F5EA9A84839458738F287030014626DEA1E9283B8",
+  "Regression": {
+    "Reports": 30,
+    "Checks": 1046,
+    "Passed": true,
+    "ExecutableSha256": "37303DF90B4EA5976D17345F72CFBBCF3611C703A5EE5DEFFF7CDC980A01AE12"
+  },
+  "NewPackages": [
+    {
+      "Id": "mod-8183",
+      "Name": "Veegee Shop 1",
+      "Files": 2,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-13870",
+      "Name": "Veegee Shop 2",
+      "Files": 2,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-18890",
+      "Name": "Veegee Shop 3",
+      "Files": 2,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-30021",
+      "Name": "Veegee Shop 4",
+      "Files": 2,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-8688",
+      "Name": "Veegee Jewelry Atelier",
+      "Files": 2,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-15712",
+      "Name": "Casual Style Outfit Pt7 (Vanilla Arms)",
+      "Files": 3,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-16345",
+      "Name": "Casual Style Outfit Pt8 (Vanilla Arms)",
+      "Files": 3,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-17501",
+      "Name": "Casual Style Outfit Pt14",
+      "Files": 3,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-18353",
+      "Name": "Casual Style Outfit Pt19",
+      "Files": 3,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-18849",
+      "Name": "Casual Style Outfit Pt20",
+      "Files": 3,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-19684",
+      "Name": "Casual Style Outfit Pt23 (Both V)",
+      "Files": 3,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-21395",
+      "Name": "Casual Style Outfit Pt28",
+      "Files": 3,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-23301",
+      "Name": "Tactical Style Outfit Pt3",
+      "Files": 3,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-14162",
+      "Name": "Kawasaki Ninja H2R",
+      "Files": 4,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-10445",
+      "Name": "BMW S1000RR",
+      "Files": 3,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-17158",
+      "Name": "Ducati Panigale V4R (Livery 2)",
+      "Files": 3,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-13847",
+      "Name": "Lexus SC300",
+      "Files": 5,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-35848",
+      "Name": "Mercedes Brabus G 900 Rocket Edition",
+      "Files": 3,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-7912",
+      "Name": "Photomode Facial Expression Mega Pack",
+      "Files": 3,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-12637",
+      "Name": "VOIDWEAR Virtual Atelier",
+      "Files": 4,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-6779",
+      "Name": "Kwek's Sartorial Omnibus Shop",
+      "Files": 2,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-6505",
+      "Name": "Kwek's Seawright Optometry Shop",
+      "Files": 2,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-6985",
+      "Name": "Kwek's Family Jewels Shop",
+      "Files": 2,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-15702",
+      "Name": "VOIDWEAR Round Glasses (FemV)",
+      "Files": 3,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-6536",
+      "Name": "Kwek's Parasol Oversized Round Glasses",
+      "Files": 5,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-7017",
+      "Name": "Kwek's Big Round Hoop Earrings",
+      "Files": 3,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-7435",
+      "Name": "Kwek's Head Sporty Glasses (FemV)",
+      "Files": 3,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    },
+    {
+      "Id": "mod-7640",
+      "Name": "Kwek's Nose Aviator Glasses (MascV)",
+      "Files": 3,
+      "OfficialHashVerified": true,
+      "EngineStageVerified": true
+    }
+  ],
+  "RealGameTouched": false
+}

@@ -1,0 +1,17 @@
+# Uncrashed — duas novas referências em mapa quadriculado — 02/11/2026
+
+Douglas gravou novamente e confirmou que alterou SOMENTE mapa/posição; não alterou rates nem calibração. Também confirmou partida100% nivelada. Não atribuir o desvio a erro de nivelamento inicial. A inclinação visual surge após a decolagem.
+
+Séries:20261102-010359-Serie-Uncrashed-19161c2d/01-Uncrashed/ID12, completa01:05:37;20261102-010547-Serie-Uncrashed-02c2f00f/01-Uncrashed/ID13, completa01:07:31(-03). Ambas13clipes, sem duplicados/erros registrados. ID12:1636quadros;ID13:1587quadros. Série01:03:11/27d300b3 sóverticalID11; não usar como bateria completa. Não apagar originais.
+
+Inspeção visual: ID13 vertical,Roll25/50,Pitch25/50,Yaw25/50; ID12 vertical,Roll25,Pitch25,Yaw50. Mapa plano/quadriculado e objeto fixo tornam as referências visuais mais claras; porém as duas subidas mostram mudança gradual de inclinação ainda antes do contato com o piso. Isso limita a medição fina pelo cenário e não é prova da causa.
+
+Na subidaID13, commands.csv tem412linhas,0com sent_roll/sent_pitch/sent_yaw diferentes de0. Fonte CalibratorSequence.Tick comControlledStart criaControlSample zerada e zeraYaw/Roll/Pitch durante subida; não repassa sticks físicos nessa etapa. CalibratorGamepad.ToReport/Stick converte0para0 nos eixos esquerdoX/direitoX/Y. Isto confirma saída declarada do programa, não a leitura real recebida pelo simulador, processamento deSteam/driver, vento ou rotação física do drone. Não diagnosticar defeito deDualSense, Uncrashed ou calibração somente por esse indício.
+
+Exceção importante: Yaw50/ID13 apresenta pouca mudança de orientação e praticamente nenhuma subida visível. Mesmo assim, log contém93amostras comYaw não zero, máximoYaw0,5 eThrottle1. ID12/Yaw50 mostra a subida/giro visível esperados. O clipeID13/Yaw50 não deve ser usado para inferir curva/velocidade; causa desconhecida (não afirmar desarmado, falha de captura ou bug do macro). Não promover todaID13 como referência instrumental validada.
+
+Conferência local somente leitura: Input.ini/Game.ini/GameUserSettings.ini emAppData/Local/Uncrashed/Saved/Config/WindowsNoEditor não expõem os centros da calibração procurados. ExisteMyOptions.sav binário, não decodificado nem alterado. Nenhum valor de centro/offset foi confirmado. Não usar dadosSavedCyberpunkProfile ouYawReferenceFromUser como rates vivos doUncrashed; neste casoSavedCyberpunkProfile=null.
+
+Próximo diagnóstico mínimo, sem outra bateria: manter outro jogo pausado, no calibrador usarPotência zero(F5), que enviaControlSample zerada e desativa repasse manual; abrir calibração/indicadores doUncrashed comXbox virtual selecionado e observarRoll/Pitch/Yaw recebidos. Se houver deslocamento dos indicadores com saída0, investigar calibração/mapeamento; se ficarem centrados, a hipótese deoffset não está demonstrada e deve-se investigar o comportamento do voo. Não recalibrar nem modificar física automaticamente. Não mexer emYaw400, gravity11,34/mass400/TWR8,407243 ou outros rates por enquanto. Não pedir a Douglas para nivelar novamente o que confirmou100% nivelado.
+
+Nenhum jogo, save, calibração, Lua, RED4ext, executável ou perfil foi alterado. Helpers reutilizados emC:/Users/Douglas/Desktop/Mods/inspect-uncrashed-20261102.ps1; folhas locaisAnalise-Uncrashed-20261102-010359 e010547. Metadados/comandos privados emAuditoria/Comparacao-FPV-20261102/Uncrashed-0103-0105, sem copiar vídeos nem publicar dados pessoais noGit.

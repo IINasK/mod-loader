@@ -38,10 +38,9 @@ public sealed partial class OnlineWindow {
     }
     void AutoDetectEdition(){if(preview||!editionReady)return;try{if(String.IsNullOrWhiteSpace(game.Text)||!File.Exists(Safe.In(game.Text,"bin/x64/Cyberpunk2077.exe")))return;gameEdition.SelectedIndex=GameEdition.HasPL(game.Text)?0:1;}catch(IOException ex){status.Text=ex.Message;}catch(ArgumentException ex){status.Text=ex.Message;}}
     void ApplyGameEdition(){
-        ClearAutomaticQueue();grid.EndEdit();grid.CurrentCell=null;
-        foreach(DataGridViewRow row in grid.Rows){bool known=catalog.Packages.Any(m=>m.Id==Convert.ToString(row.Tag))||FacialById(Convert.ToString(row.Tag))!=null;bool visible=!known||EditionEligible(Convert.ToString(row.Tag));if(!visible)row.Cells["Select"].Value=false;row.Visible=visible;}
+        ClearAutomaticQueue();ApplyListFilters();
         editionNotice.Text=withPhantomLiberty?"":"Sem Phantom Liberty: saves feitos com a expansão não abrem sem ela. Trocar este perfil não remove mods já instalados.";
-        UpdateSelectAll();UpdateSummary();status.Text="Lista atualizada para "+gameEdition.Text+". A fila anterior foi cancelada; nenhum mod instalado foi removido.";
+        status.Text="Lista atualizada para "+gameEdition.Text+". A fila anterior foi cancelada; nenhum mod instalado foi removido.";
         OnlineDiagnostics.Record("ui.edition.changed",null,"Perfil de expansão alterado; fila cancelada e lista filtrada.",new{WithPhantomLiberty=withPhantomLiberty});
     }
 }

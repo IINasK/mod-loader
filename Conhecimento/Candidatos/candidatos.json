@@ -1,7 +1,7 @@
 {
   "Schema": 1,
-  "CheckedOn": "2026-10-30",
-  "ActiveCatalogCount": 85,
+  "CheckedOn": "2026-11-02",
+  "ActiveCatalogCount": 95,
   "CandidateCount": 0,
   "Candidates": [],
   "Promoted": [
@@ -29,6 +29,60 @@
       "Id": "mod-31642",
       "InstallerVersion": "1.0.22",
       "SummaryFile": "../Mods/mod-31642.md"
+    },
+    {
+      "Id": "mod-29619",
+      "SummaryFile": "../Mods/mod-29619.md",
+      "InstallerVersion": "1.0.26",
+      "Name": "Vehicle Interior RT and Mirrors"
+    },
+    {
+      "Id": "mod-17811",
+      "SummaryFile": "../Mods/mod-17811.md",
+      "InstallerVersion": "1.0.26",
+      "Name": "Realistic Map"
+    },
+    {
+      "Name": "Nola · Virtual Boutique feminina",
+      "Id": "mod-5114",
+      "InstallerVersion": "1.0.27",
+      "SummaryFile": "../Mods/mod-5114.md"
+    },
+    {
+      "Name": "Nola · Loja de acessórios",
+      "Id": "mod-14299",
+      "InstallerVersion": "1.0.27",
+      "SummaryFile": "../Mods/mod-14299.md"
+    },
+    {
+      "Name": "Nola · Follow Your Passion (loja)",
+      "Id": "mod-12642",
+      "InstallerVersion": "1.0.27",
+      "SummaryFile": "../Mods/mod-12642.md"
+    },
+    {
+      "Name": "Nola x Aquelyras · Atelier feminino",
+      "Id": "mod-8704",
+      "InstallerVersion": "1.0.27",
+      "SummaryFile": "../Mods/mod-8704.md"
+    },
+    {
+      "Name": "Nola · Stockings Collection (FemV padrão, 2K)",
+      "Id": "mod-12572",
+      "InstallerVersion": "1.0.27",
+      "SummaryFile": "../Mods/mod-12572.md"
+    },
+    {
+      "Name": "Nola · Pack 1 (FemV padrão + Equipment-EX)",
+      "Id": "mod-5093",
+      "InstallerVersion": "1.0.27",
+      "SummaryFile": "../Mods/mod-5093.md"
+    },
+    {
+      "Name": "Nola x Aquelyras · Goth Outfit (FemV padrão)",
+      "Id": "mod-11609",
+      "InstallerVersion": "1.0.27",
+      "SummaryFile": "../Mods/mod-11609.md"
     }
   ],
   "MetadataOnly": true,

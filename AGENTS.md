@@ -118,3 +118,72 @@ Pedido de Douglas, 28/10/2026: configurar mods com o coop, registrar processos v
 - 29/10/2026,1.0.13: Douglas quer14itens NA LISTA PRINCIPAL, mostrouHystantigo. Agora14linhasRosto selecionáveis+55mods=69padrão; Conjuntofacial seleciona/mostra14na tabela; açãoinferiorBaixarpróximo1URLporclique, menusBaixar/Abrirdownload/detalhesfonte. Somentedownload/progresso—, semreceitasfictícias ouautoInstalar. Tutorialfacialdinâmico; seleção mista pede separar e filaantiga preservada. HystSHA57b106…8a82 oculto daReadPending e reimportdomesmoSHA semfila/cache; fila/ZIP reais preservados, outrosdesconhecidos/nomeparecido mantidos. Motivo perfilcorpopadrão, NÃO incompatibilidadeuniversaldeHyst. Cat57/55/hash59606181…bcc07/baseRED4ext1.31.0 iguais, nenhumjogo/save/download/browserreal alterado/iniciado.500checks15suites+previewaprovados. EXEúnicoCyberpunk Coop1.0.13.exe1086464B SHA15C7305C94F5AACAE18941E08D0192B03A0DC35D68C46DCE2423270DCDFC6E24. Auditoria/Faciais-lista-principal-20261029/resultado-final-1.0.13.json registraalterações/falhasanteriores/backup. Não fecharinstânciaantigaautomaticamente; usuárioabre1.0.13. Integraçãoinstalável dos14continuaaguardandoauditoriadospacotes, semavisosdecooppendentepara55anteriores.
 
 - 29/10/2026,1.0.14: relatoBaixareinstalarnaoabriabrowser. Log1.0.13sessãoa973/hash15c730…6e24 confirma69selecionados55+14. Guardseleçãomistaretornavaantesdolog/abertura; corrigido. Agoraqualquerfacialselecionado tornaacaoBaixarproximo e abresomentefaciais; demais55preservados, fimnaoautoInstalaoutros. Fluxosemfaciaisinalterado. SelectAll/tutorial/labelclaros, novoLogface-download.selection e esperaoperacaoanterior. Cat/base/pins/hash59606181…bcc07 iguais; nenhumjogo/save/browser/downloadrealalterado/iniciadopeloagente.502checks15suites+previewpassaram. EXEúnicoCyberpunk Coop1.0.14.exe1090048B SHA0D4ACE76631436711ACEFA018F6FE676177224555C94507C30EBED93EB4BF2E1. Auditoria/Selecao-mista-facial-20261029/resultado-final-1.0.14.json eobservacao-1.0.13.json. Nãotratar ausenciadeui.install.request antigo como nenhumclique; guardprecediaevento. Naoencerrarversãoantigaautomaticamente; usuárioretestecomnova.
+
+## Revisão 1.0.34 — 04/11/2026
+
+- Adicionados Vehicle Speed Unlimiter 1.0.2 (22155/111659) e Sit Anywhere 1.4 (7299/126672), com os ZIPs fixados por tamanho e SHA256. 108 receitas anteriores conferidas sem divergência. 110 componentes no catálogo.
+- Vehicle Speed Unlimiter exige seleção manual e mostra a ressalva na confirmação. Altera a física dos veículos. RED4ext 1.31.0 e CET 1.38.1 preservados. Sit Anywhere usa CET e oferece ajustes opcionais via Native Settings UI. Perfil JSON do usuário tratado como personalizável.
+- 1045 verificações em 30 relatórios passaram, incluindo a seleção manual. A tentativa isolada sem perfil do Windows falhou na proteção do recibo. A suíte completa passou com o perfil do usuário. O teste legado de avisos agora verifica o pacote normal, pois o componente experimental tem um aviso próprio.
+- Dois mods instalados pelo motor original com backup dos saves. Destinos e dependências conferidos depois da instalação. Sem teste de gameplay ou coop nesta revisão. Entrega única Cyberpunk Coop 1.0.34.exe, SHA256 F35BE22F7B8E95AF647D264E3B1E9CC47C30DE25F52AD5CE4FB2354E30859DE2.
+
+## Revisão 1.0.35 — 04/11/2026
+
+- O Cyberpunk 2.5 falhou duas vezes enquanto carregava Vehicle Speed Unlimiter 1.0.2. A desativação reversível deste plugin restaurou a abertura, confirmada por Douglas. Sit Anywhere carregou após o teste pela Steam.
+- mod-22155 fica fora da lista e tem instalação e restauração bloqueadas. A receita fica como registro histórico para validar recibos e quarentena. Visíveis: 107 com Phantom Liberty, 98 sem.
+- Validados o bloqueio do ZIP original, a lista da interface e a leitura dos recibos anteriores de instalação e quarentena. A suíte completa parou no teste de autorização de arquivo porque o Cyberpunk estava aberto. EXE único 1.0.35, SHA256 83798B38510AFDDC9030BEE31118B22E19AAD1BAF6C5EAE9296F5740714D7D89.
+
+## Revisão 1.0.36 — 04/11/2026
+
+- Adicionado Togglable Feet FemV 1.0 (7049/37075), para corpo padrão. Douglas confirmou que a instalação manual corrigiu as pernas invisíveis com a meia da Nola.
+- Conferidos importação e extração do ZIP, lista, elegibilidade sem DLC e reconhecimento do arquivo que já estava instalado. A suíte completa ficou para quando o Cyberpunk estiver fechado.
+- EXE único 1.0.36, SHA256 57F79D308287A41FCAEB948F4B652B1DC7094566CBAB3EE1A63B1B8EF0655460.
+
+## Revisão 1.0.37 — 04/11/2026
+
+- 28 itens novos, com 82 destinos validados pelo motor. 111 receitas existentes, 11 configurações e a base RED4ext 1.31.0 preservadas.
+- 1046 verificações em 30 relatórios. Testes com perfil isolado sem DPAPI e com pasta longa falharam durante o ensaio; a suíte passou com perfil do Windows e pasta de teste curta. Nenhum mod desta rodada instalado no jogo.
+- Pendências em Conhecimento/Candidatos/novos-mods-20261104.md. Cyber Drift 2.0 fica pendente por solicitação. A tatuagem 13556 não foi instalada por falta de combinação verificada com o corpo padrão.
+- Entrega única Cyberpunk Coop 1.0.37.exe. SHA256 37303DF90B4EA5976D17345F72CFBBCF3611C703A5EE5DEFFF7CDC980A01AE12.
+
+## Revisão 1.0.38 — 05/11/2026
+
+- Adicionados filtros de categoria e roupas para V feminina, masculina ou ambas. A seleção em massa age só nas linhas visíveis. O filtro de categoria se combina com a edição do jogo.
+- Conjunto facial abre a categoria Aparência quando outro filtro estiver ativo. Trocar categoria preserva a fila já autorizada. Catálogo, receitas e o mecanismo de instalação preservados.
+- Uma execução intermediária falhou ao fechar a janela simulada no teste de pular mods, com Dispose durante CreateHandle. A compilação final foi ensaiada separadamente.
+- Suíte isolada: 1058 verificações em 31 relatórios. Prévia visual conferida. Entrega única Cyberpunk Coop 1.0.38.exe. SHA256 6974BEDC48719DB4199240CB3D674AFBAC2085DAA40CD3A9CC6268286154FCD0.
+
+## Revisão 1.0.39 — 05/11/2026
+
+- Arquivos importados aparecem como prontos para instalar. O duplo clique abre a confirmação Instalar, inclusive com fila ativa. Arquivos já baixados podem ser marcados individualmente.
+- A fila cede antes da próxima transação. Downloads em andamento e autorizações da lista são preservados. Uma queda de arquivo durante uma transação é recebida e processada assim que o motor fica livre.
+- A instalação local reutiliza o motor existente, faz backup dos saves e grava recibo protegido para Desfazer. Aceita layouts convencionais e mods CET que vêm como pasta própria com init.lua. Destinos existentes, caminhos inválidos e arquivos reservados do catálogo são protegidos.
+- 1067 verificações em 32 relatórios, incluindo prioridade, continuação da fila, guarda de arquivos reservados, reconhecimento de CET e Desfazer em jogo simulado.
+- Catálogo fixo e filtros preservados. Entrega única Cyberpunk Coop 1.0.39.exe. SHA256 7740DBCB9D675BEB663E2908884EF8BEA5467E26834BCD335A157F1E373EEEE9.
+
+## Revisão 1.1.0 — 05/11/2026
+
+- Mod Loader geral: uma lista ativa persistente com categorias renomeáveis, variantes nomeadas e versão principal. ZIP/RAR/7z locais continuam na lista após fechar. Duplo clique edita o mod e instala a variante com prioridade. Importar troca a lista; exportar salva só organização e referências, sem payload, destino, download associado ou recibo.
+- O pacote Cyberpunk continua selecionável. Suas 136 linhas e receitas não foram alteradas, nem a base RED4ext. A densidade continua com Baixa principal e troca transacional para Média/Alta; o status distingue a variante que está no jogo. O motor valida o jogo, build e expansão para os mods fixos. Fora do Cyberpunk, a instalação preserva a estrutura do pacote na pasta escolhida.
+- Fila reutiliza o monitor por SHA/tamanho e o motor legado de instalação, inclusive o tratamento de CET, a verificação de DLC, os arquivos reservados e a remoção de importações por recibo. Fontes livres abrem no navegador padrão e exigem indicar o pacote. Arquivos divergentes são preservados pelo motor genérico.
+- 1092 verificações em 33 relatórios. Na primeira rodada, um problema no harness WinForms impedia que a segunda janela de teste executasse; a suíte final usa uma sessão de UI isolada por janela e exige todas as verificações. Testes sem rede e sem alterar o jogo real.
+- Entrega única Mod Loader 1.1.0.exe. SHA256 0FDFEA79B4C99DD0C3DBC77E1AABAC66F1684F788F6BE240F78E52F32554C3F3.
+
+## Revisão 1.2.0 — 05/11/2026
+
+- Douglas pediu o visual estático da skill g3-design-v2, sem ondas/efeitos/animações. Fonte de referência: D:/G3 arquivos/IA/skills/g3-design-v2/SKILL.md e Documentos/estudos/home-soft-ui.html. GeneralStyle centraliza Jost, cores, formas e espaçamentos. Jost e licença OFL incluídas no EXE; nenhuma instalação de fonte no Windows. Claro/escuro e pt/en persistem localmente. Nomes e descrições autorais não são traduzidos automaticamente.
+- Tabela agrupada: Sem categoria primeiro, títulos/descrições editáveis, divisões, Adicionar item em cada seção e Criar nova categoria no fim. Presets são listas explícitas editáveis de IDs, independentes do filtro de categoria; pacote inicial inclui Todos e Sem Phantom Liberty com requisitos transitivos. Selecionar todos considera só mods visíveis, nunca linhas de título.
+- Edição do mod inclui categoria, tags, descrição e NSFW, que aparece em vermelho após o nome. Variantes são opções alternativas com uma principal. Várias fontes na mesma variante são arquivos complementares e todos serão instalados; para um link alternativo, criar outra opção. Instalar/Salvar ficam desabilitados até os obrigatórios serem válidos. Arrastar arquivos abre o editor antes de adicionar/instalar; ele herda a categoria atual. Durante espera, o editor permite importar com prioridade ou associar explicitamente o arquivo ao item atual, preservando os metadados.
+- Menu Lista reúne nova/importar/exportar e presets. Opções reúne tema, idioma e pasta de Downloads. Ícones de pasta e atualizar no cabeçalho; botão principal destacado. Duas barras estáticas para item e lote, contagem de processados/restantes, Pular oculto em repouso. Progresso parcial do navegador é estimado; não declarar Instalado/100 antes de Status confirmar a variante exata. Links livres não autorizam adivinhar o ZIP; usuário precisa associar o arquivo.
+- Pular tem alvo por trabalho. Uma cópia transacional termina antes de pular a próxima fonte; pular uma prioridade não cancela a espera suspensa. Editar só metadados de item enfileirado atualiza suas referências; mudar fontes ou variante retira a autorização antiga da fila, e Instalar autoriza a versão editada. Não reintroduzir instalação com referências antigas.
+- Registro das falhas desta rodada: condicional string[]/List corrigido na compilação; recursos novos de fonte adicionados à lista explícita do empacotador, mantendo conferência de hashes. Prévia revelou toolbar quebrada em linhas e campo de pasta alto demais; corrigidos e cobertos por asserts. Auditoria final encontrou fila obsoleta após edição e perda de metadados na associação; ambos corrigidos com testes dedicados.
+- Suíte final: 1181 verificações em 36 relatórios, com navegadores/downloads/jogos simulados. Renderizações nativas claro/escuro em 1100x760 e 1440x900, editor e menu conferidos. Aplicativo Windows nativo; não foi convertido em página web. Jogo, saves, receitas, catálogo e RED4ext reais preservados.
+- Entrega única Mod Loader 1.2.0.exe. SHA256 F6A35DEE8D0F6E29048478BB88EC205EC9A8BC055FA6F6A054FB205674D78F7D.
+
+## Revisão 1.1.1 — 05/11/2026
+
+- Nomenclatura 1.1.1 solicitada por Douglas após a entrega chamada1.2.0. Esta revisão é incremental sobre o código da1.2.0; não reverter categorias, presets, temas, idiomas, fila ou metadados para o código antigo da1.1.0. A janela identifica1.1.1 no título.
+- Reproduzidos em janela real1.2.0 os quadrados roxos/pretos e contornos residuais nos botões. GeneralButton desenhava a face arredondada sem limpar todo o retângulo e ainda herdava a pintura temática do ButtonBase. Agora usa pintura opaca completa e double buffer, sem fundo temático/transparente: cada repintura limpa o retângulo com a cor da superfície antes de desenhar a face. Não mascarar esses cantos com compensações de layout.
+- 24 verificações de pintura começam com buffer magenta e exigem os quatro cantos na cor do fundo, incluindo claro/escuro, principal/secundário, normal, hover, pressionado, desabilitado, resize e repintura. Verificam limpeza com pai transparente intermediário.
+- Suíte final: 1205 verificações em 37 relatórios aprovados; binário AB40F488031FA696717BB8195DDE5E5BB23DF0AFCE11A8633581A54A984B469D. O controle da janela corrigida ao vivo foi interrompido pelo Esc físico do usuário. Não alegar confirmação visual ao vivo posterior à correção; comparar no PC do usuário continua pendente. Os testes isolados passaram, com jogo e saves reais preservados.
+- Douglas pediu commit na main após terminar. Código/fichas/registros entram no commit, sem EXE, mods baixados, caches, recibos, saves ou presets pessoais. Pedido não inclui push.
+- Entrega única Mod Loader 1.1.1.exe.

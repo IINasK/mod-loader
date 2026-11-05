@@ -1,0 +1,13 @@
+# FPV — câmera0, Roll400/0,50 — 02/11/2026
+
+Douglas confirmou “feito” após pedido de câmera0 e novo ensaio. Série completa20261102-002157-Serie-Cyberpunk-40f2becc/02-Cyberpunk/ID6, concluída00:23:59(-03). Série posterior20261102-002403/c2ae66bf contém apenas verticalID7/140quadros semcomplete; não usar como nova série de rotação nem apagar.
+
+NASKsalvo00:21:27 antes da série e session.json confirmam câmera0/FOV125; Roll Center400/Expo0,50/Max660; Pitch/Yaw400/0/660; Feedforward100; TuneTightness100. Gravidade11,3400001526, massa400g e motor/referênciaTWR8,407243 preservados. SavedOnly não é telemetria viva.
+
+13clipes,1587quadros,0duplicados e0erros registrados. Inspeção visual focada emRoll25/50 ePitch25/50, comparados com folhas da referênciaUncrashed20261031-040122/d9182a41/01-Uncrashed/ID1. Demais clipes só conferidos estruturalmente. Reutilizado helper de folhas de quadros existentes, sem algoritmo novo.
+
+Roll50 apresenta progressão visual de giro próxima à referência; Roll25 ainda apresenta menor giro acumulado. Não afirmar igualdade, deg/s exatos nem ajuste final de toda a curva. Manter Roll400/0,50/660 como base provisória para avançar um eixo por vez. As cenas e poses iniciais diferem; não ajustar dois parâmetros por pequenas diferenças de projeção.
+
+Pitch25/50 também mostra menor progressão visual que a referência; emPitch50 a câmera fica orientada ao piso por parte do pulso. Isso não prova colisão, e a ausência de telemetria limita a separação entre projeção, translação e rotação. Próximo ensaio proposto: mudar SOMENTE Pitch Center400→500, preservando Pitch Expo0/Max660, Roll eYaw, Feedforward100/Tightness100, câmera0 e física. É um incremento experimental, não valor calculado como correspondência exata. Center500 continua abaixo deMax660: reforça baixo/médio stick sem aumentar o endpoint teórico. Salvar porOverwrite antes da gravação. ObservarPitch25/50; sem solicitar nova referênciaUncrashed ou nova bateria vertical. Caso o voo tenha colisão, não usar trecho para decidir rates.
+
+Não classificarYaw como calibrado nem alterar outro eixo como efeito colateral. Não foram feitas alterações no jogo, perfil, Lua, saves, RED4ext ou executável pelo agente. Snapshot privado/metadados/comandos emAuditoria/Comparacao-FPV-20261102/00-21-Camera0, sem copiar vídeos nem publicar dados pessoais noGit. Folhas locais emC:/Users/Douglas/Desktop/Mods/Analise-Cyberpunk-20261102-002157.

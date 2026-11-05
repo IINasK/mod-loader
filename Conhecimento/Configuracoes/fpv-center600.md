@@ -1,0 +1,14 @@
+# FPV — limite de Center ampliado para 600
+
+Autorizado explicitamente por Douglas após consulta sobre a alteração e o aviso de arquivos divergentes no coop. Aplicado com Cyberpunk fechado. Somente quatro literais numéricos mudaram: três máximos dos sliders Center em fpv/settings.lua (roll/pitch/yaw) de250 para600, e o máximo compartilhado de leitura centerSensitivity em fpv/profile.lua de250.0 para600.0. Nenhuma taxa ativa foi escolhida automaticamente; perfil, índice, física, gravidade, massa, motor, binds e calibração foram preservados. RED4ext permanece1.31.0.
+
+A rotina de salvamento já serializa centerSensitivities sem outro limite; agora a leitura permite recuperar valores até600. Alterar só JSON anteriormente era insuficiente, pois seria limitado a250 ao carregar. A fórmula de rotação em utilities.lua permanece intacta. Manter Center<=MaxRate para preservar a velocidade máxima; com Max660, qualquer Center até600 permanece abaixo desse endpoint. A recomendação anterior400 deixou de ser impossível APENAS nesta revisão local; não aplicar em instalações originais.
+
+Backup original e cópias do patch em Auditoria/FPV-Center600/<horário>/, com resultado.json contendo hashes anteriores/posteriores. Verificação reverte os quatro números e confirma os bytes originais, garantindo ausência de mudanças fora desses limites. Aplicação atômica por arquivo, rollback em falha, conferência dos hashes finais e de todos os arquivos protegidos. Não houve teste de voo ou leitura real do menu após reiniciar nesta aplicação. Não anunciar que uma nova regulagem já foi calibrada.
+
+Para experimentar após abrir o jogo: mudar SOMENTE Roll Center para400. Manter o Expo do ensaio mais recente em0,00, Max660, Feedforward100 e Tightness100; isso é uma nova combinação experimental, não uma retomada do antigo conselho400/Expo0,40. Pitch/yaw permanecem com seus valores anteriores. O código não altera esses valores automaticamente; se o crash descartou mudanças não salvas, conferir no menu. Salvar a escolha aprovada com Overwrite Profile e verificar persistência após recarregar.
+
+Este patch de código ainda não foi integrado ao EXE do gerenciador. O gerenciador pode identificar os scripts como alterados; não reparar/reinstalar o FPV pelo loader antigo durante o teste, pois isso pode restaurar os originais. O NightCoop inclui os Lua no grupo CET/FPVDrone e pode exibir divergência com um parceiro sem o mesmo patch. Distribuir a mesma revisão para ambos antes da validação coop; arquivos idênticos não garantem sincronização do drone. Não desativar a conferência para esconder diferenças. Teste coop ainda não realizado com esse patch.
+
+## Atualização 1.0.28 — 02/11/2026
+Patch integrado nativamente ao loader, com fonte oficial, transformação conferida, backup e reversão. Douglas aprovou o comportamento do propwash. Ver fpv-nativo-1.0.28.md para o perfil NASK final; os ensaios acima são históricos.

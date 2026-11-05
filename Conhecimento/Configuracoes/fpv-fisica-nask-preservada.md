@@ -1,0 +1,5 @@
+# Física preservada — perfil NASK
+
+Conferido em01/11/2026 após a ampliação do limite de Center: perfil ativo profiles/NASK.json. Os três valores pedidos já estavam salvos no próprio perfil do jogo: gravidade11,340000152587891 (mostrar11,34), massa400g, referência de potência TWR8,407243 (mostrar8,407243 ou8,41). Não foi necessário reescrever o arquivo. Backup integral privado emAuditoria/FPV-Fisica-NASK/<horário>/NASK.json, com resultado.json; hashes do original antes/depois e do backup iguais. Preservar também o restante do powerSystem e da geometria da hélice, não reconstruir o perfil com só esses três campos.
+
+Não misturar pedido de preservação da física com experimentos de rotação. Center/Expo/Feedforward não foram alterados nesta operação; o Feedforward atualmente SALVO no perfil é0, embora o usuário tenha testado100 em memória anteriormente. Isso não invalida sua confirmação dos ensaios. Não afirmar que todos os ajustes experimentais de rotação foram salvos. O limite de Center600 aplicado nos scripts permanece independente destes dados. RED4ext e scripts não foram alterados nesta conferência.

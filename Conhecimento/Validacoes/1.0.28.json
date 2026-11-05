@@ -1,0 +1,19 @@
+{
+  "Version": "1.0.28",
+  "CheckedOn": "2026-11-02",
+  "CatalogComponents": 95,
+  "OtherModRecipesUnchanged": 94,
+  "GeneralChecks": 908,
+  "FPVNativeChecks": 136,
+  "ReportCount": 24,
+  "GameTouched": false,
+  "Red4extUpdated": false,
+  "BodyChanged": false,
+  "OfficialFPVAssetUnchanged": true,
+  "CustomScripts": 3,
+  "Profile": "NASK",
+  "RuntimeFlightTestThisDelivery": false,
+  "Audit": "D:\\Projetos\\Mod Loader Cyberpunk coop\\Auditoria\\Loader-1.0.28-20261102-220500",
+  "Sha256": "6DA3E29FA67A2881A35F762DBC4F410CA446438AB5C1CC07AEDC38968C5352F8",
+  "EmbeddedCatalogSha256": "a9636bba90dcf36a68ceb6263593ae846757a7b4075317709f000c85c134847d"
+}

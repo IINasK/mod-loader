@@ -1,0 +1,11 @@
+{
+  "Version": "1.0.34",
+  "Checks": 1045.0,
+  "Reports": 30,
+  "Added": [
+    "mod-22155",
+    "mod-7299"
+  ],
+  "Sha256": "F35BE22F7B8E95AF647D264E3B1E9CC47C30DE25F52AD5CE4FB2354E30859DE2",
+  "GameplayTested": false
+}

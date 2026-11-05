@@ -59,3 +59,7 @@
 !/Ferramentas/Calibrador FPV/Fonte/*.cs
 !/Ferramentas/Calibrador FPV/Fonte/*.ps1
 /Ferramentas/Calibrador FPV/Dependencias/
+
+# UI font and license required for offline builds.
+!/Instalador/Online/Fonte/Assets/Jost.ttf
+!/Instalador/Online/Fonte/Assets/Jost-OFL.txt

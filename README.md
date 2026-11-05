@@ -9,7 +9,7 @@ Gerenciador Windows de um catálogo fixado de mods para Cyberpunk2077 2.5, com d
 - `Instalador/Online/Fonte`: interface, catálogo, downloads, importação e testes.
 - `Instalador/Fonte`: motor compartilhado, validação de caminhos, backup e fixtures.
 - `Instalador/Online/Programa/catalogo.json`: receitas e fontes fixadas; não contém os mods.
-- `Conhecimento/INDICE.md` e `Conhecimento/mods.json`: fichas dos85componentes, função, uso, dependências, versões e evidências de compatibilidade.
+- `Conhecimento/INDICE.md` e `Conhecimento/mods.json`: fichas dos95componentes, função, uso, dependências, versões e evidências de compatibilidade.
 - `AGENTS.md`: histórico das decisões do projeto. As instruções antigas foram revogadas pelo usuário; as referências às auditorias locais não implicam inclusão dessas pastas no Git.
 
 Os perfis Com/Sem Phantom Liberty usam a auditoria das dependências diretas e transitivas. Evidência documental/estática não substitui teste em um jogo semDLC. O FAQ do NightCoop permite jogar sem a expansão; saves que dependem dela não abrem nesse modo. Trocar a lista do instalador não apaga arquivos existentes nem desliga a expansão por conta própria.
@@ -20,6 +20,12 @@ Os [padrões de configuração1.0.23](Conhecimento/Configuracoes/padroes-1.0.23.
 
 A1.0.24 acrescenta o [perfil FPV Nask667 e o atalho de ativação](Conhecimento/Configuracoes/fpv-1.0.24.md), preservando perfis, atalhos e seleção anteriores. A curva é uma aproximação autorizada para Actual Rates; o mesmo perfil inclui gravidade e referência de força dos motores30% maiores. Calibração e identificação do controle não são compartilhadas.
 
+## Leitor incorporado na versão 1.0.31
+
+RAR e 7z agora são lidos pelo 7-Zip oficial 26.05, incorporado ao executável, sem depender do tar do Windows. O mesmo EXE inclui as licenças e o código-fonte correspondente original, acessíveis pelo menu Sobre e licenças. Nenhum mod acompanha o programa. Os 12 pacotes RAR/7z atuais (65 arquivos) foram conferidos com o leitor novo.
+
+O catálogo atual tem 95 componentes: 93 linhas visíveis com Phantom Liberty e 84 sem a expansão; BMW/Yamaha continuam retidos. O botão Pular e continuar da 1.0.30 e o aceite/remoção rastreável de diferenças da 1.0.29 continuam disponíveis. O perfil FPV atual é NASK; Nask667 abaixo pertence ao histórico da 1.0.24. Consulte Conhecimento/Configuracoes/fpv-nativo-1.0.28.md para os valores finais aprovados.
+
 ## Compilar
 
 No Windows com .NETFramework4.x e PowerShell:
@@ -28,7 +34,7 @@ No Windows com .NETFramework4.x e PowerShell:
 ./Build.ps1
 ```
 
-A compilação usa o catálogo versionado e produz um único executável na raiz. Nenhum mod, save, token, cookie ou credencial é empacotado. O catálogo inclui onze padrões de preferências sanitizados, autorizados pelo usuário para compartilhamento; são aplicados somente quando a configuração correspondente não existe. O catálogo embutido e o hash são recompilados juntos.
+A compilação usa o catálogo versionado e produz um único executável na raiz. Na primeira compilação, preparar-leitor.ps1 obtém os componentes e o código-fonte oficiais do 7-Zip 26.05, confere hashes fixados e prepara os recursos; o usuário final não precisa fazer esse download separado. Os binários de dependência ficam fora do Git e são reproduzíveis pelo script versionado. Nenhum mod, save, token, cookie ou credencial é empacotado. O catálogo inclui onze padrões de preferências sanitizados, autorizados pelo usuário para compartilhamento; são aplicados somente quando a configuração correspondente não existe. O catálogo embutido e o hash são recompilados juntos.
 
 Os scripts históricos de remontagem do catálogo a partir dos pacotes baixados são ferramentas locais de auditoria: não são necessários para compilar o catálogo aprovado e não autorizam redistribuir arquivos de terceiros.
 

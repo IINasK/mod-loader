@@ -1,0 +1,27 @@
+{
+  "Version": "1.0.27",
+  "CheckedOn": "2026-11-02",
+  "CatalogComponents": 95,
+  "VisibleWithPL": 93,
+  "NewIds": [
+    "mod-5114",
+    "mod-14299",
+    "mod-12642",
+    "mod-8704",
+    "mod-12572",
+    "mod-5093",
+    "mod-11609"
+  ],
+  "NewFiles": 44,
+  "GeneralChecks": 910,
+  "NolaChecks": 151,
+  "ReportCount": 24,
+  "GameTouched": false,
+  "RuntimeClothingTested": false,
+  "Red4extUpdated": false,
+  "BodyChanged": false,
+  "FpvChanged": false,
+  "QueueEngineChanged": false,
+  "AuditorInformational": true,
+  "Audit": "D:\\Projetos\\Mod Loader Cyberpunk coop\\Auditoria\\Loader-1.0.27-20261102-214100"
+}

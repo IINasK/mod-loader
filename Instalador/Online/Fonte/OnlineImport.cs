@@ -75,7 +75,7 @@ public sealed class ModImporter {
             return KnownResult(matches,true);
         }
         var unknown=new ModImportItem{Id="file-"+hash,Kind="Arquivo",Name=Path.GetFileName(file),Source=file,Sha256=hash,Size=size,State=PendingState};
-        AddPending(unknown);return Pending(unknown,"Arquivo registrado para auditoria. O original foi preservado; não foi extraído, executado ou instalado.");
+        AddPending(unknown);return Pending(unknown,"Arquivo importado. Dê dois cliques na linha e escolha Instalar.");
     }
     static ModImportResult Pending(ModImportItem item,string message) {return new ModImportResult{Message=message,Pending=true,PendingItems=new[]{item}};}
     // Prepared downloads remain review records; recording a verified cache never authorizes installation.
@@ -101,7 +101,7 @@ public sealed class ModImporter {
         return ReadAll().Where(item=>item.Kind=="Arquivo"&&!ExcludedFromVanillaProfile(item)&&!catalog.Packages.Any(m=>NightCityDensity.Assets(m).Any(a=>a.Size==item.Size&&a.Sha256==item.Sha256))).ToList();
     }
     void AddPending(ModImportItem item) {
-        OnlineDiagnostics.Record("import.unknown",null,"Item importado para revisão, sem instalação.",new{Kind=item.Kind,Name=item.Name,ModId=item.ModId,FileId=item.FileId,Sha256=item.Sha256,Size=item.Size});
+        OnlineDiagnostics.Record("import.unknown",null,"Arquivo local registrado, sem instalação automática.",new{Kind=item.Kind,Name=item.Name,ModId=item.ModId,FileId=item.FileId,Sha256=item.Sha256,Size=item.Size});
         var items=ReadAll();int old=items.FindIndex(x=>x.Id==item.Id);if(old>=0)items[old]=item;else{if(items.Count>=500)throw new IOException("A fila tem 500 itens. Revise a fila antes de adicionar outros.");items.Add(item);}
         if(Encoding.UTF8.GetByteCount(Safe.Json.Serialize(items))>2000000)throw new IOException("A fila de importação atingiu o limite de tamanho. Nenhum item foi alterado.");Safe.WriteJson(queue,items);
     }

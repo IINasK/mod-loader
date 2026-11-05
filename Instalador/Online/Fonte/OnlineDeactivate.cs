@@ -7,7 +7,7 @@ using System.Text;
 
 public sealed partial class FixedInstaller {
     void EnsureNoIncomplete() {
-        foreach(string path in Directory.GetFiles(Data,"*.json")) {
+        foreach(string path in AllReceiptPaths()) {
             var old=ReadReceipt(path);
             if(new[]{"preparando","instalando","falha","desfazendo","desativando","restauracao_pendente"}.Contains(old.Status))
                 throw new IOException("Existe uma operação incompleta. Use Desfazer última operação antes de continuar.");
@@ -24,9 +24,9 @@ public sealed partial class FixedInstaller {
             if(modId==NightCityDensity.ModId)mod=NightCityDensity.Installed(mod,game);
             var scan=FixedData.Scan(mod,game,false);
             if(scan.IsConflict)throw new IOException("Há arquivos diferentes ou não verificáveis. Desativação bloqueada para preservar suas alterações.");
-            if(scan.Correct==0)return "Este mod não está instalado. Nada foi alterado.";
+            if(scan.Correct+scan.Original==0)return "Este mod não está instalado. Nada foi alterado.";
             var dependents=catalog.Packages.Where(m=>m.Id!=modId&&FixedData.Expand(catalog,new[]{m.Id}).Any(d=>d.Id==modId))
-                .Where(m=>{var s=FixedData.Scan(m,game);return s.Correct+s.Different>0||s.State=="Não verificável";}).Select(m=>m.Name).ToList();
+                .Where(m=>{var s=FixedData.Scan(m,game);return s.Correct+s.Original+s.Different>0||s.State=="Não verificável";}).Select(m=>m.Name).ToList();
             if(dependents.Count>0)throw new IOException("Desative primeiro os mods que usam este componente: "+String.Join(", ",dependents));
             var r=new OnlineReceipt{Id=Guid.NewGuid().ToString("N"),CatalogId=catalog.Id,CreatedUtc=DateTime.UtcNow.ToString("o"),Status="desativando",Operation="deactivate",BackupLayout="flat-v1",Mods=new List<string>{modId}};
             string ledger=Safe.In(Data,r.Id+".json");Save(ledger,r);
@@ -35,9 +35,10 @@ public sealed partial class FixedInstaller {
                 foreach(var f in mod.Files.Where(f=>!f.UserData)) {
                     Closed();string source=Safe.In(game,f.Path);
                     if(!File.Exists(source)){if(Directory.Exists(source))throw new IOException("Uma pasta ocupa o arquivo do mod.");continue;}
-                    if(new FileInfo(source).Length!=f.Size||Safe.Hash(source)!=f.Sha256)throw new IOException("Arquivo alterado após a conferência: "+f.Path);
+                    long size=new FileInfo(source).Length;string hash=Safe.Hash(source);
+                    if(!FpvCustomization.MatchesFile(f,size,hash))throw new IOException("Arquivo alterado após a conferência: "+f.Path);
                     string backup=DisabledPath(r,f.Path);Directory.CreateDirectory(Path.GetDirectoryName(backup));Safe.NoLinks(backup);
-                    var change=new OwnedChange{Path=f.Path,Before=f.Sha256};r.Files.Add(change);Save(ledger,r);
+                    var change=new OwnedChange{Path=f.Path,Before=hash};r.Files.Add(change);Save(ledger,r);
                     File.Move(source,backup);change.Applied=true;Save(ledger,r);moved++;
                     if(failAfter>=0&&moved>=failAfter)throw new IOException("Falha de teste na desativação.");
                     report("Desativado: "+mod.Name);
@@ -52,7 +53,7 @@ public sealed partial class FixedInstaller {
     }
     void EnsureUndoDependencies(OnlineReceipt receipt) {
         if(receipt.Operation=="deactivate"||receipt.Operation=="density")return;
-        var removing=new HashSet<string>(receipt.Files.Where(f=>f.Applied&&File.Exists(Safe.In(game,f.Path))&&Safe.Hash(Safe.In(game,f.Path))==f.After).Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
+        var removing=new HashSet<string>(receipt.Files.Where(f=>f.Before==null&&f.Applied&&File.Exists(Safe.In(game,f.Path))&&Safe.Hash(Safe.In(game,f.Path))==f.After).Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
         var components=catalog.Packages.Where(m=>m.Files.Any(f=>removing.Contains(f.Path))).Select(m=>m.Id).ToList();
         foreach(var m in catalog.Packages) {
             if(!FixedData.Expand(catalog,new[]{m.Id}).Any(d=>d.Id!=m.Id&&components.Contains(d.Id)))continue;

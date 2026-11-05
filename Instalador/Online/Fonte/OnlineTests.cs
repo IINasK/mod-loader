@@ -24,7 +24,14 @@ public static class OnlineTests {
         return new FixedCatalog{Schema=1,Id="fixture",GameVersion="2.5",GameFileVersion="2.5.0.0",Packages=new List<FixedMod>{new FixedMod{Id="NightCoop",Name="Base de teste",Version="test",Profile="Kit inicial",GameVersion="2.5",RequiresPL=true,Immutable=true,Dependencies=new string[0],Assets=new List<FixedAsset>{asset},Files=files.Take(5).ToList()},new FixedMod{Id="Extra",Name="Mod de teste",Version="test",Profile="Complementos",GameVersion="2.5",RequiresPL=true,Dependencies=new[]{"NightCoop"},Assets=new List<FixedAsset>{asset},Files=files.Skip(5).ToList()}}};
     }
     public static void Run(string parent) {
-        var embedded=FixedData.Load();Check(embedded.Id=="cp25-fixed-20261028"&&embedded.Packages.Count==85&&embedded.Packages.Any(m=>m.Id=="face-35807-168171")&&embedded.Packages.Any(m=>m.Id=="RadioExt")&&embedded.Packages.Any(m=>m.Id=="SpotOnRadio")&&new[]{"mod-11963","mod-15606","mod-15867","mod-11964"}.All(id=>embedded.Packages.Any(m=>m.Id==id))&&FacialDownload.List().All(item=>embedded.Packages.Any(m=>m.Id==item.Id)),"Catálogo85 embutido conferido por hash preserva faciais, RadioExt e Spotify e inclui os quatro pacotes Nola sem arquivo externo");
+        var embedded=FixedData.Load();Check(embedded.Id=="cp25-fixed-20261028"&&embedded.Packages.Count==139&&embedded.Packages.Any(m=>m.Id=="face-35807-168171")&&embedded.Packages.Any(m=>m.Id=="RadioExt")&&embedded.Packages.Any(m=>m.Id=="SpotOnRadio")&&new[]{"mod-11963","mod-15606","mod-15867","mod-11964"}.All(id=>embedded.Packages.Any(m=>m.Id==id))&&FacialDownload.List().All(item=>embedded.Packages.Any(m=>m.Id==item.Id)),"Catálogo139 embutido conferido por hash preserva faciais, RadioExt e Spotify e inclui os quatro pacotes Nola sem arquivo externo");
+        var speedUnlimiter=embedded.Packages.Single(m=>m.Id=="mod-22155");
+        Refuse(()=>FixedData.RequireInstallable(new[]{speedUnlimiter}),"Vehicle Speed Unlimiter retido após falha de inicialização");
+        var mirrors=embedded.Packages.Single(m=>m.Id=="mod-29619");var map8k=embedded.Packages.Single(m=>m.Id=="mod-17811");var loot=embedded.Packages.Single(m=>m.Id=="mod-3486");
+        Check(mirrors.Assets.Select(a=>a.FileId).SequenceEqual(new[]{159826,159824})&&mirrors.Files.Count==4,"Espelhos fixam HQ com central e LQ laterais, quatro arquivos e dois downloads");
+        Check(map8k.Assets.Single().FileId==111746&&map8k.Files.Single().Path=="archive/pc/mod/RealisticMap8K.archive","Mapa fixa apenas a variante 8K auditada");
+        Check(loot.Version=="1.4.1"&&loot.Assets.Single().FileId==171665&&loot.Files.Count==9&&loot.Dependencies.SequenceEqual(new[]{"CET"})&&!loot.Files.Any(f=>f.Path.EndsWith("config.json")),"Loot Markers usa CET existente e preserva configuração pessoal");
+        Check(GameEdition.NeedsPL(mirrors)&&GameEdition.NeedsPL(map8k)&&!GameEdition.NeedsPL(loot),"Classificação de DLC preserva ressalvas documentais de mapa/espelhos e permite HUD base");
         var additions=new[]{"mod-35772","mod-35353","mod-36378","mod-35886"}.Select(id=>embedded.Packages.Single(m=>m.Id==id)).ToList();
         Check(additions.Sum(m=>m.Files.Count)==8&&additions.All(m=>!m.Immutable&&!m.RequiresPL&&!m.RequiresRedmod&&m.Assets.Count==1),"Quatro novos mods: oito arquivos fixados sem alterar corpo ou base");
         Check(additions.Select(m=>m.Assets[0].FileId).SequenceEqual(new[]{168073,168808,170886,168484}),"Downloads oficiais dos quatro mods mantem os IDs auditados");
@@ -52,6 +59,13 @@ public static class OnlineTests {
         string broken=Path.Combine(root,"truncado.zip");File.WriteAllText(broken,"incompleto");Refuse(()=>cache.Import(broken,asset),"Download truncado recusado");string partial=Path.Combine(root,"fixture.crdownload");File.Copy(archive,partial);Refuse(()=>cache.Import(partial,asset),"Download em andamento recusado");
         string stage=NewDir(root,"stage");cache.Stage(mod,stage,noop);Check(mod.Files.All(f=>Safe.Hash(Safe.In(stage,f.Path))==f.Sha256),"Extração segue receita e hashes");
         var tarMod=Clone(c).Packages[1];tarMod.Assets[0].Format="tar";string tarStage=NewDir(root,"stage-tar");cache.Stage(tarMod,tarStage,noop);Check(tarMod.Files.All(f=>Safe.Hash(Safe.In(tarStage,f.Path))==f.Sha256),"Leitura tar de arquivos regulares verificada por hash");
+        foreach(bool tar in new[]{false,true}){
+            var sized=Clone(c).Packages[1];if(tar)sized.Assets[0].Format="tar";sized.Files[0].Size--;
+            ModPreparationException preparationFailure=null;try{cache.Stage(sized,NewDir(root,"tamanho-divergente"),noop);}catch(ModPreparationException ex){preparationFailure=ex;}
+            var review=preparationFailure==null?null:preparationFailure.InnerException as FileApprovalRequest;
+            Check(review!=null&&preparationFailure.Message.Contains(sized.Name)&&preparationFailure.Message.Contains(asset.Name)&&preparationFailure.Message.Contains(sized.Files[0].Entry),"Erro de tamanho identifica mod, pacote e entrada em "+(tar?"RAR/7z":"ZIP"));
+            Check(review.ExpectedSize==sized.Files[0].Size&&review.ActualSize==sized.Files[0].Size+1&&FixedData.HashValid(review.ActualSha256),"Revisão contém tamanho completo e hash observado sem aceitar automaticamente em "+(tar?"RAR/7z":"ZIP"));
+        }
         var tampered=Clone(c).Packages[1];tampered.Files[0].Sha256=new string('0',64);Refuse(()=>cache.Stage(tampered,NewDir(root,"conteudo-invalido"),noop),"Conteúdo divergente da receita recusado");
         foreach(string kind in new[]{"traversal","duplicate","symlink"}) {
             string zipPath=Safe.In(root,kind+".zip");using(var z=ZipFile.Open(zipPath,ZipArchiveMode.Create)){var entry=z.CreateEntry(kind=="traversal"?"../escape.txt":mod.Files[0].Entry);using(var w=new StreamWriter(entry.Open()))w.Write("test");if(kind=="duplicate")z.CreateEntry(mod.Files[0].Entry);if(kind=="symlink")entry.ExternalAttributes=unchecked((int)0xA1FF0000);}
@@ -117,7 +131,8 @@ public static class OnlineTests {
         Check(aliasImporter.Import(archive).SelectedIds.Contains("Extra"),"Arquivo e reconhecido pelo SHA independentemente da origem Nexus ou GitHub");
         Refuse(()=>aliasImporter.Import("https://www.nexusmods.com/cyberpunk2077/mods/31886?tab=files&file_id=168672"),"Outro file_id tambem exige o arquivo baixado");
         Check(new NexusClient().DownloadUrl(guarded,guarded.Assets[0])==guarded.Assets[0].Url,"Fonte GitHub oficial não exige login Nexus nem troca o hash fixado");
-        OnlineDiagnosticsTests.Run(parent);OnlineRemovalTests.Run(parent);OnlineDensityTests.Run(parent);OnlineDensityWindowTests.Run(parent);OnlineDownloadTests.Run(parent);OnlineImportTests.Run(parent);OnlineAutoInstallTests.Run(parent);OnlineDownloadWatchTests.Run(parent);OnlineBrowserSessionTests.Run(parent);OnlineWindowWatchTests.Run(parent);DefaultBrowserTests.Run(parent);
+        OnlineDiagnosticsTests.Run(parent);OnlineRemovalTests.Run(parent);
+        OnlineExtraCleanupTests.Run(parent);OnlineDensityTests.Run(parent);OnlineDensityWindowTests.Run(parent);OnlineDownloadTests.Run(parent);OnlineImportTests.Run(parent);OnlineAutoInstallTests.Run(parent);OnlineDownloadWatchTests.Run(parent);OnlineBrowserSessionTests.Run(parent);OnlineWindowWatchTests.Run(parent);DefaultBrowserTests.Run(parent);
         OnlineBrowserDownloadProgressTests.Run(parent);
         OnlineUnifiedQueueTests.Run(parent);
         OnlineFacialInstallTests.Run(parent);
@@ -126,13 +141,19 @@ public static class OnlineTests {
         OnlineDefaultsTests.Run(parent);
         OnlineDefaultsQueueTests.Run(parent);
         OnlineFPVDefaultsTests.Run(parent);
+        OnlineFileApprovalWindowTests.Run(parent);
+        OnlineFileApprovalsTests.Run(parent);
+        OnlineSkipModsTests.Run(parent);
+        OnlineArchiveReaderTests.Run(parent);
+        OnlineGameEditionTests.CheckCategories(parent);
+        LocalImportTests.Run(parent);
         Safe.WriteJson(Path.Combine(root,"resultado.json"),new{Passed=passed.Count,Tests=passed,FixtureOnly=true,RealGameTouched=false});File.WriteAllText(Path.Combine(parent,"ultimo-teste.txt"),root);Console.WriteLine(passed.Count+" testes aprovados em "+root);
     }
     public static void VerifySources(FixedCatalog catalog,string seedsFile,string resultFile) {
         var seeds=Safe.Json.Deserialize<List<Dictionary<string,object>>>(File.ReadAllText(seedsFile));int count=0,entries=0;
         foreach(var mod in catalog.Packages.SelectMany(m=>m.DensityProfiles==null?new List<FixedMod>{m}:m.DensityProfiles.Select(p=>NightCityDensity.Resolve(m,p.Id)).ToList()))foreach(var a in mod.Assets){var seed=seeds.First(x=>Convert.ToString(x["Sha256"])==a.Sha256);string path=Convert.ToString(seed["Path"]);if(new FileInfo(path).Length!=a.Size||Safe.Hash(path)!=a.Sha256)throw new IOException("Fonte modificada: "+a.Name);
             var files=mod.Files.Where(f=>f.Asset==a.Id).ToList();
-            if(a.Format=="zip")using(var z=ZipFile.OpenRead(path))foreach(var f in files){var e=z.Entries.Single(x=>x.FullName==f.Entry);using(var s=e.Open())using(var h=SHA256.Create()){if(e.Length!=f.Size||Safe.Hex(h.ComputeHash(s))!=f.Sha256)throw new IOException("Receita divergente: "+mod.Name+" "+f.Path);entries++;}}
+            if(a.Format=="zip")using(var z=ZipFile.OpenRead(path))foreach(var f in files){var e=z.Entries.Single(x=>x.FullName==f.Entry);using(var s=e.Open())using(var prepared=f.Patch==null?null:FpvCustomization.Apply(s,f))using(var h=SHA256.Create()){if(e.Length!=(f.Patch==null?f.Size:f.Patch.SourceSize)||Safe.Hex(h.ComputeHash(prepared??s))!=f.Sha256)throw new IOException("Receita divergente: "+mod.Name+" "+f.Path);entries++;}}
             else if(a.Format=="raw"){foreach(var f in files){if(f.Size!=a.Size||f.Sha256!=a.Sha256)throw new IOException("Fonte raw divergente.");entries++;}}
             else {string local=Path.GetDirectoryName(resultFile);string temp=NewDir(local,"verificacao-tar");var cache=new DownloadCache(Path.Combine(temp,"cache"));cache.Import(path,a);cache.Stage(mod,Path.Combine(temp,"stage"),s=>{});entries+=files.Count;}
             count++;

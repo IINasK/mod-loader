@@ -1,0 +1,166 @@
+{
+  "Version": "1.1.1",
+  "BasedOn": "1.2.0",
+  "ExecutableSha256": "AB40F488031FA696717BB8195DDE5E5BB23DF0AFCE11A8633581A54A984B469D",
+  "CatalogSha256": "87a1039ef472f6e64011a49f5ea9a84839458738f287030014626dea1e9283b8",
+  "Regression": {
+    "Passed": true,
+    "ExecutableSha256": "AB40F488031FA696717BB8195DDE5E5BB23DF0AFCE11A8633581A54A984B469D",
+    "Fixture": "D:\\T111-24fe",
+    "Checks": 1205.0,
+    "Reports": 37,
+    "Painting": {
+      "Passed": true,
+      "Tests": [
+        {
+          "Dark": false,
+          "Primary": false,
+          "State": "normal",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": false,
+          "Primary": false,
+          "State": "hover",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": false,
+          "Primary": false,
+          "State": "pressed",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": false,
+          "Primary": false,
+          "State": "disabled",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": false,
+          "Primary": false,
+          "State": "resized",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": false,
+          "Primary": false,
+          "State": "repaint",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": false,
+          "Primary": true,
+          "State": "normal",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": false,
+          "Primary": true,
+          "State": "hover",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": false,
+          "Primary": true,
+          "State": "pressed",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": false,
+          "Primary": true,
+          "State": "disabled",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": false,
+          "Primary": true,
+          "State": "resized",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": false,
+          "Primary": true,
+          "State": "repaint",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": true,
+          "Primary": false,
+          "State": "normal",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": true,
+          "Primary": false,
+          "State": "hover",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": true,
+          "Primary": false,
+          "State": "pressed",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": true,
+          "Primary": false,
+          "State": "disabled",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": true,
+          "Primary": false,
+          "State": "resized",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": true,
+          "Primary": false,
+          "State": "repaint",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": true,
+          "Primary": true,
+          "State": "normal",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": true,
+          "Primary": true,
+          "State": "hover",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": true,
+          "Primary": true,
+          "State": "pressed",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": true,
+          "Primary": true,
+          "State": "disabled",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": true,
+          "Primary": true,
+          "State": "resized",
+          "OpaqueCorners": true
+        },
+        {
+          "Dark": true,
+          "Primary": true,
+          "State": "repaint",
+          "OpaqueCorners": true
+        }
+      ],
+      "RealGameTouched": false
+    }
+  },
+  "RealGameTouched": false,
+  "LiveOriginalDefectReproduced": true,
+  "CorrectedLiveCheck": "Interrompido pelo Esc físico; testes isolados aprovados."
+}
