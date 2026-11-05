@@ -26,7 +26,17 @@ Uma linha nativa de1px, GeneralStyle.Line, separa título e cabeçalhos, com rec
 
 A barra própria também verifica se a altura total das linhas cabe no espaço disponível: trocar uma tabela grande por um preset vazio não mantém a barra visível por uma contagem de linhas desatualizada do controle nativo.
 
-## Fontes oficiais
+## Logo do projeto
+
+Douglas forneceu a imagem do monograma ML e pediu recriação vetorial. Assets/ModLoader.svg é a fonte única: viewBox2112x2016, fundo#242B30 e12polígonos, com vermelho#FF414E, branco#FFFFFF e detalhes#354049. Sem JPEG/PNG embutido, fontes, scripts ou recursos externos. O SVG tem1248bytes. A imagem JPG original permanece fora do projeto e do Git.
+
+preparar-logo.ps1 usa XML seguro e System.Drawing nativo para gerar Assets/ModLoader.ico com quadros16/24/32/48/64/128/256 e um preview local. Só o SVG e o gerador são versionados; o ICO é derivado na compilação e incorporado no EXE. GeneralBrand desenha os mesmos polígonos em cada tema, sem dependência SVG externa, e define o ícone da janela. compilar.ps1 também usa /win32icon para Explorer/taskbar. Nome/produto/versão nativa do EXE são Mod Loader1.1.6.0; metadados e aviso usam a mesma constante de versão. README exibe o vetor original.
+
+GeneralBrandTests confere ausência de imagem raster/external no vetor, cores e fundo em sete tamanhos, quadros ICO e ícone nativo do executável. O primeiro ensaio detectou área sem pintura na margem superior por diferença de proporção; GeneralBrand.Draw foi corrigido para pintar o retângulo inteiro antes de preservar a proporção. Novo ensaio geral após a correção. A mudança cabe na mesma1.1.6, pois ela ainda não tinha Release publicada quando o usuário pediu a logo.
+
+O construtor antigo System.Drawing.Icon seleciona128px quando solicitado256px neste Framework; o quadro real256px foi validado pelo diretório ICO e pelo PNG decodificado, sem mudar o arquivo correto. Os demais seis tamanhos foram lidos pelo construtor nativo, e o ícone do EXE pelo Windows. Suíte final:1016verificações/17relatórios, com código e recurso de logo já integrados.
+
+## Fontes oficiais consultadas
 
 - https://docs.github.com/en/rest/releases/releases#get-the-latest-release
 - https://cli.github.com/manual/gh_repo_rename

@@ -63,7 +63,7 @@ internal sealed partial class GeneralModWindow : Form {
         }
         if(String.IsNullOrWhiteSpace(state.DownloadFolder))state.DownloadFolder=OnlineDownloadWatch.DefaultFolder();
         if(state.SelectedPreset==null&&state.List.Presets.Any(p=>p.Id=="all"))state.SelectedPreset="all";
-        Text="Mod Loader "+GeneralUpdateChecker.CurrentVersion;ClientSize=new Size(1240,820);MinimumSize=new Size(1000,680);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
+        Text="Mod Loader "+GeneralUpdateChecker.CurrentVersion;Icon=ModLoaderBrand.AppIcon;ClientSize=new Size(1240,820);MinimumSize=new Size(1000,680);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
         BuildInterface();
         FormClosing+=(s,e)=>{
             if(p2p!=null&&p2p.Installing){e.Cancel=true;detail.Text=T("Aguarde a instalação do pacote recebido terminar antes de fechar.","Wait for the received pack installation to finish before closing.");return;}
@@ -83,7 +83,10 @@ internal sealed partial class GeneralModWindow : Form {
         var heading=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=3,Margin=Padding.Empty};
         heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         var titles=new FlowLayoutPanel{AutoSize=true,Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false,Margin=Padding.Empty};
-        titles.Controls.Add(new Label{Text="MOD LOADER",AutoSize=true,Font=GeneralStyle.Font(27,true),ForeColor=GeneralStyle.Accent,Margin=Padding.Empty});
+        var brand=new FlowLayoutPanel{AutoSize=true,WrapContents=false,Margin=Padding.Empty};
+        brand.Controls.Add(new ModLoaderLogo{Size=new Size(44,44),Margin=new Padding(0,0,12,0),Name="ProjectLogo"});
+        brand.Controls.Add(new Label{Text="MOD LOADER",AutoSize=true,Font=GeneralStyle.Font(27,true),ForeColor=GeneralStyle.Accent,Margin=Padding.Empty});
+        titles.Controls.Add(brand);
         titles.Controls.Add(new Label{Text=T("Criado por Nask e Codex. Se achou ruim, faz você.","Made by Nask and Codex. Don't like it? Make your own."),AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(0,0,0,14)});
         heading.Controls.Add(titles,0,0);
         listButton=Command(T("Pacotes","Packs"),ShowPackages,true);listButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;listButton.Margin=new Padding(0,0,12,0);heading.Controls.Add(listButton,1,0);

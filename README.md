@@ -1,5 +1,7 @@
 # Mod Loader
 
+<p><img src="Instalador/Online/Fonte/Assets/ModLoader.svg" alt="Mod Loader" width="112"></p>
+
 Repositório público: [IINasK/mod-loader](https://github.com/IINasK/mod-loader). [Baixar o executável mais recente](https://github.com/IINasK/mod-loader/releases/latest).
 
 Gerenciador de mods para Windows, com listas, presets e categorias definidos pelo usuário. Cyberpunk2077 2.5 é um pacote incluído; outros jogos podem ter suas próprias listas e destinos. Mantém downloads oficiais, identificação por SHA256, monitor da pasta Downloads, backup e desfazer. O usuário conclui os downloads gratuitos Manual/Slow no Nexus; o aplicativo confere o arquivo original e continua a fila autorizada. Receitas específicas e verificações de versão do pacote Cyberpunk não são inferidas para outros jogos.
@@ -31,6 +33,8 @@ RAR e 7z agora são lidos pelo 7-Zip oficial 26.05, incorporado ao executável, 
 O catálogo atual tem 95 componentes: 93 linhas visíveis com Phantom Liberty e 84 sem a expansão; BMW/Yamaha continuam retidos. O botão Pular e continuar da 1.0.30 e o aceite/remoção rastreável de diferenças da 1.0.29 continuam disponíveis. O perfil FPV atual é NASK; Nask667 abaixo pertence ao histórico da 1.0.24. Consulte Conhecimento/Configuracoes/fpv-nativo-1.0.28.md para os valores finais aprovados.
 
 ## Compilar
+
+A logo original está em `Instalador/Online/Fonte/Assets/ModLoader.svg`. `preparar-logo.ps1` gera o ícone do Windows diretamente desse vetor, sem ferramentas ou downloads adicionais. O mesmo SVG é desenhado no cabeçalho do aplicativo.
 
 No Windows com .NETFramework4.x e PowerShell:
 

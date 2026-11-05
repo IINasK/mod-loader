@@ -18,6 +18,8 @@ $expected=@{
  'ModLoader.Jost-OFL.txt'=(Join-Path $PSScriptRoot 'Assets\Jost-OFL.txt')
  'ModLoader.Lucide.ttf'=(Join-Path $PSScriptRoot 'Assets\Lucide.ttf')
  'ModLoader.Lucide-LICENSE.txt'=(Join-Path $PSScriptRoot 'Assets\Lucide-LICENSE.txt')
+ 'ModLoader.Logo.svg'=(Join-Path $PSScriptRoot 'Assets\ModLoader.svg')
+ 'ModLoader.Logo.ico'=(Join-Path $PSScriptRoot 'Assets\ModLoader.ico')
 }
 if($resources.Count -ne $expected.Count -or @($resources|Where-Object {-not $expected.ContainsKey($_)}).Count -ne 0){throw 'Recursos inesperados no executável'}
 foreach($resource in $resources){

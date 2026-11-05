@@ -2,11 +2,11 @@
   "Version": "1.1.6",
   "BasedOn": "1.1.5",
   "Passed": true,
-  "ExecutableSha256": "727A8321C82FE3AABFE62F0F85194D9DBC4F7BC63B8E6E24A8108D7C13539F7A",
-  "ExecutableBytes": 7211520,
+  "ExecutableSha256": "AADD6C505067D67778816F7815D9F0A51BD99B228EC06E0EBA95F7FCC594DDC2",
+  "ExecutableBytes": 7241728,
   "CatalogSha256": "89c68e6bdb8c192977fcace5d30a4b8b25912d8780fd6067f77f5c7d41c6dc05",
-  "Checks": 988,
-  "Reports": 16,
+  "Checks": 1016,
+  "Reports": 17,
   "Results": [
     {
       "Report": "resultado-loader-geral.json",
@@ -23,6 +23,10 @@
     {
       "Report": "resultado.json",
       "Checks": 36
+    },
+    {
+      "Report": "resultado-brand.json",
+      "Checks": 26
     },
     {
       "Report": "resultado-category-delete.json",
@@ -50,7 +54,7 @@
     },
     {
       "Report": "resultado-preset-clean.json",
-      "Checks": 24
+      "Checks": 26
     },
     {
       "Report": "resultado-redesign.json",
@@ -86,5 +90,28 @@
     "HistoricalLocalPathsDisclosed": true
   },
   "InitialFailure": "Self-test invoked from distribution root could not find build-only FixtureGame.exe; repeated with hash-identical Program executable in build layout.",
-  "LiveReleaseVerification": "Recorded locally after publication; do not interpret fixture tests as an internet download test."
+  "LiveReleaseVerification": "Recorded locally after publication; do not interpret fixture tests as an internet download test.",
+  "Logo": {
+    "Source": "Instalador/Online/Fonte/Assets/ModLoader.svg",
+    "VectorBytes": 1248,
+    "Polygons": 12,
+    "IcoSizes": [
+      16,
+      24,
+      32,
+      48,
+      64,
+      128,
+      256
+    ],
+    "NativeMetadataVersion": "1.1.6.0",
+    "GeneratedFromSvg": true,
+    "ImageEmbeddedInSvg": false,
+    "Tests": 26,
+    "InitialFindings": [
+      "Letterboxed renderer left top margin unpainted; fixed to fill all bounds.",
+      "Framework Icon(size256) selects128; directory and decoded PNG256 checked directly."
+    ],
+    "RuntimeAndNativeIconVerified": true
+  }
 }

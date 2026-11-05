@@ -38,6 +38,7 @@ internal sealed partial class GeneralModWindow {
             GeneralModLibrary.DeleteCategory(list,"Minhas escolhas");form.DrawRows();check(active.Categories.Count==0&&added.Category==null&&active.ModIds.Contains(added.Id),"Excluir categoria limpa sua referência nos presets e preserva os mods.");
             foreach(bool dark in new[]{false,true}){
                 state.Theme=dark?"dark":"light";form.BuildInterface();form.PerformLayout();await Task.Delay(60);
+                check(AllControls(form).OfType<ModLoaderLogo>().Count()==1&&form.Icon!=null,"Logo vetorial e ícone aparecem no cabeçalho no tema "+state.Theme);
                 var heading=AllControls(form).Single(control=>control.Name=="PresetHeading");
                 using(var bitmap=new Bitmap(heading.Width,heading.Height)){
                     heading.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));int y=heading.Height-6;
