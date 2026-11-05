@@ -1,0 +1,57 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+
+internal static class OnlineRemovedPackageTests {
+    static GeneralModEntry Entry(string id,string source,string mapped=null){return new GeneralModEntry{Id=id,Name=id,Category="Principal",DefaultVariant="main",Variants=new List<GeneralModVariant>{new GeneralModVariant{Id="main",Name="Principal",Sources=new List<string>{source},CyberpunkId=mapped}}};}
+    internal static void Run(string parent){
+        string root=Path.Combine(parent,"retirada-pacote-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
+        var checks=new List<string>();Action<bool,string> check=(ok,message)=>{if(!ok)throw new IOException(message);checks.Add(message);};
+        var catalog=FixedData.Load();
+        check(catalog.Packages.Count==138&&!catalog.Packages.Any(mod=>mod.Id==RetiredPackEntries.DroneId),"Receita retirada; demais138componentes permanecem.");
+        check(catalog.Defaults.Count==8&&!catalog.Defaults.Any(value=>value.ModId==RetiredPackEntries.DroneId||value.Content.Contains("profiles/NASK.json")),"Perfil, índice e atalhos do drone não são embutidos.");
+        check(catalog.Packages.SelectMany(mod=>mod.Files).All(file=>file.Patch==null&&!file.Path.Contains("FPVDrone")),"Nenhum script, patch ou arquivo do drone permanece no catálogo ativo.");
+        check(new[]{"NightCoop","CET","redscript","Codeware","TweakXL","Audioware","NativeSettings","ArchiveXL"}.All(id=>catalog.Packages.Any(mod=>mod.Id==id)),"Dependências compartilhadas preservadas.");
+        var prepared=new ModImportItem{Id="file-"+RetiredPackEntries.DroneArchiveHash,Kind="Arquivo",Name="legacy.zip",Source=Path.Combine(root,"legacy.zip"),Sha256=RetiredPackEntries.DroneArchiveHash,Size=1,State="Pendente de auditoria"};
+        var other=new ModImportItem{Id="file-"+new string('a',64),Kind="Arquivo",Name="other.zip",Source=Path.Combine(root,"other.zip"),Sha256=new string('a',64),Size=1,State="Pendente de auditoria"};
+        var seed=GeneralModLibrary.Seed(catalog,new[]{prepared,other});
+        check(!seed.Mods.Any(mod=>mod.Id==prepared.Id||mod.Id==RetiredPackEntries.DroneId)&&seed.Mods.Any(mod=>mod.Id==other.Id),"Preparação antiga não reaparece na lista; outros imports são preservados.");
+        var list=new GeneralModList{Categories=new List<string>{"Principal"}};
+        string page="https://www.nexusmods.com/cyberpunk2077/mods/31642?tab=files&file_id=168826";
+        list.Mods.Add(Entry(RetiredPackEntries.DroneId,page));
+        list.Mods.Add(Entry(prepared.Id,prepared.Source));
+        list.Mods.Add(Entry("old-mapped",page,RetiredPackEntries.DroneId));
+        list.Mods.Add(Entry("custom-explicit",page));
+        list.Mods.Add(Entry("other",other.Source));
+        list.Presets.Add(new GeneralModPreset{Id="all",Name="Todos",ModIds=list.Mods.Select(mod=>mod.Id).ToList()});
+        var state=new GeneralModState{List=list,SelectedPreset="all",ChosenVariants=list.Mods.ToDictionary(mod=>mod.Id,mod=>"main")};
+        state.ResolvedDownloads[RetiredPackEntries.DroneId+"/main/0/"+page]=prepared.Source;
+        state.CyberpunkImports[RetiredPackEntries.DroneId+"/main/0/"+page]=prepared.Id;
+        state.ResolvedDownloads["other/main/0/source"]=other.Source;
+        string path=Path.Combine(root,"state.json");Safe.WriteJson(path,state);
+        string before=Safe.Hash(path);var library=new GeneralModLibrary(path);var loaded=library.Load();
+        check(loaded.List.Mods.Select(mod=>mod.Id).SequenceEqual(new[]{"custom-explicit","other"}),"Carga retira apenas IDs conhecidos da lista legada.");
+        check(loaded.List.Presets.Single().ModIds.SequenceEqual(new[]{"custom-explicit","other"}),"Presets não guardam referências ao item retirado.");
+        check(loaded.ChosenVariants.Keys.OrderBy(id=>id).SequenceEqual(new[]{"custom-explicit","other"}),"Escolhas antigas do drone são retiradas do estado.");
+        check(loaded.ResolvedDownloads.Count==1&&loaded.CyberpunkImports.Count==0,"Associações automáticas antigas não retomam o item retirado.");
+        check(Safe.Hash(path)==before,"Migração em memória não apaga nem reescreve a lista original ao ler.");
+        check(loaded.List.Mods[0].Variants[0].Sources[0]==page,"Uma nova entrada custom explícita pode continuar usando o mesmo site.");
+        string exported=Path.Combine(root,"legacy-export.json");library.Export(exported,list);
+        var imported=library.Import(exported);
+        check(imported.Mods.Select(mod=>mod.Id).SequenceEqual(new[]{"old-mapped","custom-explicit","other"}),"Importação retira IDs legados mesmo sem metadados de receita no JSON.");
+        // Exports deliberately remove trusted mappings; an arbitrary renamed custom entry is not banned.
+        library.Save(loaded);check(library.Load().List.Mods.Count==2,"Estado migrado permanece correto depois de salvar e reabrir.");
+        var mappings=GeneralModLibrary.Seed(catalog,new ModImportItem[0]);
+        var legacy=new GeneralModList{Categories=new List<string>{"Principal"},Mods=new List<GeneralModEntry>{Entry(RetiredPackEntries.DroneId,page)}};
+        GeneralModLibrary.RestoreKnownMappings(legacy,mappings);check(legacy.Mods.Count==0,"Reconciliação não converte o antigo pacote fixo em download livre.");
+        string queue=Path.Combine(root,"pending.json");Safe.WriteJson(queue,new[]{prepared,other});string queueBefore=Safe.Hash(queue);
+        var importer=new ModImporter(catalog,new DownloadCache(Path.Combine(root,"cache")),queue);
+        check(importer.ReadPending().Select(item=>item.Id).SequenceEqual(new[]{other.Id})&&Safe.Hash(queue)==queueBefore,"Monitor ignora preparação aposentada sem apagar o registro antigo.");
+        string custom=Path.Combine(root,"FPVDrone-custom-explicito.zip");using(var zip=ZipFile.Open(custom,ZipArchiveMode.Create))using(var stream=new StreamWriter(zip.CreateEntry("mods/custom.txt").Open()))stream.Write("fixture");
+        var accepted=importer.Import(custom);
+        check(accepted.Pending&&accepted.PendingItems.Length==1,"Importação explícita futura continua permitida, sem proibição por nome do arquivo.");
+        Safe.WriteJson(Path.Combine(root,"resultado-pacote-retirado.json"),new{Passed=checks.Count,Tests=checks,RealGameTouched=false,PayloadExecuted=false});
+    }
+}

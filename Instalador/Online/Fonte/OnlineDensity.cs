@@ -146,6 +146,8 @@ public sealed partial class FixedInstaller {
             if(state.Id==id)return "A densidade "+state.Name+" já está instalada. Nada foi alterado.";
             var before=state.Id=="absent"?new List<FixedFile>():NightCityDensity.Installed(mod,game).Files;
             string operationId=Guid.NewGuid().ToString("N"),stage=Safe.In(cache.Root,"preparacao/"+operationId);Directory.CreateDirectory(stage);
+            var stageLease=cache.HoldPreparation(stage);
+            try {
             long bytes=target.Files.Sum(f=>f.Size)+before.Sum(f=>f.Size);
             if(new DriveInfo(Path.GetPathRoot(game)).AvailableFreeSpace<bytes*2+100L*1024*1024)throw new IOException("Espaço insuficiente para trocar a densidade.");
             cache.Stage(target,stage,report);
@@ -180,6 +182,7 @@ public sealed partial class FixedInstaller {
                 r.Status="instalado";Save(ledger,r);
                 return "Densidade "+NightCityDensity.Read(mod,game).Name+" instalada. Versão anterior guardada para desfazer. Use a mesma escolha nos dois PCs e reinicie o jogo.";
             }catch{try{UndoDensity(r,ledger,report);}catch{}throw;}
+            }finally{stageLease.Dispose();cache.CleanPreparation(stage);}
         }
     }
     string UndoDensity(OnlineReceipt r,string ledger,Action<string> report) {

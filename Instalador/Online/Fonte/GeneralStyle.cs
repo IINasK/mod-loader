@@ -44,6 +44,16 @@ internal static class GeneralStyle {
         path.AddArc(box.X,box.Y,d,d,180,90);path.AddArc(box.Right-d,box.Y,d,d,270,90);
         path.AddArc(box.Right-d,box.Bottom-d,d,d,0,90);path.AddArc(box.X,box.Bottom-d,d,d,90,90);path.CloseFigure();return path;
     }
+    internal static void PaintCard(Graphics graphics,Size size){
+        graphics.SmoothingMode=SmoothingMode.AntiAlias;graphics.Clear(Surface);
+        using(var outer=Round(new RectangleF(0,0,size.Width,size.Height),18))using(var border=new SolidBrush(Line))graphics.FillPath(border,outer);
+        using(var inner=Round(new RectangleF(1,1,Math.Max(1,size.Width-2),Math.Max(1,size.Height-2)),17))using(var fill=new SolidBrush(Surface))graphics.FillPath(fill,inner);
+    }
+    internal static void ClipCardBody(Control control){
+        using(var shape=Round(new RectangleF(0,0,Math.Max(1,control.Width),Math.Max(1,control.Height)),16)){
+            var previous=control.Region;control.Region=new Region(shape);if(previous!=null)previous.Dispose();
+        }
+    }
     internal static Button Button(string text,Action action,bool primary=false){
         var b=new GeneralButton{Text=text,Primary=primary,AutoSize=true,MinimumSize=new Size(80,44),Padding=new Padding(16,0,16,0)};
         b.Click+=(s,e)=>action();return b;
@@ -157,8 +167,8 @@ internal sealed class GeneralProgress : Control {
     internal GeneralProgress(){Height=37;SetStyle(ControlStyles.UserPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);}
     protected override void OnPaint(PaintEventArgs e){
         var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;
-        TextRenderer.DrawText(g,Caption??"",GeneralStyle.Font(10.5f),new Rectangle(0,0,Width-52,23),GeneralStyle.Muted,TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
-        TextRenderer.DrawText(g,Indeterminate?"—":Value+"%",GeneralStyle.Font(10.5f,true),new Rectangle(Width-52,0,52,23),GeneralStyle.Accent,TextFormatFlags.Right|TextFormatFlags.SingleLine);
+        using(var font=GeneralStyle.Font(10.5f))TextRenderer.DrawText(g,Caption??"",font,new Rectangle(0,0,Width-52,23),GeneralStyle.Muted,TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
+        using(var font=GeneralStyle.Font(10.5f,true))TextRenderer.DrawText(g,Indeterminate?"—":Value+"%",font,new Rectangle(Width-52,0,52,23),GeneralStyle.Accent,TextFormatFlags.Right|TextFormatFlags.SingleLine);
         var track=new RectangleF(0,27,Math.Max(1,Width-1),6);
         using(var path=GeneralStyle.Round(track,3))using(var brush=new SolidBrush(GeneralStyle.SoftLine))g.FillPath(brush,path);
         float width=track.Width*(Indeterminate ? .16f : Value/100f);
@@ -167,8 +177,8 @@ internal sealed class GeneralProgress : Control {
 }
 
 internal sealed class GeneralMenuRenderer : ToolStripProfessionalRenderer {
-    protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e){e.Graphics.Clear(GeneralStyle.Surface);}
-    protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e){using(var p=new Pen(GeneralStyle.Line))using(var shape=GeneralStyle.Round(new RectangleF(0,0,e.ToolStrip.Width-1,e.ToolStrip.Height-1),16))e.Graphics.DrawPath(p,shape);}
+    protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e){GeneralStyle.PaintCard(e.Graphics,e.ToolStrip.Size);}
+    protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e){}
     protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e){
         if(!e.Item.Selected)return;
         using(var brush=new SolidBrush(GeneralStyle.Selection))using(var shape=GeneralStyle.Round(new RectangleF(6,2,e.Item.Width-12,e.Item.Height-4),12))e.Graphics.FillPath(brush,shape);

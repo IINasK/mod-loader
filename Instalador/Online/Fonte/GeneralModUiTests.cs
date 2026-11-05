@@ -28,27 +28,27 @@ internal sealed partial class GeneralModWindow {
             check(!form.grid.Columns.Contains("Category")&&form.grid.Columns["Progress"].Visible==false,"Categoria vira seção e as duas barras ficam no rodapé.");
             check(form.grid.Rows.Cast<DataGridViewRow>().Count(r=>r.Tag is SectionRow&&((SectionRow)r.Tag).Kind=="add")==3,"Cada categoria, inclusive vazia, oferece Adicionar item.");
             check(((SectionRow)form.grid.Rows[form.grid.RowCount-1].Tag).Kind=="new","A lista termina com Criar nova categoria.");
-            int center=form.filter.PointToScreen(new Point(0,form.filter.Height/2)).Y;
-            check(new Control[]{form.preset,form.reloadButton}.All(c=>Math.Abs(c.PointToScreen(new Point(0,c.Height/2)).Y-center)<=2),"Filtros e reload ficam na mesma linha.");
+            check(form.preset.Height==44&&form.presetSettings.PointToScreen(Point.Empty).Y==form.reloadButton.PointToScreen(Point.Empty).Y,"Seletor tem44px; engrenagem e reload alinham no título da tabela.");
             check(((GeneralButton)form.optionsButton).Bare&&form.optionsButton.Text==""&&((GeneralButton)form.optionsButton).IconKind=="menu","Opções usa apenas ícone de menu sem moldura.");
-            check(form.optionsButton.PointToScreen(Point.Empty).Y==form.listButton.PointToScreen(Point.Empty).Y&&form.listButton.Text=="Gerenciar"&&form.listButton.PointToScreen(new Point(form.listButton.Width,0)).X<form.optionsButton.PointToScreen(Point.Empty).X,"Gerenciar fica ao lado do ícone de Opções no cabeçalho.");
+            check(form.optionsButton.PointToScreen(Point.Empty).Y==form.listButton.PointToScreen(Point.Empty).Y&&form.listButton.Text=="Pacotes"&&form.listButton.PointToScreen(new Point(form.listButton.Width,0)).X<form.optionsButton.PointToScreen(Point.Empty).X,"Gerenciar fica ao lado do ícone de Opções no cabeçalho.");
             check(form.destination.Parent.Height==44,"Campo da pasta mantém altura compacta alinhada ao botão.");
             check(form.Font.FontFamily.Name.IndexOf("Jost",StringComparison.OrdinalIgnoreCase)>=0,"A fonte Jost está embutida e em uso.");
             var click=new DataGridViewCellMouseEventArgs(0,-1,1,1,new MouseEventArgs(MouseButtons.Left,1,1,1,0));
             typeof(DataGridView).GetMethod("OnColumnHeaderMouseClick",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(form.grid,new object[]{click});
             check(form.marked.Count==3&&form.Marked().Count==3,"Selecionar todos ignora títulos e divisões.");
-            form.filter.SelectedIndex=2;
+            form.categoryFilters=new HashSet<string>{"Principal"};form.DrawRows();
             check(form.ModRows().Count()==2&&form.Marked().Count==2,"Filtro de categoria e seleção agem apenas sobre mods visíveis.");
-            form.filter.SelectedIndex=0;form.preset.SelectedIndex=1;
+            form.categoryFilters=null;form.DrawRows();form.preset.SelectedIndex=1;
             check(form.ModRows().Count()==1&&(string)form.ModRows().Single().Tag==two.Id,"O preset filtra itens independentemente das categorias.");
             form.preset.SelectedIndex=0;
             CaptureUi(form,Path.Combine(root,"claro-1100.png"));
             form.ClientSize=new Size(1440,900);form.PerformLayout();Application.DoEvents();CaptureUi(form,Path.Combine(root,"claro-1440.png"));
-            form.ToggleListMenu();Application.DoEvents();
-            check(form.listMenu.Visible&&form.listMenu.Items.OfType<ToolStripMenuItem>().Count()>=7,"Menu Lista reúne lista, importação, exportação e presets.");
-            using(var image=new Bitmap(form.listMenu.Width,form.listMenu.Height)){form.listMenu.DrawToBitmap(image,new Rectangle(0,0,image.Width,image.Height));image.Save(Path.Combine(root,"menu-lista.png"));}
-            form.listMenu.Close();Application.DoEvents();check(!form.listMenu.Visible,"Menu pode ser fechado sem alterar a lista.");
-
+            using(var menu=new GeneralActionsMenu()){
+                menu.StartPosition=FormStartPosition.Manual;menu.Location=new Point(-30000,-30000);menu.Show(form);Application.DoEvents();
+                check(AllControls(menu).OfType<Button>().Count(button=>button.Name!="")>=7,"Menu único reúne importação, exportação, presets e Opções.");
+                CaptureUi(menu,Path.Combine(root,"menu-principal.png"));menu.Close();
+                check(!menu.Visible,"Menu fecha sem alterar a lista.");
+            }
             using(var editor=new GeneralModEditor(NewEntry("",null),list.Categories,"default",true,"Arquivo do usuário")){
                 editor.StartPosition=FormStartPosition.Manual;editor.Location=new Point(-30000,-30000);editor.Show(form);Application.DoEvents();
                 var button=(Button)typeof(GeneralModEditor).GetField("install",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(editor);
@@ -72,7 +72,7 @@ internal sealed partial class GeneralModWindow {
                 bind.Checked=false;
                 check(name.Text=="nome-do-arquivo"&&!adult.Checked,"Voltar à importação independente restaura os metadados do arquivo.");
             }
-            form.filter.SelectedIndex=2;
+            form.categoryFilters=new HashSet<string>{"Principal"};form.DrawRows();
             bool edited=false;
             using(var timer=new Timer{Interval=40}){
                 timer.Tick+=(s,e)=>{
@@ -88,7 +88,7 @@ internal sealed partial class GeneralModWindow {
             check(added.Category=="Principal"&&added.Nsfw,"Arrastar abre edição, herda a categoria e salva NSFW.");
             check(!Directory.Exists(Path.Combine(target,"mods")),"Salvar o arquivo arrastado não instala sem autorização.");
             form.state.Theme="dark";form.state.Language="en";form.Persist();form.BuildInterface();form.ClientSize=new Size(1100,760);form.PerformLayout();Application.DoEvents();
-            check(form.grid.Columns["Status"].HeaderText=="Status"&&form.filter.Items[0].ToString()=="All categories","Idioma inglês alcança a tabela e os filtros.");
+            check(form.grid.Columns["Status"].HeaderText=="Status"&&form.preset.Items[0].ToString()=="All items","Idioma inglês alcança a tabela e os filtros.");
             check(form.BackColor==GeneralStyle.Background&&GeneralStyle.Dark,"Tema escuro atualiza toda a janela.");
             check(GeneralStyle.Status("Instalado")=="Installed"&&GeneralStyle.Status("Pulado")=="Skipped","Estados têm rótulos em inglês.");
             check(!form.next.Visible,"Pular fica oculto em repouso após trocar tema e idioma.");
@@ -98,9 +98,7 @@ internal sealed partial class GeneralModWindow {
                 editor.StartPosition=FormStartPosition.Manual;editor.Location=new Point(-30000,-30000);editor.Show(form);Application.DoEvents();
                 CaptureUi(editor,Path.Combine(root,"editor-escuro.png"));editor.Close();
             }
-            form.ToggleListMenu();Application.DoEvents();
-            check(form.listMenu.Items[0].Text=="New list","Menu flutuante também muda de idioma.");
-            form.listMenu.Close();
+            using(var menu=new GeneralActionsMenu())check(AllControls(menu).OfType<Button>().Single(button=>button.Name=="new").Text=="New list","Menu flutuante também muda de idioma.");
         });
         GeneralStyle.Dark=false;GeneralStyle.Language="pt";
         Safe.WriteJson(Path.Combine(root,"resultado-ui-v2.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});

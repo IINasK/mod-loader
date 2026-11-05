@@ -10,26 +10,27 @@ using System.Windows.Forms;
 internal sealed partial class GeneralModWindow {
     void ToggleListMenu(){
         if(working||scanning)return;
-        if(listMenu!=null&&listMenu.Visible){listMenu.Close();return;}
-        if(listMenu!=null)listMenu.Dispose();
-        listMenu=GeneralMenuRenderer.Create();
-        GeneralMenuRenderer.Add(listMenu,T("Nova lista","New list"),()=>Replace(new GeneralModList()));
-        GeneralMenuRenderer.Add(listMenu,T("Importar lista","Import list"),()=>Guard(ImportList));
-        GeneralMenuRenderer.Add(listMenu,T("Exportar lista","Export list"),()=>Guard(ExportList));
-        listMenu.Items.Add(new ToolStripSeparator());
-        GeneralMenuRenderer.Add(listMenu,T("Novo preset","New preset"),()=>EditPreset(true));
-        GeneralMenuRenderer.Add(listMenu,T("Editar preset atual","Edit current preset"),()=>EditPreset(false));
-        GeneralMenuRenderer.Add(listMenu,T("Excluir preset atual","Delete current preset"),()=>Guard(DeletePreset));
-        listMenu.Items.Add(new ToolStripSeparator());
-        GeneralMenuRenderer.Add(listMenu,T("Pacote Cyberpunk","Cyberpunk pack"),()=>Replace(GeneralModLibrary.Seed(catalog,new ModImportItem[0])));
-        listMenu.Show(listButton,new Point(listButton.Width,listButton.Height+8),ToolStripDropDownDirection.BelowLeft);
+        string action;
+        using(var menu=new GeneralActionsMenu()){menu.AnchorTo(optionsButton);if(menu.ShowDialog(this)!=DialogResult.OK)return;action=menu.ActionId;}
+        if(action=="new")CreateList();else if(action=="import")Guard(ImportList);else if(action=="export")Guard(ExportList);
+        else if(action=="new-preset")SavePresetSelection(true);else if(action=="edit-preset")SavePresetSelection(false);else if(action=="delete-preset")Guard(DeletePreset);else if(action=="options")ShowOptions();
+    }
+    void ShowPackages(){
+        if(working||scanning)return;
+        using(var menu=new GeneralActionsMenu(true)){menu.AnchorTo(listButton);if(menu.ShowDialog(this)==DialogResult.OK&&menu.ActionId=="cyberpunk")Replace(GeneralModLibrary.Seed(catalog,new ModImportItem[0]));}
+    }
+    void CreateList(){
+        using(var name=new GeneralNameDialog(T("Nome do preset","Preset name"),"")){
+            if(name.ShowDialog(this)!=DialogResult.OK)return;
+            var list=new GeneralModList();list.Presets.Add(new GeneralModPreset{Id="preset-"+Guid.NewGuid().ToString("N"),Name=name.ResultName});Replace(list);
+        }
     }
     async void Replace(GeneralModList list){
         if(working||scanning||list==null)return;
         if(state.List.Mods.Count!=0&&GeneralDialog.Message(this,T("Trocar a lista atual? Exporte primeiro se quiser guardar uma cópia. Os arquivos instalados permanecem no lugar.","Replace the current list? Export it first to keep a copy. Installed files will stay in place."),T("Trocar lista","Replace list"),MessageBoxButtons.OKCancel,MessageBoxIcon.Question)!=DialogResult.OK)return;
         try{
-            GeneralModLibrary.RestoreKnownMappings(list,seed);state.List=list;state.SelectedPreset=null;state.ChosenVariants.Clear();marked.Clear();statuses.Clear();progress.Clear();
-            Persist();RebuildFilter();RebuildPresets();await Scan();
+            GeneralModLibrary.RestoreKnownMappings(list,seed);state.List=list;state.SelectedPreset=list.Presets.FirstOrDefault()==null?null:list.Presets[0].Id;state.ChosenVariants.Clear();marked.Clear();statuses.Clear();progress.Clear();ResetColumnFilters();
+            Persist();RebuildPresets();await Scan();
         }catch(Exception ex){ShowError(ex);}
     }
     void ImportList(){using(var dialog=new OpenFileDialog{Filter=T("Lista do Mod Loader|*.json","Mod Loader list|*.json")})if(dialog.ShowDialog(this)==DialogResult.OK)Replace(library.Import(dialog.FileName));}
@@ -63,8 +64,12 @@ internal sealed partial class GeneralModWindow {
             string name=create?"":category??UncatName(),description=null;
             if(!create&&category==null)description=state.List.UncategorizedDescription;
             else if(category!=null)state.List.CategoryDescriptions.TryGetValue(category,out description);
-            using(var dialog=new GeneralCategoryDetails(name,description,!create&&category==null)){
+            using(var dialog=new GeneralCategoryDetails(name,description,!create&&category==null,!create&&category!=null)){
                 if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+                if(dialog.DeleteRequested){
+                    if(GeneralDialog.Message(this,T("Excluir a categoria? Os mods vão para Sem categoria; os arquivos instalados serão preservados.","Delete this category? Mods will move to Uncategorized; installed files will stay in place."),T("Excluir categoria","Delete category"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
+                    GeneralModLibrary.DeleteCategory(state.List,category);ResetColumnFilters();Persist();DrawRows();return;
+                }
                 string renamed=dialog.ResultName;
                 if(state.List.Categories.Any(c=>!String.Equals(c,category,StringComparison.OrdinalIgnoreCase)&&String.Equals(c,renamed,StringComparison.OrdinalIgnoreCase)))throw new IOException(T("Já existe uma categoria com esse nome.","A category with this name already exists."));
                 if(create){state.List.Categories.Add(renamed);state.List.CategoryDescriptions[renamed]=dialog.ResultDescription;}
@@ -74,7 +79,9 @@ internal sealed partial class GeneralModWindow {
                     foreach(var mod in state.List.Mods.Where(m=>String.Equals(m.Category,category,StringComparison.OrdinalIgnoreCase)))mod.Category=renamed;
                     state.List.CategoryDescriptions.Remove(category);state.List.CategoryDescriptions[renamed]=dialog.ResultDescription;
                 }
-                Persist();RebuildFilter(create?renamed:category==null?null:renamed,category==null&&!create?1:0);
+                if(categoryFilters!=null&&category!=null&&categoryFilters.Remove(category))categoryFilters.Add(renamed);
+                if(create&&categoryFilters!=null)categoryFilters.Add(renamed);
+                Persist();DrawRows();
             }
         }catch(Exception ex){ShowError(ex);}
     }
@@ -97,7 +104,7 @@ internal sealed partial class GeneralModWindow {
     }
     void ShowOptions(){
         if(working||scanning)return;
-        using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder)){
+        using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder,()=>cache.ClearDownloads())){
             dialog.AnchorTo(optionsButton);
             if(dialog.ShowDialog(this)!=DialogResult.OK)return;
             state.Theme=dialog.ThemeValue;state.Language=dialog.LanguageValue;state.DownloadFolder=dialog.DownloadFolder;

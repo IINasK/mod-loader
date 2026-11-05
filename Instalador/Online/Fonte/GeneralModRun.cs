@@ -69,7 +69,9 @@ internal sealed partial class GeneralModWindow {
         return root;
     }
     void RowStatus(Work work,string status,int? pct=null,string message=null){
+        string previous;statuses.TryGetValue(work.Key,out previous);
         statuses[work.Key]=status;
+        if(statusFilters!=null&&GeneralStatusPresentation.Label(previous)!=GeneralStatusPresentation.Label(status))DrawRows();
         if(pct.HasValue)progress[work.Key]=pct.Value;else progress.Remove(work.Key);
         var visible=grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(r=>Equals(r.Tag,work.Entry.Id));
         var listed=state.List.Mods.FirstOrDefault(m=>m.Id==work.Entry.Id);

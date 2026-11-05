@@ -14,7 +14,7 @@ internal sealed partial class GeneralModWindow {
         string root=Path.Combine(parent,"floating-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
         string target=Path.Combine(root,"game");Directory.CreateDirectory(target);
         var a=NewEntry("Mod instalado","https://example.com/a.zip");var b=NewEntry("Mod pendente","https://example.com/b.zip");var c=NewEntry("Mod com erro","https://example.com/c.zip");var d=NewEntry("Download em andamento","https://example.com/d.zip");
-        var list=new GeneralModList{Mods=new List<GeneralModEntry>{a,b,c,d}};
+        var list=new GeneralModList{Mods=new List<GeneralModEntry>{a,b,c,d}};list.Presets.Add(new GeneralModPreset{Id="test",Name="Kit teste",ModIds=new List<string>{a.Id,b.Id,c.Id,d.Id}});
         var state=new GeneralModState{List=list,Destination=target,DownloadFolder=root};
         var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
         TestForm(FixedData.Load(),state,Path.Combine(root,"state"),root,async form=>{
@@ -56,35 +56,33 @@ internal sealed partial class GeneralModWindow {
             }
 
             GeneralStyle.AnimationsEnabled=true;
-            form.filter.Toggle();Application.DoEvents();
-            var popup=form.filter.OpenPopup;
+            form.preset.Toggle();Application.DoEvents();
+            var popup=form.preset.OpenPopup;
             check(popup!=null&&popup.Visible&&popup.Region!=null,"Seletor abre popup próprio com recorte arredondado.");
             await Task.Delay(260);
             check(popup.Visible&&popup.Region.IsVisible(popup.Width/2,popup.Height/2)&&popup.Region.IsVisible(15,popup.Height-15),"Seletor termina a expansão visível e sem recortar as opções. Visible="+popup.Visible+" Size="+popup.Size+" Client="+popup.ClientSize);
-            int original=form.filter.SelectedIndex;
-            var choices=popup.Items.OfType<ToolStripControlHost>().Single().Control as ListBox;
+            int original=form.preset.SelectedIndex;
+            var choices=AllControls(popup.Items.OfType<ToolStripControlHost>().Single().Control).OfType<ListBox>().Single();
             choices.SelectedIndex=Math.Min(choices.Items.Count-1,original+1);
-            check(form.filter.SelectedIndex==original,"Navegar no seletor não altera a escolha antes de confirmar.");
+            check(form.preset.SelectedIndex==original,"Navegar no seletor não altera a escolha antes de confirmar.");
             popup.Close(ToolStripDropDownCloseReason.Keyboard);
             check(popup.Visible,"Fechamento do seletor inicia a contração.");
             await Until(()=>!popup.Visible);
-            check(form.filter.SelectedIndex==original,"Fechar seletor preserva o valor.");
-            form.filter.Toggle();await Task.Delay(260);
-            popup=form.filter.OpenPopup;
-            choices=popup.Items.OfType<ToolStripControlHost>().Single().Control as ListBox;
+            check(form.preset.SelectedIndex==original,"Fechar seletor preserva o valor.");
+            form.preset.Toggle();await Task.Delay(260);
+            popup=form.preset.OpenPopup;
+            choices=AllControls(popup.Items.OfType<ToolStripControlHost>().Single().Control).OfType<ListBox>().Single();
             choices.SelectedIndex=Math.Min(choices.Items.Count-1,original+1);
             typeof(ListBox).GetMethod("OnKeyDown",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(choices,new object[]{new KeyEventArgs(Keys.Enter)});
             await Until(()=>!popup.Visible);
-            check(form.filter.SelectedIndex==Math.Min(choices.Items.Count-1,original+1),"Enter confirma a escolha no seletor.");
-            form.filter.SelectedIndex=original;
-            form.ToggleListMenu();Application.DoEvents();
-            check(((GeneralPopupMenu)form.listMenu).Animating,"Menu Lista usa a animação de expansão.");
-            await Until(()=>!((GeneralPopupMenu)form.listMenu).Animating);
-            check(form.listMenu.Visible&&form.listMenu.Region.IsVisible(15,form.listMenu.Height-15),"Gerenciar termina a expansão mostrando a última opção.");
-            CaptureUi(form,Path.Combine(root,"lista-aberta.png"));
-            form.listMenu.Close();await Until(()=>!form.listMenu.Visible);
-            check(!form.listMenu.Visible,"Menu Lista completa a animação de fechamento.");
-
+            check(form.preset.SelectedIndex==Math.Min(choices.Items.Count-1,original+1),"Enter confirma a escolha no seletor.");
+            form.preset.SelectedIndex=original;
+            using(var menu=new GeneralActionsMenu()){
+                menu.StartPosition=FormStartPosition.Manual;menu.Location=new Point(-30000,-30000);menu.Show(form);await Task.Delay(260);
+                check(menu.Visible&&menu.Region.IsVisible(15,menu.Height-15),"Menu único mostra as ações por inteiro após a animação.");
+                menu.Close();await Until(()=>!menu.Visible);
+                check(!menu.Visible,"Menu único completa o fechamento.");
+            }
             using(var dialog=new GeneralOptionsDialog("light","pt",root)){
                 dialog.AnchorTo(form.optionsButton);
                 check(dialog.StartPosition==FormStartPosition.Manual&&Screen.FromControl(form).WorkingArea.Contains(dialog.Bounds),"Opções usa ancoragem e permanece dentro da área visível.");
@@ -97,7 +95,7 @@ internal sealed partial class GeneralModWindow {
             form.state.Theme="dark";form.state.Language="en";form.BuildInterface();form.PerformLayout();Application.DoEvents();
             int caption;
             if(DwmGetWindowAttribute(form.Handle,35,out caption,4)==0)check(caption==ColorTranslator.ToWin32(GeneralStyle.Background),"A barra de título usa a cor do tema escuro.");
-            var scrollbar=AllControls(form.grid).OfType<VScrollBar>().First(bar=>bar.Visible);
+            var scrollbar=((GeneralScrollView)form.grid.Parent.Parent).Bar;
             using(var image=new Bitmap(scrollbar.Width,scrollbar.Height)){
                 scrollbar.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));
                 check(image.GetPixel(1,image.Height/2).GetBrightness()<.35f,"A trilha da barra de rolagem fica escura.");
@@ -108,7 +106,7 @@ internal sealed partial class GeneralModWindow {
             }
             check(GeneralStyle.Status("Baixando")=="Downloading","Legenda traduzida acompanha a cor do estado.");
             form.state.Theme="light";form.BuildInterface();Application.DoEvents();
-            scrollbar=AllControls(form.grid).OfType<VScrollBar>().First(bar=>bar.Visible);
+            scrollbar=((GeneralScrollView)form.grid.Parent.Parent).Bar;
             using(var image=new Bitmap(scrollbar.Width,scrollbar.Height)){
                 scrollbar.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));
                 check(image.GetPixel(1,image.Height/2).GetBrightness()>.65f,"Voltar ao tema claro restaura a barra de rolagem clara.");

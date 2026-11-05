@@ -1,11 +1,11 @@
 # Conhecimento dos mods
 
-Indice interno de95componentes do instalador. Revisao de30/10/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
+Indice interno de138componentes ativos do instalador. Revisao de05/11/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
 
 ## Perfis Phantom Liberty
 
-- Com Phantom Liberty:95registros,93visiveis; BMW e Yamaha continuamretidos.
-- Sem Phantom Liberty:86registros elegiveis,84visiveis. ITP eNightCityAlive exigemDLC; Allies,Cyberpsycho,EconomyPunk,EXtra eNightCityFPV ficaram fora desse perfil por evidencia insuficiente para a receita exata.
+- Com Phantom Liberty:138registros,135visiveis; três componentes continuam retidos.
+- Sem Phantom Liberty:126registros elegiveis,123visiveis. Ver a classificação atual emmods.json. Night City FPV foi retirado de todos os pacotes em1.1.3.
 - A base NightCoop nao exige DLC segundo aFAQoficial; o anfitriao pode reiniciar sem a expansao pelo fluxo oferecido pelo proprio mod. Nao apagar arquivos de expansao nem converter saves automaticamente.
 - Esta separacao e documental/estatica. Nao foi executado um jogo semDLC para validar aparencia, gameplay ou rede. Confirmacoescoop anteriores do usuario continuam atribuidas a ele.
 
@@ -99,7 +99,7 @@ Busque nome ou ID em mods.json ou nesta lista. Cada ficha tem funcao, uso, depen
 | [NETGVNNER - FL00R SHXT POSE PACK](Mods/mod-35353.md) | 1 | not-required | Disponivel para teste |
 | [Unlimited Attribute Reset](Mods/mod-36378.md) | 1.0.1 | not-required | Disponivel para teste |
 | [No-Clip (Fly Through Walls)](Mods/mod-35886.md) | 1.0.1 | not-required | Disponivel para teste |
-| [Night City FPV](Mods/mod-31642.md) | 1.31.4 | unverified | Disponivel para teste comPL |
+| [Night City FPV — histórico](Mods/mod-31642.md) | 1.31.4 | retirado | Fora do instalador desde1.1.3 |
 
 ## Candidatos revisados em 01/11/2026
 
@@ -133,7 +133,7 @@ As sete adições Nola foram promovidas ao catálogo na1.0.27; consulte a seçã
 SelecionarStockings incluiFollowYourPassion;Pack1incluiVirtualBoutique;GothincluiAquelyrasAtelier. EquipmentEXexistente é incluído para as roupas. As lojas não baixam o restante de suas vitrines. Avisos de2.5 são informativos, sem bloqueio de instalação. Teste visual permanece distinto do teste de instalação.
 
 ## FPV nativo — 1.0.28
-Night City FPV agora inclui os três ajustes NASK aprovados e o perfil final. Fonte oficial mantida; o falso conflito da personalização conhecida foi corrigido. Ver [configuração atual](Configuracoes/fpv-nativo-1.0.28.md). Catálogo com 95 componentes, outras 94 receitas preservadas.
+Histórico da1.0.28: Night City FPV incluía os três ajustes NASK aprovados e o perfil final; em1.1.3 foi retirado do instalador. Fonte oficial mantida; o falso conflito da personalização conhecida foi corrigido. Ver [configuração atual](Configuracoes/fpv-nativo-1.0.28.md). Catálogo com 95 componentes, outras 94 receitas preservadas.
 
 ## Arquivos divergentes — 1.0.29
 Identificação do mod/pacote/entrada em falhas, aceite explícito de identidades extraídas divergentes, aviso por linha e remoção rastreável. Ver [comportamento e limites](Configuracoes/arquivos-divergentes-1.0.29.md). Catálogo de 95 componentes preservado.

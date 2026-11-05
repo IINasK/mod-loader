@@ -59,6 +59,7 @@ public sealed class GeneralModLibrary {
         var state = Read<GeneralModState>(statePath, "List");
         ValidateList(state.List, true);
         ValidateChoices(state);
+        RetiredPackEntries.Remove(state);
         return state;
     }
 
@@ -83,14 +84,27 @@ public sealed class GeneralModLibrary {
         });
     }
 
+    public static void DeleteCategory(GeneralModList list, string category) {
+        string requested = RequiredText(category, 120, "Categoria");
+        ValidateList(list, true);
+        string existing = list.Categories.FirstOrDefault(item => String.Equals(item, requested, StringComparison.OrdinalIgnoreCase));
+        if (existing == null) throw new IOException("A categoria não pertence à lista. O grupo sem categoria não pode ser excluído.");
+        foreach (var mod in list.Mods.Where(item => String.Equals(item.Category, existing, StringComparison.OrdinalIgnoreCase)))
+            mod.Category = null;
+        list.Categories.Remove(existing);
+        list.CategoryDescriptions.Remove(existing);
+    }
+
     public GeneralModList Import(string path) {
         var list = Read<GeneralModList>(Path.GetFullPath(path), "Schema", "Categories", "Mods");
         ValidateList(list, false);
+        RetiredPackEntries.Remove(list);
         return list;
     }
 
     public static void RestoreKnownMappings(GeneralModList list, GeneralModList trustedSeed) {
         ValidateList(list, false);
+        RetiredPackEntries.Remove(list);
         var byId = trustedSeed.Mods.ToDictionary(mod => mod.Id, StringComparer.Ordinal);
         foreach (var entry in list.Mods) {
             GeneralModEntry trusted;
@@ -124,7 +138,7 @@ public sealed class GeneralModLibrary {
             }
             list.Mods.Add(entry);
         }
-        foreach (var item in items.Where(item => item.Kind == "Arquivo")) {
+        foreach (var item in items.Where(item => item.Kind == "Arquivo"&&!RetiredPackEntries.PreparedArchive(item))) {
             list.Mods.Add(new GeneralModEntry {
                 Id = item.Id, Name = item.Name, Category = CyberpunkCategories[(int)ModCategory.Imported], DefaultVariant = "default",
                 Variants = new List<GeneralModVariant> { new GeneralModVariant {

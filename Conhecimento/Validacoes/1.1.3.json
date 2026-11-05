@@ -1,0 +1,300 @@
+{
+  "Version": "1.1.3",
+  "BasedOn": "1.1.2",
+  "Passed": true,
+  "ExecutableSha256": "88D661B043F07EAE7C3D6A7F54E23635EFA8529929DF9CE13389FD0CE21C0BBD",
+  "CatalogSha256": "89c68e6bdb8c192977fcace5d30a4b8b25912d8780fd6067f77f5c7d41c6dc05",
+  "Checks": 1370,
+  "Reports": 43,
+  "Results": [
+    {
+      "Report": "resultado-auditor.json",
+      "Checks": 24
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 26
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 46
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 26
+    },
+    {
+      "Report": "resultado-categorias.json",
+      "Checks": 12
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 13
+    },
+    {
+      "Report": "resultado-defaults.json",
+      "Checks": 36
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 10
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 13
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 22
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 109
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 38
+    },
+    {
+      "Report": "resultado-densidade.json",
+      "Checks": 99
+    },
+    {
+      "Report": "resultado-leitor.json",
+      "Checks": 41
+    },
+    {
+      "Report": "resultado-limpeza.json",
+      "Checks": 8
+    },
+    {
+      "Report": "resultado-aprovacoes.json",
+      "Checks": 32
+    },
+    {
+      "Report": "resultado-perfis-dlc.json",
+      "Checks": 29
+    },
+    {
+      "Report": "resultado-defaults-queue.json",
+      "Checks": 11
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 100
+    },
+    {
+      "Report": "resultado-unified.json",
+      "Checks": 25
+    },
+    {
+      "Report": "resultado-loader-geral.json",
+      "Checks": 25
+    },
+    {
+      "Report": "resultado-pintura-botoes.json",
+      "Checks": 24
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 36
+    },
+    {
+      "Report": "resultado-category-delete.json",
+      "Checks": 16
+    },
+    {
+      "Report": "resultado-floating.json",
+      "Checks": 30
+    },
+    {
+      "Report": "resultado-progresso-geral.json",
+      "Checks": 27
+    },
+    {
+      "Report": "resultado-status-presentation.json",
+      "Checks": 46
+    },
+    {
+      "Report": "resultado-redesign.json",
+      "Checks": 28
+    },
+    {
+      "Report": "resultado-table-dialogs.json",
+      "Checks": 14
+    },
+    {
+      "Report": "resultado-ui-v2.json",
+      "Checks": 28
+    },
+    {
+      "Report": "resultado-armazenamento.json",
+      "Checks": 25
+    },
+    {
+      "Report": "resultado-facial-install.json",
+      "Checks": 110
+    },
+    {
+      "Report": "resultado-user-data.json",
+      "Checks": 17
+    },
+    {
+      "Report": "resultado-importacao-local.json",
+      "Checks": 9
+    },
+    {
+      "Report": "resultado-diagnostico.json",
+      "Checks": 10
+    },
+    {
+      "Report": "resultado-aceite-interface.json",
+      "Checks": 8
+    },
+    {
+      "Report": "resultado-skip.json",
+      "Checks": 22
+    },
+    {
+      "Report": "resultado-density-window.json",
+      "Checks": 18
+    },
+    {
+      "Report": "resultado-skip-download.json",
+      "Checks": 18
+    },
+    {
+      "Report": "resultado-remocao.json",
+      "Checks": 36
+    },
+    {
+      "Report": "resultado-pacote-retirado.json",
+      "Checks": 16
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 62
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 25
+    }
+  ],
+  "FeatureTests": {
+    "resultado-category-delete.json": {
+      "Passed": true,
+      "Tests": [
+        "Delete removes only the chosen category and its description, ignoring case.",
+        "Members move to the uncategorized group without removing mods.",
+        "Deletion preserves tags, content flag, description and trusted variant mapping.",
+        "Other categories and preset memberships remain unchanged.",
+        "Deletion and user choices survive closing and reopening.",
+        "Portable export/import retains the moved mod and its source.",
+        "Empty categories can be deleted.",
+        "Invalid or root category deletion is rejected without changes: null",
+        "Invalid or root category deletion is rejected without changes: ",
+        "Invalid or root category deletion is rejected without changes: Avulsos",
+        "Invalid or root category deletion is rejected without changes: Missing",
+        "Category deletion never touches the referenced mod archive.",
+        "Delete category is a destructive action in the category editor.",
+        "The editor returns a deletion request for the caller to confirm.",
+        "The uncategorized editor never offers deletion.",
+        "A new unsaved category does not offer deletion."
+      ],
+      "RealGameTouched": false,
+      "NetworkUsed": false
+    },
+    "resultado-table-dialogs.json": {
+      "Passed": true,
+      "Tests": [
+        "An empty name disables confirmation.",
+        "Name is trimmed and returned only on confirmation.",
+        "Cancel does not publish the edited name.",
+        "Filter deduplicates values and copies the initial selection.",
+        "The filter list uses the shared custom scroll view.",
+        "Select all does not mutate the supplied selection.",
+        "Clear only changes the dialog draft.",
+        "Apply returns independent values and search without mutating the caller.",
+        "A null initial selection means all values.",
+        "Cancel leaves filter outputs unpublished.",
+        "An empty choice list can be confirmed safely.",
+        "Preset action returns the explicit operation: new",
+        "Preset action returns the explicit operation: update",
+        "Cancel does not select a preset action."
+      ],
+      "RealGameTouched": false,
+      "NetworkUsed": false
+    },
+    "resultado-redesign.json": {
+      "Passed": true,
+      "Tests": [
+        "Título integrado usa o nome do preset ativo.",
+        "Renomear a tabela atualiza e persiste o preset.",
+        "Cabeçalho Mods filtra múltiplas categorias.",
+        "Categoria e situação são compostas.",
+        "Filtro de variante se combina com os anteriores.",
+        "Multisseleção de situações conserva as duas situações escolhidas.",
+        "Busca do cabeçalho Mod é combinada e não distingue maiúsculas.",
+        "Limpar filtros restaura todos os itens do preset.",
+        "Nenhuma categoria marcada é diferente de selecionar todas.",
+        "Tabela usa barra própria, sem rolagem nativa sobreposta.",
+        "Mover a barra altera a posição da tabela.",
+        "Acessibilidade expõe a posição da barra própria.",
+        "Acessibilidade pode ajustar a posição da barra.",
+        "Roda do mouse avança a tabela.",
+        "Arraste/limite não passa do fim da tabela.",
+        "Início da barra retorna ao primeiro item.",
+        "Menu único tem tamanho consistente e acesso a Opções.",
+        "Pacotes oferece o pacote Cyberpunk separadamente.",
+        "Editar categoria existente oferece excluir.",
+        "Texto longo usa a barra própria sem setas nativas.",
+        "Barra própria rola texto de edição.",
+        "Pintura limpa o canto opaco: False",
+        "Pintura limpa a superfície central: False",
+        "Borda não conserva pixels da pintura anterior: False",
+        "Pintura limpa o canto opaco: True",
+        "Pintura limpa a superfície central: True",
+        "Borda não conserva pixels da pintura anterior: True",
+        "Filtros/presets não removem o arquivo fonte."
+      ],
+      "RealGameTouched": false,
+      "NetworkUsed": false
+    },
+    "resultado-armazenamento.json": {
+      "Passed": true,
+      "Tests": [
+        "Instalação concluída remove sua preparação temporária.",
+        "Limpeza preserva os arquivos instalados e conferidos.",
+        "Limpeza preserva o pacote comprimido para reinstalar.",
+        "Backup do save sintético permanece disponível.",
+        "Desfazer funciona depois de eliminar a preparação.",
+        "Falha de cópia e rollback não deixam preparação extraída.",
+        "Falha ao conferir a extração também remove a preparação.",
+        "Limpeza recusa pasta fora de preparacao.",
+        "Limpeza recusa pasta que não possui ID de transação.",
+        "Save original permanece idêntico.",
+        "Manutenção não remove preparações enquanto uma operação mantém lease ativo.",
+        "Limpar downloads é bloqueado por uma operação em andamento.",
+        "Outro Mod Loader aberto impede a limpeza de órfãos antigos.",
+        "Outro Mod Loader aberto também impede a limpeza explícita do cache.",
+        "Abertura recolhe preparações órfãs com mais de 24 horas.",
+        "Preparações recentes e pastas desconhecidas são preservadas.",
+        "Manutenção automática não apaga pacotes comprimidos.",
+        "Limpeza explícita informa os bytes de pacotes removidos.",
+        "Limpar cache não apaga arquivos desconhecidos nem o download original.",
+        "Limpar cache preserva os backups usados para desfazer.",
+        "Cache ausente não cria pasta ao ser limpo.",
+        "Rotação preserva um registro em uso e o logger continua funcionando.",
+        "Rotação limita históricos a oito arquivos e 64 MiB.",
+        "Rotação não apaga arquivos que não pertencem ao logger.",
+        "Abrir uma sessão reserva espaço para o registro atual dentro do limite."
+      ],
+      "RealGameTouched": false,
+      "NetworkUsed": false
+    }
+  },
+  "RealGameTouched": false,
+  "RealAppDataCleaned": false,
+  "LiveCheck": "Tabela, realce, abertura do filtro de categorias, barra própria e filtro inteiro dentro da janela conferidos na prévia isolada.",
+  "Storage": "Preparações antigas aguardam fechamento da instância1.1.2; sem exclusão no AppData real durante a implementação."
+}

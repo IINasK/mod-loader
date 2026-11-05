@@ -20,7 +20,7 @@ internal sealed partial class GeneralModWindow {
         var real=FixedData.Load();
         var realSeed=GeneralModLibrary.Seed(real,new ModImportItem[0]);
         var nca=realSeed.Mods.Single(m=>m.Id==NightCityDensity.ModId);
-        check(realSeed.Mods.Count==136&&nca.DefaultVariant=="low"&&nca.Variants.Count==3,"Catálogo preservado com três densidades e Baixa principal.");
+        check(realSeed.Mods.Count==135&&nca.DefaultVariant=="low"&&nca.Variants.Count==3,"Catálogo preservado com três densidades e Baixa principal.");
         string local=TestZip(root,"custom.zip","CETExample/init.lua","return {}");
         var imported=NewEntry("Nome original",local);
         imported.Name="Personalizado renomeado";imported.Category="Minha categoria";
@@ -104,7 +104,7 @@ internal sealed partial class GeneralModWindow {
         RunUiTests(root);
         GeneralButtonPaintTests.Run(root);
         GeneralStatusPresentationTests.Run(root);
-        RunFloatingTests(root);
+        RunFloatingTests(root);GeneralCategoryDeleteTests.Run(root);GeneralTableDialogTests.Run(root);RunRedesignTests(root);
         Safe.WriteJson(Path.Combine(root,"resultado-loader-geral.json"),new{Passed=true,Tests=checks,ArchiveChecks=archiveChecks,LibraryChecks=libraryChecks,RealGameTouched=false,NetworkUsed=false});
     }
     static string TestZip(string root,string name,string entry,string contents){

@@ -1,0 +1,40 @@
+{
+  "Version": "1.1.3",
+  "Scope": "Retirada do pacote FPV; snapshot isolado da base1.1.2 com backend novo, independente da interface1.1.3 em edição",
+  "Passed": true,
+  "Migration": {
+    "Passed": 16,
+    "Tests": [
+      "Receita retirada; demais138componentes permanecem.",
+      "Perfil, índice e atalhos do drone não são embutidos.",
+      "Nenhum script, patch ou arquivo do drone permanece no catálogo ativo.",
+      "Dependências compartilhadas preservadas.",
+      "Preparação antiga não reaparece na lista; outros imports são preservados.",
+      "Carga retira apenas IDs conhecidos da lista legada.",
+      "Presets não guardam referências ao item retirado.",
+      "Escolhas antigas do drone são retiradas do estado.",
+      "Associações automáticas antigas não retomam o item retirado.",
+      "Migração em memória não apaga nem reescreve a lista original ao ler.",
+      "Uma nova entrada custom explícita pode continuar usando o mesmo site.",
+      "Importação retira IDs legados mesmo sem metadados de receita no JSON.",
+      "Estado migrado permanece correto depois de salvar e reabrir.",
+      "Reconciliação não converte o antigo pacote fixo em download livre.",
+      "Monitor ignora preparação aposentada sem apagar o registro antigo.",
+      "Importação explícita futura continua permitida, sem proibição por nome do arquivo."
+    ],
+    "RealGameTouched": false,
+    "PayloadExecuted": false
+  },
+  "EmbeddedResourceAssertions": 2,
+  "RemainingRecipesSemanticallyUnchanged": 138,
+  "ActiveCatalogCount": 138,
+  "VisibleCount": 135,
+  "DefaultConfigurations": 8,
+  "CatalogSha256": "89c68e6bdb8c192977fcace5d30a4b8b25912d8780fd6067f77f5c7d41c6dc05",
+  "PrivateBackupVerified": true,
+  "PersonalPayloadIncludedInKnowledge": false,
+  "GameModified": false,
+  "SharedDependenciesPreserved": true,
+  "ExplicitFutureCustomImportsAllowed": true,
+  "LegacyReceiptSupport": "Helper histórico de identidades mantido sem scripts, perfil ou payload custom."
+}

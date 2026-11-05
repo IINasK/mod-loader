@@ -156,12 +156,23 @@ public static class FixedData {
     }
 }
 
-public sealed class DownloadCache {
+public sealed partial class DownloadCache {
     public readonly string Root;
-    public DownloadCache(string root) { Root=Path.GetFullPath(root); Safe.NoLinks(Root); }
+    public DownloadCache(string root) { Root=Path.GetFullPath(root); Safe.NoLinks(Root); CleanOrphanPreparations(); }
     public string PathFor(FixedAsset a) { return Safe.In(Root,a.Sha256+".cache"); }
     public bool Contains(FixedAsset a) { string p=PathFor(a);return File.Exists(p)&&new FileInfo(p).Length==a.Size&&Safe.Hash(p)==a.Sha256; }
+    public bool CleanPreparation(string stage) {
+        try {
+            string full=Path.GetFullPath(stage),parent=Safe.In(Root,"preparacao");
+            if(!String.Equals(Path.GetDirectoryName(full),parent,StringComparison.OrdinalIgnoreCase)||!Regex.IsMatch(Path.GetFileName(full),"^[a-f0-9]{32}$"))throw new IOException("Pasta temporária inesperada.");
+            Safe.NoLinks(full);if(!Directory.Exists(full))return true;
+            var todo=new Stack<string>();todo.Push(full);
+            while(todo.Count>0){string dir=todo.Pop();Safe.NoLinks(dir);foreach(string sub in Directory.GetDirectories(dir)){Safe.NoLinks(sub);todo.Push(sub);}foreach(string file in Directory.GetFiles(dir))Safe.NoLinks(file);}
+            Directory.Delete(full,true);return true;
+        }catch(Exception cleanup){OnlineDiagnostics.Record("stage.cleanup.failed",null,"Não foi possível limpar a preparação temporária.",new{ErrorType=cleanup.GetType().Name});return false;}
+    }
     public void Import(string source,FixedAsset a) {
+        using(HoldOperation()) {
         OnlineDiagnostics.Record("cache.import.begin",a.Id,"Conferindo arquivo para o cache.",new{Source=source,ExpectedSha256=a.Sha256,ExpectedSize=a.Size});
         Safe.NoLinks(source);
         if(source.EndsWith(".crdownload",StringComparison.OrdinalIgnoreCase)||source.EndsWith(".part",StringComparison.OrdinalIgnoreCase))throw new IOException("Download ainda incompleto.");
@@ -169,6 +180,7 @@ public sealed class DownloadCache {
         Directory.CreateDirectory(Root); string dest=PathFor(a);if(Contains(a)){OnlineDiagnostics.Record("cache.import.verified",a.Id,"Cache já continha o pacote conferido.",new{Source=source,Cache=dest,Sha256=a.Sha256,Size=a.Size,AlreadyCached=true});return;}
         Safe.CopyAtomic(source,dest,a.Sha256);
         OnlineDiagnostics.Record("cache.import.verified",a.Id,"Arquivo conferido e copiado ao cache; não implica instalação.",new{Source=source,Cache=dest,Sha256=a.Sha256,Size=a.Size,AlreadyCached=false});
+        }
     }
     public int ImportFolder(string folder,IEnumerable<FixedAsset> assets,Action<string> report) {
         Safe.NoLinks(folder);if(!Directory.Exists(folder))throw new IOException("Pasta de downloads ausente.");
@@ -181,6 +193,7 @@ public sealed class DownloadCache {
         }return count;
     }
     public void Stage(FixedMod mod,string stage,Action<string> report) {
+        using(HoldOperation()) {
         foreach(var a in mod.Assets) {
             string currentEntry=null;
             try {
@@ -209,6 +222,7 @@ public sealed class DownloadCache {
                 OnlineDiagnostics.Record("stage.failed",mod.Id,"Falha ao preparar arquivo do pacote.",new{ModName=mod.Name,Asset=a.Name,Entry=currentEntry,ExpectedAssetBytes=a.Size,AssetSha256=a.Sha256,Error=ex.Message});
                 throw failure;
             }
+        }
         }
     }
     static FixedFile filesForFailure(FixedMod mod,FixedAsset asset,string entry){return mod.Files.FirstOrDefault(f=>f.Asset==asset.Id&&(f.Entry==entry||f.Path==entry));}
@@ -304,15 +318,9 @@ public sealed partial class FixedInstaller {
             long bytes=pending.SelectMany(x=>x.Files).Sum(x=>x.Size);
             if(new DriveInfo(Path.GetPathRoot(game)).AvailableFreeSpace<bytes*2+100L*1024*1024||new DriveInfo(Path.GetPathRoot(cache.Root)).AvailableFreeSpace<bytes+100L*1024*1024)throw new IOException("Espaço insuficiente para preparação e backup.");
             string id=Guid.NewGuid().ToString("N"),stage=Safe.In(cache.Root,"preparacao/"+id);Directory.CreateDirectory(stage);
-            try{foreach(var m in pending){report("Preparando "+m.Name);cache.Stage(m,stage,report);}}
-            catch{
-                try{
-                    if(!Path.GetFullPath(stage).Equals(Safe.In(cache.Root,"preparacao/"+id),StringComparison.OrdinalIgnoreCase))throw new IOException("Pasta temporária inesperada.");
-                    var todo=new Stack<string>();todo.Push(stage);while(todo.Count>0){string dir=todo.Pop();Safe.NoLinks(dir);foreach(string sub in Directory.GetDirectories(dir)){Safe.NoLinks(sub);todo.Push(sub);}foreach(string file in Directory.GetFiles(dir))Safe.NoLinks(file);}
-                    Directory.Delete(stage,true);
-                }catch(Exception cleanup){OnlineDiagnostics.Record("stage.cleanup.failed",null,"Não foi possível limpar a preparação interrompida.",new{ErrorType=cleanup.GetType().Name});}
-                throw;
-            }
+            var stageLease=cache.HoldPreparation(stage);
+            try {
+            foreach(var m in pending){report("Preparando "+m.Name);cache.Stage(m,stage,report);}
             var receipt=new OnlineReceipt{Id=id,CatalogId=catalog.Id,Status="preparando",CreatedUtc=DateTime.UtcNow.ToString("o"),Mods=mods.Select(x=>x.Id).ToList(),Operation=localImport?LocalModPackage.ReceiptOperation:null};
             string ledger=Safe.In(Data,(localImport?"importados/":"")+id+".json");Save(ledger,receipt);
             OnlineDiagnostics.Record("install.begin",null,"Pacotes preparados; iniciando cópia para o jogo.",new{Game=game,Receipt=id,Mods=pending.Select(m=>m.Id).ToArray(),Files=pending.Sum(m=>m.Files.Count)});
@@ -353,6 +361,7 @@ public sealed partial class FixedInstaller {
                 receipt.Status="falha";Save(ledger,receipt);
                 try{UndoReceipt(receipt,ledger,report);}catch{}throw;
             }
+            }finally{stageLease.Dispose();cache.CleanPreparation(stage);}
         }
     }
     void Save(string path,OnlineReceipt r){var plain=Encoding.UTF8.GetBytes(Safe.Json.Serialize(r));Safe.WriteJson(path,new ReceiptEnvelope{Protected=Convert.ToBase64String(ProtectedData.Protect(plain,null,DataProtectionScope.CurrentUser))});}

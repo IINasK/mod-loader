@@ -12,17 +12,18 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
     internal string LanguageValue { get; private set; }
     internal string DownloadFolder { get; private set; }
 
-    internal GeneralOptionsDialog(string theme, string language, string folder)
+    internal GeneralOptionsDialog(string theme, string language, string folder, Func<long> clearDownloads = null)
         : base(T("Opções", "Options")) {
-        ClientSize = new Size(620, 340);
+        ClientSize = new Size(620, clearDownloads == null ? 340 : 420);
         Font = GeneralStyle.Font(12);
         AutoScaleMode = AutoScaleMode.Dpi;
 
         var layout = new TableLayoutPanel {
-            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4,
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5,
             Padding = new Padding(24, 16, 24, 20), Margin = Padding.Empty
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -77,12 +78,21 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
         browse.MinimumSize = new Size(140, 44);
         downloads.Controls.Add(browse, 1, 1);
         layout.Controls.Add(downloads, 0, 1);
+        if(clearDownloads!=null){
+            var cachePanel=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=new Padding(0,12,0,0)};
+            cachePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));cachePanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            cachePanel.Controls.Add(new Label{Text=T("Downloads guardados podem ser removidos sem desinstalar mods.","Saved downloads can be cleared without uninstalling mods."),Dock=DockStyle.Fill,AutoSize=true,MaximumSize=new Size(330,0)},0,0);
+            var clean=GeneralStyle.Button(T("Limpar downloads","Clear downloads"),()=>{
+                if(GeneralDialog.Message(this,T("Remover os downloads guardados pelo app? Reinstalar poderá exigir baixar novamente. Seus mods instalados, saves e arquivos em Downloads serão preservados.","Remove the app's saved downloads? Reinstalling may require downloading again. Installed mods, saves and files in Downloads will be preserved."),T("Limpar downloads","Clear downloads"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
+                try{long bytes=clearDownloads();error.Text=T("Liberado: ","Freed: ")+(bytes/1073741824.0).ToString("0.00")+" GB";}catch(Exception ex){error.Text=ex.Message;}
+            });clean.Margin=Padding.Empty;cachePanel.Controls.Add(clean,1,0);layout.Controls.Add(cachePanel,0,2);
+        }
 
         error.Dock = DockStyle.Fill;
         error.Margin = new Padding(0, 6, 0, 0);
         error.AutoEllipsis = true;
         error.AccessibleName = T("Aviso", "Notice");
-        layout.Controls.Add(error, 0, 2);
+        layout.Controls.Add(error, 0, 3);
 
         var commands = new FlowLayoutPanel {
             Dock = DockStyle.Fill, AutoSize = true, WrapContents = false,
@@ -94,7 +104,7 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
         cancel.Margin = new Padding(0, 0, 10, 0);
         commands.Controls.Add(save);
         commands.Controls.Add(cancel);
-        layout.Controls.Add(commands, 0, 3);
+        layout.Controls.Add(commands, 0, 4);
         AcceptButton = save;
         CancelButton = cancel;
         GeneralStyle.Apply(this, GeneralStyle.Dark);

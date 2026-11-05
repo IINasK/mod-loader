@@ -12,9 +12,6 @@ public sealed class FixedDefault {
 
 public static class ModDefaults {
     const string IniPath="red4ext/plugins/mod_settings/user.ini";
-    const string FpvProfile="bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/profiles/NASK.json";
-    const string FpvIndex="bin/x64/plugins/cyber_engine_tweaks/mods/FPVDrone/FPVDrone_Profiles.json";
-    const string CetBindings="bin/x64/plugins/cyber_engine_tweaks/bindings.json";
     static readonly UTF8Encoding Utf8=new UTF8Encoding(false,true);
     static readonly Dictionary<string,string> Sections=new Dictionary<string,string>(StringComparer.Ordinal){
         {"Audioware","Audioware.AudiowareConfig"},{"16-Cyberpsycho","CyberpsychoEncountersSettings"},
@@ -23,8 +20,7 @@ public static class ModDefaults {
     };
     static readonly Dictionary<string,string> JsonPaths=new Dictionary<string,string>(StringComparer.Ordinal){
         {"mod-22340","bin/x64/plugins/cyber_engine_tweaks/mods/Shift/userConfig.json"},
-        {"15-NCPDHotline","bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/mod_user_settings.json"},
-        {"mod-31642",FpvProfile}
+        {"15-NCPDHotline","bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/mod_user_settings.json"}
     };
     sealed class Change {
         public string Relative,Path,BeforeHash,AfterHash;
@@ -44,7 +40,7 @@ public static class ModDefaults {
             int bytes=Utf8.GetByteCount(entry.Content);total+=bytes;if(bytes>262144||total>1048576)throw new IOException("Padrões de configuração excedem o limite.");
             if(!Safe.Allowed(entry.Path))throw new IOException("Destino de configuração inválido.");Safe.In(System.IO.Path.GetTempPath(),entry.Path);
             var collisions=catalog.Packages.SelectMany(m=>m.Files??new List<FixedFile>()).Where(f=>String.Equals(f.Path,entry.Path,StringComparison.OrdinalIgnoreCase)).ToList();
-            if(collisions.Count>0&&!(entry.Format=="fpv-index"&&collisions.Count==1&&collisions[0].UserData&&mod.Files.Contains(collisions[0])))throw new IOException("Uma configuração não pode substituir arquivo fixado do mod.");
+            if(collisions.Count>0)throw new IOException("Uma configuração não pode substituir arquivo fixado do mod.");
             var values=ParseObject(entry.Content);CheckData(values,0);
             string target=entry.Path;
             if(entry.Format=="ini-section"){
@@ -53,11 +49,6 @@ public static class ModDefaults {
                 target+="\n"+entry.Section;
             }else if(entry.Format=="json"){
                 string path;if(!JsonPaths.TryGetValue(entry.ModId,out path)||entry.Path!=path||!String.IsNullOrEmpty(entry.Section))throw new IOException("Arquivo de configuração não autorizado.");
-                if(entry.ModId=="mod-31642"&&(!values.ContainsKey("profileVersion")||!Object.Equals(values["profileVersion"],35)))throw new IOException("Perfil FPV de outra versão.");
-            }else if(entry.Format=="cet-bindings"){
-                if(entry.ModId!="mod-31642"||entry.Path!=CetBindings||entry.Section!="FPVDrone"||values.Count==0||values.Count>3||values.Any(p=>!new[]{"fpv_drone_toggle","fpv_drone_force_return_to_player","fpv_drone_clear_player_protection"}.Contains(p.Key)||Binding(p.Value)<=0))throw new IOException("Atalhos FPV não autorizados.");
-            }else if(entry.Format=="fpv-index"){
-                if(entry.ModId!="mod-31642"||entry.Path!=FpvIndex||!String.IsNullOrEmpty(entry.Section)||collisions.Count!=1||values.Count!=3||!values.ContainsKey("activePath")||!Object.Equals(values["activePath"],"profiles/NASK.json")||!values.ContainsKey("indexVersion")||!Object.Equals(values["indexVersion"],5)||!values.ContainsKey("legacyMigrationComplete")||!Object.Equals(values["legacyMigrationComplete"],true)||!catalog.Defaults.Any(d=>d.ModId==entry.ModId&&d.Path==FpvProfile&&d.Format=="json"))throw new IOException("Seleção inicial do perfil FPV inválida.");
             }else throw new IOException("Formato de configuração não suportado.");
             if(!targets.Add(target))throw new IOException("Destino de configuração repetido.");
         }
@@ -98,15 +89,6 @@ public static class ModDefaults {
         Safe.NoLinks(game);var changes=new List<Change>();
         foreach(var group in catalog.Defaults.Where(d=>selected.Contains(d.ModId)).GroupBy(d=>d.Path,StringComparer.OrdinalIgnoreCase)){
             string path=Safe.In(game,group.Key);if(Directory.Exists(path))throw new IOException("Uma pasta ocupa o destino da configuração: "+group.Key);
-            if(group.First().Format=="cet-bindings"){
-                var change=PrepareBindings(group.Single(),path,report);if(change!=null)changes.Add(change);continue;
-            }
-            if(group.First().Format=="fpv-index"){
-                byte[] original=File.Exists(path)?ReadIni(path):null;var file=catalog.Packages.Single(m=>m.Id==group.First().ModId).Files.Single(f=>f.Path==FpvIndex);
-                // A factory-looking index can belong to a customized existing setup.
-                if(original!=null&&(freshUserData==null||!freshUserData.Contains(group.Key)||Hash(original)!=file.Sha256))continue;
-                byte[] content=Utf8.GetBytes(group.Single().Content);changes.Add(new Change{Relative=group.Key,Path=path,Before=original,BeforeHash=original==null?null:Hash(original),After=content,AfterHash=Hash(content)});continue;
-            }
             if(group.First().Format=="json"){
                 if(File.Exists(path))continue;byte[] content=Utf8.GetBytes(group.Single().Content);changes.Add(new Change{Relative=group.Key,Path=path,Before=null,After=content,AfterHash=Hash(content)});continue;
             }
@@ -124,23 +106,6 @@ public static class ModDefaults {
             changes.Add(new Change{Relative=group.Key,Path=path,Before=before,BeforeHash=before==null?null:Hash(before),After=after,AfterHash=Hash(after)});
         }
         return changes;
-    }
-    static long Binding(object value){
-        if(value is int)return (int)value;if(value is long)return (long)value;
-        throw new IOException("Atalho CET deve ser um inteiro exato; arquivo preservado.");
-    }
-    static Change PrepareBindings(FixedDefault entry,string path,Action<string> report){
-        byte[] before=File.Exists(path)?ReadIni(path):null;
-        var current=before==null?new Dictionary<string,object>():ParseObject(Decode(before));var used=new HashSet<long>();
-        foreach(var module in current){var keys=module.Value as Dictionary<string,object>;if(keys==null)throw new IOException("Atalhos CET existentes inválidos; arquivo preservado.");foreach(var value in keys.Values){long binding=Binding(value);if(binding<0)throw new IOException("Atalho CET inválido; arquivo preservado.");if(binding>0)used.Add(binding);}}
-        object existing;var target=current.TryGetValue(entry.Section,out existing)?(Dictionary<string,object>)existing:new Dictionary<string,object>();bool changed=false;
-        foreach(var pair in ParseObject(entry.Content)){
-            if(target.ContainsKey(pair.Key))continue;long binding=Binding(pair.Value);
-            if(used.Contains(binding)){if(report!=null)report("Atalho FPV já usado por outro comando; escolha uma tecla em CET > Bindings: "+pair.Key);continue;}
-            target.Add(pair.Key,pair.Value);used.Add(binding);changed=true;
-        }
-        if(!changed)return null;current[entry.Section]=target;byte[] after=Utf8.GetBytes(Safe.Json.Serialize(current));
-        return new Change{Relative=entry.Path,Path=path,Before=before,BeforeHash=before==null?null:Hash(before),After=after,AfterHash=Hash(after)};
     }
     static byte[] ReadIni(string path){if(new FileInfo(path).Length>1048576)throw new IOException("Arquivo de configurações existente é grande demais; foi preservado.");return File.ReadAllBytes(path);}
     static string Decode(byte[] bytes){try{string text=Utf8.GetString(bytes);if(text.IndexOf('\0')>=0)throw new IOException("Arquivo INI existente não é UTF-8; foi preservado.");return text.TrimStart('\uFEFF');}catch(DecoderFallbackException ex){throw new IOException("Arquivo INI existente não é UTF-8; foi preservado.",ex);}}

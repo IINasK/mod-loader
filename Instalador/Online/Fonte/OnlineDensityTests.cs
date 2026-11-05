@@ -93,6 +93,7 @@ public static class OnlineDensityTests {
             Text(f.Game,"archive/pc/mod/terceiro.archive","terceiro");before=Snapshot(f.Game);
             check(NightCityDensity.Read(f.Mod,f.Game).Id==from,"Reconhece perfil manual "+from+" antes de "+to);check(NightCityDensity.Read(f.Mod,f.Game).Version=="2.3"&&FixedData.Scan(f.Mod,f.Game).Detail.Contains("Versão reconhecida: 2.3"),"Versao instalada confirmada por hashes para "+from);check(ModDetailsInfo.Read(f.Mod,f.Game,"").InstalledVersion.StartsWith("2.3 · "),"Detalhes mostram versao e densidade de "+from);
             f.Engine.ApplyDensityProfile(to,Quiet);
+            check(!Directory.GetDirectories(Safe.In(cache.Root,"preparacao")).Any(),"Troca "+from+" para "+to+" remove a preparação extraída");
             check(NightCityDensity.Read(f.Mod,f.Game).Id==to&&FixedData.Scan(f.Mod,f.Game).IsCorrect,"Troca "+from+" para "+to+" reconhecida pelo scan");
             check(!File.Exists(Safe.In(f.Game,Only(from)))&&File.Exists(Safe.In(f.Game,Only(to))),"Troca "+from+" para "+to+" retira camada antiga e instala nova");
             check(Receipts(f.Game).Single().Operation=="density","Troca "+from+" para "+to+" registra operacao density");
@@ -111,6 +112,7 @@ public static class OnlineDensityTests {
         check(NightCityDensity.Read(fresh.Mod,fresh.Game).Id=="low","Primeira instalacao usa densidade Baixa");
         var fail=Game(root,"rollback-falha",catalog,cache,"medium");var failBefore=Snapshot(fail.Game);
         refuse(()=>fail.Engine.ApplyDensityProfile("high",Quiet,1),"Falha injetada durante troca e propagada");
+        check(!Directory.GetDirectories(Safe.In(cache.Root,"preparacao")).Any(),"Troca com falha remove preparação depois do rollback");
         check(Same(failBefore,fail.Game)&&NightCityDensity.Read(fail.Mod,fail.Game).Id=="medium","Rollback restaura arquivos anteriores apos falha");
         var edited=Game(root,"alterado",catalog,cache,"medium");Text(edited.Game,Changed,"edicao do usuario");var editBefore=Snapshot(edited.Game);
         check(!NightCityDensity.Read(edited.Mod,edited.Game).CanApply,"Perfil com arquivo diferente bloqueia seletor");check(NightCityDensity.Read(edited.Mod,edited.Game).Version==null&&!ModDetailsInfo.Read(edited.Mod,edited.Game,"").InstalledVersion.StartsWith("2.3"),"Arquivo alterado nao recebe versao instalada presumida");
@@ -144,6 +146,7 @@ public static class OnlineDensityTests {
         var empty=Game(root,"cache-ausente",catalog,cache,"medium");var emptyBefore=Snapshot(empty.Game);
         var noCache=new FixedInstaller(catalog,new DownloadCache(Safe.In(root,"cache-vazio")),empty.Game,null,true);
         refuse(()=>noCache.ApplyDensityProfile("high",Quiet),"Sem pacote validado troca e recusada");check(Same(emptyBefore,empty.Game),"Staging sem cache nao altera jogo fixture");
+        check(!Directory.GetDirectories(Safe.In(root,"cache-vazio/preparacao")).Any(),"Troca sem pacote remove a preparação vazia");
         Action<Action<FixedCatalog>,string> invalid=(edit,label)=>{
             var toxic=Safe.Json.Deserialize<FixedCatalog>(Safe.Json.Serialize(catalog));edit(toxic);refuse(()=>FixedData.Validate(toxic),label);
         };

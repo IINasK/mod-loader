@@ -24,7 +24,7 @@ public static class OnlineTests {
         return new FixedCatalog{Schema=1,Id="fixture",GameVersion="2.5",GameFileVersion="2.5.0.0",Packages=new List<FixedMod>{new FixedMod{Id="NightCoop",Name="Base de teste",Version="test",Profile="Kit inicial",GameVersion="2.5",RequiresPL=true,Immutable=true,Dependencies=new string[0],Assets=new List<FixedAsset>{asset},Files=files.Take(5).ToList()},new FixedMod{Id="Extra",Name="Mod de teste",Version="test",Profile="Complementos",GameVersion="2.5",RequiresPL=true,Dependencies=new[]{"NightCoop"},Assets=new List<FixedAsset>{asset},Files=files.Skip(5).ToList()}}};
     }
     public static void Run(string parent) {
-        var embedded=FixedData.Load();Check(embedded.Id=="cp25-fixed-20261028"&&embedded.Packages.Count==139&&embedded.Packages.Any(m=>m.Id=="face-35807-168171")&&embedded.Packages.Any(m=>m.Id=="RadioExt")&&embedded.Packages.Any(m=>m.Id=="SpotOnRadio")&&new[]{"mod-11963","mod-15606","mod-15867","mod-11964"}.All(id=>embedded.Packages.Any(m=>m.Id==id))&&FacialDownload.List().All(item=>embedded.Packages.Any(m=>m.Id==item.Id)),"Catálogo139 embutido conferido por hash preserva faciais, RadioExt e Spotify e inclui os quatro pacotes Nola sem arquivo externo");
+        var embedded=FixedData.Load();Check(embedded.Id=="cp25-fixed-20261028"&&embedded.Packages.Count==138&&embedded.Packages.Any(m=>m.Id=="face-35807-168171")&&embedded.Packages.Any(m=>m.Id=="RadioExt")&&embedded.Packages.Any(m=>m.Id=="SpotOnRadio")&&new[]{"mod-11963","mod-15606","mod-15867","mod-11964"}.All(id=>embedded.Packages.Any(m=>m.Id==id))&&FacialDownload.List().All(item=>embedded.Packages.Any(m=>m.Id==item.Id)),"Catálogo138 embutido conferido por hash preserva faciais, RadioExt e Spotify e inclui os quatro pacotes Nola sem arquivo externo");
         var speedUnlimiter=embedded.Packages.Single(m=>m.Id=="mod-22155");
         Refuse(()=>FixedData.RequireInstallable(new[]{speedUnlimiter}),"Vehicle Speed Unlimiter retido após falha de inicialização");
         var mirrors=embedded.Packages.Single(m=>m.Id=="mod-29619");var map8k=embedded.Packages.Single(m=>m.Id=="mod-17811");var loot=embedded.Packages.Single(m=>m.Id=="mod-3486");
@@ -140,7 +140,7 @@ public static class OnlineTests {
         OnlineUserDataTests.Run(parent);
         OnlineDefaultsTests.Run(parent);
         OnlineDefaultsQueueTests.Run(parent);
-        OnlineFPVDefaultsTests.Run(parent);
+        OnlineRemovedPackageTests.Run(parent);OnlineStorageTests.Run(parent);
         OnlineFileApprovalWindowTests.Run(parent);
         OnlineFileApprovalsTests.Run(parent);
         OnlineSkipModsTests.Run(parent);

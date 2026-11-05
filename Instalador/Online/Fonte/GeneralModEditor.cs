@@ -181,13 +181,13 @@ internal sealed class GeneralModEditor : GeneralDialog {
             Dock = DockStyle.Fill,
             AutoSize = !multiline,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            Size = new Size(100, multiline ? 80 : 38),
-            Padding = multiline ? new Padding(12, 10, 12, 10) : new Padding(12, 8, 12, 6),
-            MinimumSize = new Size(100, multiline ? 58 : 38),
+            Size = new Size(100, multiline ? 80 : 44),
+            Padding = multiline ? new Padding(12, 10, 12, 10) : new Padding(12, 11, 12, 6),
+            MinimumSize = new Size(100, multiline ? 58 : 44),
             Margin = new Padding(3, 3, 3, 3)
         };
         field.Dock = DockStyle.Fill;
-        surface.Controls.Add(field);
+        surface.Controls.Add(multiline&&(field is TextBox||field is ListBox)?(Control)new GeneralScrollView(field):field);
         return surface;
     }
 
@@ -292,8 +292,9 @@ internal sealed class GeneralCategoryDetails : GeneralDialog {
     readonly TextBox description = new TextBox { Dock = DockStyle.Fill, Multiline = true, ScrollBars = ScrollBars.Vertical, MaxLength = 4000 };
     internal string ResultName { get; private set; }
     internal string ResultDescription { get; private set; }
+    internal bool DeleteRequested { get; private set; }
 
-    internal GeneralCategoryDetails(string initialName, string initialDescription, bool isUncategorized = false) {
+    internal GeneralCategoryDetails(string initialName, string initialDescription, bool isUncategorized = false, bool canDelete = false) {
         Text = GeneralStyle.T("Categoria", "Category");
         Font = GeneralStyle.Font(11, false);
         AutoScaleMode = AutoScaleMode.Dpi;
@@ -319,6 +320,14 @@ internal sealed class GeneralCategoryDetails : GeneralDialog {
         var cancel = GeneralStyle.Button(GeneralStyle.T("Cancelar", "Cancel"), () => { DialogResult = DialogResult.Cancel; }, false);
         commands.Controls.Add(save);
         commands.Controls.Add(cancel);
+        if (canDelete && !isUncategorized && !String.IsNullOrWhiteSpace(initialName)) {
+            var delete = (GeneralButton)GeneralStyle.Button(GeneralStyle.T("Excluir categoria", "Delete category"), () => {
+                DeleteRequested = true;
+                Complete(DialogResult.OK);
+            });
+            delete.Destructive = true;
+            commands.Controls.Add(delete);
+        }
         layout.Controls.Add(commands);
         name.TextChanged += (s, e) => {
             save.Enabled = !String.IsNullOrWhiteSpace(name.Text) && !name.Text.Any(Char.IsControl);

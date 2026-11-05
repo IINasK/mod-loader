@@ -1,3 +1,5 @@
+Histórico: em1.1.3 o FPV foi retirado do instalador por solicitação de Douglas. O mod instalado foi preservado e um backup privado separado foi conferido. Consultar ../Mods/mod-31642.md antes de usar as instruções históricas abaixo.
+
 # FPV nativo NASK — Mod Loader 1.0.28
 
 Revisão de 02/11/2026. Corrige o falso conflito do FPV personalizado de Douglas. Nenhum arquivo do jogo real foi alterado nesta integração. As outras 94 receitas foram preservadas, inclusive as roupas da versão 1.0.27.

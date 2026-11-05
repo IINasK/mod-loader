@@ -98,7 +98,7 @@ public sealed class ModImporter {
         }return items;
     }
     public List<ModImportItem> ReadPending() {
-        return ReadAll().Where(item=>item.Kind=="Arquivo"&&!ExcludedFromVanillaProfile(item)&&!catalog.Packages.Any(m=>NightCityDensity.Assets(m).Any(a=>a.Size==item.Size&&a.Sha256==item.Sha256))).ToList();
+        return ReadAll().Where(item=>item.Kind=="Arquivo"&&!ExcludedFromVanillaProfile(item)&&!RetiredPackEntries.PreparedArchive(item)&&!catalog.Packages.Any(m=>NightCityDensity.Assets(m).Any(a=>a.Size==item.Size&&a.Sha256==item.Sha256))).ToList();
     }
     void AddPending(ModImportItem item) {
         OnlineDiagnostics.Record("import.unknown",null,"Arquivo local registrado, sem instalação automática.",new{Kind=item.Kind,Name=item.Name,ModId=item.ModId,FileId=item.FileId,Sha256=item.Sha256,Size=item.Size});
