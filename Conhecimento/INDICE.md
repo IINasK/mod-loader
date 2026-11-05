@@ -11,6 +11,8 @@ Indice interno de138componentes ativos do instalador. Revisao de05/11/2026; font
 
 ## Consulta
 
+- Menus, projetos prontos e presets: [versão 1.1.8](Menus-e-estabilidade-1.1.8.md), [validação](Validacoes/1.1.8.json) e [registro de correções de design](Design/Registro-de-correcoes.md).
+
 - Tela inicial, projetos e temas: [versão 1.1.7](Projetos-e-temas-1.1.7.md). Preserva a biblioteca anterior, separa projetos e adiciona logo transparente e tema claro vermelho.
 - Gerenciador geral: [presets e atualizações1.1.6](Atualizacoes-e-presets-1.1.6.md). Repositório público atual: [IINasK/mod-loader](https://github.com/IINasK/mod-loader). Cyberpunk é um pacote incluído.
 - Gerenciador e compartilhamento: [pacote dos instalados1.1.5](Pacotes-instalados-1.1.5.md), [motor P2P1.1.4](Compartilhamento-P2P-1.1.4.md), [interface e armazenamento1.1.3](Interface-1.1.3.md).

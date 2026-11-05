@@ -42,10 +42,10 @@ internal sealed partial class GeneralModWindow {
             CaptureUi(form,Path.Combine(root,"tabela-clara.png"));
             using(var menu=new GeneralActionsMenu()){
                 menu.StartPosition=FormStartPosition.Manual;menu.Location=new Point(-30000,-30000);menu.Show(form);Application.DoEvents();
-                check(menu.Width==620&&menu.Height==230&&AllControls(menu).OfType<Button>().Count(button=>button.Name!="")==4,"Menu compacto reúne apenas as quatro ações do projeto.");
+                check(menu.Width==350&&menu.Height==420&&AllControls(menu).OfType<Button>().Count(button=>button.Name!="")==6,"Menu em coluna reúne listas, compartilhar e opções.");
                 CaptureUi(menu,Path.Combine(root,"menu-unico.png"));menu.Close();
             }
-            using(var packages=new GeneralActionsMenu(true)){
+            using(var packages=new GeneralProjectsMenu(new GeneralProject[0],null)){
                 check(AllControls(packages).OfType<Button>().Count(button=>button.Name=="cyberpunk")==1,"Pacotes oferece o pacote Cyberpunk separadamente.");
             }
             using(var editor=new GeneralCategoryDetails("Principal","",false,true)){

@@ -45,14 +45,17 @@ internal sealed partial class GeneralModWindow {
     }
     void UpdateTableTitle(){
         if(tableName==null)return;
-        var selected=ActivePreset;tableName.ReadOnly=selected==null;tableName.Text=selected==null?T("Todos os itens","All items"):selected.Name;
+        if(!hasPresetDraft||draftPresetId!=state.SelectedPreset)CapturePresetDraft();
+        var selected=ActivePreset;tableName.ReadOnly=selected==null||ProtectedPreset;settingDraftName=true;
+        try{tableName.Text=selected==null?T("Todos os itens","All items"):draftName;}finally{settingDraftName=false;}
         tableName.AccessibleName=T("Nome do preset","Preset name");
+        UpdatePresetCommands();
     }
     void SaveTableTitle(){
-        var selected=ActivePreset;if(selected==null||tableName==null||tableName.Text==selected.Name)return;
+        var selected=ActivePreset;if(selected==null||ProtectedPreset||tableName==null||tableName.Text==selected.Name)return;
         string name=tableName.Text.Trim();
         if(name.Length==0||name.Length>120||name.Any(Char.IsControl)){tableName.Text=selected.Name;return;}
-        selected.Name=name;Persist();RebuildPresets();
+        selected.Name=name;Persist();CapturePresetDraft();RebuildPresets();
     }
     void ShowPresetSettings(){
         if(working||scanning)return;
@@ -62,13 +65,13 @@ internal sealed partial class GeneralModWindow {
     }
     void SavePresetSelection(bool create){
         if(working||scanning)return;
-        var selected=ActivePreset;if(selected==null)create=true;
+        var selected=ActivePreset;if(selected==null||ProtectedPreset)create=true;
         using(var name=new GeneralNameDialog(T(create?"Novo preset":"Atualizar preset",create?"New preset":"Update preset"),create?"":selected.Name)){
             if(name.ShowDialog(this)!=DialogResult.OK)return;
-            var ids=Marked().Select(work=>work.Entry.Id).Distinct().ToList();
+            var ids=PresetCheckedIds();
             if(create){selected=new GeneralModPreset{Id="preset-"+Guid.NewGuid().ToString("N")};state.List.Presets.Add(selected);}
             else if(GeneralDialog.Message(this,T("Substituir os itens deste preset pelos mods marcados?","Replace this preset's items with the checked mods?"),T("Atualizar preset","Update preset"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-            selected.Name=name.ResultName;selected.ModIds=ids;state.SelectedPreset=selected.Id;Persist();RebuildPresets();
+            selected.Name=name.ResultName;selected.ModIds=ids;state.SelectedPreset=selected.Id;Persist();CapturePresetDraft();RebuildPresets();
         }
     }
     void ClearPreset(){

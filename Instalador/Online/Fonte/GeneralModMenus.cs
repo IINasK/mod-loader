@@ -10,13 +10,18 @@ using System.Windows.Forms;
 internal sealed partial class GeneralModWindow {
     void ToggleListMenu(){
         if(working||scanning)return;
-        string action;
-        using(var menu=new GeneralActionsMenu()){menu.AnchorTo(optionsButton);if(menu.ShowDialog(this)!=DialogResult.OK)return;action=menu.ActionId;}
-        ProjectCommand(action);
+        menus.Toggle(this,optionsButton,()=>new GeneralActionsMenu(),dialog=>Guard(()=>{
+            string action=((GeneralActionsMenu)dialog).ActionId;
+            if(action=="new")CreateList();else if(action=="open")BackToProjects();else if(action=="import")ImportList();else if(action=="export")ExportList();else if(action=="share")ShowP2P();else if(action=="options")ShowOptions();
+        }));
     }
-    void ShowPackages(){
+    void ToggleProjects(){
         if(working||scanning)return;
-        using(var menu=new GeneralActionsMenu(true)){menu.AnchorTo(listButton);if(menu.ShowDialog(this)==DialogResult.OK&&menu.ActionId=="cyberpunk")Replace(GeneralModLibrary.Seed(catalog,new ModImportItem[0]));}
+        menus.Toggle(this,listButton,()=>new GeneralProjectsMenu(projectStore==null?new GeneralProject[0]:projectStore.Read().Projects.ToArray(),project==null?null:project.Id),dialog=>Guard(()=>{
+            var choice=(GeneralProjectsMenu)dialog;
+            if(choice.ReadyProject&&(project==null||project.TemplateId!="cyberpunk-2077"))ProjectCommand("ready");
+            else if(choice.ProjectId!=null&&(project==null||choice.ProjectId!=project.Id))ProjectCommand("project/"+choice.ProjectId);
+        }));
     }
     void CreateList(){
         using(var name=new GeneralNameDialog(T("Nome do preset","Preset name"),"")){
@@ -29,7 +34,7 @@ internal sealed partial class GeneralModWindow {
         if(working||scanning||list==null)return false;
         if(state.List.Mods.Count!=0&&GeneralDialog.Message(this,T("Trocar a lista atual? Exporte primeiro se quiser guardar uma cópia. Os arquivos instalados permanecem no lugar.","Replace the current list? Export it first to keep a copy. Installed files will stay in place."),T("Trocar lista","Replace list"),MessageBoxButtons.OKCancel,MessageBoxIcon.Question)!=DialogResult.OK)return false;
         try{
-            GeneralModLibrary.RestoreKnownMappings(list,seed);state.List=list;state.SelectedPreset=list.Presets.FirstOrDefault()==null?null:list.Presets[0].Id;state.ChosenVariants.Clear();marked.Clear();statuses.Clear();progress.Clear();ResetColumnFilters();
+            GeneralModLibrary.RestoreKnownMappings(list,seed);state.List=list;state.SelectedPreset=list.Presets.FirstOrDefault()==null?null:list.Presets[0].Id;state.ChosenVariants.Clear();marked.Clear();statuses.Clear();progress.Clear();ResetColumnFilters();hasPresetDraft=false;
             if(clearBindings){
                 foreach(string key in state.ResolvedDownloads.Keys.Where(key=>list.Mods.Any(mod=>key.StartsWith(mod.Id+"/",StringComparison.Ordinal))).ToArray())state.ResolvedDownloads.Remove(key);
                 foreach(string key in state.CyberpunkImports.Keys.Where(key=>list.Mods.Any(mod=>key.StartsWith(mod.Id+"/",StringComparison.Ordinal))).ToArray())state.CyberpunkImports.Remove(key);
@@ -61,7 +66,7 @@ internal sealed partial class GeneralModWindow {
         }catch(Exception ex){ShowError(ex);}
     }
     void DeletePreset(){
-        if(working||scanning)return;var item=state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);if(item==null)return;
+        if(working||scanning||ProtectedPreset)return;var item=state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);if(item==null)return;
         if(GeneralDialog.Message(this,T("Excluir este preset? Os mods permanecem na lista.","Delete this preset? Mods will remain in the list.")+"\n"+item.Name,T("Excluir preset","Delete preset"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
         state.List.Presets.Remove(item);state.SelectedPreset=null;Persist();RebuildPresets();
     }
@@ -118,7 +123,7 @@ internal sealed partial class GeneralModWindow {
     void ShowOptions(){
         if(working||scanning)return;
         using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder,()=>cache.ClearDownloads())){
-            dialog.AnchorTo(settingsButton);
+            dialog.AnchorTo(optionsButton);
             if(dialog.ShowDialog(this)!=DialogResult.OK)return;
             state.Theme=dialog.ThemeValue;state.Language=dialog.LanguageValue;state.DownloadFolder=dialog.DownloadFolder;
             Persist();if(projectStore!=null)projectStore.SavePreferences(state.Theme,state.Language,state.DownloadFolder);BuildInterface();

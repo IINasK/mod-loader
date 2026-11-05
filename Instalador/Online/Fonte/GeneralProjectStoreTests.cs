@@ -119,6 +119,27 @@ internal static class GeneralProjectStoreTests {
         Safe.WriteJson(invalidPath, new GeneralProjectIndex { DownloadFolder = missingOldFolder });
         check(invalidStore.Read().DownloadFolder == missingOldFolder, "Pasta antiga removida não impede abrir a Home e escolher outra.");
 
+        var templateStore = new GeneralProjectStore(Path.Combine(root, "built-in"));
+        var customClone = templateStore.Create("Meu Cyberpunk antigo", Example(source), "light", "pt");
+        check(customClone.TemplateId == null, "Projetos antigos ou personalizados não viram padrão por causa do nome ou conteúdo.");
+        var builtIn = templateStore.Create("Cyberpunk 2077", Example(source), "light-red", "pt", null, "cyberpunk-2077");
+        var configuredBuiltIn = templateStore.Load(builtIn); configuredBuiltIn.ChosenVariants["example"] = "default";
+        string builtInStatePath = Path.Combine(templateStore.DataPath(builtIn), "lista.json");
+        new GeneralModLibrary(builtInStatePath).Save(configuredBuiltIn); string builtInHash = Safe.Hash(builtInStatePath);
+        var reopenedBuiltIn = templateStore.Create("Cyberpunk 2077", new GeneralModList(), "dark", "en", null, "cyberpunk-2077");
+        check(reopenedBuiltIn.Id == builtIn.Id && templateStore.Read().Projects.Count == 2 && Safe.Hash(builtInStatePath) == builtInHash, "Reabrir padrão preserva seu estado configurado e não cria duplicatas.");
+        Throws(() => templateStore.Create("Nome pessoal", null, "light", "pt", null, "cyberpunk-2077"));
+        Throws(() => templateStore.Create("Cyberpunk 2077", null, "light", "pt", null, "../unknown"));
+        Throws(() => templateStore.DataPath(new GeneralProject { Id = builtIn.Id, Name = "Renomeado", TemplateId = "cyberpunk-2077" }));
+        check(templateStore.Read().Projects.Single(item => item.Id == builtIn.Id).Name == "Cyberpunk 2077", "Nome e identidade dos projetos padrão são protegidos.");
+        Throws(() => templateStore.Delete(builtIn));
+        check(Safe.Hash(builtInStatePath) == builtInHash && templateStore.Read().Projects.Any(item => item.Id == builtIn.Id), "Excluir não remove um projeto padrão nem seus registros.");
+        string builtInIndexPath = Path.Combine(templateStore.Root, "projects.json");
+        var tampered = templateStore.Read(); tampered.Projects.Single(item => item.Id == builtIn.Id).Name = "Renomeado";
+        Safe.WriteJson(builtInIndexPath, tampered); string tamperedHash = Safe.Hash(builtInIndexPath);
+        Throws(() => templateStore.Read());
+        check(Safe.Hash(builtInIndexPath) == tamperedHash, "Índice com nome de padrão adulterado é recusado sem sobrescrita.");
+
         TestJunction(root, store, check, skipped);
         Safe.WriteJson(Path.Combine(root, "resultado-project-store.json"), new { Passed = true, Tests = checks, Skipped = skipped, RealGameTouched = false, NetworkUsed = false });
         return checks.Count;

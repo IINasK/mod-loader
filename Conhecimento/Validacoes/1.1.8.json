@@ -1,0 +1,146 @@
+{
+  "Version": "1.1.8",
+  "BasedOn": "1.1.7",
+  "Passed": true,
+  "ExecutableSha256": "DE218E0BB602DE2B15462ACCFA48FDFC845835B36D63AAE520E80830C6CCE869",
+  "ExecutableBytes": 7382016,
+  "CatalogSha256": "89c68e6bdb8c192977fcace5d30a4b8b25912d8780fd6067f77f5c7d41c6dc05",
+  "Checks": 1394,
+  "Reports": 22,
+  "Results": [
+    {
+      "Report": "resultado-loader-geral.json",
+      "Checks": 25,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-pintura-botoes.json",
+      "Checks": 24,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 24,
+      "Passed": true
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 36,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-brand.json",
+      "Checks": 30,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-category-delete.json",
+      "Checks": 16,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-floating.json",
+      "Checks": 30,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-project-home.json",
+      "Checks": 57,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-menu-host.json",
+      "Checks": 73,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-progresso-geral.json",
+      "Checks": 27,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-status-presentation.json",
+      "Checks": 46,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-p2p.json",
+      "Checks": 45,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Checks": 552,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-popup-stability.json",
+      "Checks": 80,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-preset-clean.json",
+      "Checks": 26,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-preset-draft.json",
+      "Checks": 44,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-project-store.json",
+      "Checks": 55,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-redesign.json",
+      "Checks": 28,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-snapshot.json",
+      "Checks": 44,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-table-dialogs.json",
+      "Checks": 79,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-ui-v2.json",
+      "Checks": 28,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-updates.json",
+      "Checks": 25,
+      "Passed": true
+    }
+  ],
+  "FixturesRoot": "D:\\T118done",
+  "IntermediateFailures": [
+    "Last menu action stretched: fixed flexible spacer row.",
+    "Queued OnShown restarted cancelled reveal: guarded Shown/Opened after closing begins."
+  ],
+  "VisualChecks": [
+    "Home credits in PT/EN and three themes",
+    "Compact home buttons and saved-project hover",
+    "One-column menus with official icons",
+    "Preset actions and vertically centered footer",
+    "Popup inset geometry, first region, cancel during animation and opaque borders",
+    "Expanded list and restore within the same window, preserving preset and checked items"
+  ],
+  "Unchanged": [
+    "Catalog 138 recipes / 135 visible / 8 defaults",
+    "RED4ext 1.31.0",
+    "Installation engine and download queue"
+  ],
+  "NotTested": [
+    "Real game installation or gameplay",
+    "Personal project migration on user data",
+    "P2P transfer between two real computers",
+    "Final appearance confirmed by user on their monitor"
+  ]
+}

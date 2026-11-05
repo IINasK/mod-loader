@@ -14,8 +14,9 @@ internal static class LucideIcons {
     [DllImport("gdi32.dll")]static extern IntPtr AddFontMemResourceEx(IntPtr memory,uint size,IntPtr reserved,ref uint count);
     // Official lucide-static 0.468.0 glyphs; the upstream map and license are in Assets.
     static readonly Dictionary<string,string> glyphs=new Dictionary<string,string>{
-        {"menu","\ue118"},{"options","\ue118"},{"list","\ue10b"},{"refresh","\ue148"},
-        {"folder","\ue246"},{"down","\ue071"},{"up","\ue074"},{"left","\ue072"},{"right","\ue073"},{"check","\ue070"},{"close","\ue1b1"},{"settings","\ue157"},{"trash","\ue18d"},{"package","\ue12c"}
+        {"menu","\ue118"},{"options","\ue118"},{"list","\ue10b"},{"refresh","\ue148"},{"maximize","\ue116"},{"minimize","\ue11e"},
+        {"folder","\ue246"},{"down","\ue071"},{"up","\ue074"},{"left","\ue072"},{"right","\ue073"},{"check","\ue070"},{"close","\ue1b1"},{"settings","\ue157"},{"trash","\ue18d"},{"package","\ue12c"},
+        {"save","\ue150"},{"new","\ue0cd"},{"open","\ue246"},{"export","\ue19d"},{"import","\ue0b6"},{"share","\ue159"}
     };
     static LucideIcons(){
         using(var stream=typeof(LucideIcons).Assembly.GetManifestResourceStream("ModLoader.Lucide.ttf")){
@@ -37,22 +38,29 @@ internal sealed class GeneralReveal : IDisposable {
     readonly Timer timer=new Timer{Interval=15};
     readonly Stopwatch watch=new Stopwatch();
     bool opening;
+    double progress=1,start;
     Point origin;
     Action complete;
     internal bool Running {get;private set;}
     internal GeneralReveal(Control target){this.target=target;timer.Tick+=(s,e)=>Tick();target.Disposed+=(s,e)=>Dispose();}
+    internal void PrepareOpen(Point anchor){
+        if(target.IsDisposed)return;timer.Stop();origin=anchor;opening=true;complete=null;
+        Running=GeneralStyle.AnimationsEnabled;if(Running)Frame(0);else SetRound();
+    }
     internal void Begin(bool open,Point anchor,Action done=null){
+        if(target.IsDisposed)return;
         timer.Stop();opening=open;origin=anchor;complete=done;
         if(!GeneralStyle.AnimationsEnabled||!target.IsHandleCreated){SetRound();Running=false;if(done!=null)done();return;}
-        Running=true;watch.Restart();Frame(open?0:1);timer.Start();
+        Running=true;start=open?0:progress;watch.Restart();Frame(start);timer.Start();
     }
     void Tick(){
         if(target.IsDisposed){Dispose();return;}
         double t=Math.Min(1,watch.Elapsed.TotalMilliseconds/210.0),eased=1-Math.Pow(1-t,3);
-        Frame(opening?eased:1-eased);
+        Frame(opening?start+(1-start)*eased:start*(1-eased));
         if(t>=1){timer.Stop();Running=false;if(opening)SetRound();var done=complete;complete=null;if(done!=null)done();}
     }
     void Frame(double progress){
+        this.progress=progress;
         int width=Math.Max(1,target.ClientSize.Width),height=Math.Max(1,target.ClientSize.Height);
         double dx=Math.Max(origin.X,width-origin.X),dy=Math.Max(origin.Y,height-origin.Y);
         float radius=(float)(Math.Sqrt(dx*dx+dy*dy)*progress+1);
@@ -62,7 +70,7 @@ internal sealed class GeneralReveal : IDisposable {
             var region=new Region(round);region.Intersect(circle);Replace(region);
         }
     }
-    internal void SetRound(){if(target.IsDisposed)return;using(var round=GeneralStyle.Round(new RectangleF(0,0,Math.Max(1,target.ClientSize.Width),Math.Max(1,target.ClientSize.Height)),18))Replace(new Region(round));}
+    internal void SetRound(){if(target.IsDisposed)return;progress=1;using(var round=GeneralStyle.Round(new RectangleF(0,0,Math.Max(1,target.ClientSize.Width),Math.Max(1,target.ClientSize.Height)),18))Replace(new Region(round));}
     void Replace(Region next){var previous=target.Region;target.Region=next;if(previous!=null)previous.Dispose();target.Invalidate(true);}
     public void Dispose(){timer.Stop();timer.Dispose();complete=null;Running=false;}
 }
@@ -72,7 +80,8 @@ internal sealed class GeneralPopupMenu : ContextMenuStrip {
     bool closing,allowClose;
     internal bool Animating {get{return reveal.Running;}}
     internal GeneralPopupMenu(){reveal=new GeneralReveal(this);}
-    protected override void OnOpened(EventArgs e){allowClose=false;closing=false;base.OnOpened(e);reveal.Begin(true,new Point(Width-28,0));}
+    protected override void OnOpening(System.ComponentModel.CancelEventArgs e){allowClose=closing=false;reveal.PrepareOpen(new Point(Width-28,0));base.OnOpening(e);}
+    protected override void OnOpened(EventArgs e){base.OnOpened(e);if(closing||allowClose)return;reveal.Begin(true,new Point(Width-28,0));}
     protected override void OnClosing(ToolStripDropDownClosingEventArgs e){
         base.OnClosing(e);
         if(e.Cancel||allowClose||!Visible||!GeneralStyle.AnimationsEnabled)return;
@@ -85,6 +94,8 @@ internal sealed class GeneralPopupMenu : ContextMenuStrip {
 internal class GeneralDialog : Form {
     readonly Label title=new Label{Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,AutoEllipsis=true};
     readonly GeneralReveal reveal;
+    readonly TableLayoutPanel header;
+    readonly GeneralButton close;
     bool allowClose,closing;
     Point origin;
     internal Panel Content {get;private set;}
@@ -98,30 +109,32 @@ internal class GeneralDialog : Form {
         var shell=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=Padding.Empty,Margin=Padding.Empty,BackColor=GeneralStyle.Surface};
         shell.Resize+=(s,e)=>GeneralStyle.ClipCardBody(shell);
         shell.RowStyles.Add(new RowStyle(SizeType.Absolute,52));shell.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-        var header=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,Margin=Padding.Empty,Padding=new Padding(20,4,8,4)};
+        header=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,Margin=Padding.Empty,Padding=new Padding(20,4,8,4)};
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         title.Font=GeneralStyle.Font(14,true);title.ForeColor=GeneralStyle.Foreground;header.Controls.Add(title,0,0);
-        var close=new GeneralButton{Text="",IconKind="close",Bare=true,Size=new Size(44,44),Dock=DockStyle.Fill,AccessibleName=GeneralStyle.T("Fechar","Close")};
+        close=new GeneralButton{Text="",IconKind="close",Bare=true,Size=new Size(44,44),Dock=DockStyle.Fill,AccessibleName=GeneralStyle.T("Fechar","Close")};
         close.Click+=(s,e)=>Complete(DialogResult.Cancel);header.Controls.Add(close,1,0);
         title.MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){ReleaseCapture();SendMessage(Handle,0x00A1,(IntPtr)2,IntPtr.Zero);}};
         shell.Controls.Add(header,0,0);shell.Controls.Add(Content,0,1);base.Controls.Add(shell);Text=text;
         reveal=new GeneralReveal(this);SetStyle(ControlStyles.ResizeRedraw|ControlStyles.OptimizedDoubleBuffer,true);
     }
     protected override void OnTextChanged(EventArgs e){base.OnTextChanged(e);if(title!=null)title.Text=Text;}
-    protected override void OnShown(EventArgs e){base.OnShown(e);origin=new Point(Width-36,0);reveal.Begin(true,origin);}
+    protected override void SetVisibleCore(bool value){
+        if(value&&!Visible&&reveal!=null){allowClose=closing=false;origin=new Point(Width-36,0);reveal.PrepareOpen(origin);}
+        base.SetVisibleCore(value);
+    }
+    protected override void OnShown(EventArgs e){base.OnShown(e);if(closing||allowClose)return;origin=new Point(Width-36,0);reveal.Begin(true,origin);}
     protected override void OnPaint(PaintEventArgs e){
         base.OnPaint(e);GeneralStyle.PaintCard(e.Graphics,ClientSize);
     }
     protected override void OnResize(EventArgs e){base.OnResize(e);if(reveal!=null&&!reveal.Running)reveal.SetRound();}
     internal void Complete(DialogResult result){DialogResult=result;if(!Modal)Close();}
+    internal void ShowCloseButton(bool visible){close.Visible=visible;header.ColumnStyles[1].Width=visible?44:0;header.Padding=new Padding(20,4,visible?8:20,4);}
+    internal bool CloseButtonShown {get{return close.Visible;}}
     internal void AnchorTo(Control anchor){AnchorBelow(anchor,new Rectangle(0,0,anchor.Width,anchor.Height),true);}
     internal void AnchorBelow(Control anchor,Rectangle bounds,bool alignRight){
         StartPosition=FormStartPosition.Manual;
-        var area=Screen.FromControl(anchor).WorkingArea;
-        var owner=anchor.FindForm();
-        if(owner!=null){var inside=Rectangle.Intersect(area,owner.RectangleToScreen(owner.ClientRectangle));if(inside.Width>=Width+16&&inside.Height>=Height+16)area=inside;}
-        var point=anchor.PointToScreen(new Point(alignRight?bounds.Right:bounds.Left,bounds.Bottom+8));
-        Location=new Point(Math.Max(area.Left+8,Math.Min(area.Right-Width-8,alignRight?point.X-Width:point.X)),Math.Max(area.Top+8,Math.Min(area.Bottom-Height-8,point.Y)));
+        Location=GeneralPopupPlacement.Location(anchor,bounds,Size,alignRight);
     }
     protected override bool ProcessCmdKey(ref Message message,Keys keyData){if(keyData==Keys.Escape){Complete(DialogResult.Cancel);return true;}return base.ProcessCmdKey(ref message,keyData);}
     protected override void OnFormClosing(FormClosingEventArgs e){
@@ -149,6 +162,29 @@ internal class GeneralDialog : Form {
             GeneralStyle.Apply(dialog,GeneralStyle.Dark);body.BorderStyle=BorderStyle.None;return dialog.ShowDialog(owner);
         }
     }
+}
+
+internal static class GeneralPopupPlacement {
+    internal const int OwnerGap=24,ScreenGap=16;
+    internal static Point Location(Control anchor,Rectangle bounds,Size popup,bool alignRight){
+        var owner=anchor.FindForm();var window=owner==null?Rectangle.Empty:owner.RectangleToScreen(owner.ClientRectangle);
+        return Resolve(anchor.RectangleToScreen(bounds),popup,window,Screen.FromControl(anchor).WorkingArea,alignRight);
+    }
+    internal static Point Resolve(Rectangle anchor,Size popup,Rectangle owner,Rectangle working,bool alignRight){
+        var screen=Inset(working,ScreenGap);var inside=Inset(Rectangle.Intersect(working,owner),OwnerGap);
+        int wantedX=alignRight?anchor.Right-popup.Width:anchor.Left,wantedY=anchor.Bottom+8;
+        if(inside.Width>=popup.Width&&inside.Height>=popup.Height){
+            if(wantedY+popup.Height>inside.Bottom&&anchor.Top-8-popup.Height>=inside.Top)wantedY=anchor.Top-8-popup.Height;
+            return Clamp(new Point(wantedX,wantedY),popup,inside);
+        }
+        if(!owner.IsEmpty&&owner.Right+OwnerGap+popup.Width<=screen.Right&&owner.Right+OwnerGap>=screen.Left)
+            return Clamp(new Point(owner.Right+OwnerGap,wantedY),popup,screen);
+        if(!owner.IsEmpty&&owner.Left-OwnerGap-popup.Width>=screen.Left&&owner.Left-OwnerGap<=screen.Right)
+            return Clamp(new Point(owner.Left-OwnerGap-popup.Width,wantedY),popup,screen);
+        return Clamp(new Point(wantedX,wantedY),popup,screen);
+    }
+    static Rectangle Inset(Rectangle bounds,int margin){return new Rectangle(bounds.X+margin,bounds.Y+margin,Math.Max(0,bounds.Width-margin*2),Math.Max(0,bounds.Height-margin*2));}
+    static Point Clamp(Point point,Size size,Rectangle bounds){return new Point(Math.Max(bounds.Left,Math.Min(point.X,bounds.Right-size.Width)),Math.Max(bounds.Top,Math.Min(point.Y,bounds.Bottom-size.Height)));}
 }
 
 internal sealed class GeneralPicker : UserControl {
@@ -188,10 +224,7 @@ internal sealed class GeneralPicker : UserControl {
     protected override void OnPaint(PaintEventArgs e){
         Control surface=Parent;while(surface!=null&&surface.BackColor.A<255)surface=surface.Parent;
         e.Graphics.Clear(surface==null?GeneralStyle.Background:surface.BackColor);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
-        using(var round=GeneralStyle.Round(new RectangleF(1,1,Width-3,Height-3),16)){
-            using(var brush=new SolidBrush(GeneralStyle.Surface))e.Graphics.FillPath(brush,round);
-            using(var pen=new Pen(Focused||input.Focused||dropdown!=null&&dropdown.Visible?GeneralStyle.Accent:GeneralStyle.Line))e.Graphics.DrawPath(pen,round);
-        }
+        GeneralStyle.PaintRoundedFace(e.Graphics,new RectangleF(0,0,Width,Height),16,Focused||input.Focused||dropdown!=null&&dropdown.Visible?GeneralStyle.Accent:GeneralStyle.Line,GeneralStyle.Surface);
         if(style==ComboBoxStyle.DropDownList)TextRenderer.DrawText(e.Graphics,Text,Font,new Rectangle(14,0,Width-62,Height),Enabled?GeneralStyle.Foreground:GeneralStyle.Muted,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
         LucideIcons.Draw(e.Graphics,dropdown!=null&&dropdown.Visible?"up":"down",new Rectangle(Width-34,(Height-20)/2,20,20),GeneralStyle.Accent);
     }
@@ -219,7 +252,8 @@ internal sealed class GeneralPicker : UserControl {
         list.MouseMove+=(s,e)=>{int at=list.IndexFromPoint(e.Location);if(at>=0&&at!=list.SelectedIndex)list.SelectedIndex=at;};
         dropdown.Closed+=(s,e)=>{Invalidate();if(!IsDisposed&&CanFocus)Focus();};
         dropdown.Opened+=(s,e)=>{scroll.RefreshScroll();list.Focus();Invalidate();};
-        dropdown.Show(this,new Point(0,Height+6));Invalidate();
+        var point=GeneralPopupPlacement.Location(this,ClientRectangle,dropdown.Size,false);
+        dropdown.Show(this,PointToClient(point));Invalidate();
     }
     protected override void Dispose(bool disposing){if(disposing&&dropdown!=null)dropdown.Dispose();base.Dispose(disposing);}
     sealed class ChoiceList : ListBox {
@@ -238,9 +272,10 @@ internal sealed class GeneralPicker : UserControl {
         readonly GeneralReveal reveal;
         bool allowClose,closing;
         internal ChoicePopup(){reveal=new GeneralReveal(this);}
+        protected override void OnOpening(System.ComponentModel.CancelEventArgs e){allowClose=closing=false;reveal.PrepareOpen(new Point(24,0));base.OnOpening(e);}
         protected override void OnPaintBackground(PaintEventArgs e){GeneralStyle.PaintCard(e.Graphics,ClientSize);}
         protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);}
-        protected override void OnOpened(EventArgs e){base.OnOpened(e);allowClose=closing=false;reveal.Begin(true,new Point(24,0));}
+        protected override void OnOpened(EventArgs e){base.OnOpened(e);if(closing||allowClose)return;reveal.Begin(true,new Point(24,0));}
         protected override void OnClosing(ToolStripDropDownClosingEventArgs e){
             base.OnClosing(e);if(e.Cancel||allowClose||!Visible||!GeneralStyle.AnimationsEnabled)return;e.Cancel=true;if(closing)return;closing=true;
             var reason=e.CloseReason;reveal.Begin(false,new Point(24,0),()=>{allowClose=true;Close(reason);});

@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 
 internal sealed class GeneralProject {
     public string Id, Name;
+    public string TemplateId;
     public bool Legacy;
 }
 
@@ -75,15 +76,20 @@ internal sealed class GeneralProjectStore {
         return path;
     }
 
-    internal GeneralProject Create(string name, GeneralModList list, string theme, string language, string destination = null) {
+    internal GeneralProject Create(string name, GeneralModList list, string theme, string language, string destination = null, string templateId = null) {
         lock (gate) {
             name = ProjectName(name);
             ValidatePreferences(theme, language);
             list = list ?? new GeneralModList();
             GeneralModLibrary.ValidateList(list, true);
             var index = Read();
+            if (templateId != null) {
+                ValidateTemplate(templateId, name, false);
+                var existing = index.Projects.FirstOrDefault(item => item.TemplateId == templateId);
+                if (existing != null) return existing;
+            }
             if (index.Projects.Count >= 200) throw new IOException("Use no máximo 200 projetos nesta biblioteca.");
-            var project = new GeneralProject { Id = Guid.NewGuid().ToString("N"), Name = name };
+            var project = new GeneralProject { Id = Guid.NewGuid().ToString("N"), Name = name, TemplateId = templateId };
             string data = DataPath(project);
             var state = new GeneralModState {
                 List = list, Theme = theme, Language = language, Destination = destination,
@@ -110,6 +116,7 @@ internal sealed class GeneralProjectStore {
         lock (gate) {
             var index = Read();
             var registered = Registered(index, project);
+            if (registered.TemplateId != null) throw new IOException("O projeto padrão faz parte do Mod Loader e não pode ser excluído.");
             index.Projects.Remove(registered);
             Write(index);
         }
@@ -143,15 +150,24 @@ internal sealed class GeneralProjectStore {
         ValidatePreferences(index.Theme, index.Language);
         index.DownloadFolder = DownloadPath(String.IsNullOrWhiteSpace(index.DownloadFolder) ? OnlineDownloadWatch.DefaultFolder() : index.DownloadFolder, false);
         var ids = new HashSet<string>(StringComparer.Ordinal);
+        var templates = new HashSet<string>(StringComparer.Ordinal);
         foreach (var project in index.Projects) {
             ValidateProject(project);
             if (!ids.Add(project.Id)) throw new IOException("O índice contém um projeto repetido.");
+            if (project.TemplateId != null && !templates.Add(project.TemplateId)) throw new IOException("O índice contém um projeto padrão repetido.");
         }
     }
 
     static void ValidateProject(GeneralProject project) {
         if (project == null || (project.Legacy ? project.Id != "legacy" : !Regex.IsMatch(project.Id ?? "", @"\A[a-f0-9]{32}\z"))) throw new IOException("Identificador de projeto inválido.");
         project.Name = ProjectName(project.Name);
+        ValidateTemplate(project.TemplateId, project.Name, project.Legacy);
+    }
+
+    static void ValidateTemplate(string templateId, string name, bool legacy) {
+        if (templateId == null) return;
+        if (templateId != "cyberpunk-2077" || name != "Cyberpunk 2077" || legacy)
+            throw new IOException("Identidade ou nome do projeto padrão inválido.");
     }
 
     static string ProjectName(string name) {

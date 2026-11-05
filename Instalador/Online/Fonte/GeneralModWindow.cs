@@ -23,12 +23,15 @@ internal sealed partial class GeneralModWindow : Form {
     GeneralPicker preset;
     DataGridView grid;
     Label detail,counts;
-    Button next,listButton,reloadButton,optionsButton,settingsButton;
+    Button next,listButton,reloadButton,optionsButton,expandList;
+    TableLayoutPanel mainLayout;
+    bool listExpanded;
     int hoveredRow=-1;
     GeneralProgress currentProgress,totalProgress;
     bool drawing,working,scanning;
     string startupIssue;
     readonly ToolTip tips=new ToolTip{UseAnimation=false,UseFading=false};
+    readonly GeneralMenuHost menus=new GeneralMenuHost();
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
 
     sealed class SectionRow {
@@ -69,7 +72,9 @@ internal sealed partial class GeneralModWindow : Form {
             if(p2p!=null&&p2p.Installing){e.Cancel=true;detail.Text=T("Aguarde a instalação do pacote recebido terminar antes de fechar.","Wait for the received pack installation to finish before closing.");return;}
             if(working){RequestSkip();normal.Clear();priority.Clear();e.Cancel=true;detail.Text=T("Aguarde a operação atual terminar antes de fechar.","Wait for the current operation to finish before closing.");}
             else if(scanning){RequestSkip();e.Cancel=true;}
+            else if(!ConfirmPresetNavigation())e.Cancel=true;
         };
+        Disposed+=(s,e)=>menus.Dispose();
         if(fixture==null)Shown+=async(s,e)=>{CheckUpdatesOnStartup();await Scan();};
     }
     void BuildInterface(){
@@ -80,20 +85,20 @@ internal sealed partial class GeneralModWindow : Form {
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(32,24,32,22),ColumnCount=1,RowCount=9,BackColor=BackColor};
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         for(int i=0;i<9;i++)layout.RowStyles.Add(i==5?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.AutoSize));
-        Controls.Add(layout);
-        var heading=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=4,Margin=Padding.Empty};
-        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
+        Controls.Add(layout);mainLayout=layout;
+        menus.Close();
+        var heading=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=3,Margin=Padding.Empty};
+        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         var titles=new FlowLayoutPanel{AutoSize=true,Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false,Margin=Padding.Empty};
         var brand=new FlowLayoutPanel{AutoSize=true,WrapContents=false,Margin=Padding.Empty};
         brand.Controls.Add(new ModLoaderLogo{Size=new Size(44,44),Margin=new Padding(0,0,12,0),Name="ProjectLogo"});
         brand.Controls.Add(new Label{Text="MOD LOADER",AutoSize=true,Font=GeneralStyle.Font(27,true),ForeColor=GeneralStyle.Accent,Margin=Padding.Empty});
         titles.Controls.Add(brand);
-        titles.Controls.Add(new Label{Text=T("Criado por Nask e Codex. Se achou ruim, faz você.","Made by Nask and Codex. Don't like it? Make your own."),AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(0,0,0,14)});
+        titles.Controls.Add(new Label{Text=T("Criado por Nask e Codex. Se achou ruim, faz você.","Made by Nask and Codex. If you don't like it, make your own."),AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(0,0,0,14)});
         heading.Controls.Add(titles,0,0);
-        listButton=Command(T("Projetos","Projects"),BackToProjects,true);listButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;listButton.Margin=new Padding(0,0,12,0);heading.Controls.Add(listButton,1,0);
-        settingsButton=IconButton("settings",T("Opções","Options"),ShowOptions,true);((GeneralButton)settingsButton).Bare=true;settingsButton.Margin=Padding.Empty;heading.Controls.Add(settingsButton,2,0);
+        listButton=Command(T("Projetos","Projects"),ToggleProjects,true);listButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;listButton.Margin=new Padding(0,0,12,0);heading.Controls.Add(listButton,1,0);
         optionsButton=IconButton("menu",T("Menu","Menu"),ToggleListMenu,true);((GeneralButton)optionsButton).Bare=true;optionsButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;optionsButton.Margin=Padding.Empty;
-        heading.Controls.Add(optionsButton,3,0);layout.Controls.Add(heading,0,0);
+        heading.Controls.Add(optionsButton,2,0);layout.Controls.Add(heading,0,0);
         var path=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=new Padding(0,0,0,14)};
         path.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));path.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         var pathSurface=new GeneralSurface{Dock=DockStyle.Fill,Height=44,MinimumSize=new Size(100,44),MaximumSize=new Size(0,44),Padding=new Padding(16,11,16,0),Margin=new Padding(0,0,12,0)};
@@ -104,6 +109,9 @@ internal sealed partial class GeneralModWindow : Form {
         var filters=Flow();filters.Margin=Padding.Empty;filters.WrapContents=false;filterRow.Controls.Add(filters,0,0);layout.Controls.Add(filterRow,0,2);
         filters.Controls.Add(FieldLabel(T("Preset","Preset")));
         preset=Picker(250);filters.Controls.Add(preset);
+        presetSettings=IconButton("save",T("Salvar preset","Save preset"),SaveCurrentPreset,true);((GeneralButton)presetSettings).Bare=true;presetSettings.Name="SavePreset";filters.Controls.Add(presetSettings);
+        discardPreset=IconButton("close",T("Descartar alterações do preset","Discard preset changes"),DiscardPresetDraft,true);((GeneralButton)discardPreset).Bare=true;discardPreset.Name="DiscardPreset";filters.Controls.Add(discardPreset);
+        deletePreset=IconButton("trash",T("Excluir preset","Delete preset"),DeletePreset,true);((GeneralButton)deletePreset).Bare=true;((GeneralButton)deletePreset).Destructive=true;deletePreset.Name="DeletePreset";filters.Controls.Add(deletePreset);
         reloadButton=IconButton("refresh",T("Atualizar lista","Refresh list"),async()=>await Scan(),true);((GeneralButton)reloadButton).Bare=true;filters.Controls.Add(reloadButton);
         var summary=Flow();summary.Margin=new Padding(0,0,0,12);layout.Controls.Add(summary,0,3);
         counts=new Label{AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=Padding.Empty};summary.Controls.Add(counts);
@@ -111,9 +119,10 @@ internal sealed partial class GeneralModWindow : Form {
         var tableHeading=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,Height=52,Margin=Padding.Empty,Padding=new Padding(14,4,0,4),BackColor=GeneralStyle.Surface};
         tableHeading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));tableHeading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));tableHeading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         tableName=new TextBox{Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,Font=GeneralStyle.Font(16,true),MaxLength=120,Margin=new Padding(0,8,12,0),BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground};
-        tableName.Leave+=(s,e)=>Guard(SaveTableTitle);tableName.KeyDown+=(s,e)=>{if(e.KeyCode==Keys.Enter){e.SuppressKeyPress=true;Guard(SaveTableTitle);}};
-        tableHeading.Controls.Add(tableName,0,0);presetSettings=IconButton("settings",T("Configurar preset","Preset settings"),ShowPresetSettings,true);((GeneralButton)presetSettings).Bare=true;presetSettings.Margin=Padding.Empty;tableHeading.Controls.Add(presetSettings,1,0);
-        tableHeading.Controls.Add(reloadButton,2,0);
+        tableName.TextChanged+=(s,e)=>DraftTitleChanged();tableName.KeyDown+=(s,e)=>{if(e.KeyCode==Keys.Enter){e.SuppressKeyPress=true;Guard(SaveCurrentPreset);}};
+        tableHeading.Controls.Add(tableName,0,0);
+        tableHeading.Controls.Add(reloadButton,1,0);
+        expandList=IconButton("maximize",T("Expandir lista","Expand list"),()=>SetListExpanded(!listExpanded));((GeneralButton)expandList).Bare=true;expandList.Name="ExpandList";expandList.Margin=Padding.Empty;tableHeading.Controls.Add(expandList,2,0);
         var tableTitle=new Panel{Dock=DockStyle.Fill,Height=64,Margin=Padding.Empty,Padding=new Padding(0,0,0,12),BackColor=GeneralStyle.Surface,Name="PresetHeading"};
         tableTitle.Controls.Add(tableHeading);
         tableTitle.Paint+=(s,e)=>{using(var pen=new Pen(GeneralStyle.Line))e.Graphics.DrawLine(pen,16,tableTitle.Height-6,tableTitle.Width-17,tableTitle.Height-6);};
@@ -129,7 +138,6 @@ internal sealed partial class GeneralModWindow : Form {
         grid.Columns.Add(new DataGridViewTextBoxColumn{Name="Variant",HeaderText=T("Variante","Variant"),Width=160,ReadOnly=true,SortMode=DataGridViewColumnSortMode.NotSortable});
         grid.Columns.Add(new DataGridViewTextBoxColumn{Name="Status",HeaderText=T("Situação","Status"),Width=205,ReadOnly=true,SortMode=DataGridViewColumnSortMode.NotSortable});
         grid.Columns.Add(new DataGridViewTextBoxColumn{Name="Progress",Visible=false,ReadOnly=true});
-        grid.Columns.Add(new DataGridViewTextBoxColumn{Name="ResetPreset",HeaderText="",Width=40,ReadOnly=true,SortMode=DataGridViewColumnSortMode.NotSortable});
         grid.RowTemplate.Height=44;
         grid.CurrentCellDirtyStateChanged+=(s,e)=>{if(grid.IsCurrentCellDirty)grid.CommitEdit(DataGridViewDataErrorContexts.Commit);};
         grid.CellValueChanged+=(s,e)=>{
@@ -137,7 +145,7 @@ internal sealed partial class GeneralModWindow : Form {
             var row=grid.Rows[e.RowIndex];string id=row.Tag as string;if(id==null)return;
             if(Equals(row.Cells[0].Value,true))marked.Add(id);else marked.Remove(id);UpdateCounts();
         };
-        grid.ColumnHeaderMouseClick+=(s,e)=>{if(e.ColumnIndex==grid.Columns["ResetPreset"].Index){Guard(ClearPreset);return;}if(e.ColumnIndex>0){ShowColumnFilter(e.ColumnIndex);return;}var rows=ModRows().ToList();bool check=rows.Any(r=>!marked.Contains((string)r.Tag));foreach(var r in rows)r.Cells[0].Value=check;};
+        grid.ColumnHeaderMouseClick+=(s,e)=>{if(e.ColumnIndex>0){ShowColumnFilter(e.ColumnIndex);return;}var rows=ModRows().ToList();bool check=rows.Any(r=>!marked.Contains((string)r.Tag));foreach(var r in rows)r.Cells[0].Value=check;};
         grid.CellClick+=(s,e)=>{if(e.RowIndex>=0)HandleSection(grid.Rows[e.RowIndex].Tag as SectionRow);};
         grid.CellDoubleClick+=(s,e)=>{if(e.RowIndex>=0&&e.ColumnIndex>0){var id=grid.Rows[e.RowIndex].Tag as string;if(id!=null)Edit(state.List.Mods.Single(m=>m.Id==id));}};
         grid.KeyDown+=(s,e)=>{if(e.KeyCode!=Keys.Enter&&e.KeyCode!=Keys.F2)return;e.Handled=true;var item=FocusedEntry();if(item!=null)Edit(item);else if(grid.CurrentRow!=null)HandleSection(grid.CurrentRow.Tag as SectionRow);};
@@ -164,17 +172,27 @@ internal sealed partial class GeneralModWindow : Form {
         currentProgress=new GeneralProgress{Dock=DockStyle.Fill,Caption=T("Item atual","Current item"),Margin=new Padding(0,0,0,5)};
         totalProgress=new GeneralProgress{Dock=DockStyle.Fill,Caption=T("Progresso geral","Overall progress"),Margin=Padding.Empty};
         bars.Controls.Add(currentProgress,1,0);bars.Controls.Add(totalProgress,1,1);layout.Controls.Add(bars,0,7);
-        var bottom=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=Padding.Empty};bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));bottom.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        var leftActions=Flow();leftActions.Margin=Padding.Empty;leftActions.Anchor=AnchorStyles.Left;
-        var remove=Command(T("Desinstalar selecionados","Uninstall selected"),async()=>await Uninstall(),true);((GeneralButton)remove).Destructive=true;leftActions.Controls.Add(remove);
-        var share=Command(T("Compartilhar P2P","Share over P2P"),ShowP2P,true);share.Name="ShareP2P";leftActions.Controls.Add(share);bottom.Controls.Add(leftActions,0,0);
-        var install=Command(T("Baixar/Instalar","Download/Install"),StartSelected);((GeneralButton)install).Primary=true;install.MinimumSize=new Size(226,52);install.Font=GeneralStyle.Font(13,true);bottom.Controls.Add(install,1,0);
+        var bottom=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=false,Height=56,MinimumSize=new Size(0,56),ColumnCount=2,RowCount=1,Margin=Padding.Empty};bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));bottom.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));bottom.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        var remove=Command(T("Desinstalar selecionados","Uninstall selected"),async()=>await Uninstall(),true);((GeneralButton)remove).Destructive=true;remove.Name="UninstallSelected";remove.Margin=Padding.Empty;remove.Anchor=AnchorStyles.Left;bottom.Controls.Add(remove,0,0);
+        var install=Command(T("Baixar/Instalar","Download/Install"),StartSelected);((GeneralButton)install).Primary=true;install.Name="DownloadInstall";install.MinimumSize=new Size(226,52);install.Font=GeneralStyle.Font(13,true);install.Margin=Padding.Empty;install.Anchor=AnchorStyles.Right;bottom.Controls.Add(install,1,0);
         layout.Controls.Add(bottom,0,8);
         foreach(Control control in new Control[]{destination,preset}){control.BackColor=GeneralStyle.Surface;control.ForeColor=GeneralStyle.Foreground;}
         EnableDrops(this);
         RebuildPresets();
-        preset.SelectedIndexChanged+=(s,e)=>{if(drawing)return;state.SelectedPreset=preset.SelectedIndex>0?state.List.Presets[preset.SelectedIndex-1].Id:null;Guard(Persist);UpdateTableTitle();DrawRows();};
-        idle.Add(preset);Busy(working||scanning);ResumeLayout(true);GeneralNativeTheme.ApplyTree(this);
+        preset.SelectedIndexChanged+=(s,e)=>{if(drawing)return;if(!ConfirmPresetNavigation()){drawing=true;preset.SelectedIndex=state.List.Presets.FindIndex(p=>p.Id==state.SelectedPreset)+1;drawing=false;return;}state.SelectedPreset=preset.SelectedIndex>0?state.List.Presets[preset.SelectedIndex-1].Id:null;CapturePresetDraft();Guard(Persist);UpdateTableTitle();DrawRows();};
+        idle.Add(preset);Busy(working||scanning);SetListExpanded(listExpanded);ResumeLayout(true);GeneralNativeTheme.ApplyTree(this);
+    }
+    void SetListExpanded(bool expanded){
+        menus.Close();listExpanded=expanded;mainLayout.SuspendLayout();
+        foreach(int row in new[]{0,1,2,3,6,7,8}){
+            foreach(Control control in mainLayout.Controls)if(mainLayout.GetRow(control)==row)control.Visible=!expanded;
+            mainLayout.RowStyles[row].SizeType=expanded?SizeType.Absolute:SizeType.AutoSize;
+            mainLayout.RowStyles[row].Height=0;
+        }
+        mainLayout.Padding=expanded?new Padding(16):new Padding(32,24,32,22);
+        ((GeneralButton)expandList).IconKind=expanded?"minimize":"maximize";
+        string label=expanded?T("Restaurar visualização","Restore view"):T("Expandir lista","Expand list");expandList.AccessibleName=label;tips.SetToolTip(expandList,label);expandList.Invalidate();
+        mainLayout.ResumeLayout(true);if(Visible)grid.Focus();
     }
     static Label FieldLabel(string text){return new Label{Text=text,AutoSize=true,Font=GeneralStyle.Font(11),ForeColor=GeneralStyle.Muted,Margin=new Padding(0,11,10,0)};}
     static FlowLayoutPanel Flow(){return new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,WrapContents=true,BackColor=Color.Transparent};}
@@ -244,7 +262,7 @@ internal sealed partial class GeneralModWindow : Form {
         grid.InvalidateCell(0,-1);
         int installed=rows.Count(r=>{var m=state.List.Mods.Single(x=>x.Id==(string)r.Tag);string status;return statuses.TryGetValue(Key(m,Selected(m)),out status)&&GeneralStatusPresentation.Kind(status)=="installed";});
         int failed=rows.Count(r=>{var m=state.List.Mods.Single(x=>x.Id==(string)r.Tag);string status;return statuses.TryGetValue(Key(m,Selected(m)),out status)&&GeneralStatusPresentation.Kind(status)=="error";});
-        counts.Text=T("Mods na lista: ","Mods in list: ")+rows.Count+"   ·   "+T("Instalados: ","Installed: ")+installed+"   ·   "+T("Falhas: ","Failed: ")+failed;
+        counts.Text=T("Mods na lista: ","Mods in list: ")+rows.Count+"   ·   "+T("Instalados: ","Installed: ")+installed+"   ·   "+T("Falhas: ","Failed: ")+failed;UpdatePresetCommands();
     }
     void PaintSection(object sender,DataGridViewRowPrePaintEventArgs e){
         var section=grid.Rows[e.RowIndex].Tag as SectionRow;if(section==null)return;
@@ -262,14 +280,12 @@ internal sealed partial class GeneralModWindow : Form {
     void PaintName(object sender,DataGridViewCellPaintingEventArgs e){
         if(e.RowIndex==-1&&e.ColumnIndex>0){
             e.PaintBackground(e.ClipBounds,true);
-            if(e.ColumnIndex==grid.Columns["ResetPreset"].Index){LucideIcons.Draw(e.Graphics,"trash",new Rectangle(e.CellBounds.X+10,e.CellBounds.Y+13,18,18),GeneralStyle.Muted);e.Handled=true;return;}
             if(e.ColumnIndex<=3){
                 bool active=e.ColumnIndex==1?categoryFilters!=null||!String.IsNullOrEmpty(nameFilter):e.ColumnIndex==2?variantFilters!=null:statusFilters!=null;
                 TextRenderer.DrawText(e.Graphics,grid.Columns[e.ColumnIndex].HeaderText,e.CellStyle.Font,new Rectangle(e.CellBounds.X+10,e.CellBounds.Y,e.CellBounds.Width-36,e.CellBounds.Height),GeneralStyle.Muted,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine);
                 LucideIcons.Draw(e.Graphics,"down",new Rectangle(e.CellBounds.Right-25,e.CellBounds.Y+15,14,14),active?GeneralStyle.Accent:GeneralStyle.Muted);e.Handled=true;return;
             }
         }
-        if(e.RowIndex>=0&&e.ColumnIndex==grid.Columns["ResetPreset"].Index){e.PaintBackground(e.ClipBounds,true);e.Handled=true;return;}
         if(e.RowIndex>=0&&e.ColumnIndex==grid.Columns["Status"].Index&&grid.Rows[e.RowIndex].Tag is string){PaintStatus(e);return;}
         if(e.RowIndex==-1&&e.ColumnIndex==0){
             e.PaintBackground(e.ClipBounds,true);var rows=ModRows().ToList();int selected=rows.Count(r=>marked.Contains((string)r.Tag));
@@ -393,7 +409,7 @@ internal sealed partial class GeneralModWindow : Form {
         if(GeneralDialog.Message(this,T("Tirar da lista sem desinstalar?","Remove from the list without uninstalling?")+"\n"+item.Name,T("Tirar da lista","Remove from list"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
         state.List.Mods.Remove(item);state.ChosenVariants.Remove(item.Id);foreach(var p in state.List.Presets)p.ModIds.Remove(item.Id);marked.Remove(item.Id);Persist();DrawRows();
     }
-    void Busy(bool value){foreach(var control in idle)control.Enabled=!value;if(next!=null){next.Visible=working||scanning;next.Enabled=working||scanning;}}
+    void Busy(bool value){foreach(var control in idle)control.Enabled=!value;if(next!=null){next.Visible=working||scanning;next.Enabled=working||scanning;}UpdatePresetCommands();}
     internal void Preview(string path){
         ShowInTaskbar=false;StartPosition=FormStartPosition.Manual;Location=new Point(-30000,-30000);Show();Application.DoEvents();PerformLayout();
         using(var bmp=new Bitmap(Width,Height)){DrawToBitmap(bmp,new Rectangle(0,0,Width,Height));bmp.Save(path,System.Drawing.Imaging.ImageFormat.Png);}Close();

@@ -48,8 +48,12 @@ internal static class GeneralStyle {
     }
     internal static void PaintCard(Graphics graphics,Size size){
         graphics.SmoothingMode=SmoothingMode.AntiAlias;graphics.Clear(Surface);
-        using(var outer=Round(new RectangleF(0,0,size.Width,size.Height),18))using(var border=new SolidBrush(Line))graphics.FillPath(border,outer);
-        using(var inner=Round(new RectangleF(1,1,Math.Max(1,size.Width-2),Math.Max(1,size.Height-2)),17))using(var fill=new SolidBrush(Surface))graphics.FillPath(fill,inner);
+        PaintRoundedFace(graphics,new RectangleF(0,0,size.Width,size.Height),18,Line,Surface);
+    }
+    internal static void PaintRoundedFace(Graphics graphics,RectangleF box,float radius,Color border,Color fill){
+        using(var outer=Round(box,radius))using(var brush=new SolidBrush(border))graphics.FillPath(brush,outer);
+        var inner=new RectangleF(box.X+2,box.Y+2,Math.Max(1,box.Width-4),Math.Max(1,box.Height-4));
+        using(var path=Round(inner,Math.Max(0,radius-2)))using(var brush=new SolidBrush(fill))graphics.FillPath(brush,path);
     }
     internal static void ClipCardBody(Control control){
         using(var shape=Round(new RectangleF(0,0,Math.Max(1,control.Width),Math.Max(1,control.Height)),16)){
@@ -124,10 +128,7 @@ internal sealed class GeneralSurface : Panel {
     internal GeneralSurface(){SetStyle(ControlStyles.UserPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.SupportsTransparentBackColor,true);BackColor=Color.Transparent;}
     protected override void OnPaint(PaintEventArgs e){
         e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
-        using(var path=GeneralStyle.Round(new RectangleF(1,1,Width-3,Height-3),18)){
-            using(var brush=new SolidBrush(GeneralStyle.Surface))e.Graphics.FillPath(brush,path);
-            using(var pen=new Pen(GeneralStyle.Line))e.Graphics.DrawPath(pen,path);
-        }
+        GeneralStyle.PaintRoundedFace(e.Graphics,new RectangleF(0,0,Width,Height),18,GeneralStyle.Line,GeneralStyle.Surface);
         base.OnPaint(e);
     }
 }
@@ -145,19 +146,15 @@ internal sealed class GeneralButton : Button {
         Color fill=Primary?GeneralStyle.Primary:GeneralStyle.Surface;
         Color ink=Primary?Color.White:Destructive?GeneralStyle.Danger:GeneralStyle.Foreground;
         if(!Enabled){fill=GeneralStyle.Selection;ink=GeneralStyle.Muted;}
-        using(var path=GeneralStyle.Round(new RectangleF(1,1,Width-3,Height-3),Math.Min(22,Height/2))){
-            if(!Bare){
-            using(var brush=new SolidBrush(fill))g.FillPath(brush,path);
-            using(var pen=new Pen(Focused?GeneralStyle.Accent:Primary?fill:GeneralStyle.Line,Focused?2:1))g.DrawPath(pen,path);
-            }else if(Focused&&ShowFocusCues){using(var pen=new Pen(GeneralStyle.Accent,2))g.DrawLine(pen,Width/2-10,Height-6,Width/2+10,Height-6);}
-        }
+        if(!Bare)GeneralStyle.PaintRoundedFace(g,new RectangleF(0,0,Width,Height),Math.Min(22,Height/2),Focused?GeneralStyle.Accent:Primary?fill:GeneralStyle.Line,fill);
+        else if(Focused&&ShowFocusCues){using(var pen=new Pen(GeneralStyle.Accent,2))g.DrawLine(pen,Width/2-10,Height-6,Width/2+10,Height-6);}
         var textRect=new Rectangle(12,0,Width-24,Height);
         if(!String.IsNullOrEmpty(IconKind)){
             int x=String.IsNullOrEmpty(Text)?Width/2-9:14,y=Height/2-9;
             LucideIcons.Draw(g,IconKind,new Rectangle(x,y,20,20),ink);
             if(!String.IsNullOrEmpty(Text))textRect=new Rectangle(42,0,Width-52,Height);
         }
-        TextRenderer.DrawText(g,Text,Font,textRect,ink,TextFormatFlags.VerticalCenter|TextFormatFlags.HorizontalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine);
+        TextRenderer.DrawText(g,Text,Font,textRect,ink,TextFormatFlags.VerticalCenter|(TextAlign==ContentAlignment.MiddleLeft?TextFormatFlags.Left:TextFormatFlags.HorizontalCenter)|TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine);
     }
 }
 
