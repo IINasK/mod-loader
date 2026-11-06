@@ -19,7 +19,8 @@ internal sealed partial class GeneralModWindow {
     }
     readonly List<Work> normal=new List<Work>(),priority=new List<Work>();
     Work current, priorityCurrent;
-    bool waiting,NeedUnknownFile,editingAttachment;
+    bool waiting,NeedUnknownFile,editingAttachment,suppressQueueErrors;
+    Func<string,bool> testFailurePrompt;
     readonly HashSet<Work> skipRequests=new HashSet<Work>();
     Work scanCurrent;
     int operationTotal,operationFinished;
@@ -161,7 +162,7 @@ internal sealed partial class GeneralModWindow {
     async void Enqueue(IEnumerable<Work> jobs,bool urgent){
         if(scanning)return;
         string root;try{root=Root();}catch(Exception ex){detail.Text=ex.Message;return;}
-        if(!working){operationTotal=0;operationFinished=0;skipRequests.Clear();}
+        if(!working){operationTotal=0;operationFinished=0;skipRequests.Clear();suppressQueueErrors=false;}
         foreach(var work in jobs){
             if((current!=null&&current.Entry.Id==work.Entry.Id)||(priorityCurrent!=null&&priorityCurrent.Entry.Id==work.Entry.Id)||priority.Any(w=>w.Entry.Id==work.Entry.Id))continue;
             var existing=normal.FirstOrDefault(w=>w.Entry.Id==work.Entry.Id);
@@ -198,7 +199,11 @@ internal sealed partial class GeneralModWindow {
         catch(Exception ex){
             string message=work.Entry.Name+": "+ex.Message;
             RowStatus(work,"Falhou",null,message);
-            if(!interrupt&&!testMode)GeneralDialog.Message(this,message,T("Falha na instalação","Installation failed"),MessageBoxButtons.OK,MessageBoxIcon.Warning);
+            OnlineDiagnostics.Record("general.install.failed",work.Entry.Id,"Falha no item; a fila continua.",new{Variant=work.Variant.Id,ErrorType=ex.GetType().Name,Message=ex.Message});
+            if(!interrupt&&!suppressQueueErrors){
+                if(testMode){if(testFailurePrompt!=null)suppressQueueErrors=testFailurePrompt(message);}
+                else GeneralDialog.Message(this,message,T("Falha na instalação","Installation failed"),MessageBoxButtons.OK,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button1,value=>suppressQueueErrors=value,T("Ocultar os próximos avisos desta instalação","Hide further warnings for this installation"));
+            }
         }
         finally{RefreshStorageSize();work.Ended=true;operationFinished++;UpdateFlow(null,"");skipRequests.Remove(work);Stage(work,"work.end");}
     }

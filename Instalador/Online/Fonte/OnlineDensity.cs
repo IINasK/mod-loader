@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -38,7 +38,7 @@ public static class NightCityDensity {
         result.Files=p.Files;result.Assets=p.Assets;
         return result;
     }
-    static FixedMod Legacy(FixedMod mod) {
+    internal static FixedMod Legacy(FixedMod mod) {
         var standard=Resolve(mod,"medium");
         if(!Layers.All(p=>standard.Files.Any(f=>f.Path==p)))return null;
         var legacy=Safe.Json.Deserialize<FixedMod>(Safe.Json.Serialize(standard));

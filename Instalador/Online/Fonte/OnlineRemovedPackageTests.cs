@@ -62,3 +62,27 @@ internal static class OnlineRemovedPackageTests {
         Safe.WriteJson(Path.Combine(root,"resultado-pacote-retirado.json"),new{Passed=checks.Count,Tests=checks,RealGameTouched=false,PayloadExecuted=false});
     }
 }
+
+internal static class HistoricalReceiptTests {
+    internal static int Run(string parent){
+        string root=OnlineTests.NestedRoot(parent,"history-");Directory.CreateDirectory(root);
+        var checks=new List<string>();Action<bool,string> check=(ok,text)=>{if(!ok)throw new IOException(text);checks.Add(text);};
+        var catalog=FixedData.Load();var engine=new FixedInstaller(catalog,root);
+        var reader=typeof(FixedInstaller).GetMethod("ReadReceiptCore",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic);
+        Action<OnlineReceipt> read=saved=>{
+            string path=Safe.In(root,".CoopModsOnline/"+saved.Id+".json");
+            Safe.WriteJson(path,new ReceiptEnvelope{Protected=Convert.ToBase64String(System.Security.Cryptography.ProtectedData.Protect(System.Text.Encoding.UTF8.GetBytes(Safe.Json.Serialize(saved)),null,System.Security.Cryptography.DataProtectionScope.CurrentUser))});
+            try{reader.Invoke(engine,new object[]{path,false});}catch(System.Reflection.TargetInvocationException ex){throw ex.InnerException;}
+        };
+        string retired="mod-31642";var recipe=HistoricalReceipts.Expand(catalog,new[]{retired}).Single(m=>m.Id==retired);var file=recipe.Files.First(f=>f.Patch==null);
+        var receipt=new OnlineReceipt{Id=Guid.NewGuid().ToString("N"),CatalogId=catalog.Id,Operation="install",Status="instalado",Mods=new List<string>{retired},Files=new List<OwnedChange>{new OwnedChange{Path=file.Path,After=file.Sha256,Applied=true}}};
+        read(receipt);check(true,"Recibo histórico reconhecido sem reintroduzir o drone no catálogo ativo.");
+        check(!catalog.Packages.Any(m=>m.Id==retired),"Validação histórica não disponibiliza mods retirados para instalação.");
+        receipt.Files[0].After=new string('0',64);try{read(receipt);throw new Exception("Hash adulterado aceito.");}catch(IOException){checks.Add("Hash desconhecido permanece bloqueado, mesmo em recibo DPAPI válido.");}
+        receipt.Files[0].After=file.Sha256;receipt.Files[0].Path="r6/scripts/unknown.reds";try{read(receipt);throw new Exception("Caminho adulterado aceito.");}catch(IOException){checks.Add("Caminho fora da receita histórica permanece bloqueado.");}
+        receipt.Files[0].Path=file.Path;receipt.Mods[0]="unknown-mod";try{read(receipt);throw new Exception("Mod desconhecido aceito.");}catch(IOException){checks.Add("Mod ausente do histórico não é ignorado.");}
+        receipt.Mods[0]="NightCoop";receipt.Operation="deactivate";try{read(receipt);throw new Exception("Base desativável.");}catch(IOException){checks.Add("Base imutável continua protegida.");}
+        check(HistoricalReceipts.Expand(new FixedCatalog{Id="other-game",Packages=new List<FixedMod>()},new string[0]).Count==0,"Histórico não injeta receitas em outros projetos.");
+        Safe.WriteJson(Path.Combine(root,"resultado-historico.json"),new{Passed=true,Checks=checks,RealGameTouched=false});return checks.Count;
+    }
+}

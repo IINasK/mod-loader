@@ -17,7 +17,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     readonly GeneralProgress progress=new GeneralProgress{Dock=DockStyle.Fill,Height=44};
     readonly Timer timer=new Timer{Interval=1000};
     readonly Panel targetRow;
-    readonly Button connect,pause,choose,generate;
+    readonly Button connect,pause,choose,generate,copy;
     readonly ToolTip tips=new ToolTip{UseAnimation=false,UseFading=false};
     P2PSession selected;
     bool busy,polling,remotePaused,returning;
@@ -31,13 +31,13 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         ClientSize=new Size(690,500);Name="p2p-dialog";
         var body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=8,Padding=new Padding(24,8,24,20),Margin=Padding.Empty};
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-        foreach(int height in new[]{24,56,24,56,76,56,50})body.RowStyles.Add(new RowStyle(SizeType.Absolute,height));body.RowStyles.Add(new RowStyle(SizeType.Percent,100));Content.Controls.Add(body);
+        foreach(int height in new[]{24,64,24,64,76,56,50})body.RowStyles.Add(new RowStyle(SizeType.Absolute,height));body.RowStyles.Add(new RowStyle(SizeType.Percent,100));Content.Controls.Add(body);
         body.Controls.Add(Heading(T("Link para enviar ao amigo","Link to send to your friend")),0,0);
-        var send=Field(output);send.Padding=new Padding(14,12,66,8);
-        var copy=GeneralStyle.Button("",()=>{if(output.Text.Length>0)try{Clipboard.SetText(output.Text);}catch(Exception ex){status.Text=ex.Message;}});
+        var send=Field(output);send.Padding=new Padding(14,16,72,8);
+        copy=GeneralStyle.Button("",()=>{if(output.Text.Length>0)try{Clipboard.SetText(output.Text);}catch(Exception ex){status.Text=ex.Message;}});
         ((GeneralButton)copy).IconKind="copy";((GeneralButton)copy).Bare=true;copy.AutoSize=false;copy.MinimumSize=new Size(44,44);copy.Size=copy.MinimumSize;copy.Margin=Padding.Empty;copy.Name="p2p-copy";copy.AccessibleName=T("Copiar link","Copy link");tips.SetToolTip(copy,copy.AccessibleName);
-        send.Controls.Add(copy);send.SizeChanged+=(s,e)=>copy.Location=new Point(send.ClientSize.Width-62,2);body.Controls.Add(send,0,1);
-        body.Controls.Add(Heading(T("Link recebido do amigo","Link received from your friend")),0,2);var receive=Field(input);receive.Padding=new Padding(14,12,14,8);body.Controls.Add(receive,0,3);
+        send.Controls.Add(copy);send.SizeChanged+=(s,e)=>copy.Location=new Point(send.ClientSize.Width-62,6);body.Controls.Add(send,0,1);
+        body.Controls.Add(Heading(T("Link recebido do amigo","Link received from your friend")),0,2);var receive=Field(input);receive.Padding=new Padding(14,16,14,8);body.Controls.Add(receive,0,3);
         targetRow=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};var target=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=3,Margin=Padding.Empty};target.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));target.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));target.RowStyles.Add(new RowStyle(SizeType.Absolute,24));target.RowStyles.Add(new RowStyle(SizeType.Absolute,44));target.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         target.Controls.Add(Heading(T("Instalar na pasta local","Install into local folder")),0,0);target.SetColumnSpan(target.GetControlFromPosition(0,0),2);var destinationField=Field(destination);destinationField.Margin=Padding.Empty;target.Controls.Add(destinationField,0,1);
         choose=GeneralStyle.Button(T("Escolher pasta","Choose folder"),ChooseFolder);choose.Margin=new Padding(8,0,0,0);choose.Name="p2p-folder";target.Controls.Add(choose,1,1);targetRow.Controls.Add(target);body.Controls.Add(targetRow,0,4);
@@ -46,18 +46,22 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         pause=GeneralStyle.Button(T("Pausar","Pause"),()=>Run(()=>{var session=selected;return Task.Run(()=>service.Pause(session));}));pause.Name="p2p-pause";pause.Margin=Padding.Empty;actions.Controls.Add(pause);
         generate=GeneralStyle.Button(T("Gerar modpack","Generate modpack"),()=>Run(GenerateModpack));generate.Name="modpack-generate";generate.Margin=new Padding(0,0,8,0);actions.Controls.Add(generate);body.Controls.Add(actions,0,5);body.Controls.Add(progress,0,6);body.Controls.Add(status,0,7);
         output.Name="p2p-output";input.Name="p2p-input";destination.Name="p2p-destination";status.Name="p2p-status";destination.Text=state.Destination??"";
-        input.TextChanged+=(s,e)=>UpdateActions();timer.Tick+=async(s,e)=>await Poll();
+        output.TextChanged+=(s,e)=>UpdateActions();input.TextChanged+=(s,e)=>UpdateActions();timer.Tick+=async(s,e)=>await Poll();
         selected=service.Sessions.LastOrDefault(s=>!s.Completed)??service.Sessions.LastOrDefault(s=>!s.Sender&&s.Completed&&!s.ListImported);
         FormClosing+=(s,e)=>{if(busy){e.Cancel=true;status.Text=T("Aguarde a preparação terminar.","Wait for preparation to finish.");}};FormClosed+=(s,e)=>timer.Stop();Disposed+=(s,e)=>{timer.Dispose();tips.Dispose();};
         GeneralStyle.Apply(this,GeneralStyle.Dark);status.Text=T("O link de envio é preparado automaticamente. Para receber, cole o convite do amigo e clique em Conectar.","The send link is prepared automatically. To receive, paste your friend's invitation and click Connect.");UpdateActions();
-        if(autoStart)Shown+=(s,e)=>Run(PrepareLink);
+        output.HandleCreated+=(s,e)=>SendMessage(output.Handle,0x1501,(IntPtr)1,T("Preparando convite automaticamente…","Preparing invitation automatically…"));
+        if(autoStart)Shown+=(s,e)=>Run(PrepareLink,false);
     }
+    [System.Runtime.InteropServices.DllImport("user32.dll",CharSet=System.Runtime.InteropServices.CharSet.Unicode)]
+    static extern IntPtr SendMessage(IntPtr handle,int message,IntPtr wParam,string text);
     static Label Heading(string text){return new Label{Text=text,Dock=DockStyle.Fill,Font=GeneralStyle.Font(11),Margin=Padding.Empty};}
     static GeneralSurface Field(Control control){var field=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(14,9,14,9),Margin=new Padding(0,0,0,8)};field.Controls.Add(control);return field;}
     void Report(string text){if(!IsDisposed&&IsHandleCreated)BeginInvoke((Action)(()=>{if(!IsDisposed)status.Text=text;}));}
-    async void Run(Func<Task> action){if(busy)return;busy=true;UpdateActions();try{while(polling)await Task.Delay(40);await action();}catch(InstalledSnapshotReviewException ex){status.Text=T("Exportação interrompida: há mods incompletos ou alterados.","Export stopped: some mods are incomplete or changed.");GeneralDialog.Message(this,ex.Message,T("Conferência dos mods","Mod verification"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}catch(Exception ex){status.Text=T("Falha: ","Failed: ")+ex.Message;}finally{busy=false;if(!IsDisposed)UpdateActions();}}
+    async void Run(Func<Task> action,bool showReview=true){if(busy)return;busy=true;UpdateActions();try{while(polling)await Task.Delay(40);await action();}catch(InstalledSnapshotReviewException ex){output.Clear();status.Text=ex.Message;if(showReview)GeneralDialog.Message(this,ex.Message,T("Conferência dos mods","Mod verification"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}catch(Exception ex){status.Text=T("Falha: ","Failed: ")+ex.Message;}finally{busy=false;if(!IsDisposed)UpdateActions();}}
     void UpdateActions(){
         generate.Enabled=!busy&&!service.Installing;
+        copy.Enabled=output.Text.StartsWith("ML-P2P1:",StringComparison.Ordinal);
         bool receiving=selected!=null&&!selected.Sender;try{receiving|=P2PInvite.Decode(input.Text).Kind=="offer";}catch(IOException){}
         targetRow.Visible=receiving;var layout=(TableLayoutPanel)targetRow.Parent;layout.RowStyles[4].Height=receiving?76:0;
         connect.Enabled=!busy&&(selected==null||selected.Stage==null);choose.Enabled=!busy&&(selected==null||selected.Sender||!selected.Completed&&selected.Stage==null);
@@ -68,7 +72,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     void ChooseFolder(){using(var folder=new FolderBrowserDialog{Description=T("Escolha a pasta local de instalação.","Choose the local installation folder."),SelectedPath=Directory.Exists(destination.Text)?destination.Text:""})if(folder.ShowDialog(this)==DialogResult.OK)destination.Text=folder.SelectedPath;}
     async Task PrepareLink(){
         if(ids.Length==0){status.Text=T("Cole o convite do amigo e clique em Conectar.","Paste your friend's invitation and click Connect.");return;}
-        progress.Caption=T("Preparando link…","Preparing link…");progress.Indeterminate=true;
+        status.Text=T("Conferindo mods e preparando o convite…","Verifying mods and preparing the invitation…");progress.Caption=T("Preparando link…","Preparing link…");progress.Indeterminate=true;
         try{
             if(selected!=null&&!selected.Sender&&selected.Completed){
                 if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));SelectSession(selected);timer.Start();

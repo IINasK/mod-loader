@@ -23,6 +23,15 @@
 - Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
   autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
 
+## Revisão1.1.24 — fila, recibos antigos e compartilhamento
+
+- Ocultar avisos é escolha opcional no erro da fila e vale só para a operação atual, inclusive prioridade. Falhas continuam na tabela/log; nova fila restaura avisos. Não silenciar aprovações/conflitos globais.
+- Histórico confiável somente na validação de recibos: HistoricalReceipts não alimenta instalação/download/Seed. DPAPI, caminhos/hashes, base imutável e operações incompletas preservados. Não reintroduzir FPV/SpotOn/lojas retiradas. Desfazer desativação de retirado bloqueia restauração, preservando backup. Supersede a limitação histórica registrada após a aplicação local1.1.19.
+- Exportar NCA reconhece legacy-low exato. Payload, Project, variante recebida e reconhecimento persistido devem coincidir. Não converter densidade nem aceitar alterações desconhecidas. Gerar modpack e P2P usam o mesmo leitor seguro. Convite ML-P2P1 real só depois de verificar/preparar; sem URL fictícia. Falha automática vai ao status; ação explícita conserva revisão detalhada.
+- Copy interno44px em campo56px, recuos6vertical/18lateral; não testar somente retângulo externo. Relato privado G3 no fallback docs/relatos-g3-design/2026-11-06-mod-loader-acao-interna-campo-regressao.md. Não editar skill central.
+-104recibos e68arquivos de snapshot NCA conferidos somente leitura no jogo real; nenhuma mutação, fechamento ou lançamento. Fixtures e Setup aprovados; limites em Conhecimento/Validacoes/1.1.24.json. Jogo/app reais abertos, sem suíte geral dependente de fechar nem teste novo entre dois PCs reais.
+- Usuário autorizou registrar versões1.1.20–23 antes das correções atuais e publicar. Staging por lista explícita conferida; não coletar diretórios automaticamente. Manter commits separados e excluir payloads/saves/evidências privadas.
+
 ## Aplicação local posterior concluída —06/11/2026
 
 - Usuário autorizou remover os cinco arquivos e instalar Reporter. Jogo estava fechado; não foi encerrado ou iniciado pelo agente. Esta aplicação SUPERA a pendência local registrada na entrega1.1.19 abaixo.

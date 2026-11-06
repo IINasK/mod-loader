@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 internal sealed partial class GeneralModWindow {
     internal static void RunProgressTests(string parent) {
@@ -124,6 +125,30 @@ internal sealed partial class GeneralModWindow {
             form.Enqueue(new[]{form.MakeWork(changed)},true);await Until(()=>!form.working);
             check(form.Status(form.MakeWork(changed),editRoot)=="Instalado"&&File.Exists(Path.Combine(editRoot,"mods","second.txt"))&&!File.Exists(Path.Combine(editRoot,"mods","first.txt")),"Nova instalação explícita usa somente a fonte editada.");
         });
+        string errorRoot=Path.Combine(root,"error-target");Directory.CreateDirectory(errorRoot);
+        var errorState=new GeneralModState{Destination=errorRoot,DownloadFolder=downloads,List=new GeneralModList()};
+        var badFirst=NewEntry("Falha A",Path.Combine(root,"missing-a.zip"));var badSecond=NewEntry("Falha B",Path.Combine(root,"missing-b.zip"));
+        errorState.List.Mods.AddRange(new[]{badFirst,badSecond});
+        TestForm(catalog,errorState,Path.Combine(root,"error-data"),root,async form=>{
+            int prompts=0;form.testFailurePrompt=message=>{prompts++;return true;};
+            form.Enqueue(new[]{form.MakeWork(badFirst),form.MakeWork(badSecond)},false);await Until(()=>!form.working);
+            check(prompts==1&&form.operationFinished==2,"Uma confirmação silencia somente os próximos avisos da mesma fila.");
+            check(form.statuses[form.MakeWork(badFirst).Key]=="Falhou"&&form.statuses[form.MakeWork(badSecond).Key]=="Falhou","Suprimir avisos não transforma falhas em instalações.");
+            form.Enqueue(new[]{form.MakeWork(badFirst)},false);await Until(()=>!form.working);
+            check(prompts==2,"Nova instalação volta a mostrar o aviso; a preferência não é permanente.");
+        });
+        bool remembered=false;var previousAnimation=GeneralStyle.AnimationsEnabled;GeneralStyle.AnimationsEnabled=false;
+        using(var timer=new System.Windows.Forms.Timer{Interval=100}){
+            timer.Tick+=(sender,args)=>{
+                var dialog=System.Windows.Forms.Application.OpenForms.Cast<System.Windows.Forms.Form>().OfType<GeneralDialog>().FirstOrDefault(f=>f.Text=="Queue failure fixture");if(dialog==null)return;timer.Stop();
+                var box=dialog.Content.Controls.Find("queue-errors-suppress",true).OfType<System.Windows.Forms.CheckBox>().Single();
+                check(!box.Checked&&box.Visible,"Aviso abre com supressão desmarcada e opção visível.");box.Checked=true;
+                using(var image=new System.Drawing.Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(image,new System.Drawing.Rectangle(System.Drawing.Point.Empty,image.Size));image.Save(Path.Combine(root,"queue-failure.png"));}
+                dialog.Complete(System.Windows.Forms.DialogResult.OK);
+            };
+            timer.Start();GeneralDialog.Message(null,"Fixture: missing archive. Failures remain in the list.","Queue failure fixture",System.Windows.Forms.MessageBoxButtons.OK,System.Windows.Forms.MessageBoxIcon.Warning,System.Windows.Forms.MessageBoxDefaultButton.Button1,value=>remembered=value,"Hide further warnings for this installation");
+        }
+        GeneralStyle.AnimationsEnabled=previousAnimation;check(remembered,"Confirmar aviso respeita a escolha marcada no diálogo real.");
         Safe.WriteJson(Path.Combine(root,"resultado-progresso-geral.json"),new{Passed=true,Count=checks.Count,Tests=checks,RealGameTouched=false,NetworkUsed=false});
     }
 }

@@ -102,6 +102,14 @@ internal static class InstalledSnapshotTests {
         corrupt=Copy(fixedManifest);corrupt.List.Mods.RemoveAll(m=>m.Id==core.Id);corrupt.Files.RemoveAll(f=>f.Owners.Contains(core.Id+"/default"));refuse(()=>InstalledSnapshot.Validate(corrupt,fixedCatalog),"Bloqueia pacote sem dependência transitiva.");
         corrupt=Copy(fixedManifest);corrupt.List.Mods.Single(m=>m.Id==addon.Id).Variants[0].Sources[0]="https://example.com/wrong.zip";refuse(()=>InstalledSnapshot.Validate(corrupt,fixedCatalog),"Bloqueia fonte alterada de componente conhecido.");
         Write(fixedGame,core.Files[0].Path,"different RED4ext");refuse(()=>InstalledSnapshot.Create(Path.Combine(root,"wrong-core.zip"),fixedState,new[]{addon.Id},fixedCatalog,fixedData,true,s=>{}),"Recusa exportar base instalada diferente da versão fixada.");
+        RunDensityTests(root);
+        Safe.WriteJson(Path.Combine(root,"resultado-snapshot.json"),new{Passed=true,Checks=checks.Count,Tests=checks,RealGameTouched=false,OriginalArchivesRequired=false,NetworkUsed=false});
+        return checks.Count;
+    }
+    internal static int RunDensityTests(string parent){
+        string root=OnlineTests.NestedRoot(parent,"online-testes-");Directory.CreateDirectory(root);
+        var checks=new List<string>();Action<bool,string> check=(ok,label)=>{if(!ok)throw new IOException(label);checks.Add(label);};
+        Action<Action,string> refuse=(action,label)=>{try{action();}catch(IOException){checks.Add(label);return;}throw new IOException("Não bloqueou: "+label);};
         var density=Fixed(NightCityDensity.ModId,"r6/tweaks/FixtureDensity/medium.yml","medium",new string[0]);
         density.DensityProfiles=new List<FixedDensityProfile>();
         foreach(string level in new[]{"low","medium","high"}){var profile=Fixed(NightCityDensity.ModId,"r6/tweaks/FixtureDensity/"+level+".yml",level,new string[0]);density.DensityProfiles.Add(new FixedDensityProfile{Id=level,Name=level,Assets=profile.Assets,Files=profile.Files});}
@@ -111,8 +119,28 @@ internal static class InstalledSnapshotTests {
         var densityManifest=InstalledSnapshot.Create(Path.Combine(root,"density.zip"),densityState,new[]{density.Id},densityCatalog,densityData,false,s=>{});
         check(densityManifest.List.Mods.Single().DefaultVariant=="high"&&densityManifest.List.Mods.Single().Variants.Single().CyberpunkVariant=="high","Exporta densidade NCA realmente instalada apesar da seleção antiga.");
         check(densityManifest.Files.Single().Owners.Single()==density.Id+"/high"&&densityManifest.Files.Single().Path.EndsWith("/high.yml"),"Manifesto liga bytes e proprietário à mesma variante instalada.");
-        Safe.WriteJson(Path.Combine(root,"resultado-snapshot.json"),new{Passed=true,Checks=checks.Count,Tests=checks,RealGameTouched=false,OriginalArchivesRequired=false,NetworkUsed=false});
-        return checks.Count;
+        var legacyDensity=Copy(density);var medium=legacyDensity.DensityProfiles.Single(p=>p.Id=="medium");
+        foreach(string layer in new[]{"r6/tweaks/NightCityAlive/passengers/low-to-std.yml","r6/tweaks/NightCityAlive/aigeneralsettings/low-to-std.yml"})medium.Files.Add(Fixed(density.Id,layer,"layer",new string[0]).Files.Single());
+        var legacyCatalog=Copy(densityCatalog);legacyCatalog.Packages=new List<FixedMod>{legacyDensity};
+        File.Delete(Safe.In(densityGame,"r6/tweaks/FixtureDensity/high.yml"));
+        Write(densityGame,"r6/tweaks/FixtureDensity/medium.yml","medium");
+        Write(densityGame,NightCityDensity.LegacyPath,"# Perfil local de densidade baixa: preservar os demais encontros.\r\nAIGeneralSettings.ReactionSystem.aggressiveCiviliansLimit: 1\r\n");
+        var legacyState=new GeneralModState{Destination=densityGame,List=GeneralModLibrary.Seed(legacyCatalog,new ModImportItem[0])};
+        var legacyManifest=InstalledSnapshot.Create(Path.Combine(root,"legacy.zip"),legacyState,new[]{density.Id},legacyCatalog,densityData,false,s=>{},true);
+        var legacyRead=InstalledSnapshot.Read(Path.Combine(root,"legacy.zip"),Safe.Hash(Path.Combine(root,"legacy.zip")),legacyCatalog);
+        check(legacyRead.List.Mods.Single().DefaultVariant=="legacy-low"&&legacyRead.Project.Mods.Single().DefaultVariant=="legacy-low","Perfil antigo conhecido exporta e valida com a identidade exata, sem converter a densidade.");
+        check(legacyManifest.Files.Any(f=>f.Path==NightCityDensity.LegacyPath)&&!legacyManifest.Files.Any(f=>f.Path.EndsWith("low-to-std.yml")),"Snapshot inclui a configuração baixa antiga e omite as camadas removidas.");
+        GeneralModLibrary.RestoreKnownMappings(legacyRead.Project,GeneralModLibrary.Seed(legacyCatalog,new ModImportItem[0]));
+        check(legacyRead.Project.Mods.Single().Variants.Single(v=>v.Id=="legacy-low").CyberpunkVariant=="legacy-low","Reabrir projeto recebido conserva reconhecimento do perfil antigo.");
+        string modpack=Path.Combine(root,"legacy-modpack.zip");InstalledSnapshot.CreateModpack(modpack,legacyManifest,densityGame,legacyCatalog,s=>{});
+        using(var archive=ZipFile.OpenRead(modpack))check(archive.GetEntry(NightCityDensity.LegacyPath)!=null&&archive.GetEntry("_modloader/project.json")!=null&&!archive.Entries.Any(e=>e.FullName.StartsWith("files/")),"Gerar modpack usa árvore relativa do jogo e metadados, com o perfil antigo preservado.");
+        Write(densityGame,NightCityDensity.LegacyPath,"unknown edit");
+        refuse(()=>InstalledSnapshot.Create(Path.Combine(root,"legacy-bad.zip"),legacyState,new[]{density.Id},legacyCatalog,densityData,false,s=>{},true),"Perfil antigo alterado continua bloqueado, sem relaxar hashes.");
+        string target=Path.Combine(root,"receive"),receivedData=Path.Combine(root,"received-data");Directory.CreateDirectory(target);Write(target,".fixture-only","test");
+        var receiver=new InstalledSnapshotInstaller(target,receivedData,legacyCatalog,true);
+        var receipt=receiver.Install(Path.Combine(root,"legacy.zip"),Safe.Hash(Path.Combine(root,"legacy.zip")),s=>{});
+        check(NightCityDensity.Read(legacyDensity,target).Id=="legacy-low"&&receiver.Status(receipt,density.Id+"/legacy-low")==GeneralModInstaller.Installed,"Recepção e instalação em fixture preservam a mesma densidade antiga e conferem o recibo.");
+        Safe.WriteJson(Path.Combine(root,"resultado-snapshot-density.json"),new{Passed=true,Checks=checks,RealGameTouched=false});return checks.Count;
     }
     static FixedMod Fixed(string id,string path,string content,string[] dependencies){return new FixedMod{Id=id,Name=id,Version="1.0",GameVersion="2.5",Dependencies=dependencies,Assets=new List<FixedAsset>{new FixedAsset{Id="asset",Name=id+".zip",Format="zip",Url="https://github.com/fixture/fixture/releases/download/v1/"+id+".zip",Sha256=new string('a',64),Size=1}},Files=new List<FixedFile>{new FixedFile{Asset="asset",Entry=path,Path=path,Size=Encoding.UTF8.GetByteCount(content),Sha256=InstalledSnapshot.Hash(Encoding.UTF8.GetBytes(content))}}};}
     static T Copy<T>(T value){return Safe.Json.Deserialize<T>(Safe.Json.Serialize(value));}

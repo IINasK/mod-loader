@@ -33,10 +33,15 @@ public static partial class InstalledSnapshot {
         Safe.In(System.IO.Path.GetTempPath(),path);
         return !Regex.IsMatch(path,@"(^|/)(?:\.git|\.codex|\.agents|\.aws|\.CoopModsOnline|saves?|saved games|accounts?|credentials?|cookies?|logs?|cache|profiles?|userdata)(?:/|\.|$)|(?:^|/)(?:user\.settings|loginusers\.vdf|config\.vdf|steam_api\.ini|.*\.(?:dmp|log|sav|dat|db|sqlite))$",RegexOptions.IgnoreCase);
     }
+    static GeneralModVariant LegacyDensityVariant(FixedCatalog catalog){
+        var variant=Clone(GeneralModLibrary.Seed(catalog,new ModImportItem[0]).Mods.Single(m=>m.Id==NightCityDensity.ModId).Variants.Single(v=>v.CyberpunkVariant=="medium"));
+        variant.Id="legacy-low";variant.CyberpunkVariant="legacy-low";variant.Name="Baixa personalizada (legado)";return variant;
+    }
     static FixedMod FixedRecipe(FixedCatalog catalog,GeneralModVariant variant) {
         var mod=catalog.Packages.SingleOrDefault(m=>m.Id==variant.CyberpunkId);
         if(mod==null||!String.IsNullOrEmpty(mod.BlockedReason))throw new IOException("Componente desconhecido ou retido.");
         if(mod.Id==NightCityDensity.ModId) {
+            if(variant.CyberpunkVariant=="legacy-low"){var legacy=NightCityDensity.Legacy(mod);if(legacy!=null)return legacy;}
             if(!NightCityDensity.Supported(variant.CyberpunkVariant))throw new IOException("Densidade instalada não suportada para compartilhamento.");
             return NightCityDensity.Resolve(mod,variant.CyberpunkVariant);
         }
@@ -70,10 +75,9 @@ public static partial class InstalledSnapshot {
             var variant=mod.Variants.Single(v=>v.Id==Selected(state,mod));
             if(allowMissing&&Uninstalled(state,mod,variant,catalog,root,appData))continue;
             if(cyberpunk && variant.CyberpunkId==NightCityDensity.ModId) {
-                var installed=NightCityDensity.Installed(catalog.Packages.Single(m=>m.Id==variant.CyberpunkId),root);
-                var density=NightCityDensity.Read(installed,root);
-                if(!NightCityDensity.Supported(density.Id))throw new IOException(mod.Name+": densidade instalada personalizada não suportada.");
-                variant=mod.Variants.Single(v=>v.CyberpunkVariant==density.Id);
+                var density=NightCityDensity.Read(catalog.Packages.Single(m=>m.Id==variant.CyberpunkId),root);
+                if(density.Id=="legacy-low"){variant=LegacyDensityVariant(catalog);mod.Variants.Add(variant);}
+                else {if(!NightCityDensity.Supported(density.Id)||density.Partial)throw new IOException(density.Detail);variant=mod.Variants.Single(v=>v.CyberpunkVariant==density.Id);}
             }
             string work=Owner(mod,variant);
             var originalSources=variant.Sources.ToList();
@@ -183,7 +187,7 @@ public static partial class InstalledSnapshot {
             if(variant.CyberpunkId!=null) {
                 if(manifest.Game!="cyberpunk2077")throw new IOException("Receita Cyberpunk em destino genérico.");
                 var recipe=FixedRecipe(catalog,variant);recipes.Add(owner,recipe);
-                var seed=GeneralModLibrary.Seed(catalog,new ModImportItem[0]).Mods.Single(m=>m.Id==recipe.Id).Variants.Single(v=>v.CyberpunkVariant==variant.CyberpunkVariant);
+                var seed=recipe.Id==NightCityDensity.ModId&&variant.CyberpunkVariant=="legacy-low"?LegacyDensityVariant(catalog):GeneralModLibrary.Seed(catalog,new ModImportItem[0]).Mods.Single(m=>m.Id==recipe.Id).Variants.Single(v=>v.CyberpunkVariant==variant.CyberpunkVariant);
                 if(!seed.Sources.SequenceEqual(variant.Sources,StringComparer.Ordinal))throw new IOException("Fontes fixas alteradas no pacote.");
             }else if(variant.CyberpunkVariant!=null||!(variant.Sources.Count==1&&variant.Sources[0]=="installed://"+mod.Id+"/"+variant.Id)&&!variant.Sources.All(GeneralModDownload.IsWebSource))throw new IOException("O pacote contém caminhos privados de origem.");
         }

@@ -381,9 +381,9 @@ public sealed partial class FixedInstaller {
         if(r.BackupLayout!=null&&!(disabling?r.BackupLayout=="flat-v1":r.BackupLayout=="fpv-flat-v1"))throw new IOException("Formato de backup desconhecido no registro.");
         if(r.Operation=="density"){NightCityDensity.ValidateReceipt(catalog,r);return r;}
         if(r.Operation!=null&&r.Operation!="install"&&!disabling)throw new IOException("Operação desconhecida no registro.");
-        var mods=FixedData.Expand(catalog,r.Mods);
-        if(disabling&&(r.Mods.Count==0||r.Mods.Count!=r.Mods.Distinct().Count()||catalog.Packages.Any(m=>r.Mods.Contains(m.Id)&&m.Immutable)))throw new IOException("Registro de desativação inválido.");
-        var allowed=(disabling?catalog.Packages.Where(m=>r.Mods.Contains(m.Id)).SelectMany(m=>NightCityDensity.KnownFiles(m)):mods.SelectMany(x=>NightCityDensity.KnownFiles(x))).ToList();var seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var mods=HistoricalReceipts.Expand(catalog,r.Mods);
+        if(disabling&&(r.Mods.Count==0||r.Mods.Count!=r.Mods.Distinct().Count()||mods.Any(m=>r.Mods.Contains(m.Id)&&m.Immutable)))throw new IOException("Registro de desativação inválido.");
+        var allowed=(disabling?mods.Where(m=>r.Mods.Contains(m.Id)).SelectMany(m=>NightCityDensity.KnownFiles(m)):mods.SelectMany(x=>NightCityDensity.KnownFiles(x))).ToList();var seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach(var f in r.Files){
             if(f==null||!seen.Add(f.Path)||!allowed.Any(known=>known.Path==f.Path&&FpvCustomization.KnownHash(known,disabling?f.Before:f.After))||(disabling?f.After!=null:f.Before!=null&&(r.BackupLayout!="fpv-flat-v1"||!allowed.Any(known=>known.Path==f.Path&&FpvCustomization.UpgradePair(known,f.Before,f.After)))))throw new IOException("Registro não corresponde ao catálogo.");
             Safe.In(game,f.Path);
@@ -395,6 +395,7 @@ public sealed partial class FixedInstaller {
             var candidates=AllReceiptPaths().Select(p=>new{Path=p,Receipt=ReadReceipt(p)}).Where(x=>x.Receipt.Status!="desfeito"&&x.Receipt.Status!="desfeito_com_preservados").OrderByDescending(x=>x.Receipt.CreatedUtc).ToList();
             if(candidates.Count==0)return "Nenhuma operação deste programa para desfazer.";var last=candidates[0];
             if(last.Receipt.Operation=="deactivate"){
+                if(last.Receipt.Mods.Any(id=>!catalog.Packages.Any(m=>m.Id==id)))throw new IOException("Esta desativação contém mods retirados do pacote. A restauração automática foi bloqueada; os backups foram preservados.");
                 var restoring=catalog.Packages.Where(m=>last.Receipt.Mods.Contains(m.Id)).ToList();FixedData.RequireInstallable(restoring);
                 foreach(var m in restoring){string issue=FixedData.Incompatibility(m,game);if(issue!=null)throw new IOException(issue);}
             }

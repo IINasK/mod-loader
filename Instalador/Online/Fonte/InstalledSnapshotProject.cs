@@ -31,7 +31,7 @@ public static partial class InstalledSnapshot {
                 variant.SourceInfo=variant.SourceInfo.Where(pair=>variant.Sources.Contains(pair.Key)).ToDictionary(pair=>pair.Key,pair=>pair.Value);
             }
         }
-        foreach(var item in installed.Mods){var mod=project.Mods.SingleOrDefault(m=>m.Id==item.Id);if(mod==null)project.Mods.Add(Clone(item));else mod.DefaultVariant=item.DefaultVariant;}
+        foreach(var item in installed.Mods){var mod=project.Mods.SingleOrDefault(m=>m.Id==item.Id);if(mod==null)project.Mods.Add(Clone(item));else {mod.DefaultVariant=item.DefaultVariant;foreach(var variant in item.Variants)if(!mod.Variants.Any(v=>v.Id==variant.Id))mod.Variants.Add(Clone(variant));}}
         project.Categories=project.Categories.Concat(installed.Categories).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         project.Presets=project.Presets.OrderByDescending(p=>p.Id==state.SelectedPreset).ToList();
         return project;
@@ -45,6 +45,7 @@ public static partial class InstalledSnapshot {
             var mod=project.Mods.SingleOrDefault(m=>m.Id==installed.Id);
             if(mod==null||mod.DefaultVariant!=installed.DefaultVariant)throw new IOException("Projeto não corresponde aos mods transferidos.");
             var expected=installed.Variants.Single();var variant=mod.Variants.Single(v=>v.Id==mod.DefaultVariant);
+            if(expected.CyberpunkId==NightCityDensity.ModId&&expected.CyberpunkVariant=="legacy-low"&&variant.Id=="legacy-low"&&variant.Sources.SequenceEqual(LegacyDensityVariant(catalog).Sources)){variant.CyberpunkId=expected.CyberpunkId;variant.CyberpunkVariant=expected.CyberpunkVariant;}
             if(!variant.Sources.SequenceEqual(expected.Sources)||variant.CyberpunkId!=expected.CyberpunkId||variant.CyberpunkVariant!=expected.CyberpunkVariant)throw new IOException("Fontes do projeto divergem do pacote instalado.");
         }
     }

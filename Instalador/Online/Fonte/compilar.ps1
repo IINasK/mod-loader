@@ -1,4 +1,4 @@
-$ErrorActionPreference='Stop'
+﻿$ErrorActionPreference='Stop'
 & (Join-Path $PSScriptRoot 'preparar-leitor.ps1')
 & (Join-Path $PSScriptRoot 'preparar-logo.ps1')
 $out=Join-Path (Split-Path -Parent $PSScriptRoot) 'Programa'
@@ -20,6 +20,7 @@ $extensions += Join-Path $PSScriptRoot 'OnlineModAudit.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineModAuditTests.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineDiagnostics.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineDiagnosticsTests.cs'
+$extensions += Join-Path $PSScriptRoot 'HistoricalReceipts.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineRemoval.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineExtraCleanup.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineExtraCleanupTests.cs'

@@ -116,9 +116,10 @@ public sealed class GeneralModLibrary {
             if (!byId.TryGetValue(entry.Id, out trusted)) continue;
             foreach (var variant in entry.Variants) {
                 var original = trusted.Variants.FirstOrDefault(candidate => candidate.Id == variant.Id && candidate.Sources.SequenceEqual(variant.Sources, StringComparer.Ordinal));
+                if(original==null&&entry.Id==NightCityDensity.ModId&&variant.Id=="legacy-low")original=trusted.Variants.FirstOrDefault(candidate=>candidate.CyberpunkVariant=="medium"&&candidate.Sources.SequenceEqual(variant.Sources,StringComparer.Ordinal));
                 if (original == null) continue;
                 variant.CyberpunkId = original.CyberpunkId;
-                variant.CyberpunkVariant = original.CyberpunkVariant;
+                variant.CyberpunkVariant = entry.Id==NightCityDensity.ModId&&variant.Id=="legacy-low"?"legacy-low":original.CyberpunkVariant;
             }
         }
     }

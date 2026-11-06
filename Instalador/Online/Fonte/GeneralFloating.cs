@@ -143,10 +143,11 @@ internal class GeneralDialog : Form {
         var result=DialogResult==DialogResult.None?DialogResult.Cancel:DialogResult;
         reveal.Begin(false,origin,()=>{allowClose=true;Complete(result);});
     }
-    internal static DialogResult Message(IWin32Window owner,string text,string caption,MessageBoxButtons buttons=MessageBoxButtons.OK,MessageBoxIcon icon=MessageBoxIcon.None,MessageBoxDefaultButton defaultButton=MessageBoxDefaultButton.Button1){
+    internal static DialogResult Message(IWin32Window owner,string text,string caption,MessageBoxButtons buttons=MessageBoxButtons.OK,MessageBoxIcon icon=MessageBoxIcon.None,MessageBoxDefaultButton defaultButton=MessageBoxDefaultButton.Button1,Action<bool> remember=null,string rememberLabel=null){
         using(var dialog=new GeneralDialog(caption){ClientSize=new Size(620,320),MinimumSize=new Size(420,220)}){
-            var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(20,8,20,20)};
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(20,8,20,20)};
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var preference=new CheckBox{Text=rememberLabel??"",AutoSize=true,Dock=DockStyle.Fill,Margin=new Padding(0,8,0,0),Name="queue-errors-suppress",Visible=remember!=null};
             var body=new TextBox{Multiline=true,ReadOnly=true,BorderStyle=BorderStyle.None,Dock=DockStyle.Fill,ScrollBars=ScrollBars.Vertical,Text=text,BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground,Font=GeneralStyle.Font(12)};
             var commands=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.RightToLeft,WrapContents=false,Padding=new Padding(0,14,0,0)};
             var results=buttons==MessageBoxButtons.YesNo?new[]{DialogResult.Yes,DialogResult.No}:buttons==MessageBoxButtons.OKCancel?new[]{DialogResult.OK,DialogResult.Cancel}:new[]{DialogResult.OK};
@@ -158,8 +159,8 @@ internal class GeneralDialog : Form {
                 if(result==DialogResult.Cancel||result==DialogResult.No)dialog.CancelButton=action;
                 if(result==results[defaultButton==MessageBoxDefaultButton.Button2&&results.Length>1?1:0])dialog.AcceptButton=action;
             }
-            layout.Controls.Add(new GeneralScrollView(body),0,0);layout.Controls.Add(commands,0,1);dialog.Content.Controls.Add(layout);
-            GeneralStyle.Apply(dialog,GeneralStyle.Dark);body.BorderStyle=BorderStyle.None;return dialog.ShowDialog(owner);
+            layout.Controls.Add(new GeneralScrollView(body),0,0);layout.Controls.Add(preference,0,1);layout.Controls.Add(commands,0,2);dialog.Content.Controls.Add(layout);
+            GeneralStyle.Apply(dialog,GeneralStyle.Dark);body.BorderStyle=BorderStyle.None;var answer=dialog.ShowDialog(owner);if(remember!=null&&answer==DialogResult.OK)remember(preference.Checked);return answer;
         }
     }
 }

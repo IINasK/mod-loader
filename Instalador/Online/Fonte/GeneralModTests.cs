@@ -100,7 +100,7 @@ internal sealed partial class GeneralModWindow {
         });
         int archiveChecks=GeneralModInstallerTests.Run(root);
         int libraryChecks=GeneralModLibraryV2Tests.Run(root);
-        RunProgressTests(root);
+        RunProgressTests(root);HistoricalReceiptTests.Run(root);
         RunUiTests(root);
         GeneralButtonPaintTests.Run(root);
         GeneralP2PTests.Run(root);
