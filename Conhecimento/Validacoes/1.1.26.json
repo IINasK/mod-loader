@@ -1,48 +1,51 @@
 {
-  "Version": "1.1.26",
-  "Checks": 79,
-  "Reports": [
-    {
-      "Passed": true,
-      "Checks": 30,
-      "Evidence": "T/R126/online-testes-13dc67c240e64a3f8e6e508e7937a703/resultado-updates.json",
-      "Report": "update parser"
-    },
-    {
-      "Passed": true,
-      "Checks": 25,
-      "Evidence": "T/R126/online-testes-f619e5a5a6df40a9b0ceba47670e5b78/resultado-automatic-update.json",
-      "Report": "automatic update"
-    },
-    {
-      "Passed": true,
-      "Checks": 24,
-      "Evidence": "T/setup-d45c3578f3cc443ba2beb6640defe29b/resultado-setup.json",
-      "Report": "standard Setup"
-    }
-  ],
-  "RealInstallerFixture": {
-    "OldProcessExited": true,
-    "ProductionRegistrationChanged": false,
-    "Evidence": "T/R126/online-testes-fdad2965dffc4cfe82bef6f45766006a/resultado-auto-update-real.json",
-    "AutomaticallyRelaunched": true,
-    "Passed": true,
-    "TemporaryPayloadRemoved": true,
-    "ConfigurationPreserved": true
-  },
-  "ProductionTransport": {
-    "Passed": true,
-    "VerifiedRelease": "1.1.25",
-    "RegisteredInstallationRecognized": true,
-    "DownloadedSetupExecuted": false
-  },
-  "AppSha256": "3a0ef41d029910b92a17cf0b00f5c06f9aae5d0ebba486ef235004d6af688a3a",
-  "SetupSha256": "41710c0811038a86674cc6038dc834a0edd8b8c3c035e7ef9d0f771dc5ae8712",
-  "CatalogSha256": "c6a0b3a6170e10c8d707c4d25361d30be7382bccb9a25dd8a50d27c956e2e6a2",
-  "CatalogChanged": false,
-  "RealGameModified": false,
-  "RealFriendComputerTested": false,
-  "FullGeneralSuiteRun": false,
-  "ReleaseVerified": false,
-  "Limit": "Requires installing 1.1.26 once. No arbitrary power-loss recovery claim; self-replacement tested in isolated installation."
+    "Version":  "1.1.26",
+    "Checks":  79,
+    "Reports":  [
+                    {
+                        "Passed":  true,
+                        "Checks":  30,
+                        "Evidence":  "T/R126/online-testes-13dc67c240e64a3f8e6e508e7937a703/resultado-updates.json",
+                        "Report":  "update parser"
+                    },
+                    {
+                        "Passed":  true,
+                        "Checks":  25,
+                        "Evidence":  "T/R126/online-testes-f619e5a5a6df40a9b0ceba47670e5b78/resultado-automatic-update.json",
+                        "Report":  "automatic update"
+                    },
+                    {
+                        "Passed":  true,
+                        "Checks":  24,
+                        "Evidence":  "T/setup-d45c3578f3cc443ba2beb6640defe29b/resultado-setup.json",
+                        "Report":  "standard Setup"
+                    }
+                ],
+    "RealInstallerFixture":  {
+                                 "OldProcessExited":  true,
+                                 "ProductionRegistrationChanged":  false,
+                                 "Evidence":  "T/R126/online-testes-fdad2965dffc4cfe82bef6f45766006a/resultado-auto-update-real.json",
+                                 "AutomaticallyRelaunched":  true,
+                                 "Passed":  true,
+                                 "TemporaryPayloadRemoved":  true,
+                                 "ConfigurationPreserved":  true
+                             },
+    "ProductionTransport":  {
+                                "Passed":  true,
+                                "VerifiedRelease":  "1.1.25",
+                                "RegisteredInstallationRecognized":  true,
+                                "DownloadedSetupExecuted":  false
+                            },
+    "AppSha256":  "3a0ef41d029910b92a17cf0b00f5c06f9aae5d0ebba486ef235004d6af688a3a",
+    "SetupSha256":  "41710c0811038a86674cc6038dc834a0edd8b8c3c035e7ef9d0f771dc5ae8712",
+    "CatalogSha256":  "c6a0b3a6170e10c8d707c4d25361d30be7382bccb9a25dd8a50d27c956e2e6a2",
+    "CatalogChanged":  false,
+    "RealGameModified":  false,
+    "RealFriendComputerTested":  false,
+    "FullGeneralSuiteRun":  false,
+    "ReleaseVerified":  true,
+    "Limit":  "Requires installing 1.1.26 once. No arbitrary power-loss recovery claim; self-replacement tested in isolated installation.",
+    "ReleaseUrl":  "https://github.com/IINasK/mod-loader/releases/download/v1.1.26/Mod-Loader-1.1.26.exe",
+    "PublicDownloadSha256":  "41710c0811038a86674cc6038dc834a0edd8b8c3c035e7ef9d0f771dc5ae8712",
+    "UpdateFrom1125":  "1.1.26"
 }
