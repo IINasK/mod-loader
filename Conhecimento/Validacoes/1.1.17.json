@@ -258,5 +258,19 @@
     "Two stale built-in menu test expectations were updated for the new read-only modpack action.",
     "One final-suite run failed an existing floating picker visibility assertion. No UI workaround was introduced; the unchanged final build passed on repeat. Cause remains unknown.",
     "Automatic cache purge on startup was rejected by approval review and was not implemented. The one-time 124-copy cleanup proceeded only after explicit user authorization."
-  ]
+  ],
+  "SourceCommit": "51a28e2a8edc1f9f8a8e435dd745c7fbbac8f3e3",
+  "PublishedRelease": {
+    "AnonymousRequest": true,
+    "Runtime": "Windows PowerShell 5.1 / .NET Framework",
+    "UsedPublished116Checker": true,
+    "AvailableToVersion116": "1.1.17",
+    "Version117DoesNotNotifyItself": true,
+    "ReleasePage": "https://github.com/IINasK/mod-loader/releases/tag/v1.1.17",
+    "DownloadUrl": "https://github.com/IINasK/mod-loader/releases/download/v1.1.17/Mod-Loader-1.1.17.exe",
+    "DownloadBytes": 5390979,
+    "DownloadedSha256": "BFBC1CBD55A2FFFBE0697A82F1F2EACA921AB92487D22741E3B4BA7C2069E944",
+    "DownloadedExecutableWasRun": false,
+    "TempDownloadRemoved": true
+  }
 }
