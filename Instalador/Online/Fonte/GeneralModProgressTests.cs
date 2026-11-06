@@ -134,9 +134,24 @@ internal sealed partial class GeneralModWindow {
             form.Enqueue(new[]{form.MakeWork(badFirst),form.MakeWork(badSecond)},false);await Until(()=>!form.working);
             check(prompts==1&&form.operationFinished==2,"Uma confirmação silencia somente os próximos avisos da mesma fila.");
             check(form.statuses[form.MakeWork(badFirst).Key]=="Falhou"&&form.statuses[form.MakeWork(badSecond).Key]=="Falhou","Suprimir avisos não transforma falhas em instalações.");
+            string firstKey=form.MakeWork(badFirst).Key;string reason=form.StatusDetail(firstKey,form.statuses[firstKey]);
+            form.DrawRows();
+            var failedRow=form.ModRows().Single(row=>Equals(row.Tag,badFirst.Id));
+            check(reason.Contains("missing-a.zip")&&failedRow.Cells["Status"].ToolTipText==reason,"Mensagem completa do erro permanece após redesenhar a lista.");
+            string diagnostic=form.FailureReport();
+            check(diagnostic.Contains(GeneralUpdateChecker.CurrentVersion)&&diagnostic.Contains("missing-a.zip")&&diagnostic.Contains("missing-b.zip")&&diagnostic.Contains(badFirst.Id),"Diagnóstico copiável inclui versão, IDs e todas as falhas sem esconder a causa.");
+            var copy=form.grid.ContextMenuStrip.Items.OfType<System.Windows.Forms.ToolStripItem>().Single(item=>item.Name=="CopyInstallFailures");copy.PerformClick();
+            check(System.Windows.Forms.Clipboard.GetText()==diagnostic,"Menu copia o diagnóstico completo em vez da etiqueta Falhou.");
             form.Enqueue(new[]{form.MakeWork(badFirst)},false);await Until(()=>!form.working);
             check(prompts==2,"Nova instalação volta a mostrar o aviso; a preferência não é permanente.");
         });
+        try{FixedData.Expand(catalog,new[]{"unknown-test-mod"});throw new Exception("Unknown mod accepted");}catch(IOException ex){check(ex.Message.Contains("unknown-test-mod"),"Erro de catálogo identifica a referência ausente sem relaxar a validação.");}
+        string oldArchive=TestZip(downloads,"old-version.zip","mods/version.txt","old version");string newArchive=TestZip(downloads,"new-version.zip","mods/version.txt","new version");
+        var exactAsset=new FixedAsset{Id="version-fixture",Name="new-version.zip",Format="zip",Sha256=Safe.Hash(newArchive),Size=new FileInfo(newArchive).Length};
+        var sourceCache=new DownloadCache(Path.Combine(root,"version-cache"),()=>downloads);
+        bool oldRefused=false;try{sourceCache.Import(oldArchive,exactAsset);}catch(IOException){oldRefused=true;}
+        check(oldRefused&&File.Exists(oldArchive),"Download antigo não é usado como versão nova e permanece preservado.");
+        sourceCache.Import(newArchive,exactAsset);check(sourceCache.Contains(exactAsset)&&sourceCache.PathFor(exactAsset)==newArchive&&File.Exists(oldArchive),"Download correto é reaproveitado sem apagar as versões antigas.");
         bool remembered=false;var previousAnimation=GeneralStyle.AnimationsEnabled;GeneralStyle.AnimationsEnabled=false;
         using(var timer=new System.Windows.Forms.Timer{Interval=100}){
             timer.Tick+=(sender,args)=>{

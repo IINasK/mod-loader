@@ -74,17 +74,26 @@ internal sealed partial class GeneralModWindow {
     void RowStatus(Work work,string status,int? pct=null,string message=null){
         string previous;statuses.TryGetValue(work.Key,out previous);
         statuses[work.Key]=status;
+        if(message!=null)statusDetails[work.Key]=message;else statusDetails.Remove(work.Key);
         if(statusFilters!=null&&GeneralStatusPresentation.Label(previous)!=GeneralStatusPresentation.Label(status))DrawRows();
         if(pct.HasValue)progress[work.Key]=pct.Value;else progress.Remove(work.Key);
         var visible=grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(r=>Equals(r.Tag,work.Entry.Id));
         var listed=state.List.Mods.FirstOrDefault(m=>m.Id==work.Entry.Id);
         if(visible!=null&&listed!=null&&Object.ReferenceEquals(Selected(listed),work.Variant)){
-            visible.Cells["Status"].Value=GeneralStatusPresentation.Label(status);visible.Cells["Status"].ToolTipText=message??GeneralStyle.Status(status);
+            visible.Cells["Status"].Value=GeneralStatusPresentation.Label(status);visible.Cells["Status"].ToolTipText=StatusDetail(work.Key,status);
             visible.Cells["Progress"].Value=pct.HasValue?(object)pct.Value:"—";UpdateCounts();
         }
         if(message!=null)detail.Text=message;
         if(working||scanning)UpdateFlow(work,status,pct);
     }
+    string StatusDetail(string key,string status){string message;return statusDetails.TryGetValue(key,out message)?message:GeneralStyle.Status(status??"Não conferido");}
+    string FailureReport(){
+        var lines=new List<string>{"Mod Loader "+GeneralUpdateChecker.CurrentVersion,"Catalog: "+OnlineIdentity.CatalogHash};
+        foreach(var mod in state.List.Mods){var variant=Selected(mod);string key=Key(mod,variant),status;if(!statuses.TryGetValue(key,out status)||GeneralStatusPresentation.Kind(status)!="error")continue;lines.Add("\r\n"+mod.Name+" ["+mod.Id+"/"+variant.Id+"]\r\n"+StatusDetail(key,status));}
+        return String.Join("\r\n",lines);
+    }
+    void ShowFocusedFailure(){var mod=FocusedEntry();if(mod==null)return;string key=Key(mod,Selected(mod)),status;if(statuses.TryGetValue(key,out status)&&GeneralStatusPresentation.Kind(status)=="error")GeneralDialog.Message(this,StatusDetail(key,status),T("Detalhes da falha","Failure details"));}
+    void CopyFailures(){try{Clipboard.SetText(FailureReport());detail.Text=T("Erros copiados. Cole a mensagem para compartilhar o diagnóstico.","Errors copied. Paste to share the diagnostics.");}catch(Exception ex){ShowError(ex);}}
     string Status(Work work,string root){
         string snapshot;
         if(root!=null&&Directory.Exists(root)&&state.SnapshotReceipts.TryGetValue(work.Key,out snapshot)){
@@ -136,7 +145,7 @@ internal sealed partial class GeneralModWindow {
                 scanCurrent=work;UpdateFlow(work,"Verificando",0);Stage(work,"scan.begin");
                 string found=null;
                 if(!skipRequests.Contains(work))found=await Task.Run(()=>{try{return Status(work,root);}catch(Exception){return "Não verificável";}});
-                bool skipped=skipRequests.Contains(work);statuses[work.Key]=skipped?"Verificação pulada":found??"Não verificável";progress.Remove(work.Key);
+                bool skipped=skipRequests.Contains(work);statusDetails.Remove(work.Key);statuses[work.Key]=skipped?"Verificação pulada":found??"Não verificável";progress.Remove(work.Key);
                 var visible=ModRows().FirstOrDefault(row=>Equals(row.Tag,work.Entry.Id));
                 if(visible!=null){visible.Cells["Status"].Value=GeneralStatusPresentation.Label(statuses[work.Key]);visible.Cells["Status"].ToolTipText=GeneralStyle.Status(statuses[work.Key]);grid.InvalidateRow(visible.Index);UpdateCounts();}
                 operationFinished++;work.Ended=true;UpdateFlow(work,statuses[work.Key],skipped?(int?)null:found=="Instalado"?100:0);Stage(work,"scan.end");
@@ -199,7 +208,7 @@ internal sealed partial class GeneralModWindow {
         catch(Exception ex){
             string message=work.Entry.Name+": "+ex.Message;
             RowStatus(work,"Falhou",null,message);
-            OnlineDiagnostics.Record("general.install.failed",work.Entry.Id,"Falha no item; a fila continua.",new{Variant=work.Variant.Id,ErrorType=ex.GetType().Name,Message=ex.Message});
+            OnlineDiagnostics.Record("general.install.failed",work.Entry.Id,"Falha no item; a fila continua.",new{Variant=work.Variant.Id,ErrorType=ex.GetType().Name,Message=ex.Message,Exception=ex.ToString(),AppVersion=GeneralUpdateChecker.CurrentVersion,Catalog=OnlineIdentity.CatalogHash});
             if(!interrupt&&!suppressQueueErrors){
                 if(testMode){if(testFailurePrompt!=null)suppressQueueErrors=testFailurePrompt(message);}
                 else GeneralDialog.Message(this,message,T("Falha na instalação","Installation failed"),MessageBoxButtons.OK,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button1,value=>suppressQueueErrors=value,T("Ocultar os próximos avisos desta instalação","Hide further warnings for this installation"));

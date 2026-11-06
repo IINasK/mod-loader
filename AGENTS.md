@@ -23,6 +23,13 @@
 - Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
   autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
 
+## Revisão1.1.25 — mensagens completas e diagnóstico remoto
+
+- RowStatus guarda detalhe por item/variante separado da etiqueta; DrawRows reutiliza o detalhe e não o sobrescreve. Rechecagem, troca de projeto/fonte limpam dados antigos. Menu contextual oferece ver erro e copiar todos os erros com versão/catálogo/IDs. Logs existentes guardam exceção completa; não criar cache de pacotes nem exportar logs dentro de modpacks.
+- Dois logs enviados do amigo identificam executável1.1.23 por SHA391b7243..., embora o relato dissesse última versão. Não afirmar qual processo está aberto remotamente agora.12ZIPs enviados coincidem com catálogo. Evidência privada em Auditoria/Falhas-amigo-20261106/; não publicar logs/nomes de usuário/caminhos pessoais.
+- Comparação de recibo em fixture:1.1.23 reproduz Mod fora da lista fixa;1.1.25 valida pelo histórico conhecido. Não reintroduzir retirados, ignorar recibos nem afrouxar hashes. Mensagens de IDs ausentes devem identificar o ID. Atualização e uma tentativa no PC remoto ainda precisam confirmar o caso real.
+- Testes/limites em Conhecimento/Validacoes/1.1.25.json. Sem mudanças no catálogo/jogo/RED4ext; Setup somente fixture. Nenhuma alteração comum de mensagem virou relato falso de design G3.
+
 ## Revisão1.1.24 — fila, recibos antigos e compartilhamento
 
 - Ocultar avisos é escolha opcional no erro da fila e vale só para a operação atual, inclusive prioridade. Falhas continuam na tabela/log; nova fila restaura avisos. Não silenciar aprovações/conflitos globais.

@@ -17,6 +17,7 @@ internal sealed partial class GeneralModWindow : Form {
     GeneralModState state;
     readonly HashSet<string> marked=new HashSet<string>();
     readonly Dictionary<string,string> statuses=new Dictionary<string,string>();
+    readonly Dictionary<string,string> statusDetails=new Dictionary<string,string>();
     readonly Dictionary<string,int> progress=new Dictionary<string,int>();
     readonly List<Control> idle=new List<Control>();
     TextBox destination;
@@ -164,9 +165,12 @@ internal sealed partial class GeneralModWindow : Form {
         GeneralMenuRenderer.Add(menu,T("Abrir fonte no navegador","Open source in browser"),()=>Guard(()=>{var item=FocusedEntry();if(item!=null){var url=Selected(item).Sources.FirstOrDefault(GeneralModDownload.IsWebSource);if(url!=null)GeneralModDownload.OpenSource(url);}}));
         GeneralMenuRenderer.Add(menu,T("Tirar da lista","Remove from list"),()=>Guard(RemoveEntry));
         menu.Items.Add(new ToolStripSeparator());
+        var failureDetails=GeneralMenuRenderer.Add(menu,T("Ver erro da instalação","View installation error"),ShowFocusedFailure);
+        failureDetails.Name="ViewInstallFailure";
+        var copyFailures=GeneralMenuRenderer.Add(menu,T("Copiar erros da instalação","Copy installation errors"),CopyFailures);copyFailures.Name="CopyInstallFailures";
         var undo=GeneralMenuRenderer.Add(menu,T("Cyberpunk: desfazer operação","Cyberpunk: undo operation"),async()=>await CyberpunkMaintenance(false));
         var clean=GeneralMenuRenderer.Add(menu,T("Cyberpunk: limpar extras","Cyberpunk: remove extra mods"),async()=>await CyberpunkMaintenance(true));
-        menu.Opening+=(s,e)=>{bool available=!working&&!scanning&&IsCyberpunk(state.Destination);undo.Visible=available;clean.Visible=available;e.Cancel=FocusedEntry()==null;};
+        menu.Opening+=(s,e)=>{bool available=!working&&!scanning&&IsCyberpunk(state.Destination);undo.Visible=available;clean.Visible=available;var focused=FocusedEntry();string status;failureDetails.Visible=focused!=null&&statuses.TryGetValue(Key(focused,Selected(focused)),out status)&&GeneralStatusPresentation.Kind(status)=="error";copyFailures.Visible=statuses.Values.Any(value=>GeneralStatusPresentation.Kind(value)=="error");e.Cancel=focused==null;};
         grid.CellMouseDown+=(s,e)=>{if(e.Button==MouseButtons.Right&&e.RowIndex>=0&&grid.Rows[e.RowIndex].Tag is string)grid.CurrentCell=grid.Rows[e.RowIndex].Cells[1];};grid.ContextMenuStrip=menu;grid.Disposed+=(s,e)=>menu.Dispose();
         layout.Controls.Add(new GeneralScrollView(grid),0,5);
         detail=new Label{Dock=DockStyle.Fill,AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(0,10,0,4),MaximumSize=new Size(0,46)};
@@ -246,8 +250,8 @@ internal sealed partial class GeneralModWindow : Form {
             AddSection("heading",category,String.IsNullOrWhiteSpace(description)?54:78);
             foreach(var m in visible.Where(m=>String.Equals(m.Category,category,StringComparison.OrdinalIgnoreCase)||String.IsNullOrEmpty(m.Category)&&category==null)){
                 var v=Selected(m);string key=Key(m,v),status;int pct;statuses.TryGetValue(key,out status);bool hasProgress=progress.TryGetValue(key,out pct);
-                int i=grid.Rows.Add(marked.Contains(m.Id),m.Name,v.Name,GeneralStatusPresentation.Label(status),hasProgress?(object)pct:null,ModSpace(m.Id));var row=grid.Rows[i];row.Tag=m.Id;row.Cells["Status"].ToolTipText=GeneralStyle.Status(status??"Não conferido");
-                row.Cells["Size"].ToolTipText=SpaceTip(m.Id);row.Cells["Name"].ToolTipText=m.Description??"";row.Cells["Status"].ToolTipText=status??"";
+                int i=grid.Rows.Add(marked.Contains(m.Id),m.Name,v.Name,GeneralStatusPresentation.Label(status),hasProgress?(object)pct:null,ModSpace(m.Id));var row=grid.Rows[i];row.Tag=m.Id;row.Cells["Status"].ToolTipText=StatusDetail(key,status);
+                row.Cells["Size"].ToolTipText=SpaceTip(m.Id);row.Cells["Name"].ToolTipText=m.Description??"";
                 if(m.Id==old)grid.CurrentCell=row.Cells[1];
             }
             if(searchTerms.Length==0)AddSection("add",category,44);
@@ -367,7 +371,7 @@ internal sealed partial class GeneralModWindow : Form {
             }
             foreach(var old in before.Variants){
                 var replacement=after.Variants.FirstOrDefault(v=>v.Id==old.Id);
-                if(replacement==null||!replacement.Sources.SequenceEqual(old.Sources,StringComparer.Ordinal)){statuses.Remove(Key(before,old));progress.Remove(Key(before,old));state.SnapshotReceipts.Remove(Key(before,old));}
+                if(replacement==null||!replacement.Sources.SequenceEqual(old.Sources,StringComparer.Ordinal)){statuses.Remove(Key(before,old));statusDetails.Remove(Key(before,old));progress.Remove(Key(before,old));state.SnapshotReceipts.Remove(Key(before,old));}
             }
             if(working)UpdateFlow(null,"");
         }

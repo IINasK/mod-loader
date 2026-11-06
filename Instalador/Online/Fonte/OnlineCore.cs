@@ -91,7 +91,7 @@ public static class FixedData {
     public static List<FixedMod> Expand(FixedCatalog c,IEnumerable<string> selected) {
         var result=new List<FixedMod>(); var active=new HashSet<string>(); var done=new HashSet<string>();
         Action<string> visit=null;
-        visit=id=>{if(done.Contains(id))return;if(!active.Add(id))throw new IOException("Ciclo de dependências.");var m=c.Packages.SingleOrDefault(x=>x.Id==id);if(m==null)throw new IOException("Mod fora da lista fixa.");foreach(string d in m.Dependencies)visit(d);active.Remove(id);done.Add(id);result.Add(NightCityDensity.Default(m));};
+        visit=id=>{if(done.Contains(id))return;if(!active.Add(id))throw new IOException("Ciclo de dependências.");var m=c.Packages.SingleOrDefault(x=>x.Id==id);if(m==null)throw new IOException("Mod fora da lista fixa: "+(id??"<sem ID>")+". A referência não pertence ao catálogo desta versão.");foreach(string d in m.Dependencies)visit(d);active.Remove(id);done.Add(id);result.Add(NightCityDensity.Default(m));};
         foreach(string id in selected)visit(id);return result;
     }
     public static ModScan Scan(FixedMod mod,string game,bool checkIncompatibilities=true) {

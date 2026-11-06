@@ -1,0 +1,54 @@
+{
+  "Version": "1.1.25",
+  "Checks": 199,
+  "Reports": [
+    {
+      "Report": "resultado-progresso-geral.json",
+      "Checks": 38,
+      "Passed": true,
+      "Evidence": "T/R125/online-testes-e88f71a202cc4687bee7ef855a350598/resultado-progresso-geral.json"
+    },
+    {
+      "Report": "resultado-historico.json",
+      "Checks": 7,
+      "Passed": true,
+      "Evidence": "T/R125/online-testes-bea8a9fbedda41648ca1e628e3d6a438/resultado-historico.json"
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Checks": 122,
+      "Passed": true,
+      "Evidence": "T/R125/online-testes-0b85abdea3ac405cabf6b80c8243e05f/resultado-p2p-ui.json"
+    },
+    {
+      "Report": "resultado-snapshot-density.json",
+      "Checks": 8,
+      "Passed": true,
+      "Evidence": "T/R125/online-testes-7c7c44424b374796b779fa80b24fa8b3/resultado-snapshot-density.json"
+    },
+    {
+      "Report": "resultado-setup.json",
+      "Checks": 24,
+      "Passed": true,
+      "Evidence": "T/setup-f358285076a04368aadfc365ef99869f/resultado-setup.json"
+    }
+  ],
+  "AppSha256": "4f84a5d7881a22762bb5bc8c8ccafc34190467022ec9d03e92c301067fd04bbf",
+  "SetupSha256": "a97bf6a87bef64b8954c82eb44b6b3c7c5fa0cf84f61dbf084ef39f702a01f34",
+  "CatalogSha256": "c6a0b3a6170e10c8d707c4d25361d30be7382bccb9a25dd8a50d27c956e2e6a2",
+  "CatalogChanged": false,
+  "SubmittedLogsExecutableVersion": "1.1.23",
+  "SubmittedLogsExecutableSha256": "391b724376b5cfffaa8a4fa67d63a6897ecce1d8ff35c18be0dd8c2d04ba3a1a",
+  "SubmittedDesktopPackagesVerified": 12,
+  "AllSubmittedPackagesMatchCurrentCatalog": true,
+  "LegacyReceiptComparison": {
+    "Old123": "Mod fora da lista fixa.",
+    "New125": "accepted after trusted validation; no retired mod reintroduced"
+  },
+  "RealFriendComputerDirectlyInspected": false,
+  "RealGameModified": false,
+  "FullGeneralSuiteRun": false,
+  "P2PNetworkRepeated": false,
+  "Limit": "Remote installed process may have been updated after the submitted logs. Need one real retry after running the new installer; do not claim all remote installs fixed.",
+  "ReleaseVerified": false
+}
