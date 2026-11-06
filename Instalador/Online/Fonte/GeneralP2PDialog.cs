@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -11,165 +9,93 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     readonly P2PService service;
     readonly GeneralModState state;
     readonly FixedCatalog catalog;
-    readonly DownloadCache cache;
     readonly string[] ids;
-    readonly ListBox sessions=new ListBox{Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,IntegralHeight=false};
+    readonly TextBox output=new TextBox{ReadOnly=true,Multiline=true,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None};
     readonly TextBox input=new TextBox{Multiline=true,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,MaxLength=12000};
-    readonly TextBox output=new TextBox{Multiline=true,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,ReadOnly=true};
-    readonly Label status=new Label{Dock=DockStyle.Fill,AutoEllipsis=true};
-    readonly GeneralProgress progress=new GeneralProgress{Dock=DockStyle.Fill,Height=46};
-    readonly List<Button> commands=new List<Button>();
-    readonly Timer timer=new Timer{Interval=1500};
-    readonly CheckBox includeConfigs=new CheckBox{AutoSize=true,Checked=true};
-    readonly HashSet<string> autoReturn=new HashSet<string>();
-    readonly Button pause,load,install;
-    bool busy,polling;
+    readonly TextBox destination=new TextBox{ReadOnly=true,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None};
+    readonly Label status=new Label{Dock=DockStyle.Fill,UseMnemonic=false};
+    readonly GeneralProgress progress=new GeneralProgress{Dock=DockStyle.Fill,Height=44};
+    readonly Timer timer=new Timer{Interval=1000};
+    readonly Panel targetRow;
+    readonly Button connect,pause,choose;
+    readonly ToolTip tips=new ToolTip{UseAnimation=false,UseFading=false};
+    P2PSession selected;
+    bool busy,polling,remotePaused,returning;
     internal GeneralModList ReceivedList {get;private set;}
-    internal bool InstallAfterReceive {get;private set;}
+    internal bool InstallAfterReceive {get{return false;}}
     internal string InstalledReceiptId {get;private set;}
     internal string InstalledDestination {get;private set;}
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
-    P2PSession Selected {get{return sessions.SelectedItem as P2PSession;}}
-    internal GeneralP2PDialog(P2PService service,GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,DownloadCache cache,bool autoStart=true):base(T("Compartilhar pacote P2P","Share pack over P2P")){
-        this.service=service;this.state=state;this.ids=ids.ToArray();this.catalog=catalog;this.cache=cache;
-        sessions.DrawMode=DrawMode.OwnerDrawFixed;sessions.ItemHeight=28;
-        sessions.DrawItem+=(s,e)=>{
-            if(e.Index<0)return;bool selected=(e.State&DrawItemState.Selected)!=0;
-            using(var background=new SolidBrush(selected?GeneralStyle.Selection:GeneralStyle.Surface))e.Graphics.FillRectangle(background,e.Bounds);
-            var bounds=e.Bounds;bounds.Inflate(-8,0);
-            TextRenderer.DrawText(e.Graphics,Convert.ToString(sessions.Items[e.Index]),sessions.Font,bounds,GeneralStyle.Foreground,TextFormatFlags.Left|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis);
-            if((e.State&DrawItemState.Focus)!=0)e.DrawFocusRectangle();
-        };
-        ClientSize=new Size(900,720);Name="p2p-dialog";
-        var body=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(24,8,24,20),ColumnCount=1,RowCount=10};
-        int[] heights={96,48,118,48,30,74,48,74,48,70};
-        for(int row=0;row<heights.Length;row++)body.RowStyles.Add(row==2?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.Absolute,heights[row]));
-        Content.Controls.Add(body);
-        var intro=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=Padding.Empty};intro.RowStyles.Add(new RowStyle(SizeType.Percent,100));intro.RowStyles.Add(new RowStyle(SizeType.Absolute,28));
-        intro.Controls.Add(new Label{Name="p2p-intro",Dock=DockStyle.Fill,Text=T("Exporte um ZIP dos mods instalados. Envie o convite e autorize a resposta do amigo. Ele recebe, confere e instala automaticamente; o ZIP temporário é removido.","Export a ZIP of installed mods. Send the invitation and authorize your friend's reply. They receive, verify and install automatically; the temporary ZIP is removed.")},0,0);
-        includeConfigs.AutoSize=false;includeConfigs.Dock=DockStyle.Fill;includeConfigs.Margin=Padding.Empty;includeConfigs.Name="p2p-settings";
-        includeConfigs.Text=T("Incluir configurações seguras dos mods","Include safe mod settings");intro.Controls.Add(includeConfigs,0,1);body.Controls.Add(intro,0,0);
-        var top=Flow();body.Controls.Add(top,0,1);
-        Add(top,T("Exportar mods instalados","Export installed mods"),()=>Share(),true,"p2p-share");
-        Add(top,T("Receber convite","Receive invitation"),()=>Accept(),false,"p2p-receive");
-        Add(top,T("Autorizar resposta","Authorize reply"),()=>Authorize(),false,"p2p-authorize");
-        body.Controls.Add(new GeneralScrollView(sessions),0,2);
-        var sessionCommands=Flow();body.Controls.Add(sessionCommands,0,3);
-        Add(sessionCommands,T("Copiar convite/resposta","Copy invitation/reply"),()=>Copy());
-        pause=Add(sessionCommands,T("Pausar/Retomar","Pause/Resume"),()=>Run(()=>{if(Selected!=null)service.Pause(Selected);return Task.FromResult(0);}));
-        Add(sessionCommands,T("Encerrar e liberar espaço","Stop and free space"),()=>Remove());
-        body.Controls.Add(new Label{Dock=DockStyle.Fill,Text=T("Cole aqui o convite ou a resposta do seu amigo:","Paste your friend's invitation or reply here:")},0,4);
-        body.Controls.Add(Field(input),0,5);
-        var codeCommands=Flow();body.Controls.Add(codeCommands,0,6);
-        Add(codeCommands,T("Colar da área de transferência","Paste from clipboard"),()=>{try{input.Text=Clipboard.GetText();}catch(Exception ex){status.Text=ex.Message;}});
-        Add(codeCommands,T("Abrir pasta do pacote","Open pack folder"),()=>{if(Selected!=null)try{Process.Start(new ProcessStartInfo(service.Folder(Selected)){UseShellExecute=true});}catch(Exception ex){status.Text=ex.Message;}});
-        body.Controls.Add(Field(output),0,7);
-        var actions=Flow();actions.FlowDirection=FlowDirection.RightToLeft;body.Controls.Add(actions,0,8);
-        install=Add(actions,T("Carregar/Instalar","Load/Install"),()=>LoadPack(true),true,"p2p-install");
-        load=Add(actions,T("Carregar lista","Load list"),()=>LoadPack(false),false,"p2p-load");
-        var bottom=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2};bottom.RowStyles.Add(new RowStyle(SizeType.Absolute,36));bottom.RowStyles.Add(new RowStyle(SizeType.Percent,100));bottom.Controls.Add(progress,0,0);bottom.Controls.Add(status,0,1);body.Controls.Add(bottom,0,9);
-        input.Name="p2p-input";output.Name="p2p-output";sessions.Name="p2p-sessions";status.Name="p2p-status";
-        sessions.SelectedIndexChanged+=(s,e)=>SelectSession();timer.Tick+=async(s,e)=>await Poll();
-        FormClosing+=(s,e)=>{if(busy){e.Cancel=true;status.Text=T("Aguarde a preparação terminar.","Wait for preparation to finish.");}};
-        FormClosed+=(s,e)=>{timer.Stop();};Disposed+=(s,e)=>timer.Dispose();
-        GeneralStyle.Apply(this,GeneralStyle.Dark);Refill();
-        status.Text=T("Nenhum arquivo será enviado antes da autorização dos dois computadores.","No files are sent until both computers authorize the connection.");
-        if(autoStart)Shown+=(s,e)=>Run(async()=>{await Task.Run(()=>service.Start(Report));Refill();timer.Start();status.Text=T("Conexão pronta. Compartilhe um preset ou cole um convite.","Ready. Share a preset or paste an invitation.");});
+    internal GeneralP2PDialog(P2PService service,GeneralModState state,System.Collections.Generic.IEnumerable<string> ids,FixedCatalog catalog,DownloadCache cache,bool autoStart=true):base(T("Compartilhar P2P","Share over P2P")){
+        this.service=service;this.state=state;this.ids=ids.ToArray();this.catalog=catalog;
+        ClientSize=new Size(690,540);Name="p2p-dialog";
+        var body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=8,Padding=new Padding(24,8,24,20),Margin=Padding.Empty};
+        body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        foreach(int height in new[]{24,76,24,76,76,56,50})body.RowStyles.Add(new RowStyle(SizeType.Absolute,height));body.RowStyles.Add(new RowStyle(SizeType.Percent,100));Content.Controls.Add(body);
+        body.Controls.Add(Heading(T("Link para enviar ao amigo","Link to send to your friend")),0,0);
+        var send=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};send.RowStyles.Add(new RowStyle(SizeType.Percent,100));send.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));send.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
+        send.Controls.Add(Field(output),0,0);var copy=GeneralStyle.Button("",()=>{if(output.Text.Length>0)try{Clipboard.SetText(output.Text);}catch(Exception ex){status.Text=ex.Message;}});
+        ((GeneralButton)copy).IconKind="copy";((GeneralButton)copy).Bare=true;copy.AutoSize=false;copy.MinimumSize=new Size(44,44);copy.Size=copy.MinimumSize;copy.Margin=Padding.Empty;copy.Name="p2p-copy";copy.AccessibleName=T("Copiar link","Copy link");tips.SetToolTip(copy,copy.AccessibleName);send.Controls.Add(copy,1,0);body.Controls.Add(send,0,1);
+        body.Controls.Add(Heading(T("Link recebido do amigo","Link received from your friend")),0,2);body.Controls.Add(Field(input),0,3);
+        targetRow=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};var target=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=3,Margin=Padding.Empty};target.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));target.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));target.RowStyles.Add(new RowStyle(SizeType.Absolute,24));target.RowStyles.Add(new RowStyle(SizeType.Absolute,44));target.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        target.Controls.Add(Heading(T("Instalar na pasta local","Install into local folder")),0,0);target.SetColumnSpan(target.GetControlFromPosition(0,0),2);var destinationField=Field(destination);destinationField.Margin=Padding.Empty;target.Controls.Add(destinationField,0,1);
+        choose=GeneralStyle.Button(T("Escolher pasta","Choose folder"),ChooseFolder);choose.Margin=new Padding(8,0,0,0);choose.Name="p2p-folder";target.Controls.Add(choose,1,1);targetRow.Controls.Add(target);body.Controls.Add(targetRow,0,4);
+        var actions=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.RightToLeft,WrapContents=false,Margin=Padding.Empty};
+        connect=GeneralStyle.Button(T("Conectar","Connect"),()=>Run(Connect),true);connect.Name="p2p-connect";connect.Margin=new Padding(8,0,0,0);actions.Controls.Add(connect);
+        pause=GeneralStyle.Button(T("Pausar","Pause"),()=>Run(()=>{var session=selected;return Task.Run(()=>service.Pause(session));}));pause.Name="p2p-pause";pause.Margin=Padding.Empty;actions.Controls.Add(pause);body.Controls.Add(actions,0,5);body.Controls.Add(progress,0,6);body.Controls.Add(status,0,7);
+        output.Name="p2p-output";input.Name="p2p-input";destination.Name="p2p-destination";status.Name="p2p-status";destination.Text=state.Destination??"";
+        input.TextChanged+=(s,e)=>UpdateActions();timer.Tick+=async(s,e)=>await Poll();
+        selected=service.Sessions.LastOrDefault(s=>!s.Completed)??service.Sessions.LastOrDefault(s=>!s.Sender&&s.Completed&&!s.ListImported);
+        FormClosing+=(s,e)=>{if(busy){e.Cancel=true;status.Text=T("Aguarde a preparação terminar.","Wait for preparation to finish.");}};FormClosed+=(s,e)=>timer.Stop();Disposed+=(s,e)=>{timer.Dispose();tips.Dispose();};
+        GeneralStyle.Apply(this,GeneralStyle.Dark);status.Text=T("Para enviar o preset atual, deixe o segundo campo vazio e clique em Conectar. Para receber, cole o link do amigo.","To share the current preset, leave the second field empty and click Connect. To receive, paste your friend's link.");UpdateActions();
+        if(autoStart)Shown+=(s,e)=>Run(async()=>{await Task.Run(()=>service.Start(Report));SelectSession(selected);timer.Start();});
     }
-    static FlowLayoutPanel Flow(){return new FlowLayoutPanel{Dock=DockStyle.Fill,WrapContents=false,Margin=Padding.Empty};}
-    static GeneralSurface Field(Control control){var field=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(14,8,14,8),Margin=new Padding(0,0,0,8)};field.Controls.Add(control);return field;}
-    Button Add(FlowLayoutPanel panel,string text,Action action,bool primary=false,string name=null){var b=GeneralStyle.Button(text,action,primary);b.Name=name??"";b.Margin=new Padding(0,0,8,0);commands.Add(b);panel.Controls.Add(b);return b;}
+    static Label Heading(string text){return new Label{Text=text,Dock=DockStyle.Fill,Font=GeneralStyle.Font(11),Margin=Padding.Empty};}
+    static GeneralSurface Field(Control control){var field=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(14,9,14,9),Margin=new Padding(0,0,0,8)};field.Controls.Add(control);return field;}
     void Report(string text){if(!IsDisposed&&IsHandleCreated)BeginInvoke((Action)(()=>{if(!IsDisposed)status.Text=text;}));}
-    async void Run(Func<Task> operation){
-        if(busy)return;busy=true;SetEnabled();
-        try{while(polling)await Task.Delay(50);await operation();}catch(Exception ex){status.Text=T("Falha: ","Failed: ")+ex.Message;}
-        finally{busy=false;if(!IsDisposed)SetEnabled();}
+    async void Run(Func<Task> action){if(busy)return;busy=true;UpdateActions();try{while(polling)await Task.Delay(40);await action();}catch(Exception ex){status.Text=T("Falha: ","Failed: ")+ex.Message;}finally{busy=false;if(!IsDisposed)UpdateActions();}}
+    void UpdateActions(){
+        bool receiving=selected!=null&&!selected.Sender;try{receiving|=P2PInvite.Decode(input.Text).Kind=="offer";}catch(IOException){}
+        targetRow.Visible=receiving;var layout=(TableLayoutPanel)targetRow.Parent;layout.RowStyles[4].Height=receiving?76:0;
+        connect.Enabled=!busy&&(selected==null||selected.Stage==null);choose.Enabled=!busy&&(selected==null||selected.Sender||!selected.Completed&&selected.Stage==null);
+        pause.Visible=selected!=null&&!selected.Completed;pause.Enabled=!busy&&service.Engine.Running&&selected!=null&&!selected.Completed&&selected.Stage==null&&(!remotePaused||selected.Paused);
+        pause.Text=selected!=null&&selected.Paused?T("Retomar","Resume"):remotePaused?T("Pausado pelo amigo","Paused by friend"):T("Pausar","Pause");
     }
-    void SetEnabled(){
-        foreach(var b in commands)b.Enabled=!busy&&service.Engine.Running;
-        var s=Selected;load.Enabled=install.Enabled=!busy&&service.Engine.Running&&s!=null&&!s.Sender;
-        if(s!=null&&s.Stage!=null){foreach(var b in commands)b.Enabled=false;return;}
-        if(s!=null&&s.Mode=="installed-zip"){load.Enabled&=s.Completed;install.Enabled&=!s.Completed&&!String.IsNullOrEmpty(s.Error);pause.Enabled&=!s.Completed&&s.Stage==null;}
-    }
-    void Refill(P2PSession select=null){var previous=select??Selected;sessions.Items.Clear();sessions.Items.AddRange(service.Sessions.Cast<object>().ToArray());if(previous!=null&&sessions.Items.Contains(previous))sessions.SelectedItem=previous;else if(sessions.Items.Count>0)sessions.SelectedIndex=sessions.Items.Count-1;SetEnabled();}
-    void SelectSession(){var s=Selected;output.Text=s==null||!service.Engine.Running?T("Seu convite ou resposta aparecerá aqui.","Your invitation or reply will appear here."):service.Invitation(s);progress.Value=0;SetEnabled();}
-    void Share(){
-        if(GeneralDialog.Message(this,T("Criar um ZIP temporário usando somente os arquivos instalados dos mods deste preset e suas dependências? Não precisa dos downloads originais. Confirme que pode redistribuir os mods escolhidos. Feche o jogo antes de preparar. Saves e contas não serão enviados.","Create a temporary ZIP using only installed files from this preset and its dependencies? Original downloads are not required. Confirm you may redistribute the selected mods. Close the game before preparing. Saves and accounts are excluded."),T("Exportar instalados","Export installed mods"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-        bool settings=includeConfigs.Checked;
-        Run(async()=>{var session=await Task.Run(()=>service.ShareInstalled(state,ids,catalog,service.ApplicationData,settings,Report));Refill(session);status.Text=T("ZIP pronto. Copie o convite e envie ao amigo. O temporário será removido após o envio.","ZIP ready. Copy the invitation and send it to your friend. The temporary is removed after transfer.");});
-    }
-    void Accept(){
-        string code=input.Text;P2PInvite invite;
-        try{invite=P2PInvite.Decode(code);if(invite.Kind!="offer")throw new IOException(T("Cole um convite de envio.","Paste a sender invitation."));}catch(Exception ex){status.Text=ex.Message;return;}
-        string target=null;
-        if(invite.Mode=="installed-zip"){
-            target=state.Destination;
-            if(String.IsNullOrWhiteSpace(target)||!Directory.Exists(target))using(var folder=new FolderBrowserDialog{Description=T("Escolha a pasta do jogo para instalar o pacote.","Choose the game folder for this pack.")}){if(folder.ShowDialog(this)!=DialogResult.OK)return;target=folder.SelectedPath;}
+    void SelectSession(P2PSession session){selected=session;remotePaused=false;output.Text=session==null||!service.Engine.Running?"":service.Invitation(session);if(session!=null&&!session.Sender)destination.Text=session.Destination??destination.Text;UpdateActions();}
+    void ChooseFolder(){using(var folder=new FolderBrowserDialog{Description=T("Escolha a pasta local de instalação.","Choose the local installation folder."),SelectedPath=Directory.Exists(destination.Text)?destination.Text:""})if(folder.ShowDialog(this)==DialogResult.OK)destination.Text=folder.SelectedPath;}
+    async Task Connect(){
+        if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));timer.Start();
+        string code=input.Text.Trim();
+        if(code.Length==0){
+            if(selected!=null&&!selected.Completed){if(!selected.Sender&&selected.Error!=null){string target=destination.Text;await Task.Run(()=>service.RetryInstalled(selected,target));}SelectSession(selected);status.Text=T("Compartilhamento retomado. Envie o link acima ao amigo.","Sharing resumed. Send the link above to your friend.");return;}
+            var session=await Task.Run(()=>service.ShareInstalled(state,ids,catalog,service.ApplicationData,true,Report));SelectSession(session);status.Text=T("Envie o link acima. Depois cole aqui o link de resposta do amigo e clique em Conectar.","Send the link above. Then paste your friend's reply link here and click Connect.");return;
         }
-        string question=T("Receber o pacote ","Receive pack ")+invite.Name+T(" deste dispositivo?\n"," from this device?\n")+invite.Device;
-        if(target!=null)question+=T("\n\nInstalar automaticamente após a conferência em:\n","\n\nAutomatically install after verification into:\n")+target+T("\nAs configurações incluídas serão aplicadas com backup. Mantenha o jogo fechado.","\nIncluded settings will be applied with backup. Keep the game closed.");
-        if(GeneralDialog.Message(this,question,T("Autorizar remetente","Authorize sender"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-        Run(async()=>{var s=await Task.Run(()=>service.Accept(code,target,target!=null));if(s.Mode=="installed-zip"&&!s.Completed)autoReturn.Add(s.Id);Refill(s);status.Text=T("Copie a resposta abaixo e envie ao remetente para ele autorizar.","Copy the reply below and send it to the sender for authorization.");});
-    }
-    void Authorize(){
-        string code=input.Text;P2PInvite reply;try{reply=P2PInvite.Decode(code);}catch(Exception ex){status.Text=ex.Message;return;}
-        if(GeneralDialog.Message(this,T("Autorizar este computador a receber o pacote?\n","Authorize this computer to receive the pack?\n")+reply.Device,T("Autorizar amigo","Authorize friend"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-        Run(async()=>{var s=await Task.Run(()=>service.Authorize(code));Refill(s);status.Text=T("Amigo autorizado. A transferência começa quando os dois estiverem conectados.","Friend authorized. Transfer starts when both computers are connected.");});
-    }
-    void Copy(){if(Selected==null)return;try{Clipboard.SetText(service.Invitation(Selected));status.Text=T("Copiado. Envie o código ao seu amigo.","Copied. Send the code to your friend.");}catch(Exception ex){status.Text=ex.Message;}}
-    void Remove(){
-        var s=Selected;if(s==null)return;
-        if(GeneralDialog.Message(this,T("Encerrar este compartilhamento e remover sua cópia de transferência? Os originais, arquivos recebidos já preparados e mods instalados serão preservados.","Stop sharing and remove this transfer copy? Originals, prepared received files and installed mods will be preserved."),T("Encerrar compartilhamento","Stop sharing"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-        Run(async()=>{await Task.Run(()=>service.Remove(s));Refill();status.Text=T("Compartilhamento encerrado.","Sharing stopped.");});
-    }
-    void LoadPack(bool installNow){
-        var s=Selected;if(s==null||s.Sender)return;
-        if(s.Mode=="installed-zip"){
-            if(s.Completed)Run(()=>{ReceivedList=service.InstalledManifest(s).List;InstalledReceiptId=s.ReceiptId;InstalledDestination=s.Destination;busy=false;Complete(DialogResult.OK);return Task.FromResult(0);});
-            else if(installNow)Run(()=>{service.RetryInstalled(s,s.Destination);return Task.FromResult(0);});
-            return;
-        }
-        Run(async()=>{ReceivedList=await Task.Run(()=>P2PPack.Receive(service.Folder(s),s.Hash,service.PrivateFolder(s),catalog,cache,Report));InstallAfterReceive=installNow;busy=false;Complete(DialogResult.OK);});
+        var invite=P2PInvite.Decode(code);if(invite.Mode!="installed-zip")throw new IOException(T("Este link usa o formato antigo. Peça um novo link ao amigo.","This link uses the old format. Ask your friend for a new link."));
+        if(invite.Kind=="offer"){
+            if(!Directory.Exists(destination.Text))ChooseFolder();if(!Directory.Exists(destination.Text))throw new IOException(T("Escolha a pasta de instalação.","Choose the installation folder."));string target=destination.Text;
+            if(GeneralDialog.Message(this,T("Receber e instalar o pacote ","Receive and install pack ")+invite.Name+T(" em:\n"," into:\n")+target+T("\n\nMantenha o jogo fechado. Configurações anteriores terão backup.","\n\nKeep the game closed. Previous settings will be backed up."),T("Conectar e instalar","Connect and install"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
+            var session=await Task.Run(()=>{var received=service.Accept(code,target,true);if(!received.Completed)service.RetryInstalled(received,target);return received;});SelectSession(session);status.Text=T("Envie o link de resposta acima ao amigo. O recebimento e a instalação continuarão automaticamente.","Send the reply link above to your friend. Receiving and installation will continue automatically.");
+        }else{var session=await Task.Run(()=>service.Authorize(code));SelectSession(session);status.Text=T("Conectado. A transferência continua automaticamente.","Connected. Transfer continues automatically.");}
+        input.Clear();
     }
     async Task Poll(){
-        if(busy||polling||!service.Engine.Running||Selected==null)return;polling=true;var s=Selected;
+        if(busy||polling||!service.Engine.Running||selected==null||returning)return;polling=true;var session=selected;
         try{
-            var result=await Task.Run(()=>{
-                if(s.Mode=="installed-zip"){
-                    if(s.Completed)return new object[]{100,s.Sender?T("Enviado. ZIP temporário removido.","Sent. Temporary ZIP removed."):T("Instalado e conferido. ZIP temporário removido.","Installed and verified. Temporary ZIP removed.")};
-                    if(!String.IsNullOrEmpty(s.Error))return new object[]{0,T("Falha: ","Failed: ")+s.Error};
-                    if(s.Stage!=null)return new object[]{99,s.Stage};
-                    var snapshot=service.Engine.Get("db/status?folder="+s.Id);long snapshotNeeded=Convert.ToInt64(snapshot["needBytes"]);
-                    int snapshotPct=s.Sender?0:(int)Math.Max(0,Math.Min(99,(s.Size-snapshotNeeded)*100.0/s.Size));
-                    if(s.Sender&&s.Peer!=null){var c=service.Engine.Get("db/completion?folder="+s.Id+"&device="+s.Peer);snapshotPct=(int)Math.Min(99,Convert.ToDouble(c["completion"]));}
-                    return new object[]{snapshotPct,s.Paused?T("Pausado","Paused"):s.Peer==null?T("Aguardando resposta do amigo.","Waiting for your friend's reply."):s.Sender?T("Enviando ZIP temporário…","Sending temporary ZIP…"):T("Recebendo ZIP; a instalação começa após a conferência.","Receiving ZIP; installation starts after verification.")};
-                }
-                var connection=service.Engine.Get("system/connections");var connections=connection["connections"] as Dictionary<string,object>;
-                bool online=false;if(s.Peer!=null&&connections!=null&&connections.ContainsKey(s.Peer)){var peer=connections[s.Peer] as Dictionary<string,object>;online=peer!=null&&Convert.ToBoolean(peer["connected"]);}
-                if(s.Sender){
-                    double percentage=0;if(s.Peer!=null){var completion=service.Engine.Get("db/completion?folder="+s.Id+"&device="+s.Peer);percentage=Convert.ToDouble(completion["completion"]);}
-                    return new object[]{(int)percentage,s.Paused?T("Pausado","Paused"):s.Peer==null?T("Aguardando a resposta do amigo.","Waiting for your friend's reply."):online?T("Enviando · ","Sending · ")+percentage.ToString("0")+"%":T("Aguardando seu amigo conectar.","Waiting for your friend to connect.")};
-                }
-                string manifest=Safe.In(service.Folder(s),"pack.json");if(!File.Exists(manifest))return new object[]{0,online?T("Recebendo manifesto…","Receiving manifest…"):T("Aguardando autorização/conexão do remetente.","Waiting for sender authorization/connection.")};
-                var pack=service.AllowFiles(s);long total=pack.Files.Sum(f=>f.Size);
-                var transfer=service.Engine.Get("db/status?folder="+s.Id);long needed=Convert.ToInt64(transfer["needBytes"]);
-                bool arrived=pack.Files.All(f=>File.Exists(Safe.In(service.Folder(s),f.File))&&new FileInfo(Safe.In(service.Folder(s),f.File)).Length==f.Size);
-                int pct=total==0?99:(int)Math.Max(0,Math.Min(99,(total-needed)*100.0/total));
-                string note=s.Paused?T("Pausado","Paused"):arrived?T("Arquivos recebidos; clique em Carregar lista para conferir, ou Carregar/Instalar.","Files received; click Load list to verify, or Load/Install."):(online?T("Recebendo · estimado","Receiving · estimated"):T("Aguardando remetente","Waiting for sender"))+" · "+pct+"%";
-                return new object[]{pct,note};
-            });
-            if(!IsDisposed&&Selected==s){progress.Value=Convert.ToInt32(result[0]);progress.Caption=s.Name;status.Text=Convert.ToString(result[1]);progress.Invalidate();SetEnabled();}
-            if(!IsDisposed&&s.Completed&&!s.Sender&&autoReturn.Remove(s.Id))LoadPack(false);
-        }catch(Exception ex){if(!IsDisposed)status.Text=T("Aguardando ou falha: ","Waiting or failed: ")+ex.Message;}
-        finally{polling=false;}
+            if(session.Completed){if(Directory.Exists(service.Folder(session))){progress.Value=99;status.Text=T("Finalizando a limpeza do arquivo temporário…","Finishing temporary archive cleanup…");return;}progress.Value=100;progress.Caption=session.Sender?T("Envio concluído","Send complete"):T("Instalação concluída","Installation complete");status.Text=T("Concluído. Arquivo temporário removido.","Complete. Temporary archive removed.");
+                if(!session.Sender&&!session.ListImported){ReceivedList=service.InstalledManifest(session).List;InstalledReceiptId=session.ReceiptId;InstalledDestination=session.Destination;returning=true;Complete(DialogResult.OK);}return;}
+            if(session.Error!=null){status.Text=T("Falha: ","Failed: ")+session.Error+T(" O arquivo foi preservado. Use Conectar para tentar novamente."," The file was preserved. Use Connect to retry.");return;}
+            if(session.Stage!=null){progress.Value=99;progress.Caption=T("Conferindo e instalando","Verifying and installing");status.Text=session.Stage;return;}
+            var transfer=await Task.Run(()=>service.TransferStatus(session));if(IsDisposed)return;remotePaused=transfer.RemotePaused;progress.Value=transfer.Percent;progress.Caption=session.Sender?T("Enviando","Sending"):T("Recebendo","Receiving");
+            status.Text=session.Paused?T("Pausado por você. Só você pode retomar sua pausa.","Paused by you. Only you can release your pause."):remotePaused?T("Pausado pelo amigo. Aguarde ele retomar.","Paused by your friend. Wait for them to resume."):session.Peer==null?T("Aguardando o link de resposta do amigo.","Waiting for your friend's reply link."):!transfer.Connected?T("Aguardando reconexão do amigo. A transferência será retomada.","Waiting for your friend to reconnect. Transfer will resume."):session.Sender?T("Enviando pacote…","Sending pack…"):T("Recebendo pacote; a instalação começa após a conferência.","Receiving pack; installation starts after verification.");
+        }catch(Exception){status.Text=T("Conexão interrompida. Tentando retomar; o progresso foi preservado.","Connection interrupted. Retrying; progress was preserved.");}
+        finally{polling=false;if(!IsDisposed)UpdateActions();}
     }
 }
 
+
 internal sealed partial class GeneralModWindow {
     P2PService p2p;
-    async void ShowP2P(){
-        if(working||scanning)return;
-        try{
+    void PrepareP2P(){
             if(p2p==null){
                 p2p=new P2PService(Path.Combine(data,"P2P"),Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"Mod Loader","Pacotes P2P"));
                 p2p.EnableInstalledReceive(catalog,data);
@@ -188,13 +114,25 @@ internal sealed partial class GeneralModWindow {
                 };
                 FormClosed+=(s,e)=>{try{p2p.Dispose();}catch(Exception){}};
             }
+    }
+    async Task ResumeP2P(){
+        if(testMode||!File.Exists(Path.Combine(data,"P2P","sessions.json")))return;
+        try{PrepareP2P();if(!p2p.Sessions.Any(s=>!s.Completed))return;await Task.Run(()=>p2p.Start(_=>{}));if(!IsDisposed)detail.Text=T("Compartilhamento P2P retomado.","P2P sharing resumed.");else p2p.Dispose();}
+        catch(Exception ex){if(!IsDisposed)detail.Text=T("Retomada P2P: ","P2P resume: ")+ex.Message;}
+    }
+
+    async void ShowP2P(){
+        if(working||scanning)return;
+        try{
+            PrepareP2P();
             var chosen=state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);
             var ids=chosen==null?state.List.Mods.Select(m=>m.Id):chosen.ModIds;
             using(var dialog=new GeneralP2PDialog(p2p,state,ids,catalog,cache)){
                 if(dialog.ShowDialog(this)!=DialogResult.OK||dialog.ReceivedList==null)return;
                 if(!await ReplaceList(dialog.ReceivedList,true,dialog.InstalledReceiptId,dialog.InstalledDestination))return;
+                if(dialog.InstalledReceiptId!=null)p2p.MarkImported(dialog.InstalledReceiptId);
                 if(dialog.InstallAfterReceive){foreach(var mod in state.List.Mods)marked.Add(mod.Id);DrawRows();StartSelected();}
-                else detail.Text=T("Pacote recebido e conferido. Selecione os itens e clique em Baixar/Instalar.","Pack received and verified. Select items and click Download/Install.");
+                else detail.Text=T("Pacote instalado e conferido; presets e nomes importados.","Pack installed and verified; presets and names imported.");
             }
         }catch(Exception ex){ShowError(ex);}
     }

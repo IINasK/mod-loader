@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Xml;
+using System.Windows.Forms;
 
 internal static class InstalledSnapshotP2PTests {
     static readonly Action<string> Ignore=message=>{};
@@ -69,6 +70,8 @@ internal static class InstalledSnapshotP2PTests {
             receiver.Remove(bad);receiver.Remove(accepted);sender.Remove(sent);
             Check(checks,FolderCount(sender)==0&&FolderCount(receiver)==0&&File.Exists(Safe.In(target,"mods/fixture.txt")),"Encerrar sessões preserva instalações e não deixa compartilhamento ativo.");
             sender.Dispose();receiver.Dispose();Check(checks,!sender.Engine.Running&&!receiver.Engine.Running,"Finalização encerra apenas os dois auxiliares deste ensaio.");
+            ResumeTransfer(root,checks,officialExe);
+            DialogTransfer(root,checks,officialExe);
             Safe.WriteJson(Path.Combine(root,"resultado-snapshot-p2p.json"),new{Passed=true,Checks=checks.Count,Tests=checks,RealGameTouched=false,NetworkUsed=true,LoopbackOnly=true,AutoInstalled=true});return checks.Count;
         }catch(Exception ex){Safe.WriteJson(Path.Combine(root,"resultado-snapshot-p2p.json"),new{Passed=false,Checks=checks.Count,Tests=checks,Error=ex.ToString(),RealGameTouched=false,NetworkUsed=true,LoopbackOnly=true});throw;}
         finally{if(sender!=null)sender.Dispose();if(receiver!=null)receiver.Dispose();}
@@ -95,6 +98,77 @@ internal static class InstalledSnapshotP2PTests {
         Check(checks,!Archives(receivedData).Any()&&!Directory.Exists(receiver.PrivateFolder(accepted)),"Mesmo com configurações nenhum pacote persistente recebido é mantido.");
         receiver.Remove(accepted);sender.Remove(sent);
     }
+    static void ResumeTransfer(string root,List<string> checks,string officialExe){
+        string source=Path.Combine(root,"resume-source"),data=Path.Combine(root,"resume-data"),receivedData=Path.Combine(root,"resume-received"),target=Target(root,"resume-target");Directory.CreateDirectory(source);Directory.CreateDirectory(data);Directory.CreateDirectory(receivedData);
+        byte[] bytes=new byte[8*1024*1024];new Random(12345).NextBytes(bytes);string original=Path.Combine(root,"resume-original.zip");
+        using(var zip=ZipFile.Open(original,ZipArchiveMode.Create))using(var output=zip.CreateEntry("mods/fixture.bin",CompressionLevel.NoCompression).Open())output.Write(bytes,0,bytes.Length);
+        var state=State(source,original);var catalog=EmptyCatalog();new GeneralModInstaller(source,Path.Combine(data,"Instalacoes")).Install(original,"fixture/default/0/"+original,Ignore);File.Delete(original);
+        string sh=Path.Combine(root,"resume-sh"),st=Path.Combine(root,"resume-st"),rh=Path.Combine(root,"resume-rh"),rt=Path.Combine(root,"resume-rt");P2PService sender=null,receiver=null;
+        try{
+            sender=new P2PService(sh,st,true);receiver=new P2PService(rh,rt,true);sender.Start(Ignore,officialExe);receiver.EnableInstalledReceive(catalog,receivedData,true);receiver.Start(Ignore,officialExe);
+            sender.Engine.Request("PATCH","config/options",new{maxSendKbps=1024,limitBandwidthInLan=true});var sent=sender.ShareInstalled(state,new[]{"fixture"},catalog,data,true,Ignore);var received=receiver.Accept(sender.Invitation(sent),target,true);sender.Authorize(receiver.Invitation(received));
+            Link(sender,receiver);sender.Engine.Request("POST","db/scan?folder="+sent.Id,null);
+            int partial=0;Wait(()=>{partial=receiver.TransferStatus(received).Percent;return partial>0&&partial<99;},"Progresso parcial por blocos não apareceu.");Check(checks,partial>0&&partial<99&&!received.Completed,"Barra mede blocos baixados de um ZIP ainda incompleto, não tamanho pré-alocado.");
+            receiver.Pause(received);Wait(()=>sender.TransferStatus(sent).RemotePaused,"Remetente não percebeu a pausa remota.");Check(checks,!sent.Paused&&received.Paused,"Pausa do receptor aparece no remetente sem alterar a pausa local dele.");
+            sender.Pause(sent);receiver.Pause(received);Wait(()=>receiver.TransferStatus(received).RemotePaused,"Receptor não percebeu a pausa do remetente.");Check(checks,!received.Paused&&sent.Paused,"Retomar a própria pausa não libera uma pausa ainda mantida pelo amigo.");receiver.Pause(received);
+            string senderDevice=sender.Engine.Device,receiverDevice=receiver.Engine.Device,folder=sent.Id;
+            foreach(var service in new[]{sender,receiver}){
+                var process=(Process)typeof(SyncthingEngine).GetField("process",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).GetValue(service.Engine);
+                // Syncthing's monitor has a child worker; a power-loss test must stop both.
+                using(var stop=Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory,"taskkill.exe"),"/PID "+process.Id+" /T /F"){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden})){stop.WaitForExit();if(stop.ExitCode!=0)throw new IOException("Falha ao interromper apenas o auxiliar isolado de teste.");}
+                process.WaitForExit();service.Dispose();
+            }
+            sender=new P2PService(sh,st,true);receiver=new P2PService(rh,rt,true);sent=sender.Sessions.Single(s=>s.Id==folder);received=receiver.Sessions.Single(s=>s.Id==folder);
+            sender.Start(Ignore,officialExe);receiver.EnableInstalledReceive(catalog,receivedData,true);receiver.Start(Ignore,officialExe);Link(sender,receiver);
+            Check(checks,sent.Paused&&received.Paused&&sender.Engine.Device==senderDevice&&receiver.Engine.Device==receiverDevice&&received.Destination==target&&!received.Completed,"Após encerrar abruptamente os auxiliares, sessões, identidades, destino e pausas são recuperados.");
+            Check(checks,File.Exists(Safe.In(sender.Folder(sent),"pack.zip"))&&Directory.GetFiles(receiver.Folder(received),"*",SearchOption.AllDirectories).Any(p=>p.EndsWith(".tmp",StringComparison.OrdinalIgnoreCase)),"ZIP fonte e blocos temporários permanecem disponíveis após reiniciar.");
+            receiver.Pause(received);sender.Engine.Request("PATCH","config/options",new{maxSendKbps=0});sender.Pause(sent);
+            Wait(()=>received.Completed||received.Error!=null,"A retomada não concluiu a instalação.");Check(checks,received.Completed&&received.Error==null&&Safe.Hash(Safe.In(target,"mods/fixture.bin"))==InstalledSnapshot.Hash(bytes),"Transferência reiniciada conclui por hash e instala automaticamente no destino autorizado.");
+            Wait(()=>sent.Completed&&!Directory.Exists(sender.Folder(sent))&&!Directory.Exists(receiver.Folder(received)),"Temporários da retomada não foram removidos.");Check(checks,!Directory.Exists(sender.Folder(sent))&&!Directory.Exists(receiver.Folder(received)),"Conclusão elimina ZIP e blocos temporários nos dois lados.");
+        }finally{if(sender!=null)sender.Dispose();if(receiver!=null)receiver.Dispose();}
+    }
+    static void Link(P2PService sender,P2PService receiver){sender.Engine.ConfigurePeer(receiver.Engine.Device,"tcp://127.0.0.1:"+receiver.Engine.ListenPort);receiver.Engine.ConfigurePeer(sender.Engine.Device,"tcp://127.0.0.1:"+sender.Engine.ListenPort);}
+    internal static void RunDialogNetwork(string parent,string officialExe){
+        if(Safe.Hash(officialExe)!=SyncthingEngine.ExeHash)throw new IOException("Auxiliar de teste não reconhecido.");
+        string root=Path.Combine(parent,"pd-"+Guid.NewGuid().ToString("N").Substring(0,6));Directory.CreateDirectory(root);var checks=new List<string>();
+        try{DialogTransfer(root,checks,officialExe);Safe.WriteJson(Path.Combine(root,"resultado-p2p-dialog-network.json"),new{Passed=true,Tests=checks,LoopbackOnly=true,RealGameTouched=false});}
+        catch(Exception ex){Safe.WriteJson(Path.Combine(root,"resultado-p2p-dialog-network.json"),new{Passed=false,Tests=checks,Error=ex.ToString()});throw;}
+    }
+    static void DialogTransfer(string root,List<string> checks,string officialExe){
+        string game=Path.Combine(root,"ui-source"),data=Path.Combine(root,"ui-data"),receivedData=Path.Combine(root,"ui-rdata"),target=Target(root,"ui-target"),original=Path.Combine(root,"ui-original.zip");Directory.CreateDirectory(game);Directory.CreateDirectory(data);Directory.CreateDirectory(receivedData);
+        using(var zip=ZipFile.Open(original,ZipArchiveMode.Create))using(var writer=new StreamWriter(zip.CreateEntry("mods/ui.txt").Open()))writer.Write("dialog transfer");
+        var state=State(game,original);state.List.Mods[0].Name="Meu mod da UI";state.List.Presets.Add(new GeneralModPreset{Id="amigos",Name="Meus amigos",ModIds=new List<string>{"fixture"}});state.SelectedPreset="amigos";
+        new GeneralModInstaller(game,Path.Combine(data,"Instalacoes")).Install(original,"fixture/default/0/"+original,Ignore);File.Delete(original);var catalog=EmptyCatalog();bool animation=GeneralStyle.AnimationsEnabled;GeneralStyle.AnimationsEnabled=false;
+        Exception failure=null;Action<string> phase=value=>File.WriteAllText(Path.Combine(root,"ui-phase.txt"),value);
+        try{using(var sender=new P2PService(Path.Combine(root,"ui-sh"),Path.Combine(root,"ui-st"),true))using(var receiver=new P2PService(Path.Combine(root,"ui-rh"),Path.Combine(root,"ui-rt"),true)){
+            sender.EnableInstalledReceive(catalog,data,true);receiver.EnableInstalledReceive(catalog,receivedData,true);sender.Start(Ignore,officialExe);receiver.Start(Ignore,officialExe);
+            var receiverState=new GeneralModState{Destination=target};var cache=new DownloadCache(Path.Combine(root,"ui-cache"));
+            using(var host=new Form{ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,Location=new System.Drawing.Point(-30000,-30000)})
+            using(var sending=new GeneralP2PDialog(sender,state,new[]{"fixture"},catalog,cache,false))using(var receiving=new GeneralP2PDialog(receiver,receiverState,new string[0],catalog,cache,false)){
+                System.Threading.ThreadExceptionEventHandler onError=(s,e)=>{failure=e.Exception;phase(e.Exception.ToString());receiving.Dispose();sending.Dispose();host.Close();};Application.ThreadException+=onError;
+                host.Shown+=async(s,e)=>{
+                    try{
+                        foreach(var form in new[]{sending,receiving}){form.ShowInTaskbar=false;form.StartPosition=FormStartPosition.Manual;form.Location=new System.Drawing.Point(-30000,-30000);form.Show(host);}
+                        phase("source connect");((Button)sending.Content.Controls.Find("p2p-connect",true).Single()).PerformClick();await UIWait(()=>sending.Content.Controls.Find("p2p-output",true).Single().Text.Length>0,"Conectar não gerou convite na UI.");
+                        string offer=sending.Content.Controls.Find("p2p-output",true).Single().Text;Check(checks,P2PInvite.Decode(offer).Kind=="offer","Conectar sem link cria o pacote e mostra o convite real no primeiro campo.");
+                        phase("receiver connect");receiving.Content.Controls.Find("p2p-input",true).Single().Text=offer;
+                        using(var confirm=new System.Windows.Forms.Timer{Interval=25}){
+                            confirm.Tick+=(a,b)=>{var question=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(f=>f!=sending&&f!=receiving&&f.AcceptButton!=null);if(question!=null){((Button)question.AcceptButton).PerformClick();confirm.Stop();}};confirm.Start();
+                            ((Button)receiving.Content.Controls.Find("p2p-connect",true).Single()).PerformClick();await UIWait(()=>receiving.Content.Controls.Find("p2p-output",true).Single().Text.Length>0,"UI de recebimento não gerou resposta.");
+                        }
+                        string reply=receiving.Content.Controls.Find("p2p-output",true).Single().Text;Check(checks,P2PInvite.Decode(reply).Kind=="accept"&&receiver.Sessions.Single().Destination==target,"Conectar com convite vincula o destino local escolhido e mostra a resposta.");
+                        phase("sender authorize");sending.Content.Controls.Find("p2p-input",true).Single().Text=reply;await UIWait(()=>((Button)sending.Content.Controls.Find("p2p-connect",true).Single()).Enabled,"Botão Conectar não liberou após preparar.");((Button)sending.Content.Controls.Find("p2p-connect",true).Single()).PerformClick();await UIWait(()=>sender.Sessions.Single().Peer!=null,"UI não autorizou a resposta.");Link(sender,receiver);
+                        phase("waiting install");await UIWait(()=>receiving.ReceivedList!=null,"UI não concluiu e devolveu a lista instalada.");Check(checks,receiving.ReceivedList.Mods.Single().Name=="Meu mod da UI"&&receiving.ReceivedList.Presets.Single().Name=="Meus amigos"&&receiving.InstalledReceiptId!=null,"Fluxo real dos dois botões Conectar instala e retorna nomes/presets/recibo.");
+                        Check(checks,File.ReadAllText(Safe.In(target,"mods/ui.txt"))=="dialog transfer"&&!Directory.Exists(receiver.Folder(receiver.Sessions.Single())),"Conclusão pela UI contém o arquivo instalado e remove o temporário recebido.");phase("complete");
+                    }catch(Exception ex){failure=ex;phase(ex.ToString());}finally{receiving.Dispose();sending.Dispose();host.Close();}
+                };
+                try{Application.Run(host);}finally{Application.ThreadException-=onError;}
+            }
+        }}finally{GeneralStyle.AnimationsEnabled=animation;}
+        if(failure!=null)throw new IOException("Fluxo UI: "+failure.Message,failure);
+    }
+    static async System.Threading.Tasks.Task UIWait(Func<bool> ready,string message){var elapsed=Stopwatch.StartNew();while(!ready()){if(elapsed.ElapsedMilliseconds>40000)throw new IOException(message);await System.Threading.Tasks.Task.Delay(25);}}
+
     static FixedCatalog EmptyCatalog(){return new FixedCatalog{Schema=1,Id="network-fixture",GameVersion="2.5",GameFileVersion="2.5.0.0",Packages=new List<FixedMod>(),Defaults=new List<FixedDefault>()};}
     static GeneralModState State(string game,string original){var state=new GeneralModState{Destination=game};state.List.Mods.Add(new GeneralModEntry{Id="fixture",Name="Installed fixture",DefaultVariant="default",Variants=new List<GeneralModVariant>{new GeneralModVariant{Id="default",Name="Main",Sources=new List<string>{original}}}});return state;}
     static string Target(string root,string name){string path=Path.Combine(root,"online-testes-"+Guid.NewGuid().ToString("N"),name);Directory.CreateDirectory(path);File.WriteAllText(Safe.In(path,".fixture-only"),"isolated fixture");return path;}

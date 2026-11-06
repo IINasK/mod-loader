@@ -67,6 +67,20 @@ public static class InstalledSnapshotInstallerTests {
         Throws(() => engine.Install(bad, new string('0', 64), null), "Hash incorreto do pacote é recusado antes de instalar.");
 
         ConfigTransactions(root);
+        ResumeTransactions(root,catalog);
+    }
+    static void ResumeTransactions(string parent,FixedCatalog catalog){
+        string target=Path.Combine(parent,"resume-game"),data=Path.Combine(parent,"resume-data");Directory.CreateDirectory(target);File.WriteAllText(Safe.In(target,".fixture-only"),"fixture");
+        string zip=Pack(parent,"resume",catalog,new Dictionary<string,string>{{"mods/a.txt","aaa"},{"mods/b.txt","bbb"}});var engine=new InstalledSnapshotInstaller(target,data,catalog,true);
+        string id=engine.Install(zip,Safe.Hash(zip),null);var flags=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
+        var receipt=(InstalledSnapshotInstaller.Receipt)typeof(InstalledSnapshotInstaller).GetMethod("Read",flags).Invoke(engine,new object[]{id});receipt.Status="installing";receipt.Files.ForEach(f=>f.Applied=false);
+        string stage=Safe.In(target,".mod-loader-snapshot-"+id);Directory.CreateDirectory(stage);var last=receipt.Files.Last();string prepared=Safe.In(stage,InstalledSnapshot.Hash(Encoding.UTF8.GetBytes(last.Path)).Substring(0,32));File.Copy(Safe.In(target,last.Path),prepared);File.Delete(Safe.In(target,last.Path));
+        typeof(InstalledSnapshotInstaller).GetMethod("Save",flags).Invoke(engine,new object[]{receipt});
+        var restarted=new InstalledSnapshotInstaller(target,data,catalog,true);string resumed=restarted.Install(zip,Safe.Hash(zip),null);
+        Check(resumed==id&&restarted.Status(id,"resume/default")==GeneralModInstaller.Installed&&!Directory.Exists(stage),"Reinício retoma recibo interrompido, reconhece cópia anterior ao último Save e limpa o estágio.");
+        Check(restarted.Install(zip,Safe.Hash(zip),null)==id,"Reinício após concluir reaproveita recibo sem duplicar instalação ou backups.");
+        receipt.Status="installing";typeof(InstalledSnapshotInstaller).GetMethod("Save",flags).Invoke(restarted,new object[]{receipt});File.WriteAllText(Safe.In(target,last.Path),"alteração do usuário");
+        Throws(()=>restarted.Install(zip,Safe.Hash(zip),null),"Retomada recusa arquivo alterado pelo usuário após a interrupção.");Check(File.ReadAllText(Safe.In(target,last.Path))=="alteração do usuário"&&File.Exists(zip),"Falha na retomada preserva alteração local e pacote original.");
     }
 
     static void ConfigTransactions(string parent) {

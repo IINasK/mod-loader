@@ -11,12 +11,14 @@ using System.Text.RegularExpressions;
 public sealed class InstalledSnapshotInstaller {
     public sealed class Receipt {
         public string Id, Root, Status;
+        public bool Recoverable;
         public InstalledSnapshotManifest Manifest;
         public List<string> ActiveOwners = new List<string>();
         public List<Change> Files = new List<Change>();
     }
     public sealed class Change {
         public string Path, Before, After;
+        public string Expected;
         public long Size;
         public bool Owned, Applied, Reverted;
     }
@@ -54,12 +56,17 @@ public sealed class InstalledSnapshotInstaller {
             using (AcquireLock(manifest.Game)) {
                 ValidateEnvironment(manifest);
                 var receipts = AllReceipts().ToList();
-                if (receipts.Any(r => r.Status == "preparing" || r.Status == "installing"))
-                    throw new IOException("Há uma instalação de snapshot interrompida nesta pasta. Preserve os recibos e restaure a operação antes de continuar.");
+                var pending=receipts.Where(r=>r.Status=="preparing"||r.Status=="installing").ToList();
+                if(pending.Count!=0){
+                    if(pending.Count!=1||!pending[0].Recoverable||Safe.Json.Serialize(pending[0].Manifest)!=Safe.Json.Serialize(manifest))throw new IOException("Há outra instalação interrompida nesta pasta. Preserve os recibos e restaure a operação antes de continuar.");
+                    return Resume(pending[0],report);
+                }
+                var complete=receipts.FirstOrDefault(r=>r.Status=="installed"&&r.ActiveOwners.Count==WorkKeys(manifest).Count()&&Safe.Json.Serialize(r.Manifest)==Safe.Json.Serialize(manifest)&&r.Files.All(Matches));
+                if(complete!=null){CleanStage(Safe.In(destination,".mod-loader-snapshot-"+complete.Id));return complete.Id;}
                 CheckSpace(manifest);
                 var others = receipts.Where(r => r.Status == "installed" && r.ActiveOwners.Count > 0).ToList();
                 var receipt = new Receipt {
-                    Id = Guid.NewGuid().ToString("N"), Root = destination, Status = "preparing", Manifest = manifest,
+                    Id = Guid.NewGuid().ToString("N"), Root = destination, Status = "preparing", Manifest = manifest, Recoverable=true,
                     ActiveOwners = WorkKeys(manifest).ToList()
                 };
                 string stage = Safe.In(destination, ".mod-loader-snapshot-" + receipt.Id);
@@ -93,7 +100,7 @@ public sealed class InstalledSnapshotInstaller {
                             }
                             string after = Safe.Hash(prepared);
                             if (before != null && before != after) Backup(target, Safe.In(stage, Fingerprint(group.Key) + ".rollback"), before);
-                            var change = new Change { Path = group.Key, Before = before, After = after, Size = new FileInfo(prepared).Length, Owned = before == null };
+                            var change = new Change { Path = group.Key, Before = before, Expected=before, After = after, Size = new FileInfo(prepared).Length, Owned = before == null };
                             var previous = others.SelectMany(r => r.Files.Select(f => new { Receipt = r, File = f }))
                                 .FirstOrDefault(x => x.File.Path.Equals(group.Key, StringComparison.OrdinalIgnoreCase)
                                     && !x.File.Reverted && x.File.Applied && x.File.After == before && x.File.Owned);
@@ -122,7 +129,7 @@ public sealed class InstalledSnapshotInstaller {
                             if (current != expectedCurrent) throw new IOException("O destino mudou durante a preparação: " + change.Path);
                             if (current == change.After) { change.Applied = true; Save(receipt); continue; }
                             CreateParents(change.Path, directories);
-                            ReplaceChecked(prepared, target, change.After, expectedCurrent);
+                            ReplaceChecked(prepared, target, change.After, expectedCurrent,Safe.In(stage,"replace-"+Fingerprint(change.Path)));
                             writtenPaths.Add(change.Path);
                             change.Applied = true; Save(receipt);
                             written++;
@@ -164,6 +171,23 @@ public sealed class InstalledSnapshotInstaller {
             }
         }
         return exported;
+    }
+    string Resume(Receipt receipt,Action<string> report){
+        if(receipt.Files.Count!=receipt.Manifest.Files.Select(f=>f.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count())throw new IOException("Preparação interrompida incompleta. Preserve o pacote e o recibo.");
+        string stage=Safe.In(destination,".mod-loader-snapshot-"+receipt.Id);Safe.NoLinks(stage);
+        foreach(var file in receipt.Files){
+            string current=HashOrNull(Safe.In(destination,file.Path));
+            if(current==file.After)continue;
+            string prepared=Safe.In(stage,Fingerprint(file.Path));
+            if(current!=file.Expected||!File.Exists(prepared)||new FileInfo(prepared).Length!=file.Size||Safe.Hash(prepared)!=file.After)throw new IOException("Não foi possível retomar: arquivo alterado ou preparação ausente em "+file.Path+". Sua alteração foi preservada.");
+        }
+        receipt.Status="installing";Save(receipt);
+        foreach(var file in receipt.Files){
+            Closed(receipt.Manifest.Game);string target=Safe.In(destination,file.Path);
+            if(HashOrNull(target)!=file.After){CreateParents(file.Path,new List<string>());ReplaceChecked(Safe.In(stage,Fingerprint(file.Path)),target,file.After,file.Expected,Safe.In(stage,"replace-"+Fingerprint(file.Path)));}
+            file.Applied=true;Save(receipt);Report(report,"Retomado: "+file.Path);
+        }
+        receipt.Status="installed";Save(receipt);CleanStage(stage);return receipt.Id;
     }
 
     internal InstalledSnapshotManifest ReadManifest(string receiptId) {
@@ -328,7 +352,7 @@ public sealed class InstalledSnapshotInstaller {
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in receipt.Files) {
             if (file == null || !paths.Add(file.Path) || !FixedData.HashValid(file.After) || file.Size < 0 || file.Size > InstalledSnapshot.MaxFileBytes
-                || file.Before != null && !FixedData.HashValid(file.Before)
+                || file.Before != null && !FixedData.HashValid(file.Before)||file.Expected!=null&&!FixedData.HashValid(file.Expected)
                 || !receipt.Manifest.Files.Any(f => f.Path.Equals(file.Path, StringComparison.OrdinalIgnoreCase))) throw new IOException("Arquivo inválido no recibo de snapshot.");
             Safe.In(destination, file.Path);
             var payload = receipt.Manifest.Files.First(f => f.Path.Equals(file.Path, StringComparison.OrdinalIgnoreCase));
@@ -358,10 +382,11 @@ public sealed class InstalledSnapshotInstaller {
         }
         receipt.ActiveOwners.Clear(); receipt.Status = preserved == 0 ? "rolledback" : "rollback-preserved"; Save(receipt);
     }
-    static void ReplaceChecked(string source, string target, string desiredHash, string expectedCurrent) {
+    static void ReplaceChecked(string source, string target, string desiredHash, string expectedCurrent,string preparedTemp=null) {
         Safe.NoLinks(source); Safe.NoLinks(target);
-        string temp = target + ".snapshot-" + Guid.NewGuid().ToString("N") + ".tmp";
+        string temp = preparedTemp??target + ".snapshot-" + Guid.NewGuid().ToString("N") + ".tmp";
         try {
+            if(preparedTemp!=null){Safe.NoLinks(temp);if(File.Exists(temp))File.Delete(temp);}
             File.Copy(source, temp, false);
             if (Safe.Hash(temp) != desiredHash) throw new IOException("O arquivo preparado mudou durante a cópia.");
             if (Directory.Exists(target) || HashOrNull(target) != expectedCurrent) throw new IOException("O destino mudou durante a cópia; sua alteração foi preservada.");

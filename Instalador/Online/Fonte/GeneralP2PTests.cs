@@ -109,6 +109,7 @@ internal static class GeneralP2PTests {
             File.WriteAllText(immutableFixture.Original,"original mutated after snapshot");
             check(Safe.Hash(Path.Combine(independent,immutable.Files[0].File)) == expected, "Alteração posterior do original não modifica snapshot publicado.");
             KnownCatalogTests(root,checks);
+            PreparationCleanup(root,checks);
             check(!Directory.Exists(fixture.State.Destination), "Testes de pacote não criam instalação de jogo.");
             Safe.WriteJson(Path.Combine(root,"resultado-p2p.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});
             return checks.Count;
@@ -189,6 +190,15 @@ internal static class GeneralP2PTests {
         } catch(Exception ex) {
             Safe.WriteJson(Path.Combine(root,"resultado-p2p-network.json"),new{Passed=false,Tests=checks,Error=ex.ToString(),RealGameTouched=false,NetworkUsed=true,LoopbackOnly=true}); throw;
         } finally { if(sender != null)sender.Dispose(); if(receiver != null)receiver.Dispose(); }
+    }
+    static void PreparationCleanup(string root,List<string> checks){
+        using(var service=new P2PService(Path.Combine(root,"prep-private"),Path.Combine(root,"prep-transport"),true)){
+            string marker=Safe.In(service.Root,"creating.json"),id="ml-"+new string('e',32),folder=Safe.In(service.Store,id);Directory.CreateDirectory(folder);File.WriteAllText(Safe.In(folder,"pack.zip"),"incomplete preparation");Safe.WriteJson(marker,new{Id=id});
+            var cleanup=typeof(P2PService).GetMethod("CleanupPreparation",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance);cleanup.Invoke(service,null);
+            if(File.Exists(marker)||Directory.Exists(folder))throw new IOException("Preparação interrompida não foi limpa.");checks.Add("Reabertura limpa somente o ZIP de preparação interrompida sem sessão salva.");
+            Directory.CreateDirectory(folder);File.WriteAllText(Safe.In(folder,"pack.zip"),"active transfer");service.Sessions.Add(new P2PSession{Id=id,Name="fixture",Hash=new string('f',64),Sender=true});Safe.WriteJson(marker,new{Id=id});cleanup.Invoke(service,null);
+            if(!File.Exists(Safe.In(folder,"pack.zip"))||File.Exists(marker))throw new IOException("ZIP ativo não foi preservado.");checks.Add("Marcador após salvar sessão preserva o ZIP de transferência ativa.");
+        }
     }
 
     static void KnownCatalogTests(string root,List<string> checks) {

@@ -75,7 +75,7 @@ internal sealed partial class GeneralModWindow : Form {
             else if(!ConfirmPresetNavigation())e.Cancel=true;
         };
         Disposed+=(s,e)=>menus.Dispose();
-        if(fixture==null)Shown+=async(s,e)=>{CheckUpdatesOnStartup();await Scan();};
+        if(fixture==null)Shown+=async(s,e)=>{CheckUpdatesOnStartup();await Scan();if(!IsDisposed)await ResumeP2P();};
     }
     void BuildInterface(){
         GeneralStyle.UseTheme(state.Theme);GeneralStyle.Language=state.Language??"pt";

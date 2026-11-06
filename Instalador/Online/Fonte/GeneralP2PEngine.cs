@@ -129,7 +129,7 @@ internal sealed class SyncthingEngine : IDisposable {
     internal void Pause(string id,bool value){try{Request("PATCH","config/folders/"+id,new{paused=value});}catch(WebException ex){var response=ex.Response as HttpWebResponse;if(response==null||response.StatusCode!=HttpStatusCode.NotFound)throw;response.Dispose();}}
     internal void RemoveFolder(string id){try{Request("DELETE","config/folders/"+id,null);}catch(WebException ex){var response=ex.Response as HttpWebResponse;if(response==null||response.StatusCode!=HttpStatusCode.NotFound)throw;response.Dispose();}}
     public void Dispose(){
-        if(process!=null){try{if(!process.HasExited){try{Request("POST","system/shutdown",null);}catch(Exception){}if(!process.WaitForExit(4000))process.Kill();}}finally{process.Dispose();process=null;}}
+        if(process!=null){try{try{Request("POST","system/shutdown",null);}catch(Exception){}if(!process.HasExited&&!process.WaitForExit(4000))process.Kill();}finally{process.Dispose();process=null;}}
         if(lease!=null){lease.Dispose();lease=null;}
     }
 }

@@ -11,6 +11,8 @@ Indice interno de138componentes ativos do instalador. Revisao de05/11/2026; font
 
 ## Consulta
 
+- P2P atual: [tela simplificada, pausa e retomada1.1.11](P2P-simples-e-retomada-1.1.11.md). Presets, nomes, links e limpeza automática.
+
 - Cabeçalho, botões e divisor do menu: [versão1.1.10](Cabecalho-e-acoes-1.1.10.md), mantendo a logo local1.1.9.
 
 - Menus, projetos prontos e presets: [versão 1.1.8](Menus-e-estabilidade-1.1.8.md), [validação](Validacoes/1.1.8.json) e [registro de correções de design](Design/Registro-de-correcoes.md).

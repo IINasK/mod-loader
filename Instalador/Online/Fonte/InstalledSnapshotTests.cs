@@ -26,6 +26,15 @@ internal static class InstalledSnapshotTests {
         check(read.Files.All(f=>f.Sha256==Safe.Hash(Safe.In(game,"mods/fixture.txt"))),"ZIP e bytes instalados conferidos por hashes.");
         using(var archive=ZipFile.OpenRead(zip))check(archive.Entries.Count==2&&archive.GetEntry("manifest.json")!=null&&archive.GetEntry("files/"+manifest.Files[0].Sha256)!=null,"Um ZIP contém somente manifesto e blobs deduplicados.");
         check(!Directory.Exists(Path.Combine(data,"SnapshotReadCache")),"Exportação não cria cache de pacotes.");
+        var publicState=Copy(state);string page="https://www.nexusmods.com/cyberpunk2077/mods/9083";
+        publicState.List.Mods[0].Name="Meu mod personalizado";publicState.List.Mods[0].Variants[0].Sources=new List<string>{page};
+        publicState.List.Categories.Add("Minha categoria");publicState.List.CategoryDescriptions["Minha categoria"]="Descrição mantida";
+        publicState.List.Presets=new List<GeneralModPreset>{new GeneralModPreset{Id="primeiro",Name="Minha seleção",ModIds=new List<string>{"fixture"}},new GeneralModPreset{Id="segundo",Name="Outro preset",ModIds=new List<string>{"fixture"}}};publicState.SelectedPreset="segundo";
+        WriteGenericRecord(game,data,work+"/0/"+page,new[]{"mods/fixture.txt","mods/copy.txt"});
+        string publicZip=Path.Combine(root,"public.zip");var publicManifest=InstalledSnapshot.Create(publicZip,publicState,new[]{"fixture"},catalog,data,true,s=>{});
+        check(publicManifest.List.Mods[0].Name=="Meu mod personalizado"&&publicManifest.List.Mods[0].Variants[0].Sources.SequenceEqual(new[]{page}),"Preserva nome personalizado e link público original sem exportar caminhos locais.");
+        check(publicManifest.List.Presets.Count==2&&publicManifest.List.Presets[0].Id=="segundo"&&publicManifest.List.Presets[1].Name=="Minha seleção"&&publicManifest.List.CategoryDescriptions["Minha categoria"]=="Descrição mantida","Preserva nomes, membros e categorias dos presets e coloca o ativo primeiro.");
+        check(InstalledSnapshot.Read(publicZip,Safe.Hash(publicZip),catalog).List.Presets.Count==2,"Metadados preservados continuam válidos na leitura do ZIP.");
         refuse(()=>InstalledSnapshot.Read(zip,new string('0',64),catalog),"Recusa hash de convite divergente.");
         Write(game,"mods/fixture.txt","later edit");
         refuse(()=>InstalledSnapshot.Create(Path.Combine(root,"bad.zip"),state,new[]{"fixture"},catalog,data,true,s=>{}),"Recusa arquivo instalado alterado após recibo.");

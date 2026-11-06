@@ -1,0 +1,152 @@
+{
+  "Version": "1.1.11",
+  "BasedOn": "1.1.10",
+  "Passed": true,
+  "Checks": 1021,
+  "Reports": 23,
+  "Results": [
+    {
+      "Report": "resultado-loader-geral.json",
+      "Checks": 25,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-pintura-botoes.json",
+      "Checks": 36,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 28,
+      "Passed": true
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 36,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-brand.json",
+      "Checks": 45,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-category-delete.json",
+      "Checks": 16,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-floating.json",
+      "Checks": 30,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-project-home.json",
+      "Checks": 57,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-menu-host.json",
+      "Checks": 73,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-progresso-geral.json",
+      "Checks": 27,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-status-presentation.json",
+      "Checks": 46,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-p2p.json",
+      "Checks": 47,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Checks": 92,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-popup-stability.json",
+      "Checks": 80,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-preset-clean.json",
+      "Checks": 26,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-preset-draft.json",
+      "Checks": 48,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-project-store.json",
+      "Checks": 55,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-redesign.json",
+      "Checks": 28,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-snapshot.json",
+      "Checks": 47,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-table-dialogs.json",
+      "Checks": 85,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-ui-v2.json",
+      "Checks": 28,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-updates.json",
+      "Checks": 25,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-snapshot-p2p.json",
+      "Checks": 41,
+      "Passed": true
+    }
+  ],
+  "ExecutableSha256": "AFC4AE5F0C277893A8DB1F64D092AACC13094AD934B21D82947D63AEB59B749E",
+  "ExecutableBytes": 7427072,
+  "CatalogSha256": "89c68e6bdb8c192977fcace5d30a4b8b25912d8780fd6067f77f5c7d41c6dc05",
+  "RealGameTouched": false,
+  "NativeNetworkTest": {
+    "ActualDialogConnectFlow": true,
+    "Checks": 41,
+    "PartialDownloadAndPauseOwnership": true,
+    "LoopbackOnly": true,
+    "MonitorAndWorkerAbruptlyStopped": true,
+    "ResumeWithSameDeviceAndDestination": true,
+    "OfficialSyncthing": "2.1.7",
+    "AutoInstallAndCleanupBothSides": true
+  },
+  "IntermediateFailures": [
+    "Icon inherited 80px minimum inside 44px slot; fixed minimum before size.",
+    "Implicit row grew beyond parent; explicit rows and flexible spacer fixed.",
+    "Loopback rate limit ignored LAN until fixture enabled limitBandwidthInLan.",
+    "Crash fixture killed only monitor; fixed owned process-tree stop.",
+    "UI harness without proper message loop stalled; Application.Run harness passed."
+  ],
+  "NotTested": [
+    "Transfer across different real computers or external networks/CGNAT",
+    "Physical sudden power failure of a real PC",
+    "Real game installation or gameplay"
+  ],
+  "PrivateG3ReportsRecorded": true,
+  "CentralSkillEdited": false
+}

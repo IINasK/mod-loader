@@ -9,14 +9,19 @@ using System.Threading;
 internal sealed class P2PSession {
     public string Id, Name, Hash, Peer, Mode, Destination, ReceiptId, Error, Stage;
     public long Size;
-    public bool Sender, Paused, AutoInstall, Completed;
+    public bool Sender, Paused, AutoInstall, Completed, ListImported;
     public override string ToString(){return GeneralStyle.T(Sender?"Enviando · ":"Recebendo · ",Sender?"Sending · ":"Receiving · ")+Name;}
+}
+internal sealed class P2PTransferStatus {
+    internal int Percent;
+    internal bool Connected,RemotePaused;
 }
 internal sealed class P2PService : IDisposable {
     internal readonly string Root, Store;
     internal readonly SyncthingEngine Engine;
     internal readonly List<P2PSession> Sessions;
     readonly string statePath;
+    readonly object startGate=new object();
     Timer pump;
     int pumping;
     volatile bool disposed;
@@ -39,7 +44,7 @@ internal sealed class P2PService : IDisposable {
             Sessions=Safe.Json.Deserialize<List<P2PSession>>(File.ReadAllText(statePath));
         }else Sessions=new List<P2PSession>();
         if(Sessions==null||Sessions.Count>100)throw new IOException("Registro de compartilhamentos inválido.");
-        var ids=new HashSet<string>();foreach(var s in Sessions){Validate(s);if(!ids.Add(s.Id))throw new IOException("Compartilhamento repetido.");}
+        var ids=new HashSet<string>();foreach(var s in Sessions){Validate(s);s.Stage=null;if(!ids.Add(s.Id))throw new IOException("Compartilhamento repetido.");}
     }
     static void Validate(P2PSession s){
         if(s==null||!Regex.IsMatch(s.Id??"","\\Aml-[a-f0-9]{32}\\z")||!P2PPack.HashValid(s.Hash)||String.IsNullOrWhiteSpace(s.Name)||s.Name.Length>300||s.Name.Any(Char.IsControl)||(s.Peer!=null&&!P2PInvite.DeviceValid(s.Peer)))throw new IOException("Registro de compartilhamento inválido.");
@@ -49,9 +54,15 @@ internal sealed class P2PService : IDisposable {
     internal string Folder(P2PSession s){Validate(s);return Safe.In(Store,s.Id);}
     internal string PrivateFolder(P2PSession s){Validate(s);return Safe.In(Root,"received");}
     internal void Start(Action<string> report,string testExe=null,string excludeFolder=null){
+        lock(startGate)StartCore(report,testExe,excludeFolder);
+    }
+    void StartCore(Action<string> report,string testExe,string excludeFolder){
+        if(disposed)throw new ObjectDisposedException("P2PService");
         if(Engine.Running)return;
         try{
+            CleanupPreparation();
             Engine.Start(testExe??SyncthingEngine.Ensure(Root,report));
+            if(disposed)throw new ObjectDisposedException("P2PService");
             lock(manifestsLock)allowedManifests.Clear();
             foreach(var s in Sessions){if(s.Id==excludeFolder||s.Mode=="installed-zip"&&s.Completed)continue;if(s.Peer!=null)Engine.ConfigurePeer(s.Peer);Engine.ConfigureFolder(s.Id,Folder(s),s.Name,s.Sender,s.Peer);if(s.Paused)Engine.Pause(s.Id,true);}
             receivers=Sessions.Where(s=>!s.Sender).ToArray();
@@ -75,11 +86,20 @@ internal sealed class P2PService : IDisposable {
         string folder=FolderForNew(s.Id);
         if(!String.IsNullOrEmpty(state.Destination)&&Path.GetFullPath(folder).StartsWith(Path.GetFullPath(state.Destination).TrimEnd('\\')+"\\",StringComparison.OrdinalIgnoreCase))throw new IOException("A transferência deve ficar fora da pasta do jogo.");
         Directory.CreateDirectory(folder);string zip=Safe.In(folder,"pack.zip");
+        string preparation=Safe.In(Root,"creating.json");Safe.WriteJson(preparation,new{Id=s.Id});
         try{
             var manifest=InstalledSnapshot.Create(zip,state,ids,catalog,appData,includeConfigs,report);
             s.Name=manifest.Name;s.Hash=Safe.Hash(zip);s.Size=new FileInfo(zip).Length;
             Engine.ConfigureFolder(s.Id,folder,s.Name,true);Sessions.Add(s);Save();return s;
         }catch{Sessions.Remove(s);try{Engine.RemoveFolder(s.Id);}catch(Exception){}try{P2PPack.DeleteSnapshot(folder);}catch(Exception){}throw;}
+        finally{Safe.NoLinks(preparation);if((Sessions.Any(x=>x.Id==s.Id)||!Directory.Exists(folder))&&File.Exists(preparation))File.Delete(preparation);}
+    }
+    void CleanupPreparation(){
+        string marker=Safe.In(Root,"creating.json");Safe.NoLinks(marker);if(!File.Exists(marker))return;
+        if(new FileInfo(marker).Length>1024)throw new IOException("Registro de preparação inválido.");
+        var record=Safe.Json.Deserialize<Dictionary<string,string>>(File.ReadAllText(marker));string id;
+        if(record==null||record.Count!=1||!record.TryGetValue("Id",out id)||!Regex.IsMatch(id??"","\\Aml-[a-f0-9]{32}\\z"))throw new IOException("Registro de preparação inválido.");
+        if(!Sessions.Any(s=>s.Id==id))P2PPack.DeleteSnapshot(Safe.In(Store,id));File.Delete(marker);
     }
     string FolderForNew(string id){return Safe.In(Store,id);}
     internal InstalledSnapshotManifest InstalledManifest(P2PSession s){
@@ -87,11 +107,18 @@ internal sealed class P2PService : IDisposable {
         return new InstalledSnapshotInstaller(s.Destination,installedData,installedCatalog,installedFixture).ReadManifest(s.ReceiptId);
     }
     internal void RetryInstalled(P2PSession s,string destination){
+        lock(s){
         if(s.Mode!="installed-zip"||s.Sender||s.Completed)throw new IOException("Selecione um pacote recebido ainda não instalado.");
+        if(s.Stage!=null)throw new IOException("A instalação já começou. Aguarde terminar.");
         if(!Directory.Exists(destination))throw new IOException("Escolha uma pasta de instalação existente.");Safe.NoLinks(destination);
         s.Destination=Path.GetFullPath(destination);s.AutoInstall=true;s.Error=null;Save();
+        }
     }
+    internal void MarkImported(string receipt){foreach(var session in Sessions.Where(s=>!s.Sender&&s.Completed&&s.ReceiptId==receipt))session.ListImported=true;Save();}
     void ProcessInstalled(P2PSession s){
+        lock(s)ProcessInstalledLocked(s);
+    }
+    void ProcessInstalledLocked(P2PSession s){
         if(s.Completed){if(Directory.Exists(Folder(s))){CleanupTransport(s);s.Error=null;Save();}return;}
         if(s.Sender){
             if(s.Peer==null)return;
@@ -153,7 +180,7 @@ internal sealed class P2PService : IDisposable {
     internal P2PSession Authorize(string code){
         var answer=P2PInvite.Decode(code);if(answer.Kind!="accept")throw new IOException("Cole a resposta enviada por seu amigo.");
         var s=Sessions.SingleOrDefault(x=>x.Id==answer.Folder&&x.Sender);
-        if(s==null||s.Hash!=answer.ManifestHash||s.Mode!=answer.Mode||s.Size!=answer.Size||answer.Device==Engine.Device)throw new IOException("A resposta não pertence a este pacote.");
+        if(s==null||s.Completed||s.Hash!=answer.ManifestHash||s.Mode!=answer.Mode||s.Size!=answer.Size||answer.Device==Engine.Device)throw new IOException("A resposta não pertence a um envio ativo.");
         if(s.Peer!=null&&s.Peer!=answer.Device)throw new IOException("Este convite já está vinculado a outro amigo. Crie outro compartilhamento.");
         Engine.ConfigurePeer(answer.Device);Engine.ConfigureFolder(s.Id,Folder(s),s.Name,true,answer.Device);if(s.Paused)Engine.Pause(s.Id,true);s.Peer=answer.Device;Save();return s;
     }
@@ -169,7 +196,37 @@ internal sealed class P2PService : IDisposable {
         allowedManifests.Add(s.Id,m);return m;
         }
     }
-    internal void Pause(P2PSession s){Engine.Pause(s.Id,!s.Paused);s.Paused=!s.Paused;Save();}
+    internal void Pause(P2PSession s){lock(s){if(s.Stage!=null||s.Completed)throw new IOException("A transferência terminou ou a instalação já começou; aguarde terminar.");Engine.Pause(s.Id,!s.Paused);s.Paused=!s.Paused;Save();}}
+    internal P2PTransferStatus TransferStatus(P2PSession s){
+        Validate(s);var result=new P2PTransferStatus();if(s.Completed){result.Percent=100;return result;}if(s.Peer==null)return result;
+        var connections=Engine.Get("system/connections")["connections"] as Dictionary<string,object>;object raw;
+        if(connections!=null&&connections.TryGetValue(s.Peer,out raw))result.Connected=Convert.ToBoolean(((Dictionary<string,object>)raw)["connected"]);
+        if(!result.Connected||s.Paused)return result;
+        var completion=Engine.Get("db/completion?folder="+s.Id+"&device="+s.Peer);
+        result.RemotePaused=completion.ContainsKey("remoteState")&&Convert.ToString(completion["remoteState"])=="paused";
+        if(s.Sender)result.Percent=(int)Math.Max(0,Math.Min(99,Convert.ToDouble(completion["completion"])));
+        else{var local=Engine.Get("db/status?folder="+s.Id);long global=Convert.ToInt64(local["globalBytes"]),needed=Convert.ToInt64(local["needBytes"]);result.Percent=global==0?0:(int)Math.Max(0,Math.Min(99,(s.Size-needed)*100.0/s.Size));}
+        long partial=PartialBytes(s);if(partial>0)result.Percent=Math.Max(result.Percent,(int)Math.Min(99,partial*100.0/s.Size));
+        return result;
+    }
+    long PartialBytes(P2PSession s){
+        // Syncthing's needBytes counts unfinished files, not their downloaded blocks.
+        var events=Engine.Request("GET","events?events="+(s.Sender?"RemoteDownloadProgress":"DownloadProgress")+"&limit=16&timeout=0",null) as System.Collections.IEnumerable;
+        if(events==null)return 0;
+        foreach(var entry in events.Cast<object>().OfType<Dictionary<string,object>>().Reverse()){
+            var data=entry["data"] as Dictionary<string,object>;if(data==null)continue;object folderRaw,fileRaw;
+            if(s.Sender){
+                if(Convert.ToString(data["folder"])!=s.Id||Convert.ToString(data["device"])!=s.Peer)continue;
+                var files=data["state"] as Dictionary<string,object>;if(files==null||!files.TryGetValue("pack.zip",out fileRaw))return 0;
+                var file=Engine.Get("db/file?folder="+s.Id+"&file=pack.zip")["local"] as Dictionary<string,object>;
+                return file!=null&&file.ContainsKey("blockSize")?Math.Min(s.Size,Convert.ToInt64(fileRaw)*Convert.ToInt64(file["blockSize"])):0;
+            }
+            if(!data.TryGetValue(s.Id,out folderRaw))return 0;
+            var folder=folderRaw as Dictionary<string,object>;if(folder==null||!folder.TryGetValue("pack.zip",out fileRaw))return 0;
+            var progress=fileRaw as Dictionary<string,object>;return progress!=null&&progress.ContainsKey("bytesDone")?Math.Min(s.Size,Convert.ToInt64(progress["bytesDone"])):0;
+        }
+        return 0;
+    }
     internal void Remove(P2PSession s){
         Validate(s);s.AutoInstall=false;s.Paused=true;Save();
         if(!s.Completed)Engine.Pause(s.Id,true);

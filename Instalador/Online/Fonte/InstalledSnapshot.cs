@@ -107,7 +107,7 @@ public static class InstalledSnapshot {
                 }
             }
             mod.Variants=new List<GeneralModVariant>{variant};mod.DefaultVariant=variant.Id;
-            if(variant.CyberpunkId==null)variant.Sources=new List<string>{"installed://"+mod.Id+"/"+variant.Id};
+            if(variant.CyberpunkId==null){variant.Sources=originalSources.Where(GeneralModDownload.IsWebSource).ToList();if(variant.Sources.Count==0)variant.Sources.Add("installed://"+mod.Id+"/"+variant.Id);}
             list.Mods.Add(mod);
             foreach(var file in files) {
                 if(!includeConfigs&&file.Kind!="file")continue;
@@ -118,9 +118,13 @@ public static class InstalledSnapshot {
             }
             if(!manifest.Files.Any(f=>f.Owners.Contains(work)&&f.Kind=="file"))throw new IOException(mod.Name+": nenhum arquivo instalado foi encontrado.");
         }
-        list.Categories=state.List.Categories.Where(c=>list.Mods.Any(m=>m.Category==c)).Concat(list.Mods.Where(m=>!String.IsNullOrWhiteSpace(m.Category)).Select(m=>m.Category)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        list.Categories=state.List.Categories.Concat(list.Mods.Where(m=>!String.IsNullOrWhiteSpace(m.Category)).Select(m=>m.Category)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         foreach(string category in list.Categories) {string description;if(state.List.CategoryDescriptions.TryGetValue(category,out description))list.CategoryDescriptions[category]=description;}
-        list.Presets.Add(new GeneralModPreset{Id="installed",Name=manifest.Name,ModIds=list.Mods.Select(m=>m.Id).ToList()});
+        var included=new HashSet<string>(list.Mods.Select(m=>m.Id),StringComparer.Ordinal);
+        foreach(var original in state.List.Presets.OrderByDescending(p=>p.Id==state.SelectedPreset)){
+            var copy=Clone(original);copy.ModIds=copy.ModIds.Where(included.Contains).ToList();list.Presets.Add(copy);
+        }
+        if(list.Presets.Count==0)list.Presets.Add(new GeneralModPreset{Id="installed",Name=manifest.Name,ModIds=list.Mods.Select(m=>m.Id).ToList()});
         Validate(manifest,catalog);
         string output=Path.GetFullPath(zipPath);Safe.NoLinks(output);
         bool created=false;
@@ -167,7 +171,7 @@ public static class InstalledSnapshot {
                 var recipe=FixedRecipe(catalog,variant);recipes.Add(owner,recipe);
                 var seed=GeneralModLibrary.Seed(catalog,new ModImportItem[0]).Mods.Single(m=>m.Id==recipe.Id).Variants.Single(v=>v.CyberpunkVariant==variant.CyberpunkVariant);
                 if(!seed.Sources.SequenceEqual(variant.Sources,StringComparer.Ordinal))throw new IOException("Fontes fixas alteradas no pacote.");
-            }else if(variant.CyberpunkVariant!=null||variant.Sources.Count!=1||variant.Sources[0]!="installed://"+mod.Id+"/"+variant.Id)throw new IOException("O pacote contém caminhos privados de origem.");
+            }else if(variant.CyberpunkVariant!=null||!(variant.Sources.Count==1&&variant.Sources[0]=="installed://"+mod.Id+"/"+variant.Id)&&!variant.Sources.All(GeneralModDownload.IsWebSource))throw new IOException("O pacote contém caminhos privados de origem.");
         }
         foreach(var recipe in recipes.Values)foreach(string dependency in recipe.Dependencies)if(!recipes.Values.Any(m=>m.Id==dependency))throw new IOException("Dependência não incluída: "+dependency);
         var keys=new HashSet<string>(StringComparer.OrdinalIgnoreCase);var regular=new HashSet<string>(StringComparer.OrdinalIgnoreCase);long total=0,configs=0;
