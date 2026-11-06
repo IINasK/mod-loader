@@ -1,5 +1,24 @@
 ﻿# Cyberpunk 2077 — pacote coop
 
+## Regra prioritaria: arquivos de desenvolvimento dentro do projeto
+
+- Criar logs, capturas, relatorios, fixtures, backups e temporarios SOMENTE
+  dentro de D:/Projetos/Mod Loader Cyberpunk coop/. Usar T/ para fixtures e
+  Auditoria/ para evidencias; ambos ja estao fora do Git publico.
+- NUNCA criar pastas na raiz D:/ ou C:/ (ex.: T111verifiedNet, T110release,
+  S115-network-*), Desktop, Downloads ou outro projeto para encurtar caminhos.
+  Limite de tamanho de caminho nao autoriza saidas externas ou junctions de fuga.
+- Resolver os destinos antes de executar e conferir que continuam dentro do
+  projeto, inclusive apos seguir links. Informar aos self-tests um diretorio
+  pai interno. Configurar TEMP/TMP/TMPDIR somente no processo quando necessario.
+- Os caminhos D:/T* e D:/S* citados abaixo sao evidencias HISTORICAS: nao repetir
+  esses destinos. Os testes recebem parent do chamador; escolher a raiz do SSD
+  para parent espalha fixtures e relatorios fora do projeto.
+- Destinos externos exigem pedido explicito do usuario para aquele destino;
+  respeitar a instrucao especifica de relatos G3 quando aplicavel.
+- Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
+  autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
+
 ## Revisão atual 1.1.13 — lixeira dos projetos salvos — 05/11/2026
 
 - Trocar somente a seta das linhas da Home por lixeira Lucide/Danger, alvo44px, texto reservado. Clique no nome/Enter continuam abrindo; clique na lixeira/Delete usam DeleteSavedProject. Duas confirmações YesNo, ambas com Não por padrão; nome explícito e CRLF para separação no TextBox nativo. Cancelar/fechar/Não preservam dados sem rebuild da Home.
