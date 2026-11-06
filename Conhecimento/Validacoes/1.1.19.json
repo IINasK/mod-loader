@@ -141,5 +141,18 @@
     "An intermediate nested layout reintroduced a native textbox border; direct GeneralSurface composition and inset copy action fixed the rendered field.",
     "The full suite guard failure is retained as a limitation, not recorded as a passing full run."
   ],
-  "PrivateG3ReportPublished": false
+  "PrivateG3ReportPublished": false,
+  "SourceCommit": "776692f1e05c867683227c108d447d0b4ced2858",
+  "PublishedRelease": {
+    "AnonymousRequest": true,
+    "UsedPublished118Checker": true,
+    "AvailableToVersion118": "1.1.19",
+    "Version119DoesNotNotifyItself": true,
+    "ReleasePage": "https://github.com/IINasK/mod-loader/releases/tag/v1.1.19",
+    "DownloadUrl": "https://github.com/IINasK/mod-loader/releases/download/v1.1.19/Mod-Loader-1.1.19.exe",
+    "DownloadBytes": 5402703,
+    "DownloadedSha256": "5F5CD84F530595478847B7B05DC46ADCC6D2B8EE3F136D428FCA4405022C11B6",
+    "DownloadedExecutableWasRun": false,
+    "TempDownloadRemoved": true
+  }
 }
