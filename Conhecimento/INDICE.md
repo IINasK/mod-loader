@@ -11,6 +11,8 @@ Indice interno de138componentes ativos do instalador. Revisao de05/11/2026; font
 
 ## Consulta
 
+- Lixeira e confirmação dupla nos projetos salvos: [versão1.1.13](Excluir-projetos-1.1.13.md), [validação](Validacoes/1.1.13.json).
+
 - Navegação e pesquisa atuais: [projetos, menus e busca1.1.12](Projetos-e-pesquisa-1.1.12.md), [validação](Validacoes/1.1.12.json).
 
 - P2P atual: [tela simplificada, pausa e retomada1.1.11](P2P-simples-e-retomada-1.1.11.md). Presets, nomes, links e limpeza automática.

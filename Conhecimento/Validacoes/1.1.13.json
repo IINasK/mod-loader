@@ -1,0 +1,30 @@
+{
+  "Version": "1.1.13",
+  "Checks": 204,
+  "Reports": [
+    {
+      "Report": "resultado-brand.json",
+      "Checks": 45,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-project-home.json",
+      "Checks": 104,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-project-store.json",
+      "Checks": 55,
+      "Passed": true
+    }
+  ],
+  "FixtureRoot": "D:\\T113verified",
+  "ExecutableSha256": "A8D05F82B726B9DAE0EC2632870B684ACD4234D5752F212BE0E6306B1B755905",
+  "ExecutableBytes": 7447040,
+  "CatalogSha256": "89c68e6bdb8c192977fcace5d30a4b8b25912d8780fd6067f77f5c7d41c6dc05",
+  "RealProjectsDeleted": false,
+  "RealGameTouched": false,
+  "FullGeneralSuiteRepeated": false,
+  "PreviousFullGeneralVersion": "1.1.12",
+  "DeletionScope": "Saved-project index only. Game files, installed mods and project data preserved."
+}

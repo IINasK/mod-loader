@@ -78,6 +78,36 @@ internal sealed partial class GeneralModWindow {
                                 timer.Start();((Button)home.Controls.Find("HomeOptions",true).Single()).PerformClick();
                             }
                             check(store.Read().Theme=="light-red","Salvar opções da Home preserva o tema vermelho.");
+                            var disposable=store.Create("Projeto descartável",new GeneralModList(),"light-red","pt");
+                            var neighbor=store.Create("Vizinho preservado",new GeneralModList(),"light-red","pt");home.Build();
+                            string disposableFile=Path.Combine(store.DataPath(disposable),"lista.json"),disposableHash=Safe.Hash(disposableFile);
+                            string blankFile=Path.Combine(store.DataPath(blank),"lista.json"),blankHash=Safe.Hash(blankFile);
+                            choices=(ListBox)home.Controls.Find("SavedProjects",true).Single();
+                            int target=choices.Items.Cast<object>().Select(item=>item.ToString()).ToList().IndexOf(disposable.Name);
+                            var trash=GeneralProjectHome.DeleteProjectBounds(choices.GetItemRectangle(target));
+                            check(target==1&&trash.Width==44&&trash.Height==44&&trash.Right==choices.GetItemRectangle(target).Right,"A lixeira reserva alvo de44px na própria linha, inclusive entre vizinhos.");
+                            int beforeClick=openCalls;ClickSavedProject(choices,new Point(12,choices.GetItemRectangle(target).Top+28));
+                            check(openCalls==beforeClick+1&&opened.Id==disposable.Id&&store.Read().Projects.Count==4,"Clicar no nome continua abrindo o projeto, sem excluir.");
+                            choices=(ListBox)home.Controls.Find("SavedProjects",true).Single();target=choices.Items.Cast<object>().Select(item=>item.ToString()).ToList().IndexOf(disposable.Name);
+                            trash=GeneralProjectHome.DeleteProjectBounds(choices.GetItemRectangle(target));var trashPoint=new Point(trash.Left+22,trash.Top+22);
+                            beforeClick=openCalls;
+                            int prompts=ConfirmHomeDelete(home,new[]{DialogResult.No},()=>ClickSavedProject(choices,trashPoint),check,root);
+                            check(prompts==1&&store.Read().Projects.Count==4&&Object.ReferenceEquals(choices,home.Controls.Find("SavedProjects",true).Single()),"Cancelar a primeira confirmação não exclui nem reconstrói a Home.");
+                            prompts=ConfirmHomeDelete(home,new[]{DialogResult.Yes,DialogResult.No},()=>ClickSavedProject(choices,trashPoint),check,root);
+                            check(prompts==2&&store.Read().Projects.Count==4&&File.Exists(disposableFile)&&Safe.Hash(disposableFile)==disposableHash,"Cancelar a segunda confirmação preserva o projeto e seu arquivo.");
+                            choices.SelectedIndex=target;
+                            prompts=ConfirmHomeDelete(home,new[]{DialogResult.Cancel},()=>typeof(ListBox).GetMethod("OnKeyDown",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(choices,new object[]{new KeyEventArgs(Keys.Delete)}),check,root);
+                            check(prompts==1&&store.Read().Projects.Count==4,"Delete no teclado usa a mesma confirmação e fechar o diálogo cancela.");
+                            ClickSavedProject(choices,new Point(choices.ClientSize.Width-22,choices.GetItemRectangle(choices.Items.Count-1).Bottom+12));
+                            check(store.Read().Projects.Count==4&&openCalls==beforeClick,"Clicar no vazio da lista ou na lixeira não abre projeto.");
+                            prompts=ConfirmHomeDelete(home,new[]{DialogResult.Yes,DialogResult.Yes},()=>ClickSavedProject(choices,trashPoint),check,root);
+                            var afterDelete=store.Read();
+                            check(prompts==2&&afterDelete.Projects.Count==3&&!afterDelete.Projects.Any(item=>item.Id==disposable.Id),"Somente duas confirmações positivas removem o projeto certo do índice persistido.");
+                            check(afterDelete.Projects.Any(item=>item.Id==neighbor.Id)&&afterDelete.Projects.Any(item=>item.Id==blank.Id)&&afterDelete.Projects.Any(item=>item.Id==builtIn.Id),"Excluir um projeto conserva vizinhos e o projeto padrão.");
+                            check(File.Exists(disposableFile)&&Safe.Hash(disposableFile)==disposableHash&&Safe.Hash(blankFile)==blankHash,"A exclusão preserva dados, registros e arquivos dos projetos.");
+                            check(openCalls==beforeClick&&((ListBox)home.Controls.Find("SavedProjects",true).Single()).Items.Count==2,"A lixeira atualiza a Home sem abrir o projeto excluído.");
+                            home.Build();check(((ListBox)home.Controls.Find("SavedProjects",true).Single()).Items.Count==2,"O projeto excluído continua ausente depois de reconstruir a tela.");
+                            store.Delete(neighbor);home.Build();
                             store.Delete(blank);home.Build();check(store.Read().Projects.Count==1&&File.Exists(Path.Combine(store.DataPath(blank),"lista.json")),"Excluir metadados retira o projeto da Home e conserva seus dados.");
                             var remaining=store.Read().Projects.Single();string before=Safe.Hash(Path.Combine(store.DataPath(remaining),"lista.json"));home.OpenRequested=actualOpen;
                             using(var timer=new Timer{Interval=60}){
@@ -106,6 +136,25 @@ internal sealed partial class GeneralModWindow {
             check(form.Text.Contains("Projeto atual"),"Janela identifica o projeto aberto.");form.ProjectCommand("new");check(form.ProjectAction=="new","Novo projeto retorna à Home sem substituir a lista atual.");await Task.CompletedTask;
         });
         Safe.WriteJson(Path.Combine(root,"resultado-project-home.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});
+    }
+    static void ClickSavedProject(ListBox list,Point point){typeof(ListBox).GetMethod("OnMouseClick",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(list,new object[]{new MouseEventArgs(MouseButtons.Left,1,point.X,point.Y,0)});}
+    static int ConfirmHomeDelete(GeneralProjectHome home,DialogResult[] responses,Action click,Action<bool,string> check,string root){
+        int prompts=0;GeneralDialog previous=null;Exception failure=null;
+        using(var timer=new Timer{Interval=50}){
+            timer.Tick+=(s,e)=>{
+                var dialog=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(item=>item.Text=="Excluir projeto"||item.Text=="Confirmar exclusão do projeto");
+                if(dialog==null||Object.ReferenceEquals(dialog,previous))return;previous=dialog;
+                try{
+                    check(prompts<responses.Length,"A ação não abre confirmações extras.");
+                    check(((Button)dialog.AcceptButton).Text=="Não","A confirmação começa com Não como ação padrão.");
+                    check(AllControls(dialog).OfType<TextBox>().Any(box=>box.Text.Contains("Projeto descartável")),"Cada confirmação identifica o projeto que será excluído.");
+                    CaptureUi(dialog,Path.Combine(root,"delete-confirm-"+prompts+".png"));var answer=responses[prompts++];
+                    if(answer==DialogResult.Cancel)dialog.Close();else AllControls(dialog).OfType<Button>().Single(button=>button.Text==(answer==DialogResult.Yes?"Sim":"Não")).PerformClick();
+                }catch(Exception ex){failure=ex;timer.Stop();dialog.DialogResult=DialogResult.Cancel;}
+            };
+            timer.Start();click();
+        }
+        if(failure!=null)throw failure;return prompts;
     }
     static void CompleteProjectName(string value,Action show){
         using(var timer=new Timer{Interval=60}){timer.Tick+=(s,e)=>{var dialog=Application.OpenForms.OfType<GeneralNameDialog>().FirstOrDefault();if(dialog==null)return;timer.Stop();AllControls(dialog).OfType<TextBox>().Single(box=>box.Name=="NameInput").Text=value;((Button)dialog.AcceptButton).PerformClick();};timer.Start();show();}

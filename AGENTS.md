@@ -1,6 +1,13 @@
 ﻿# Cyberpunk 2077 — pacote coop
 
-## Revisão atual 1.1.12 — projetos, pesquisa e seleção — 05/11/2026
+## Revisão atual 1.1.13 — lixeira dos projetos salvos — 05/11/2026
+
+- Trocar somente a seta das linhas da Home por lixeira Lucide/Danger, alvo44px, texto reservado. Clique no nome/Enter continuam abrindo; clique na lixeira/Delete usam DeleteSavedProject. Duas confirmações YesNo, ambas com Não por padrão; nome explícito e CRLF para separação no TextBox nativo. Cancelar/fechar/Não preservam dados sem rebuild da Home.
+- Usar GeneralProjectStore.Delete existente: excluir referência do índice, não arquivos do jogo/dados locais/recibos/backups. Padrões seguem protegidos. Não criar limpeza recursiva nem desinstalar mods como parte dessa ação. ToolTip é descartado com a Home.
+-204checks/3relatórios em D:\T113verified: clicar nome/lixeira/vazio, alvo entre vizinhos, cancelar primeira/segunda, fechar, teclado, duas confirmações, persistência do índice e hashes preservados; marca/temas/Home/store. Capturas conferidas. Teste isolado, sem exclusão pessoal/jogo. Suíte geral1.1.12 não repetida na mudança localizada. Não inventar novo achado G3 para alteração comum de tela.
+- EXE7447040bytes/SHA A8D05F82B726B9DAE0EC2632870B684ACD4234D5752F212BE0E6306B1B755905. Catálogo e RED4ext intactos. Conhecimento/Excluir-projetos-1.1.13.md e Validacoes/1.1.13.json guardam escopo/provas. Publicar apenas EXE e fonte, sem arquivos de mods ou projetos pessoais.
+
+## Revisão 1.1.12 — projetos, pesquisa e seleção — 05/11/2026
 
 - Menu único com nomenclatura Projeto PT/EN e Voltar ao menu principal. Novo projeto despacha para a Home, não substitui a lista atual. Abrir projeto também retorna à biblioteca. Removidos botão e classe GeneralProjectsMenu, mais os testes específicos desse seletor aposentado; Home e sua proteção de projeto padrão permanecem.
 - Menu de TemplateId não vazio oferece somente novo/abrir/voltar/opções; sem importar/exportar/share. ProjectCommand recusa importar/exportar/delete-project do padrão. Não transformar essa restrição de menu em apagar bibliotecas ou impedir a instalação/variantes. Presets pessoais e proteções anteriores continuam.

@@ -72,3 +72,8 @@ Registro solicitado por Douglas em 05/11/2026 para preparar um relatório futuro
 - Pesquisa local fica entre título e colunas e continua na lista expandida. Nome/variante/status, acentos, trechos e erros pequenos compõem filtros/preset, preservando seleção oculta.
 - A seleção quadrada da Home foi corrigida na pintura compartilhada com o picker. Testes de DrawItem/pixels em três temas, inclusive primeira/meio/última linha. O relato privado ficou no fallback docs/relatos-g3-design após acesso negado na caixa central. Não publicar esse relato, não modificar a skill central.
 - Texto e filhos internos da pesquisa recebem cores explícitas e recuo que não cobre o contorno arredondado. Conferência renderizada do campo e menus e testes de geometria, não somente build.
+
+## Revisão1.1.13 — exclusão na Home
+
+- Nas linhas de projetos salvos, lixeira no lugar da seta, alvo44px e margem de texto. Abrir pelo nome/Enter, excluir pelo ícone/Delete; ações separadas.
+- Duas confirmações identificadas, Não por padrão; cancelar não reconstrói a tela. Exclusão só do índice, dados/jogo preservados. Rotina de tela, sem alteração da skill central.

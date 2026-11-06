@@ -14,12 +14,13 @@ internal sealed class GeneralProjectHome : Form {
     LinkLabel update;
     GeneralUpdateRelease available;
     int buildVersion,hoverSaved=-1;
+    readonly ToolTip savedTips=new ToolTip{UseAnimation=false,UseFading=false};
     internal int HoveredSavedProject {get{return hoverSaved;}}
     internal Action<GeneralProject> OpenRequested;
     internal GeneralProjectHome(FixedCatalog catalog,DownloadCache cache,string root,bool fixture=false){
         this.catalog=catalog;this.cache=cache;this.fixture=fixture;store=new GeneralProjectStore(root);OpenRequested=OpenProject;
         Text="Mod Loader "+GeneralUpdateChecker.CurrentVersion;Icon=ModLoaderBrand.AppIcon;ClientSize=new Size(1020,740);MinimumSize=new Size(900,680);
-        StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;Build();
+        StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;Build();Disposed+=(s,e)=>savedTips.Dispose();
         if(!fixture)Shown+=async(s,e)=>{available=await GeneralUpdateChecker.Session.CheckOnce();if(!IsDisposed)UpdateNotice();};
     }
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
@@ -47,17 +48,26 @@ internal sealed class GeneralProjectHome : Form {
         else{
             saved=new ListBox{Name="SavedProjects",Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,IntegralHeight=false,DrawMode=DrawMode.OwnerDrawFixed,ItemHeight=56,AccessibleName=T("Projetos salvos","Saved projects")};
             foreach(var project in custom.Reverse())saved.Items.Add(new Choice(project));
-            saved.DrawItem+=(s,e)=>{if(e.Index<0)return;bool selected=hoverSaved>=0?e.Index==hoverSaved:(e.State&DrawItemState.Selected)!=0;GeneralStyle.PaintChoice(e.Graphics,e.Bounds,selected);using(var font=GeneralStyle.Font(13,true))TextRenderer.DrawText(e.Graphics,((ListBox)s).Items[e.Index].ToString(),font,new Rectangle(e.Bounds.X+12,e.Bounds.Y,e.Bounds.Width-48,e.Bounds.Height),GeneralStyle.Foreground,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);LucideIcons.Draw(e.Graphics,"right",new Rectangle(e.Bounds.Right-28,e.Bounds.Y+19,18,18),GeneralStyle.Accent);};
-            saved.MouseMove+=(s,e)=>{int at=((ListBox)s).IndexFromPoint(e.Location);if(at!=hoverSaved){hoverSaved=at;((ListBox)s).Invalidate();}};
-            saved.MouseLeave+=(s,e)=>{hoverSaved=-1;((ListBox)s).Invalidate();};
-            saved.MouseClick+=(s,e)=>{int at=saved.IndexFromPoint(e.Location);if(e.Button==MouseButtons.Left&&at>=0)Guard(()=>OpenRequested(((Choice)saved.Items[at]).Project));};
-            saved.KeyDown+=(s,e)=>{if(e.KeyCode==Keys.Enter&&saved.SelectedItem!=null){e.Handled=true;Guard(()=>OpenRequested(((Choice)saved.SelectedItem).Project));}};
+            saved.DrawItem+=(s,e)=>{if(e.Index<0)return;bool selected=hoverSaved>=0?e.Index==hoverSaved:(e.State&DrawItemState.Selected)!=0;GeneralStyle.PaintChoice(e.Graphics,e.Bounds,selected);using(var font=GeneralStyle.Font(13,true))TextRenderer.DrawText(e.Graphics,((ListBox)s).Items[e.Index].ToString(),font,new Rectangle(e.Bounds.X+12,e.Bounds.Y,e.Bounds.Width-68,e.Bounds.Height),GeneralStyle.Foreground,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);var trash=DeleteProjectBounds(e.Bounds);LucideIcons.Draw(e.Graphics,"trash",new Rectangle(trash.X+12,trash.Y+12,20,20),GeneralStyle.Danger);};
+            saved.AccessibleDescription=T("Enter abre o projeto selecionado. Delete exclui com duas confirmações.","Enter opens the selected project. Delete removes it after two confirmations.");
+            saved.MouseMove+=(s,e)=>{var list=(ListBox)s;int at=list.IndexFromPoint(e.Location);if(at!=hoverSaved){hoverSaved=at;list.Invalidate();}string hint=at>=0&&DeleteProjectBounds(list.GetItemRectangle(at)).Contains(e.Location)?T("Excluir projeto","Delete project"):"";if(savedTips.GetToolTip(list)!=hint)savedTips.SetToolTip(list,hint);};
+            saved.MouseLeave+=(s,e)=>{hoverSaved=-1;savedTips.SetToolTip((Control)s,"");((ListBox)s).Invalidate();};
+            saved.MouseClick+=(s,e)=>{var list=(ListBox)s;int at=list.IndexFromPoint(e.Location);if(e.Button!=MouseButtons.Left||at<0)return;var item=((Choice)list.Items[at]).Project;if(DeleteProjectBounds(list.GetItemRectangle(at)).Contains(e.Location))DeleteSavedProject(item);else Guard(()=>OpenRequested(item));};
+            saved.KeyDown+=(s,e)=>{var list=(ListBox)s;if(list.SelectedItem==null)return;if(e.KeyCode==Keys.Enter){e.SuppressKeyPress=true;Guard(()=>OpenRequested(((Choice)list.SelectedItem).Project));}else if(e.KeyCode==Keys.Delete){e.SuppressKeyPress=true;DeleteSavedProject(((Choice)list.SelectedItem).Project);}};
             surface.Controls.Add(new GeneralScrollView(saved));
         }
         layout.Controls.Add(surface,0,4);layout.Controls.Add(Heading(T("Projetos prontos","Ready-made projects")),0,5);
         var ready=GeneralStyle.Button("Cyberpunk 2077  ·  "+T("Pacote pronto","Ready-made pack"),()=>Guard(()=>OpenRequested(CreateProject(true))));ready.Name="ReadyCyberpunk";ready.Dock=DockStyle.Fill;ready.MinimumSize=new Size(200,56);ready.Margin=new Padding(0,0,0,14);layout.Controls.Add(ready,0,6);
         update=new LinkLabel{Name="HomeUpdate",AutoSize=true,LinkColor=GeneralStyle.Accent,ActiveLinkColor=GeneralStyle.Foreground,Margin=Padding.Empty};update.LinkClicked+=(s,e)=>{if(available!=null)Guard(()=>GeneralModDownload.OpenSource(available.Page));};layout.Controls.Add(update,0,7);UpdateNotice();
         GeneralStyle.Apply(this,GeneralStyle.Dark);brandTitle.ForeColor=GeneralStyle.Accent;ResumeLayout(true);GeneralNativeTheme.ApplyTree(this);
+    }
+    internal static Rectangle DeleteProjectBounds(Rectangle row){return new Rectangle(row.Right-44,row.Y+(row.Height-44)/2,44,44);}
+    void DeleteSavedProject(GeneralProject project){
+        if(project==null||project.TemplateId!=null)return;
+        string name="\r\n\r\n"+T("Projeto: ","Project: ")+project.Name;
+        if(GeneralDialog.Message(this,T("Excluir este projeto da lista de projetos salvos?","Remove this project from saved projects?")+name,T("Excluir projeto","Delete project"),MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+        if(GeneralDialog.Message(this,T("Confirme novamente: excluir o projeto da lista? Os mods instalados, arquivos do jogo, registros e backups serão preservados.","Confirm again: remove the project from the list? Installed mods, game files, records and backups will be preserved.")+name,T("Confirmar exclusão do projeto","Confirm project deletion"),MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+        Guard(()=>store.Delete(project));
     }
     static Label Heading(string text){return new Label{Text=text,AutoSize=true,Font=GeneralStyle.Font(15,true),Margin=new Padding(0,0,0,10)};}
     void UpdateNotice(){if(update==null||update.IsDisposed)return;update.Visible=available!=null;if(available!=null)update.Text=T("Nova versão ","New version ")+available.Version+T(" — baixar"," — download");}
