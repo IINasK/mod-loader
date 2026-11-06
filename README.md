@@ -6,6 +6,8 @@ Repositório público: [IINasK/mod-loader](https://github.com/IINasK/mod-loader)
 
 Gerenciador de mods para Windows, com projetos, presets e categorias definidos pelo usuário. Cyberpunk2077 2.5 é um pacote incluído; outros jogos podem ter suas próprias listas e destinos. Mantém downloads oficiais, identificação por SHA256, monitor da pasta Downloads, backup e desfazer. O usuário conclui os downloads gratuitos Manual/Slow no Nexus; o aplicativo confere o arquivo original e continua a fila autorizada. Receitas específicas e verificações de versão do pacote Cyberpunk não são inferidas para outros jogos.
 
+A versão **1.1.15** é distribuída como instalador Windows: instala para o usuário atual, cria atalhos e aparece em Aplicativos instalados com desinstalador. Separa configurações/cache/logs para instalações novas e reaproveita os dados antigos sem copiar os pacotes. Desinstalar o gerenciador preserva projetos e mods do jogo. [Uso e requisitos](Conhecimento/Instalacao-Windows-1.1.15.md) · [Validação](Conhecimento/Validacoes/1.1.15.json).
+
 A versão **1.1.14** traz o painel Projetos, o botão de voltar junto ao cabeçalho, consulta informativa de nome/arquivo/tamanho do Nexus e contadores de espaço. A lixeira permite excluir só do app ou apagar os mods rastreados após revisão, sem Desfazer. O editor mantém avisos e ações visíveis em janelas menores. Consultas novas podem ser bloqueadas pelo Nexus; preenchimento manual continua disponível. [Uso e limites atuais](Conhecimento/Projetos-nexus-espaco-1.1.14.md) · [Validação](Conhecimento/Validacoes/1.1.14.json).
 
 As notas abaixo são históricas; a navegação atual é a descrita na1.1.14.
@@ -46,7 +48,7 @@ O catálogo atual tem 95 componentes: 93 linhas visíveis com Phantom Liberty e 
 
 A logo original está em `Instalador/Online/Fonte/Assets/ModLoader.svg`. `preparar-logo.ps1` gera o ícone do Windows diretamente desse vetor, sem ferramentas ou downloads adicionais. O mesmo SVG é desenhado no cabeçalho do aplicativo.
 
-No Windows com .NETFramework4.x e PowerShell:
+No Windows com .NET Framework4.7.2+, PowerShell e Inno Setup6 (somente para compilar o Setup):
 
 ```powershell
 ./Build.ps1

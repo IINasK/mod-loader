@@ -692,20 +692,22 @@ static class OnlineProgram {
         var c=FixedData.Load();
         if(args.Length==3&&args[0]=="--inspect"){string game=Path.GetFullPath(args[1]).TrimEnd('\\'),output=Path.GetFullPath(args[2]);if(output.StartsWith(game+"\\",StringComparison.OrdinalIgnoreCase))throw new IOException("O relatório deve ficar fora do jogo.");var report=c.Packages.Select(m=>FixedData.Scan(m,game)).ToList();string issue=null;try{FixedData.ValidateGame(game,c.Packages,c.GameFileVersion);}catch(IOException ex){issue=ex.Message;}Safe.WriteJson(output,new{GameVersion=FixedData.GameVersion(game),Build=FixedData.GameBuild(game),VersionAndRequirementsMatch=issue==null,Issue=issue,Mods=report});return 0;}
         if(args.Length==3&&args[0]=="--verify-local-sources"){OnlineTests.VerifySources(c,args[1],args[2]);return 0;}
-        var cache=new DownloadCache(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CyberpunkCoop","Downloads"));
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
         if(args.Length==2&&args[0]=="--self-test-general"){GeneralModWindow.RunGeneralTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-projects"){GeneralProjectStoreTests.Run(args[1]);GeneralModWindow.RunProjectHomeTests(args[1]);GeneralModWindow.RunProjectDeletionTests(args[1]);GeneralModWindow.RunProjectHubTests(args[1]);GeneralBrandTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-menus"){GeneralMenuHostTests.Run(args[1]);GeneralModWindow.RunPresetDraftTests(args[1]);GeneralTableDialogTests.Run(args[1]);GeneralPopupStabilityTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-p2p-ui"){GeneralP2PUiTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--preview-p2p"){GeneralP2PUiTests.Preview(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--self-test-paths"){GeneralAppPathsTests.Run(args[1]);return 0;}
+        var paths=GeneralAppPaths.Current();
+        var cache=new DownloadCache(paths.Cache);
         if(args.Length==2&&args[0]=="--preview"){using(var f=new OnlineWindow(c,cache,true))f.Preview(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--preview-general"){
             var fixture=new GeneralModState{List=GeneralModLibrary.Seed(c,new ModImportItem[0]),Destination=@"D:\Jogos\Cyberpunk 2077"};
             using(var f=new GeneralModWindow(c,cache,Path.GetTempPath(),fixture))f.Preview(args[1]);return 0;
         }
         if(args.Length!=0)throw new IOException("Argumento não reconhecido. A instalação exige confirmação na interface.");
-        OnlineDiagnostics.Start(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CyberpunkCoop","Logs"));string exeHash=null;try{if(OnlineDiagnostics.Enabled)exeHash=Safe.Hash(Application.ExecutablePath);}catch(Exception){}OnlineDiagnostics.Record("app.start",null,"Aplicativo iniciado com diagnóstico ativo.",new{Executable=Path.GetFileName(Application.ExecutablePath),ExecutableSha256=exeHash,Catalog=c.Id,CatalogSha256=OnlineIdentity.CatalogHash});
-        Application.Run(new GeneralProjectHome(c,cache,Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"ModLoaderGeral")));OnlineDiagnostics.Stop();return 0;
+        OnlineDiagnostics.Start(paths.Logs);string exeHash=null;try{if(OnlineDiagnostics.Enabled)exeHash=Safe.Hash(Application.ExecutablePath);}catch(Exception){}OnlineDiagnostics.Record("app.start",null,"Aplicativo iniciado com diagnóstico ativo.",new{Executable=Path.GetFileName(Application.ExecutablePath),ExecutableSha256=exeHash,Catalog=c.Id,CatalogSha256=OnlineIdentity.CatalogHash});
+        Application.Run(new GeneralProjectHome(c,cache,paths.Data));OnlineDiagnostics.Stop();return 0;
     }catch(Exception ex){if(args.Length>0){File.WriteAllText(Path.Combine(Path.GetTempPath(),"CyberpunkCoopOnline-erro.txt"),ex.ToString());return 1;}MessageBox.Show(ex.Message,"Não foi possível abrir o programa",MessageBoxButtons.OK,MessageBoxIcon.Error);return 1;}}
 }

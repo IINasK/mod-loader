@@ -23,7 +23,16 @@
 - Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
   autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
 
-## Revisão atual 1.1.14 — projetos, Nexus, espaço e exclusão — 06/11/2026
+## Revisão atual 1.1.15 — instalador Windows — 06/11/2026
+
+- Pedido atual substitui a distribuição portátil: entregar um único Setup EXE, asset canônico Mod-Loader-X.Y.Z.exe. Inno Setup6 padrão, por usuário, sem admin. AppId estável IINasK.ModLoader; programa em LocalAppData/Programs/Mod Loader, atalhos Iniciar/desktop e entrada de desinstalação HKCU64. Desinstalador próprio do Inno; não criar desinstalador artesanal nem remover pastas inteiras.
+- Config/cache/logs novos em LocalAppData/ModLoader/{Config,Cache,Logs}. GeneralAppPaths reconhece biblioteca antiga ModLoaderGeral se não houver biblioteca moderna; cache/logs CyberpunkCoop existentes continuam em uso, sem copiar/mover payloads. Dirs vazios não escondem dados antigos. Desinstalar app preserva projetos/config/cache/mods. Não executar instalação de mods durante Setup.
+- Build.ps1 gera aplicativo e Setup; compilar-setup.ps1 valida versão do payload, recebe -Compiler opcional e encontra Inno instalado. Requisitos definidos do Setup: Win10/11 x64 e .NET Framework4.7.2+ (Release>=461808). Não instalar runtime automaticamente. Amigo não precisa de Inno/compilador. Checks de atualização aceitam o mesmo nome público canônico, agora contendo Setup; não autoexecutar download.
+- testar-setup.ps1 usa AppId temporário, destinos T verificados sem links e atalhos internos à fixture. Confere HKCU real temporário, hash, versão/nome, reinstalação, uninstaller, preservação e remoção da entrada; nunca trocar AppId de produção para testar uninstall. Testes --self-test-general/paths despacham antes de criar cache pessoal.
+- Instalado de verdade neste PC após os testes: Mod Loader1.1.15 registrado por usuário, atalhos Iniciar/Desktop, payload SHA conferido e dois arquivos de preferências anteriores inalterados. Sem forçar fechamento de programas, sem mods/saves/jogo alterados. Não desinstalar esta instalação de produção como teste; o ciclo de desinstalação fica na fixture. Resultados públicos sem caminhos pessoais em Conhecimento/Validacoes/1.1.15.json; documentação Instalação-Windows-1.1.15.md.
+- Commit/push main e Releases continuam autorizados; distribuir somente Setup, sem fontes de mods/payloads/saves/dados pessoais. Binário portátil interno fica fora Git. Catálogo/RED4ext1.31.0 inalterados. Preservar política de evidências em T/Auditoria e relatos G3 privados.
+
+## Revisão 1.1.14 — projetos, Nexus, espaço e exclusão — 06/11/2026
 
 - Cabeçalho: Projetos, casa (voltar à Home), hamburger. Voltar saiu do menu. Painel Projetos reutiliza a navegação da Home, criar/importar e pessoais antes do Cyberpunk pronto. Repetir clique fecha. Importar do painel cria outro projeto pessoal mesmo partindo do padrão; as proteções do projeto padrão permanecem.
 - ZIP/RAR/7z e URL abrem o editor. Nexus: recomendar tela Slow/Premium com file_id, sem proibir página geral. Tenta nome/rótulo/bytes por metadados públicos, sem API-chave/cookies. Catálogo conhecido dispensa consulta. Consulta anônima real recebeu403: manter preenchimento manual e não contornar bloqueio. Respostas atrasadas não sobrescrevem outra fonte/variante nem nome digitado. SourceInfo persiste/exporta; é informativo, nunca aprovação de hash/status. Snapshot remove metadados de fontes locais.
