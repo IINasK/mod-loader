@@ -185,5 +185,19 @@
     "j/projects-panel.png",
     "j/source-overview-warning.png",
     "d/delete-review-light-red-en.png"
-  ]
+  ],
+  "SourceCommit": "ee0f9ce9678674aa921169b299a0b4bb45c476f4",
+  "PublishedRelease": {
+    "AnonymousRequest": true,
+    "Runtime": "Windows PowerShell 5.1 / .NET Framework",
+    "UsedPublished113Checker": true,
+    "AvailableToVersion113": "1.1.14",
+    "Version114DoesNotNotifyItself": true,
+    "ReleasePage": "https://github.com/IINasK/mod-loader/releases/tag/v1.1.14",
+    "DownloadUrl": "https://github.com/IINasK/mod-loader/releases/download/v1.1.14/Mod-Loader-1.1.14.exe",
+    "DownloadBytes": 7545856,
+    "DownloadedSha256": "E83BF97FEFC01EB441C03C7A4C7598EA537B012550EBAD695B5AB4C7821CF54A",
+    "DownloadedExecutableWasRun": false,
+    "TempDownloadRemoved": true
+  }
 }
