@@ -23,6 +23,14 @@
 - Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
   autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
 
+## Revisão 1.1.27 — decisão antes de trocar versões
+
+- ModVersionDifference/GeneralVersionChoiceDialog: Manter atual ou Usar do pacote, PT/EN, padrão seguro Manter. Fechar equivale a preservar. Não suprimir escolhas com a preferência de ocultar erros. Versão de PE lida sem executar; conteúdo sem versão não ganha número inventado. Fila conhecida confere dependências e densidade antes do download/cópia. Manter não marca instalado nem interrompe os próximos itens.
+- SnapshotInstaller agrupa conflito por mod, decide antes de gravar, confere hash após decisão, usa backup/transação/reversão existentes. P2P encaminha escolha para a UI ativa; sem UI/decisão não substitui. Manter adia o pack inteiro e mantém transporte para retry. Eventos/bindings de instalado só depois de concluir.
+- GenericInstaller registra SourceSha256 opcional e Before apenas nas trocas aprovadas. ZIP novo no mesmo caminho não é ignorado por recibo antigo. Backups somente dos arquivos substituídos; não reintroduzir cache permanente de downloads. Desinstalar restaura Before conferido; alterações posteriores são preservadas. Recibos legados continuam aceitos.
+- Base imutável e código desconhecido continuam protegidos. Estrutura antiga registrada com arquivos ausentes do novo pack exige remover versão anterior; não misturar silenciosamente. Custom Cyberpunk com colisão avisa mas não força substituição: remover anterior explicitamente. Pacote fora da receita atual continua bloqueado. Não transformar confirmação em bypass de hashes, permissões ou caminhos.
+- Provas e limites em Conhecimento/Validacoes/1.1.27.json e Escolha-de-versoes-1.1.27.md. Catálogo/jogo/RED4ext reais inalterados. Relato G3 não criado: funcionalidade usa componentes existentes, sem novo achado reutilizável comprovado. Não editar skill central. Publicar apenas fonte/validações sanitizadas/Setup; T/R127 contém evidências privadas.
+
 ## Revisão 1.1.26 — atualização silenciosa na abertura
 
 - Reutilizar Inno Setup e GeneralUpdateChecker.Session. Instalação registrada somente: toda nova execução confere Release antes de abrir projetos, valida URL/tamanho/SHA-256 do GitHub e identidade ProductVersion/FileDescription do Setup; encerra normalmente, instala e reabre. Inno FileVersion pode ser vazio e metadados podem ter espaços de preenchimento. Não relaxar hash nem executar portable como Setup.

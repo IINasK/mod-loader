@@ -106,7 +106,7 @@ public sealed partial class FixedInstaller {
         }
     }
 
-    internal string InstallImported(ModImportItem item, Action<string> report) {
+    internal string InstallImported(ModImportItem item, Action<string> report, Func<ModVersionDifference,bool> chooseVersion = null) {
         Closed();
         FixedData.ValidateGame(game,new FixedMod[0],catalog.GameFileVersion);
         var recipe=LocalModPackage.Read(item,catalog,cache,report);
@@ -115,6 +115,8 @@ public sealed partial class FixedInstaller {
         foreach(var file in recipe.Files) {
             string destination=Safe.In(game,file.Path);
             Safe.NoLinks(destination);
+            if(File.Exists(destination)&&Safe.Hash(destination)!=file.Sha256)
+                new ModVersionDifference{Name=recipe.Name,Current=ModVersionDifference.FileVersion(destination),Incoming=item.Name,CanReplace=false,Detail=GeneralStyle.T("Este importado conflita com outro arquivo do Cyberpunk. Remova a instalação anterior pelo gerenciador antes de escolher a nova, para não misturar versões. Nenhum arquivo foi substituído.","This import conflicts with another Cyberpunk file. Remove the previous installation through the manager before choosing the new one, to avoid mixing versions. No file was replaced.")+"\r\n"+file.Path}.Require(chooseVersion);
             if(File.Exists(destination)||Directory.Exists(destination))
                 throw new IOException("Já existe um arquivo em "+file.Path+". O arquivo existente foi preservado.");
         }

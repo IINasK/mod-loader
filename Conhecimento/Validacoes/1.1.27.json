@@ -1,0 +1,74 @@
+{
+  "Version": "1.1.27",
+  "Checks": 24.0,
+  "Reports": [
+    {
+      "Report": "resultado-version-choice.json",
+      "Checks": 51,
+      "Passed": true,
+      "Evidence": "T/R127/online-testes-8567bef8b32f4d4e97164e031df8ad99/resultado-version-choice.json"
+    },
+    {
+      "Report": "resultado-snapshot.json",
+      "Checks": 45,
+      "Passed": true,
+      "Evidence": "T/R127/online-testes-b066030243674832929be8e8098baed5/resultado-snapshot.json"
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 28,
+      "Passed": true,
+      "Evidence": "T/R127/online-testes-8567bef8b32f4d4e97164e031df8ad99/resultado-snapshot-installer.json"
+    },
+    {
+      "Report": "resultado-no-copy.json",
+      "Checks": 28,
+      "Passed": true,
+      "Evidence": "T/R127/online-testes-bd380e8b08c946bcb0d806d0d228ea62/resultado-no-copy.json"
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Checks": 122,
+      "Passed": true,
+      "Evidence": "T/R127/online-testes-cc7dd57da9cf40d589c18dfc06ac1a47/resultado-p2p-ui.json"
+    },
+    {
+      "Report": "resultado-updates.json",
+      "Checks": 30,
+      "Passed": true,
+      "Evidence": "T/R127/online-testes-0952077abb1b4b01a948e6295810afa0/resultado-updates.json"
+    },
+    {
+      "Report": "resultado-automatic-update.json",
+      "Checks": 25,
+      "Passed": true,
+      "Evidence": "T/R127/online-testes-fdc464d183394990981ff98b69617184/resultado-automatic-update.json"
+    },
+    {
+      "Report": "resultado-progresso-geral.json",
+      "Checks": 38,
+      "Passed": true,
+      "Evidence": "T/R127/online-testes-ad1395e5d99b4029a1ddde7afc5dd8b7/resultado-progresso-geral.json"
+    },
+    {
+      "Checks": 24,
+      "Passed": true,
+      "Report": "resultado-setup.json",
+      "Evidence": "T/setup-73994dd5d1024887a2cf382547ef34cb/resultado-setup.json"
+    }
+  ],
+  "AppSha256": "d822920c0432c3f228957f527063be6a843332df04da7fb067f18e1b121cb7cd",
+  "SetupSha256": "04281a8c34ddc91b072c074f22ffa5ee961bae48922a6dbe1592c70ca9dadcf8",
+  "CatalogSha256": "c6a0b3a6170e10c8d707c4d25361d30be7382bccb9a25dd8a50d27c956e2e6a2",
+  "CatalogChanged": false,
+  "RealGameModified": false,
+  "FullGeneralSuiteRun": false,
+  "TwoComputerTransferRepeated": false,
+  "FriendComputerDirectlyTested": false,
+  "ReleaseVerified": false,
+  "Limits": [
+    "Unknown versions are not guessed.",
+    "Unsupported file-tree changes and Cyberpunk custom collisions require removing the previous installation first.",
+    "Keeping current defers the entire received pack; other queue items may continue."
+  ]
+}

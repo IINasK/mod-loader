@@ -45,7 +45,7 @@ public sealed partial class InstalledSnapshotInstaller {
         records = Safe.In(this.appData, "Snapshots/" + Fingerprint(this.destination.ToUpperInvariant()));
     }
 
-    public string Install(string zipPath, string expectedHash, Action<string> report, int failAfter = -1) {
+    public string Install(string zipPath, string expectedHash, Action<string> report, int failAfter = -1, Func<ModVersionDifference,bool> chooseVersion = null) {
         // The archive is leased throughout verification and copying; no archive is kept in the receipt store.
         zipPath = Path.GetFullPath(zipPath); Safe.NoLinks(zipPath);
         using (var source = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
@@ -63,6 +63,7 @@ public sealed partial class InstalledSnapshotInstaller {
                 }
                 var complete=receipts.FirstOrDefault(r=>r.Status=="installed"&&r.ActiveOwners.Count==WorkKeys(manifest).Count()&&Safe.Json.Serialize(r.Manifest)==Safe.Json.Serialize(manifest)&&r.Files.All(Matches));
                 if(complete!=null){CleanStage(Safe.In(destination,".mod-loader-snapshot-"+complete.Id));return complete.Id;}
+                var approvals=ConfirmVersions(manifest,chooseVersion,receipts);
                 CheckSpace(manifest);
                 var others = receipts.Where(r => r.Status == "installed" && r.ActiveOwners.Count > 0).ToList();
                 var receipt = new Receipt {
@@ -92,7 +93,7 @@ public sealed partial class InstalledSnapshotInstaller {
                                     CopyBounded(input, output, file.Size);
                                 }
                                 if (Safe.Hash(prepared) != file.Sha256) throw new IOException("Arquivo divergente no pacote: " + file.Path);
-                                if (before != null && before != file.Sha256) throw Conflict(file.Path);
+                                if(before!=null&&before!=file.Sha256){string approved;if(!approvals.TryGetValue(file.Path,out approved)||approved!=before)throw Conflict(file.Path);}
                             } else {
                                 byte[] content = File.Exists(target) ? InstalledSnapshotConfig.Read(target) : null;
                                 foreach (var file in files) content = InstalledSnapshotConfig.Apply(file, content);
@@ -104,11 +105,11 @@ public sealed partial class InstalledSnapshotInstaller {
                             var previous = others.SelectMany(r => r.Files.Select(f => new { Receipt = r, File = f }))
                                 .FirstOrDefault(x => x.File.Path.Equals(group.Key, StringComparison.OrdinalIgnoreCase)
                                     && !x.File.Reverted && x.File.Applied && x.File.After == before && x.File.Owned);
-                            if (previous != null) {
+                            if (previous != null && before == after) {
                                 change.Owned = true; change.Before = previous.File.Before;
                                 if (change.Before != null) Backup(BackupPath(previous.Receipt, change.Path), BackupPath(receipt, change.Path), change.Before);
                             } else if (before != null && before != after) {
-                                // Only sanitized, whitelisted configuration entries reach this branch.
+                                // Configuration changes and explicitly approved file replacements retain a verified backup.
                                 change.Owned = true;
                                 Backup(target, BackupPath(receipt, change.Path), before);
                             }
@@ -146,6 +147,20 @@ public sealed partial class InstalledSnapshotInstaller {
                 } finally { CleanStage(stage); }
             }
         }
+    }
+
+    Dictionary<string,string> ConfirmVersions(InstalledSnapshotManifest manifest,Func<ModVersionDifference,bool> choose,List<Receipt> receipts){
+        var ids=new HashSet<string>(manifest.List.Mods.Select(m=>m.Id),StringComparer.Ordinal);
+        var paths=new HashSet<string>(manifest.Files.Where(f=>f.Kind=="file").Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
+        var obsolete=receipts.Where(r=>r.Status=="installed").SelectMany(r=>r.Manifest.Files.Where(f=>f.Kind=="file"&&f.Owners.Any(o=>r.ActiveOwners.Contains(o)&&ids.Contains(o.Split('/')[0]))&&!paths.Contains(f.Path))).Where(f=>File.Exists(Safe.In(destination,f.Path))||Directory.Exists(Safe.In(destination,f.Path))).Select(f=>f.Path).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if(obsolete.Count>0)new ModVersionDifference{Name=manifest.Name,Current=GeneralStyle.T("Outra versão registrada","Another recorded version"),Incoming=manifest.Name,CanReplace=false,Detail=GeneralStyle.T("A versão anterior contém arquivos que não fazem parte do novo pacote. Remova a versão anterior pelo gerenciador para evitar misturar versões. Nada foi apagado.","The previous version contains files absent from the new pack. Remove the previous version through the manager to avoid mixing versions. Nothing was deleted.")+"\r\n"+String.Join("\r\n",obsolete.Take(6))}.Require(choose);
+        var changed=manifest.Files.Where(f=>f.Kind=="file").GroupBy(f=>f.Path,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()).Where(f=>File.Exists(Safe.In(destination,f.Path))&&HashOrNull(Safe.In(destination,f.Path))!=f.Sha256).ToList();
+        var expected=changed.ToDictionary(f=>f.Path,f=>HashOrNull(Safe.In(destination,f.Path)),StringComparer.OrdinalIgnoreCase);
+        foreach(var group in changed.GroupBy(f=>String.Join(", ",manifest.List.Mods.Where(m=>f.Owners.Any(owner=>owner.StartsWith(m.Id+"/",StringComparison.Ordinal))).Select(m=>m.Name)))){
+            var files=group.ToList();var known=catalog.Packages.FirstOrDefault(m=>m.Files.Any(f=>files.Any(p=>p.Path.Equals(f.Path,StringComparison.OrdinalIgnoreCase))));
+            new ModVersionDifference{Name=group.Key,Current=String.Join("; ",files.Select(f=>ModVersionDifference.FileVersion(Safe.In(destination,f.Path))).Distinct()),Incoming=known==null?GeneralStyle.T("Conteúdo do pacote recebido","Received pack content"):known.Version,CanReplace=!files.Any(f=>IsImmutable(f.Path)),Detail=String.Join("\r\n",files.Take(6).Select(f=>f.Path))+"\r\n"+GeneralStyle.T("O pacote inteiro aguarda sua escolha. A troca guarda os arquivos anteriores para reversão. A base protegida não pode ser substituída.","The entire pack waits for your choice. Replacement backs up the previous files. The protected base cannot be replaced.")}.Require(choose);
+        }
+        return expected;
     }
 
     public List<InstalledSnapshotFile> ReadInstalledFiles(string receiptId, string workKey) {
@@ -269,6 +284,7 @@ public sealed partial class InstalledSnapshotInstaller {
             if (file.Kind == "file") {
                 staged = checked(staged + file.Size);
                 if (!File.Exists(path)) copies = checked(copies + file.Size);
+                else if(HashOrNull(path)!=file.Sha256){long size=new FileInfo(path).Length;backups=checked(backups+size);staged=checked(staged+size);copies=checked(copies+file.Size);}
             } else {
                 staged = checked(staged + 3L * 1048576);
                 copies = checked(copies + 2L * 1048576);

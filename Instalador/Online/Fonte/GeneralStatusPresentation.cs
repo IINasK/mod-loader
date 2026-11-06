@@ -5,6 +5,8 @@ using System.IO;
 internal static class GeneralStatusPresentation {
     internal static string Label(string raw) {
         string value=(raw??"").Trim().ToLowerInvariant();
+        if(value=="versão diferente")return GeneralStyle.T("Versão diferente","Different version");
+        if(value=="versão mantida")return GeneralStyle.T("Versão mantida","Version kept");
         if(Kind(raw)=="error")return GeneralStyle.T("Falha","Failed");
         if(value=="baixando")return GeneralStyle.T("Baixando","Downloading");
         if(Kind(raw)=="installed"||value=="pronto para instalar"||value=="instalando")return GeneralStyle.T("Download concluído","Download complete");
@@ -25,6 +27,7 @@ internal static class GeneralStatusPresentation {
             case "instalação parcial":
             case "parcial/pulado":
                 return "error";
+            case "versão diferente":
             case "na fila":
             case "verificando":
             case "baixando":

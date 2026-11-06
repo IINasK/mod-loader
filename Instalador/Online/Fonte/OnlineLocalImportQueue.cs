@@ -93,7 +93,7 @@ public sealed partial class OnlineWindow {
                     continue;
                 }
                 if(row!=null)row.Cells["State"].Value="Instalando";
-                bool installed=await Run(()=>createInstaller(request.Root).InstallImported(request.Item,Report));
+                bool installed=await Run(()=>createInstaller(request.Root).InstallImported(request.Item,Report,difference=>GeneralVersionChoiceDialog.Ask(this,difference)));
                 row=Row("pending:"+request.Item.Id);
                 if(row==null)continue;
                 row.Cells["Installed"].Value=installed?"Instalado correto":"Não registrado";

@@ -31,6 +31,7 @@ internal sealed class P2PService : IDisposable {
     string installedData;
     bool installedFixture;
     internal event Action<P2PSession> SnapshotInstalled;
+    internal Func<ModVersionDifference,bool> ChooseVersion;
     internal string ApplicationData {get{return installedData;}}
     internal bool Installing {get{return installedSessions.Any(s=>s.Stage!=null&&!s.Completed&&String.IsNullOrEmpty(s.Error));}}
     readonly object manifestsLock=new object();
@@ -133,7 +134,7 @@ internal sealed class P2PService : IDisposable {
         s.Stage="Conferindo e instalando…";
         if(Safe.Hash(zip)!=s.Hash)throw new IOException("O ZIP recebido não corresponde ao convite. A instalação foi cancelada.");
         var installer=new InstalledSnapshotInstaller(s.Destination,installedData,installedCatalog,installedFixture);
-        s.ReceiptId=installer.Install(zip,s.Hash,message=>s.Stage=message);s.Completed=true;s.Error=null;s.Stage=null;Save();
+        s.ReceiptId=installer.Install(zip,s.Hash,message=>s.Stage=message,-1,ChooseVersion);s.Completed=true;s.Error=null;s.Stage=null;Save();
         var handler=SnapshotInstalled;if(handler!=null)handler(s);
         CleanupTransport(s);
     }

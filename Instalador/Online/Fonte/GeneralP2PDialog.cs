@@ -28,6 +28,8 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
     internal GeneralP2PDialog(P2PService service,GeneralModState state,System.Collections.Generic.IEnumerable<string> ids,FixedCatalog catalog,DownloadCache cache,bool autoStart=true):base(T("Modpack e compartilhamento","Modpack and sharing")){
         this.service=service;this.state=state;this.ids=ids.ToArray();this.catalog=catalog;
+        var previousChoice=service.ChooseVersion;Func<ModVersionDifference,bool> versionChoice=difference=>GeneralVersionChoiceDialog.Ask(this,difference);service.ChooseVersion=versionChoice;
+        Disposed+=(s,e)=>{if(Object.ReferenceEquals(service.ChooseVersion,versionChoice))service.ChooseVersion=previousChoice;};
         ClientSize=new Size(690,500);Name="p2p-dialog";
         var body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=8,Padding=new Padding(24,8,24,20),Margin=Padding.Empty};
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
@@ -127,6 +129,7 @@ internal sealed partial class GeneralModWindow {
             if(p2p==null){
                 p2p=new P2PService(Path.Combine(data,"P2P"),Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"Mod Loader","Pacotes P2P"));
                 p2p.EnableInstalledReceive(catalog,data);
+                p2p.ChooseVersion=difference=>GeneralVersionChoiceDialog.Ask(this,difference);
                 p2p.SnapshotInstalled+=session=>{
                     if(IsDisposed||!IsHandleCreated)return;
                     BeginInvoke((Action)(async()=>{
