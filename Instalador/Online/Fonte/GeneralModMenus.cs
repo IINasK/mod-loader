@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -10,24 +10,12 @@ using System.Windows.Forms;
 internal sealed partial class GeneralModWindow {
     void ToggleListMenu(){
         if(working||scanning)return;
-        menus.Toggle(this,optionsButton,()=>new GeneralActionsMenu(),dialog=>Guard(()=>{
+        menus.Toggle(this,optionsButton,()=>new GeneralActionsMenu(BuiltInProject),dialog=>Guard(()=>{
             string action=((GeneralActionsMenu)dialog).ActionId;
-            if(action=="new")CreateList();else if(action=="open")BackToProjects();else if(action=="import")ImportList();else if(action=="export")ExportList();else if(action=="share")ShowP2P();else if(action=="options")ShowOptions();
+            if(action=="new")ProjectCommand("new");else if(action=="open"||action=="home")BackToProjects();
+            else if(!BuiltInProject&&action=="import")ProjectCommand("import");else if(!BuiltInProject&&action=="export")ProjectCommand("export");
+            else if(!BuiltInProject&&action=="share")ShowP2P();else if(action=="options")ShowOptions();
         }));
-    }
-    void ToggleProjects(){
-        if(working||scanning)return;
-        menus.Toggle(this,listButton,()=>new GeneralProjectsMenu(projectStore==null?new GeneralProject[0]:projectStore.Read().Projects.ToArray(),project==null?null:project.Id),dialog=>Guard(()=>{
-            var choice=(GeneralProjectsMenu)dialog;
-            if(choice.ReadyProject&&(project==null||project.TemplateId!="cyberpunk-2077"))ProjectCommand("ready");
-            else if(choice.ProjectId!=null&&(project==null||choice.ProjectId!=project.Id))ProjectCommand("project/"+choice.ProjectId);
-        }));
-    }
-    void CreateList(){
-        using(var name=new GeneralNameDialog(T("Nome do preset","Preset name"),"")){
-            if(name.ShowDialog(this)!=DialogResult.OK)return;
-            var list=new GeneralModList();list.Presets.Add(new GeneralModPreset{Id="preset-"+Guid.NewGuid().ToString("N"),Name=name.ResultName});Replace(list);
-        }
     }
     async void Replace(GeneralModList list){await ReplaceList(list);}
     async Task<bool> ReplaceList(GeneralModList list,bool clearBindings=false,string snapshotReceipt=null,string newDestination=null){
@@ -44,13 +32,6 @@ internal sealed partial class GeneralModWindow {
             if(newDestination!=null){state.Destination=newDestination;destination.Text=newDestination;}
             Persist();RebuildPresets();await Scan();return true;
         }catch(Exception ex){ShowError(ex);return false;}
-    }
-    void ImportList(){using(var dialog=new OpenFileDialog{Filter=T("Lista do Mod Loader|*.json","Mod Loader list|*.json")})if(dialog.ShowDialog(this)==DialogResult.OK)Replace(library.Import(dialog.FileName));}
-    void ExportList(){
-        using(var dialog=new SaveFileDialog{Filter=T("Lista do Mod Loader|*.json","Mod Loader list|*.json"),FileName="mod-list.json"}){
-            if(dialog.ShowDialog(this)!=DialogResult.OK)return;
-            library.Export(dialog.FileName,state.List);detail.Text=T("Lista exportada com categorias, tags e presets. Os arquivos dos mods não estão no JSON.","List exported with categories, tags and presets. Mod files are not included in the JSON.");
-        }
     }
     void EditPreset(bool create){
         if(working||scanning)return;

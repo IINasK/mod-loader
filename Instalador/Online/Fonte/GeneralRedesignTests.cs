@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -8,6 +8,55 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
+    internal static void RunProjectSearchTests(string parent){
+        string root=Path.Combine(parent,"search-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
+        var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
+        check(GeneralModSearch.Matches(GeneralModSearch.Terms("veiculos"),"Veículos"),"Search ignores accents and case.");
+        check(GeneralModSearch.Matches(GeneralModSearch.Terms("wolf"),"Wolfcut Hair"),"Name fragments match.");
+        check(GeneralModSearch.Matches(GeneralModSearch.Terms("wlofcut"),"Wolfcut Hair"),"Transposed letters are accepted.");
+        check(GeneralModSearch.Matches(GeneralModSearch.Terms("Cyberpnuk"),"Cyberpunk 2077"),"Long names tolerate two small edits.");
+        check(!GeneralModSearch.Matches(GeneralModSearch.Terms("2078"),"Cyberpunk 2077"),"Numeric versions and identifiers are literal.");
+        check(!GeneralModSearch.Matches(GeneralModSearch.Terms("abc"),"axc"),"Very short queries are not fuzzed.");
+        check(!GeneralModSearch.Matches(GeneralModSearch.Terms("banana"),"Wolfcut Hair"),"Unrelated words do not match.");
+        var a=NewEntry("Wolfcut Hair","https://example.com/a.zip");a.Category="Aparência";a.Variants[0].Name="Feminina 2.0";
+        var b=NewEntry("Nissan GTR","https://example.com/b.zip");b.Category="Veículos";b.Variants[0].Name="Principal";
+        var c=NewEntry("Radio Ext","https://example.com/c.zip");c.Category="Principal";
+        var list=new GeneralModList{Categories=new List<string>{a.Category,b.Category,c.Category},Mods=new List<GeneralModEntry>{a,b,c}};
+        list.Presets.Add(new GeneralModPreset{Id="kit",Name="Meu kit",ModIds=new List<string>{a.Id,b.Id}});
+        var state=new GeneralModState{Destination=root,DownloadFolder=root,List=list};
+        TestForm(FixedData.Load(),state,Path.Combine(root,"state"),root,async form=>{
+            form.statuses[Key(a,form.Selected(a))]="Instalado";form.statuses[Key(b,form.Selected(b))]="Falhou";form.DrawRows();form.Persist();string original=Safe.Hash(Path.Combine(form.data,"lista.json"));string projectBefore=Safe.Json.Serialize(state.List);
+            form.marked.Add(b.Id);
+            form.searchBox.Text="wlofcut feminina concluido";await Task.Delay(220);
+            check(form.VisibleMods().Single()==a,"The native search field combines name typo, variant and visible status.");
+            check(original==Safe.Hash(Path.Combine(form.data,"lista.json")),"Typing a query does not save or replace the project.");
+            check(form.ModRows().Count()==1&&form.marked.Contains(b.Id),"Filtering hides unmatched rows and preserves hidden checked items.");
+            form.categoryFilters=new HashSet<string>{b.Category};form.DrawRows();check(form.VisibleMods().Count==0,"Search composes with category filters.");
+            check(form.grid.Rows.Cast<DataGridViewRow>().Any(row=>row.Tag is SectionRow&&((SectionRow)row.Tag).Kind=="empty"),"No results has an explicit empty-state message.");
+            form.categoryFilters=null;form.searchBox.Text="falha";await Task.Delay(220);check(form.VisibleMods().Single()==b,"Search finds failed status.");
+            form.searchBox.Text="nao baixado";await Task.Delay(220);check(form.VisibleMods().Single()==c,"Search finds not-downloaded status.");
+            state.Language="en";form.BuildInterface();form.searchBox.Text="download complete";await Task.Delay(220);check(form.VisibleMods().Single()==a,"Status is searchable in the active English language.");
+            form.searchBox.Text="principal";await Task.Delay(220);form.statusFilters=new HashSet<string>{"Failed"};form.DrawRows();check(form.VisibleMods().Single()==b,"Search composes with status and variant values.");
+            form.statusFilters=null;form.searchBox.Text="feminina";await Task.Delay(220);form.preset.SelectedIndex=1;check(form.VisibleMods().Single()==a,"Preset membership and search are combined.");
+            form.searchBox.Text="radio";await Task.Delay(220);check(form.VisibleMods().Count==0,"Search never leaks items outside the current preset.");
+            form.preset.SelectedIndex=0;form.searchBox.Clear();await Task.Delay(220);check(form.VisibleMods().Count==3&&form.marked.Contains(b.Id),"Clearing restores rows without changing selection.");
+            foreach(string theme in new[]{"light-red","light","dark"}){
+                state.Theme=theme;form.BuildInterface();form.ClientSize=new Size(1000,720);form.PerformLayout();await Task.Delay(30);
+                var field=form.searchBox.Parent.Parent;
+                check(form.tableName.PointToScreen(Point.Empty).Y+form.tableName.Height<=field.PointToScreen(Point.Empty).Y&&field.PointToScreen(Point.Empty).Y+field.Height<=form.grid.PointToScreen(Point.Empty).Y,"Search fits between title and column headers: "+theme);
+                check(form.searchBox.BackColor==GeneralStyle.Surface&&form.searchBox.ForeColor==GeneralStyle.Foreground&&form.searchBox.BorderStyle==BorderStyle.None,"Search text uses the active palette without a square native border: "+theme);
+                check(field.Height>=44&&form.searchBox.Width>350,"Search remains usable at minimum window width: "+theme);
+                form.searchBox.Text="gtr";await Task.Delay(220);form.expandList.PerformClick();check(form.searchBox.Visible&&form.VisibleMods().Single()==b,"Expanded list retains live search: "+theme);
+                CaptureUi(form,Path.Combine(root,"search-expanded-"+theme+".png"));form.expandList.PerformClick();CaptureUi(form,Path.Combine(root,"search-"+theme+".png"));
+            }
+            form.ResetColumnFilters();form.DrawRows();check(form.searchBox.Text==""&&form.VisibleMods().Count==3,"Reset clears the query and column filters together.");
+            check(Safe.Json.Serialize(state.List)==projectBefore,"Search/filter/expand preserve names, categories and preset members.");
+            form.optionsButton.PerformClick();var menu=(GeneralActionsMenu)form.menus.Current;
+            check(AllControls(menu).OfType<Button>().Any(button=>button.Name=="home"),"The real project menu offers Back to main menu.");form.menus.Close();
+        });
+        GeneralStyle.UseTheme("light");GeneralStyle.Language="pt";
+        Safe.WriteJson(Path.Combine(root,"resultado-project-search.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});
+    }
     internal static void RunRedesignTests(string parent){
         string root=Path.Combine(parent,"redesign-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
         string archive=TestZip(root,"original.zip","mods/item.txt","unchanged");
@@ -42,11 +91,8 @@ internal sealed partial class GeneralModWindow {
             CaptureUi(form,Path.Combine(root,"tabela-clara.png"));
             using(var menu=new GeneralActionsMenu()){
                 menu.StartPosition=FormStartPosition.Manual;menu.Location=new Point(-30000,-30000);menu.Show(form);Application.DoEvents();
-                check(menu.Width==350&&menu.Height==420&&AllControls(menu).OfType<Button>().Count(button=>button.Name!="")==6,"Menu em coluna reúne listas, compartilhar e opções.");
+                check(menu.Width==350&&menu.Height==468&&AllControls(menu).OfType<Button>().Count(button=>button.Name!="")==7,"Menu em coluna reúne listas, compartilhar e opções.");
                 CaptureUi(menu,Path.Combine(root,"menu-unico.png"));menu.Close();
-            }
-            using(var packages=new GeneralProjectsMenu(new GeneralProject[0],null)){
-                check(AllControls(packages).OfType<Button>().Count(button=>button.Name=="cyberpunk")==1,"Pacotes oferece o pacote Cyberpunk separadamente.");
             }
             using(var editor=new GeneralCategoryDetails("Principal","",false,true)){
                 editor.StartPosition=FormStartPosition.Manual;editor.Location=new Point(-30000,-30000);editor.Show(form);Application.DoEvents();

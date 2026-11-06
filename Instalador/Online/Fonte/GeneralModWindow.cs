@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -23,7 +23,7 @@ internal sealed partial class GeneralModWindow : Form {
     GeneralPicker preset;
     DataGridView grid;
     Label detail,counts;
-    Button next,listButton,reloadButton,optionsButton,expandList;
+    Button next,reloadButton,optionsButton,expandList;
     TableLayoutPanel mainLayout;
     bool listExpanded;
     int hoveredRow=-1;
@@ -87,8 +87,8 @@ internal sealed partial class GeneralModWindow : Form {
         for(int i=0;i<9;i++)layout.RowStyles.Add(i==5?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.AutoSize));
         Controls.Add(layout);mainLayout=layout;
         menus.Close();
-        var heading=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=3,Margin=Padding.Empty};
-        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
+        var heading=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=Padding.Empty};
+        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         var titles=new FlowLayoutPanel{AutoSize=true,Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false,Margin=Padding.Empty};
         var brand=new FlowLayoutPanel{AutoSize=true,WrapContents=false,Margin=Padding.Empty};
         brand.Controls.Add(new ModLoaderLogo{Size=new Size(44,44),Margin=new Padding(0,0,12,0),Name="ProjectLogo"});
@@ -96,9 +96,8 @@ internal sealed partial class GeneralModWindow : Form {
         titles.Controls.Add(brand);
         titles.Controls.Add(new Label{Text=T("Criado por Nask e Codex. Se achou ruim, faz você.","Made by Nask and Codex. If you don't like it, make your own."),AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(0,0,0,14)});
         heading.Controls.Add(titles,0,0);
-        listButton=Command(T("Projetos","Projects"),ToggleProjects,true);listButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;listButton.Margin=new Padding(0,0,12,0);heading.Controls.Add(listButton,1,0);
         optionsButton=IconButton("menu",T("Menu","Menu"),ToggleListMenu,true);((GeneralButton)optionsButton).Bare=true;optionsButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;optionsButton.Margin=Padding.Empty;
-        heading.Controls.Add(optionsButton,2,0);layout.Controls.Add(heading,0,0);
+        heading.Controls.Add(optionsButton,1,0);layout.Controls.Add(heading,0,0);
         var path=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=new Padding(0,0,0,14)};
         path.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));path.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         var pathSurface=new GeneralSurface{Dock=DockStyle.Fill,Height=44,MinimumSize=new Size(100,44),MaximumSize=new Size(0,44),Padding=new Padding(16,11,16,0),Margin=new Padding(0,0,12,0)};
@@ -122,7 +121,9 @@ internal sealed partial class GeneralModWindow : Form {
         var tableTitle=new Panel{Dock=DockStyle.Fill,Height=64,Margin=Padding.Empty,Padding=new Padding(0,0,0,12),BackColor=GeneralStyle.Surface,Name="PresetHeading"};
         tableTitle.Controls.Add(tableHeading);
         tableTitle.Paint+=(s,e)=>{using(var pen=new Pen(GeneralStyle.Line))e.Graphics.DrawLine(pen,16,tableTitle.Height-6,tableTitle.Width-17,tableTitle.Height-6);};
-        layout.Controls.Add(tableTitle,0,4);
+        var tableTools=new TableLayoutPanel{Name="TableTools",Dock=DockStyle.Fill,AutoSize=true,ColumnCount=1,RowCount=2,Margin=Padding.Empty,BackColor=GeneralStyle.Surface};
+        tableTools.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));tableTools.RowStyles.Add(new RowStyle(SizeType.Absolute,64));tableTools.RowStyles.Add(new RowStyle(SizeType.Absolute,62));
+        tableTools.Controls.Add(tableTitle,0,0);tableTools.Controls.Add(BuildSearch(),0,1);layout.Controls.Add(tableTools,0,4);
         grid=new DataGridView{Dock=DockStyle.Fill,AllowUserToAddRows=false,AllowUserToDeleteRows=false,AllowUserToResizeRows=false,AllowUserToResizeColumns=false,
             RowHeadersVisible=false,SelectionMode=DataGridViewSelectionMode.FullRowSelect,MultiSelect=false,BackgroundColor=GeneralStyle.Surface,BorderStyle=BorderStyle.None,
             CellBorderStyle=DataGridViewCellBorderStyle.None,ColumnHeadersBorderStyle=DataGridViewHeaderBorderStyle.None,AutoGenerateColumns=false,EnableHeadersVisualStyles=false,
@@ -227,7 +228,7 @@ internal sealed partial class GeneralModWindow : Form {
         var visible=VisibleMods();var groups=new List<string>();
         groups.Add(null);groups.AddRange(PresetCategories());
         if(categoryFilters!=null)groups=groups.Where(category=>categoryFilters.Contains(category??"")).ToList();
-        if(variantFilters!=null||statusFilters!=null||!String.IsNullOrWhiteSpace(nameFilter))groups=groups.Where(category=>visible.Any(mod=>String.Equals(mod.Category,category,StringComparison.OrdinalIgnoreCase)||String.IsNullOrEmpty(mod.Category)&&category==null)).ToList();
+        if(variantFilters!=null||statusFilters!=null||!String.IsNullOrWhiteSpace(nameFilter)||searchTerms.Length>0)groups=groups.Where(category=>visible.Any(mod=>String.Equals(mod.Category,category,StringComparison.OrdinalIgnoreCase)||String.IsNullOrEmpty(mod.Category)&&category==null)).ToList();
         foreach(var category in groups){
             if(grid.Rows.Count>0)AddSection("divider",category,23);
             string description;
@@ -240,9 +241,10 @@ internal sealed partial class GeneralModWindow : Form {
                 row.Cells["Name"].ToolTipText=m.Description??"";row.Cells["Status"].ToolTipText=status??"";
                 if(m.Id==old)grid.CurrentCell=row.Cells[1];
             }
-            AddSection("add",category,44);
+            if(searchTerms.Length==0)AddSection("add",category,44);
         }
-        AddSection("new",null,56);
+        if(searchTerms.Length==0)AddSection("new",null,56);
+        else if(visible.Count==0)AddSection("empty",null,56);
         if(old==null)grid.ClearSelection();
         if(scroll>=0&&scroll<grid.RowCount)try{grid.FirstDisplayedScrollingRowIndex=scroll;}catch(InvalidOperationException){}
         drawing=false;UpdateCounts();
@@ -269,7 +271,8 @@ internal sealed partial class GeneralModWindow : Form {
         if(section.Kind=="heading"){
             text=section.Category??UncatName();y=bounds.Y+12;
             if(section.Category==null)description=state.List.UncategorizedDescription;else state.List.CategoryDescriptions.TryGetValue(section.Category,out description);
-        }else text=section.Kind=="add"?"+ "+T("Adicionar item","Add item"):"+ "+T("Criar nova categoria","Create new category");
+        }else if(section.Kind=="empty")text=T("Nenhum mod encontrado. Tente outro termo ou limpe os filtros.","No mods found. Try another term or clear the filters.");
+        else text=section.Kind=="add"?"+ "+T("Adicionar item","Add item"):"+ "+T("Criar nova categoria","Create new category");
         using(var font=GeneralStyle.Font(section.Kind=="heading"?15:12,section.Kind=="heading"))TextRenderer.DrawText(g,text,font,new Rectangle(bounds.X+18,y,bounds.Width-40,30),section.Kind=="heading"?GeneralStyle.Foreground:GeneralStyle.Accent,TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
         if(!String.IsNullOrWhiteSpace(description))using(var font=GeneralStyle.Font(10.5f))TextRenderer.DrawText(g,description.Replace("\r"," ").Replace("\n"," "),font,new Rectangle(bounds.X+18,y+31,bounds.Width-40,24),GeneralStyle.Muted,TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
     }

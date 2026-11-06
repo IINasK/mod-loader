@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -30,7 +30,7 @@ internal sealed partial class GeneralModWindow {
             check(((SectionRow)form.grid.Rows[form.grid.RowCount-1].Tag).Kind=="new","A lista termina com Criar nova categoria.");
             check(form.preset.Height==44&&form.presetSettings.PointToScreen(Point.Empty).Y==form.preset.PointToScreen(Point.Empty).Y,"Seletor e salvar preset ficam alinhados na mesma linha.");
             check(((GeneralButton)form.optionsButton).Bare&&form.optionsButton.Text==""&&((GeneralButton)form.optionsButton).IconKind=="menu","Opções usa apenas ícone de menu sem moldura.");
-            check(form.optionsButton.PointToScreen(Point.Empty).Y==form.listButton.PointToScreen(Point.Empty).Y&&form.listButton.Text=="Projetos"&&form.listButton.PointToScreen(new Point(form.listButton.Width,0)).X<form.optionsButton.PointToScreen(Point.Empty).X,"Projetos fica alinhado ao menu no cabeçalho.");
+            check(!AllControls(form).OfType<Button>().Any(button=>button.Text=="Projetos"||button.Text=="Projects")&&form.optionsButton.Parent.Controls.OfType<Button>().Count()==1,"Cabeçalho tem só o hamburger, sem seletor Projetos.");
             check(form.destination.Parent.Height==44,"Campo da pasta mantém altura compacta alinhada ao botão.");
             check(form.Font.FontFamily.Name.IndexOf("Jost",StringComparison.OrdinalIgnoreCase)>=0,"A fonte Jost está embutida e em uso.");
             var click=new DataGridViewCellMouseEventArgs(0,-1,1,1,new MouseEventArgs(MouseButtons.Left,1,1,1,0));
@@ -45,7 +45,7 @@ internal sealed partial class GeneralModWindow {
             form.ClientSize=new Size(1440,900);form.PerformLayout();Application.DoEvents();CaptureUi(form,Path.Combine(root,"claro-1440.png"));
             using(var menu=new GeneralActionsMenu()){
                 menu.StartPosition=FormStartPosition.Manual;menu.Location=new Point(-30000,-30000);menu.Show(form);Application.DoEvents();
-                check(AllControls(menu).OfType<Button>().Where(button=>button.Name!="").Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"export","import","new","open","options","share"}),"Menu reúne listas, compartilhar e opções em uma coluna.");
+                check(AllControls(menu).OfType<Button>().Where(button=>button.Name!="").Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"export","home","import","new","open","options","share"}),"Menu reúne listas, compartilhar e opções em uma coluna.");
                 CaptureUi(menu,Path.Combine(root,"menu-principal.png"));menu.Close();
                 check(!menu.Visible,"Menu fecha sem alterar a lista.");
             }
@@ -98,7 +98,7 @@ internal sealed partial class GeneralModWindow {
                 editor.StartPosition=FormStartPosition.Manual;editor.Location=new Point(-30000,-30000);editor.Show(form);Application.DoEvents();
                 CaptureUi(editor,Path.Combine(root,"editor-escuro.png"));editor.Close();
             }
-            using(var menu=new GeneralActionsMenu())check(AllControls(menu).OfType<Button>().Single(button=>button.Name=="new").Text=="New list","Menu de listas também muda de idioma.");
+            using(var menu=new GeneralActionsMenu())check(AllControls(menu).OfType<Button>().Single(button=>button.Name=="new").Text=="New project","Menu de listas também muda de idioma.");
         });
         GeneralStyle.Dark=false;GeneralStyle.Language="pt";
         Safe.WriteJson(Path.Combine(root,"resultado-ui-v2.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -51,8 +51,6 @@ internal sealed partial class GeneralModWindow {
                 check(form.grid.RowCount==rows&&form.state.SelectedPreset==selectedPreset&&form.marked.SetEquals(markedBefore)&&((GeneralButton)form.expandList).IconKind=="minimize","Expandir preserva itens, preset e seleção e oferece restaurar: "+theme);
                 CaptureUi(form,Path.Combine(root,"lista-expandida-"+theme+".png"));form.expandList.PerformClick();form.PerformLayout();
                 check(!form.listExpanded&&form.grid.Height==height&&form.destination.Visible&&form.preset.Visible&&remove.Visible&&install.Visible&&form.Bounds==windowBounds,"Restaurar recupera layout e controles sem maximizar o aplicativo: "+theme);
-                form.listButton.PerformClick();var projects=form.menus.Current as GeneralProjectsMenu;check(projects!=null&&projects.Visible&&form.Enabled&&!projects.CloseButtonShown,"Projetos abre menu sem X e sem bloquear a janela: "+theme);
-                form.listButton.PerformClick();Application.DoEvents();check(form.menus.Current==null,"Segundo clique em Projetos fecha o menu: "+theme);
                 form.optionsButton.PerformClick();var actions=form.menus.Current as GeneralActionsMenu;check(actions!=null&&actions.Visible,"Hamburger abre menu vertical: "+theme);CaptureUi(form,Path.Combine(root,"editor-"+theme+".png"));
                 form.optionsButton.PerformClick();Application.DoEvents();check(form.menus.Current==null,"Segundo clique no hamburger fecha o menu: "+theme);
             }
@@ -64,9 +62,11 @@ internal sealed partial class GeneralModWindow {
             form.AttachProject(builtInStore,builtIn);form.UpdateTableTitle();
             check(form.ProtectedPreset&&form.tableName.ReadOnly&&!form.deletePreset.Enabled,"Presets fornecidos pelo projeto padrão não podem ser renomeados nem excluídos.");
             string presetName=form.ActivePreset.Name;int count=form.state.List.Presets.Count;
-            form.listButton.PerformClick();var menu=(GeneralProjectsMenu)form.menus.Current;
-            AllControls(menu).OfType<Button>().Single(button=>button.Name=="cyberpunk").PerformClick();await Task.Delay(30);
-            check(form.Visible&&form.ProjectAction==null&&form.state.List.Presets.Count==count,"Clicar no projeto padrão já aberto fecha o menu sem trocar ou piscar a janela.");
+            form.optionsButton.PerformClick();var menu=(GeneralActionsMenu)form.menus.Current;
+            check(AllControls(menu).OfType<Button>().Where(button=>button.Name!="").Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"home","new","open","options"}),"Projeto padrão oferece somente novo/abrir/voltar/opções.");
+            form.optionsButton.PerformClick();await Task.Delay(30);
+            string beforeExport=Safe.Hash(Path.Combine(builtInStore.DataPath(builtIn),"lista.json"));form.ProjectCommand("export");form.ProjectCommand("import");
+            check(form.Visible&&form.ProjectAction==null&&beforeExport==Safe.Hash(Path.Combine(builtInStore.DataPath(builtIn),"lista.json")),"Projeto padrão também recusa importação/exportação no despacho, sem alterar dados.");
             form.marked.Add(form.state.List.Mods.First().Id);form.DrawRows();
             CompleteProjectName("Meu preset pessoal",()=>form.presetSettings.PerformClick());
             check(form.ActivePreset.Name=="Meu preset pessoal"&&!form.ProtectedPreset&&!form.tableName.ReadOnly&&form.state.List.Presets.First(item=>item.Id=="all").Name==presetName,"Salvar personalização de padrão cria um preset pessoal e preserva o original.");

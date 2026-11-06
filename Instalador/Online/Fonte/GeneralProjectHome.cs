@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -47,7 +47,7 @@ internal sealed class GeneralProjectHome : Form {
         else{
             saved=new ListBox{Name="SavedProjects",Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,IntegralHeight=false,DrawMode=DrawMode.OwnerDrawFixed,ItemHeight=56,AccessibleName=T("Projetos salvos","Saved projects")};
             foreach(var project in custom.Reverse())saved.Items.Add(new Choice(project));
-            saved.DrawItem+=(s,e)=>{if(e.Index<0)return;bool selected=hoverSaved>=0?e.Index==hoverSaved:(e.State&DrawItemState.Selected)!=0;using(var brush=new SolidBrush(selected?GeneralStyle.Selection:GeneralStyle.Surface))e.Graphics.FillRectangle(brush,e.Bounds);using(var font=GeneralStyle.Font(13,true))TextRenderer.DrawText(e.Graphics,((ListBox)s).Items[e.Index].ToString(),font,new Rectangle(e.Bounds.X+12,e.Bounds.Y,e.Bounds.Width-48,e.Bounds.Height),GeneralStyle.Foreground,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);LucideIcons.Draw(e.Graphics,"right",new Rectangle(e.Bounds.Right-28,e.Bounds.Y+19,18,18),GeneralStyle.Accent);};
+            saved.DrawItem+=(s,e)=>{if(e.Index<0)return;bool selected=hoverSaved>=0?e.Index==hoverSaved:(e.State&DrawItemState.Selected)!=0;GeneralStyle.PaintChoice(e.Graphics,e.Bounds,selected);using(var font=GeneralStyle.Font(13,true))TextRenderer.DrawText(e.Graphics,((ListBox)s).Items[e.Index].ToString(),font,new Rectangle(e.Bounds.X+12,e.Bounds.Y,e.Bounds.Width-48,e.Bounds.Height),GeneralStyle.Foreground,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);LucideIcons.Draw(e.Graphics,"right",new Rectangle(e.Bounds.Right-28,e.Bounds.Y+19,18,18),GeneralStyle.Accent);};
             saved.MouseMove+=(s,e)=>{int at=((ListBox)s).IndexFromPoint(e.Location);if(at!=hoverSaved){hoverSaved=at;((ListBox)s).Invalidate();}};
             saved.MouseLeave+=(s,e)=>{hoverSaved=-1;((ListBox)s).Invalidate();};
             saved.MouseClick+=(s,e)=>{int at=saved.IndexFromPoint(e.Location);if(e.Button==MouseButtons.Left&&at>=0)Guard(()=>OpenRequested(((Choice)saved.Items[at]).Project));};
@@ -118,9 +118,11 @@ internal sealed partial class GeneralModWindow {
         Text="Mod Loader "+GeneralUpdateChecker.CurrentVersion+" — "+project.Name;
         UpdateTableTitle();
     }
+    bool BuiltInProject {get{return project!=null&&!String.IsNullOrEmpty(project.TemplateId);}}
     void BackToProjects(){if(working||scanning||p2p!=null&&p2p.Installing)return;Close();}
     void ProjectCommand(string action){
         if(working||scanning||p2p!=null&&p2p.Installing)return;
+        if(BuiltInProject&&(action=="export"||action=="import"||action=="delete-project"))return;
         if(action=="export"){
             using(var save=new SaveFileDialog{Filter=T("Projeto Mod Loader|*.json","Mod Loader project|*.json"),FileName=project==null?"projeto.json":String.Concat(project.Name.Where(c=>!Path.GetInvalidFileNameChars().Contains(c)))+".json"})
                 if(save.ShowDialog(this)==DialogResult.OK)library.Export(save.FileName,state.List);

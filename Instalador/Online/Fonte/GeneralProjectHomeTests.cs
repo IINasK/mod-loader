@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -36,6 +36,20 @@ internal sealed partial class GeneralModWindow {
                             int beforeHover=openCalls;
                             typeof(ListBox).GetMethod("OnMouseMove",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(choices,new object[]{new MouseEventArgs(MouseButtons.None,0,12,20,0)});
                             check(home.HoveredSavedProject==0&&openCalls==beforeHover&&choices.SelectedIndex==0,"Hover destaca o projeto salvo sem abrir nem alterar a seleção por teclado.");
+                            foreach(string theme in new[]{"light-red","light","dark"}){
+                                GeneralStyle.UseTheme(theme);
+                                choices.Items.Add(choices.Items[0]);choices.Items.Add(choices.Items[0]);
+                                foreach(int at in new[]{0,1,choices.Items.Count-1})using(var image=new Bitmap(240,56))using(var graphics=Graphics.FromImage(image)){
+                                    var bounds=new Rectangle(0,0,image.Width,image.Height);
+                                    typeof(ListBox).GetMethod("OnMouseLeave",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(choices,new object[]{EventArgs.Empty});
+                                    typeof(ListBox).GetMethod("OnDrawItem",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(choices,new object[]{new DrawItemEventArgs(graphics,choices.Font,bounds,at,DrawItemState.Selected)});
+                                    check(image.GetPixel(3,3).ToArgb()==GeneralStyle.Surface.ToArgb()&&image.GetPixel(235,3).ToArgb()==GeneralStyle.Surface.ToArgb(),"Seleção nativa deixa cantos livres na linha "+at+"/"+theme);
+                                    check(image.GetPixel(120,3).ToArgb()==GeneralStyle.Selection.ToArgb()&&image.GetPixel(120,1).ToArgb()==GeneralStyle.Surface.ToArgb(),"Seleção nativa tem recuo e preenchimento arredondado: "+at+"/"+theme);
+                                    image.Save(Path.Combine(root,"home-selection-"+theme+"-"+at+".png"));
+                                }
+                                choices.Items.RemoveAt(choices.Items.Count-1);choices.Items.RemoveAt(choices.Items.Count-1);
+                            }
+                            GeneralStyle.UseTheme("light-red");
                             CaptureUi(home,Path.Combine(root,"home-hover.png"));
                             typeof(ListBox).GetMethod("OnMouseLeave",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(choices,new object[]{EventArgs.Empty});
                             check(home.HoveredSavedProject==-1,"Sair da lista remove o highlight de hover.");
@@ -67,11 +81,11 @@ internal sealed partial class GeneralModWindow {
                             store.Delete(blank);home.Build();check(store.Read().Projects.Count==1&&File.Exists(Path.Combine(store.DataPath(blank),"lista.json")),"Excluir metadados retira o projeto da Home e conserva seus dados.");
                             var remaining=store.Read().Projects.Single();string before=Safe.Hash(Path.Combine(store.DataPath(remaining),"lista.json"));home.OpenRequested=actualOpen;
                             using(var timer=new Timer{Interval=60}){
-                                timer.Tick+=(ss,ee)=>{var window=Application.OpenForms.OfType<GeneralModWindow>().FirstOrDefault();if(window==null)return;timer.Stop();try{check(window.state.List.Mods.Count==135&&window.data==store.DataPath(remaining),"Abrir projeto usa a lista e a pasta próprias na janela real.");window.Close();}catch(Exception ex){failure=ex;window.Close();}};
+                                timer.Tick+=(ss,ee)=>{var window=Application.OpenForms.OfType<GeneralModWindow>().FirstOrDefault();if(window==null)return;timer.Stop();try{check(window.state.List.Mods.Count==135&&window.data==store.DataPath(remaining),"Abrir projeto usa a lista e a pasta próprias na janela real.");window.optionsButton.PerformClick();var menu=(GeneralActionsMenu)window.menus.Current;AllControls(menu).OfType<Button>().Single(button=>button.Name=="home").PerformClick();}catch(Exception ex){failure=ex;window.Close();}};
                                 timer.Start();home.OpenRequested(remaining);
                             }
                             if(failure!=null)throw failure;
-                            check(home.Visible&&home.Controls.Find("EmptyProjects",true).Length==1&&before==Safe.Hash(Path.Combine(store.DataPath(remaining),"lista.json")),"Fechar o editor restaura a Home sem transformar o padrão em projeto personalizado.");
+                            check(home.Visible&&home.Controls.Find("EmptyProjects",true).Length==1&&before==Safe.Hash(Path.Combine(store.DataPath(remaining),"lista.json")),"Voltar pelo menu do editor restaura a Home e preserva os dados do projeto padrão.");
                             completed=true;
                         }catch(Exception ex){failure=ex;}finally{Application.ExitThread();}
                     };Application.Run(home);

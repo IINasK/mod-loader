@@ -1,0 +1,133 @@
+{
+  "Version": "1.1.12",
+  "Checks": 1022,
+  "Reports": [
+    {
+      "Report": "resultado-loader-geral.json",
+      "Checks": 25,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-pintura-botoes.json",
+      "Checks": 36,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 28,
+      "Passed": true
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 36,
+      "Passed": 36
+    },
+    {
+      "Report": "resultado-brand.json",
+      "Checks": 45,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-category-delete.json",
+      "Checks": 16,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-floating.json",
+      "Checks": 30,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-project-home.json",
+      "Checks": 75,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-menu-host.json",
+      "Checks": 73,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-progresso-geral.json",
+      "Checks": 27,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-status-presentation.json",
+      "Checks": 46,
+      "Passed": 46
+    },
+    {
+      "Report": "resultado-p2p.json",
+      "Checks": 47,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Checks": 92,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-popup-stability.json",
+      "Checks": 80,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-preset-clean.json",
+      "Checks": 26,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-preset-draft.json",
+      "Checks": 43,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-project-store.json",
+      "Checks": 55,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-redesign.json",
+      "Checks": 27,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-project-search.json",
+      "Checks": 34,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-snapshot.json",
+      "Checks": 47,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-table-dialogs.json",
+      "Checks": 81,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-ui-v2.json",
+      "Checks": 28,
+      "Passed": true
+    },
+    {
+      "Report": "resultado-updates.json",
+      "Checks": 25,
+      "Passed": true
+    }
+  ],
+  "FixtureRoot": "D:\\T112verified",
+  "RealGameTouched": false,
+  "ExternalP2PRetest": false,
+  "ExecutableSha256": "D5730703E1C8F59A2D7FEF2F24397C4AC4875549EAA7D10DE8352FA8A87175BF",
+  "ExecutableBytes": 7437312,
+  "CatalogSha256": "89c68e6bdb8c192977fcace5d30a4b8b25912d8780fd6067f77f5c7d41c6dc05",
+  "EarlierFailures": [
+    "T112a: comparação de arquivo de estado confundia preferências com conteúdo do projeto; assert separado de conteúdo e persistência corrigido.",
+    "T112b: teste encerrava seu message loop antes de completar await; volta real passou a ser exercitada pela Home com Application.Run."
+  ],
+  "G3Report": "docs/relatos-g3-design/2026-11-05-mod-loader-selecao-retangular.md",
+  "G3CentralInboxWrite": "Denied; local fallback, not published."
+}

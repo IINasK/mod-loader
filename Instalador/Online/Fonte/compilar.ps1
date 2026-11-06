@@ -1,4 +1,4 @@
-$ErrorActionPreference='Stop'
+﻿$ErrorActionPreference='Stop'
 & (Join-Path $PSScriptRoot 'preparar-leitor.ps1')
 & (Join-Path $PSScriptRoot 'preparar-logo.ps1')
 $out=Join-Path (Split-Path -Parent $PSScriptRoot) 'Programa'
@@ -71,7 +71,7 @@ $extensions += @('InstalledSnapshot.cs','InstalledSnapshotConfig.cs','InstalledS
 $extensions += @('GeneralUpdates.cs','GeneralUpdatesTests.cs','GeneralPresetIsolationTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += @('GeneralBrand.cs','GeneralBrandTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += @('GeneralProjectStore.cs','GeneralProjectStoreTests.cs','GeneralProjectHome.cs','GeneralProjectHomeTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
-$extensions += @('GeneralMenuHost.cs','GeneralMenuHostTests.cs','GeneralProjectsMenu.cs','GeneralPresetDraft.cs','GeneralPresetDraftTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
+$extensions += @('GeneralMenuHost.cs','GeneralMenuHostTests.cs','GeneralPresetDraft.cs','GeneralPresetDraftTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += Join-Path $PSScriptRoot 'GeneralPopupStabilityTests.cs'
 $extensions += '/reference:System.Xml.dll'
 $extensions += '/win32icon:'+(Join-Path $PSScriptRoot 'Assets\ModLoader.ico')

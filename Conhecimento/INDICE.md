@@ -1,4 +1,4 @@
-# Conhecimento dos mods
+﻿# Conhecimento dos mods
 
 Indice interno de138componentes ativos do instalador. Revisao de05/11/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
 
@@ -10,6 +10,8 @@ Indice interno de138componentes ativos do instalador. Revisao de05/11/2026; font
 - Esta separacao e documental/estatica. Nao foi executado um jogo semDLC para validar aparencia, gameplay ou rede. Confirmacoescoop anteriores do usuario continuam atribuidas a ele.
 
 ## Consulta
+
+- Navegação e pesquisa atuais: [projetos, menus e busca1.1.12](Projetos-e-pesquisa-1.1.12.md), [validação](Validacoes/1.1.12.json).
 
 - P2P atual: [tela simplificada, pausa e retomada1.1.11](P2P-simples-e-retomada-1.1.11.md). Presets, nomes, links e limpeza automática.
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -46,6 +46,12 @@ internal static class GeneralStyle {
         if(d<=0){path.AddRectangle(box);return path;}
         path.AddArc(box.X,box.Y,d,d,180,90);path.AddArc(box.Right-d,box.Y,d,d,270,90);
         path.AddArc(box.Right-d,box.Bottom-d,d,d,0,90);path.AddArc(box.X,box.Bottom-d,d,d,90,90);path.CloseFigure();return path;
+    }
+    internal static void PaintChoice(Graphics graphics,Rectangle bounds,bool selected){
+        graphics.SmoothingMode=SmoothingMode.AntiAlias;
+        using(var brush=new SolidBrush(Surface))graphics.FillRectangle(brush,bounds);
+        if(selected)using(var path=Round(new RectangleF(bounds.X+2,bounds.Y+2,Math.Max(1,bounds.Width-4),Math.Max(1,bounds.Height-4)),12))
+            using(var brush=new SolidBrush(Selection))graphics.FillPath(brush,path);
     }
     internal static void PaintCard(Graphics graphics,Size size){
         graphics.SmoothingMode=SmoothingMode.AntiAlias;graphics.Clear(Surface);

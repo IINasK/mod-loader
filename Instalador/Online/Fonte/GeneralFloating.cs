@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -16,7 +16,7 @@ internal static class LucideIcons {
     static readonly Dictionary<string,string> glyphs=new Dictionary<string,string>{
         {"menu","\ue118"},{"options","\ue118"},{"list","\ue10b"},{"refresh","\ue148"},{"maximize","\ue116"},{"minimize","\ue11e"},
         {"folder","\ue246"},{"down","\ue071"},{"up","\ue074"},{"left","\ue072"},{"right","\ue073"},{"check","\ue070"},{"close","\ue1b1"},{"settings","\ue157"},{"trash","\ue18d"},{"package","\ue12c"},
-        {"save","\ue150"},{"new","\ue0cd"},{"open","\ue246"},{"export","\ue19d"},{"import","\ue0b6"},{"share","\ue159"},{"copy","\ue0a2"}
+        {"save","\ue150"},{"new","\ue0cd"},{"open","\ue246"},{"export","\ue19d"},{"import","\ue0b6"},{"share","\ue159"},{"copy","\ue0a2"},{"home","\ue0f8"},{"search","\ue154"}
     };
     static LucideIcons(){
         using(var stream=typeof(LucideIcons).Assembly.GetManifestResourceStream("ModLoader.Lucide.ttf")){
@@ -263,8 +263,7 @@ internal sealed class GeneralPicker : UserControl {
         protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);GeneralNativeTheme.Apply(this);}
         protected override void OnDrawItem(DrawItemEventArgs e){
             if(e.Index<0)return;e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
-            using(var bg=new SolidBrush(GeneralStyle.Surface))e.Graphics.FillRectangle(bg,e.Bounds);
-            if((e.State&DrawItemState.Selected)!=0)using(var round=GeneralStyle.Round(new RectangleF(e.Bounds.X+2,e.Bounds.Y+2,e.Bounds.Width-4,e.Bounds.Height-4),12))using(var b=new SolidBrush(GeneralStyle.Selection))e.Graphics.FillPath(b,round);
+            GeneralStyle.PaintChoice(e.Graphics,e.Bounds,(e.State&DrawItemState.Selected)!=0);
             if(e.Index==chosen)LucideIcons.Draw(e.Graphics,"check",new Rectangle(e.Bounds.X+10,e.Bounds.Y+12,18,18),GeneralStyle.Accent);
             TextRenderer.DrawText(e.Graphics,Convert.ToString(Items[e.Index]),Font,new Rectangle(e.Bounds.X+38,e.Bounds.Y,e.Bounds.Width-48,e.Bounds.Height),GeneralStyle.Foreground,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
         }

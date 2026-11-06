@@ -1,4 +1,4 @@
-# Registro de correções do Mod Loader
+﻿# Registro de correções do Mod Loader
 
 Registro solicitado por Douglas em 05/11/2026 para preparar um relatório futuro de melhoria da skill de design. Guardar as decisões e evidências do aplicativo; não alterar a skill global automaticamente a partir deste registro.
 
@@ -64,3 +64,11 @@ Registro solicitado por Douglas em 05/11/2026 para preparar um relatório futuro
 - Preferir ícones oficiais reconhecíveis para navegação; usar texto nos menus e nome acessível nos botões compactos. Incorporado à referência de ícones da G3 Design.
 - Divisor entre grupos deve ter respiro simétrico entre os limites pintados dos itens, incluindo suas margens. Margem só embaixo deslocava o centro percebido. Corrigido com margens verticais iguais e medido em seis combinações de idioma/tema. Regra incorporada à geometria da G3 Design.
 - 1.431 verificações/22relatórios aprovados em fixtures; imagens de cabeçalho e menu conferidas. O defeito anterior da seleção retangular continua apenas registrado, sem correção neste executável.
+
+
+## Revisão1.1.12 — decisões atuais
+
+- O seletor Projetos foi retirado: navegação pelo menu único, com Voltar ao menu principal. Criar/abrir/importar/exportar usam Projeto nos dois idiomas. O menu de projetos padrão limita-se a novo/abrir/voltar/opções; o personalizado mantém os demais recursos.
+- Pesquisa local fica entre título e colunas e continua na lista expandida. Nome/variante/status, acentos, trechos e erros pequenos compõem filtros/preset, preservando seleção oculta.
+- A seleção quadrada da Home foi corrigida na pintura compartilhada com o picker. Testes de DrawItem/pixels em três temas, inclusive primeira/meio/última linha. O relato privado ficou no fallback docs/relatos-g3-design após acesso negado na caixa central. Não publicar esse relato, não modificar a skill central.
+- Texto e filhos internos da pesquisa recebem cores explícitas e recuo que não cobre o contorno arredondado. Conferência renderizada do campo e menus e testes de geometria, não somente build.
