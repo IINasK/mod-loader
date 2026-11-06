@@ -698,6 +698,7 @@ static class OnlineProgram {
         if(args.Length==2&&args[0]=="--self-test-menus"){GeneralMenuHostTests.Run(args[1]);GeneralModWindow.RunPresetDraftTests(args[1]);GeneralTableDialogTests.Run(args[1]);GeneralPopupStabilityTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-p2p-ui"){GeneralP2PUiTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--preview-p2p"){GeneralP2PUiTests.Preview(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--self-test-no-copy"){GeneralModWindow.RunNoCopyTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-storage"){GeneralModWindow.RunStorageTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-paths"){GeneralAppPathsTests.Run(args[1]);return 0;}
         var paths=GeneralAppPaths.Current();

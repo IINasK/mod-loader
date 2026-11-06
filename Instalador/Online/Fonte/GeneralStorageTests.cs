@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -71,7 +71,7 @@ internal sealed partial class GeneralModWindow {
         var size=GeneralProjectStorage.Measure(store,catalog,cache,project);
         check(size.Identified==1&&size.ModBytes["outfit"]==4&&size.Mods==13,"A fixed mod row counts its own files; project total also includes its installed dependency.");
         long support=Directory.GetFiles(store.DataPath(project),"*",SearchOption.AllDirectories).Sum(path=>new FileInfo(path).Length),archives=catalog.Packages.SelectMany(recipe=>recipe.Assets).Sum(asset=>new FileInfo(cache.PathFor(asset)).Length);
-        check(size.Cache==support+archives,"Project cache includes cached dependencies even when not separate rows in the list.");
+        check(size.Cache==support&&size.Retained==archives,"Metadata cache stays small; old dependency packages are shown separately until explicit cleanup.");
         string first=Safe.In(target,"archive/pc/mod/base.archive"),second=Safe.In(target,"archive/pc/mod/outfit.archive");File.Delete(first);File.Delete(second);size=GeneralProjectStorage.Measure(store,catalog,cache,project);
         check(size.Identified==0&&size.ModCount==1&&!size.ModBytes.ContainsKey("outfit")&&size.Mods==0&&size.Cache>0,"Cached packages are not mistaken for installed mod space or measured mods.");
         var real=FixedData.Load();var density=real.Packages.Single(recipe=>recipe.Id==NightCityDensity.ModId);string densityPath=Safe.In(target,density.Files[0].Path);Directory.CreateDirectory(Path.GetDirectoryName(densityPath));File.WriteAllText(densityPath,"changed");

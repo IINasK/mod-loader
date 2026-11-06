@@ -159,7 +159,7 @@ public static class FixedData {
 public sealed partial class DownloadCache {
     public readonly string Root;
     public DownloadCache(string root) { Root=Path.GetFullPath(root); Safe.NoLinks(Root); CleanOrphanPreparations(); }
-    public string PathFor(FixedAsset a) { return Safe.In(Root,a.Sha256+".cache"); }
+    public string PathFor(FixedAsset a) { return SourcesOnly?OriginalFor(a):Safe.In(Root,a.Sha256+".cache"); }
     public bool Contains(FixedAsset a) { string p=PathFor(a);return File.Exists(p)&&new FileInfo(p).Length==a.Size&&Safe.Hash(p)==a.Sha256; }
     public bool CleanPreparation(string stage) {
         try {
@@ -177,6 +177,7 @@ public sealed partial class DownloadCache {
         Safe.NoLinks(source);
         if(source.EndsWith(".crdownload",StringComparison.OrdinalIgnoreCase)||source.EndsWith(".part",StringComparison.OrdinalIgnoreCase))throw new IOException("Download ainda incompleto.");
         if(!File.Exists(source)||new FileInfo(source).Length!=a.Size||Safe.Hash(source)!=a.Sha256)throw new IOException("Arquivo diferente da versão fixada: "+a.Name);
+        if(SourcesOnly){Remember(a,source);return;}
         Directory.CreateDirectory(Root); string dest=PathFor(a);if(Contains(a)){OnlineDiagnostics.Record("cache.import.verified",a.Id,"Cache já continha o pacote conferido.",new{Source=source,Cache=dest,Sha256=a.Sha256,Size=a.Size,AlreadyCached=true});return;}
         Safe.CopyAtomic(source,dest,a.Sha256);
         OnlineDiagnostics.Record("cache.import.verified",a.Id,"Arquivo conferido e copiado ao cache; não implica instalação.",new{Source=source,Cache=dest,Sha256=a.Sha256,Size=a.Size,AlreadyCached=false});

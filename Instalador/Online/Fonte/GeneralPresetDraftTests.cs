@@ -63,7 +63,7 @@ internal sealed partial class GeneralModWindow {
             check(form.ProtectedPreset&&form.tableName.ReadOnly&&!form.deletePreset.Enabled,"Presets fornecidos pelo projeto padrão não podem ser renomeados nem excluídos.");
             string presetName=form.ActivePreset.Name;int count=form.state.List.Presets.Count;
             form.optionsButton.PerformClick();var menu=(GeneralActionsMenu)form.menus.Current;
-            check(AllControls(menu).OfType<Button>().Where(button=>button.Name!="").Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"new","open","options"}),"Projeto padrão oferece somente novo/abrir/opções.");
+            check(AllControls(menu).OfType<Button>().Where(button=>button.Name!="").Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"new","open","options","share"}),"Projeto padrão oferece novo/abrir/opções e exportação somente leitura do modpack.");
             form.optionsButton.PerformClick();await Task.Delay(30);
             string beforeExport=Safe.Hash(Path.Combine(builtInStore.DataPath(builtIn),"lista.json"));form.ProjectCommand("export");form.ProjectCommand("import");
             check(form.Visible&&form.ProjectAction==null&&beforeExport==Safe.Hash(Path.Combine(builtInStore.DataPath(builtIn),"lista.json")),"Projeto padrão também recusa importação/exportação no despacho, sem alterar dados.");

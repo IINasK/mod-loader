@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -17,7 +17,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     readonly GeneralProgress progress=new GeneralProgress{Dock=DockStyle.Fill,Height=44};
     readonly Timer timer=new Timer{Interval=1000};
     readonly Panel targetRow;
-    readonly Button connect,pause,choose;
+    readonly Button connect,pause,choose,generate;
     readonly ToolTip tips=new ToolTip{UseAnimation=false,UseFading=false};
     P2PSession selected;
     bool busy,polling,remotePaused,returning;
@@ -26,7 +26,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     internal string InstalledReceiptId {get;private set;}
     internal string InstalledDestination {get;private set;}
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
-    internal GeneralP2PDialog(P2PService service,GeneralModState state,System.Collections.Generic.IEnumerable<string> ids,FixedCatalog catalog,DownloadCache cache,bool autoStart=true):base(T("Compartilhar P2P","Share over P2P")){
+    internal GeneralP2PDialog(P2PService service,GeneralModState state,System.Collections.Generic.IEnumerable<string> ids,FixedCatalog catalog,DownloadCache cache,bool autoStart=true):base(T("Modpack e compartilhamento","Modpack and sharing")){
         this.service=service;this.state=state;this.ids=ids.ToArray();this.catalog=catalog;
         ClientSize=new Size(690,540);Name="p2p-dialog";
         var body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=8,Padding=new Padding(24,8,24,20),Margin=Padding.Empty};
@@ -42,19 +42,21 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         choose=GeneralStyle.Button(T("Escolher pasta","Choose folder"),ChooseFolder);choose.Margin=new Padding(8,0,0,0);choose.Name="p2p-folder";target.Controls.Add(choose,1,1);targetRow.Controls.Add(target);body.Controls.Add(targetRow,0,4);
         var actions=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.RightToLeft,WrapContents=false,Margin=Padding.Empty};
         connect=GeneralStyle.Button(T("Conectar","Connect"),()=>Run(Connect),true);connect.Name="p2p-connect";connect.Margin=new Padding(8,0,0,0);actions.Controls.Add(connect);
-        pause=GeneralStyle.Button(T("Pausar","Pause"),()=>Run(()=>{var session=selected;return Task.Run(()=>service.Pause(session));}));pause.Name="p2p-pause";pause.Margin=Padding.Empty;actions.Controls.Add(pause);body.Controls.Add(actions,0,5);body.Controls.Add(progress,0,6);body.Controls.Add(status,0,7);
+        pause=GeneralStyle.Button(T("Pausar","Pause"),()=>Run(()=>{var session=selected;return Task.Run(()=>service.Pause(session));}));pause.Name="p2p-pause";pause.Margin=Padding.Empty;actions.Controls.Add(pause);
+        generate=GeneralStyle.Button(T("Gerar modpack","Generate modpack"),()=>Run(GenerateModpack));generate.Name="modpack-generate";generate.Margin=new Padding(0,0,8,0);actions.Controls.Add(generate);body.Controls.Add(actions,0,5);body.Controls.Add(progress,0,6);body.Controls.Add(status,0,7);
         output.Name="p2p-output";input.Name="p2p-input";destination.Name="p2p-destination";status.Name="p2p-status";destination.Text=state.Destination??"";
         input.TextChanged+=(s,e)=>UpdateActions();timer.Tick+=async(s,e)=>await Poll();
         selected=service.Sessions.LastOrDefault(s=>!s.Completed)??service.Sessions.LastOrDefault(s=>!s.Sender&&s.Completed&&!s.ListImported);
         FormClosing+=(s,e)=>{if(busy){e.Cancel=true;status.Text=T("Aguarde a preparação terminar.","Wait for preparation to finish.");}};FormClosed+=(s,e)=>timer.Stop();Disposed+=(s,e)=>{timer.Dispose();tips.Dispose();};
         GeneralStyle.Apply(this,GeneralStyle.Dark);status.Text=T("Para enviar o preset atual, deixe o segundo campo vazio e clique em Conectar. Para receber, cole o link do amigo.","To share the current preset, leave the second field empty and click Connect. To receive, paste your friend's link.");UpdateActions();
-        if(autoStart)Shown+=(s,e)=>Run(async()=>{await Task.Run(()=>service.Start(Report));SelectSession(selected);timer.Start();});
+        if(autoStart)Shown+=(s,e)=>{if(service.Engine.Running){SelectSession(selected);timer.Start();}};
     }
     static Label Heading(string text){return new Label{Text=text,Dock=DockStyle.Fill,Font=GeneralStyle.Font(11),Margin=Padding.Empty};}
     static GeneralSurface Field(Control control){var field=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(14,9,14,9),Margin=new Padding(0,0,0,8)};field.Controls.Add(control);return field;}
     void Report(string text){if(!IsDisposed&&IsHandleCreated)BeginInvoke((Action)(()=>{if(!IsDisposed)status.Text=text;}));}
-    async void Run(Func<Task> action){if(busy)return;busy=true;UpdateActions();try{while(polling)await Task.Delay(40);await action();}catch(Exception ex){status.Text=T("Falha: ","Failed: ")+ex.Message;}finally{busy=false;if(!IsDisposed)UpdateActions();}}
+    async void Run(Func<Task> action){if(busy)return;busy=true;UpdateActions();try{while(polling)await Task.Delay(40);await action();}catch(InstalledSnapshotReviewException ex){status.Text=T("Exportação interrompida: há mods incompletos ou alterados.","Export stopped: some mods are incomplete or changed.");GeneralDialog.Message(this,ex.Message,T("Conferência dos mods","Mod verification"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}catch(Exception ex){status.Text=T("Falha: ","Failed: ")+ex.Message;}finally{busy=false;if(!IsDisposed)UpdateActions();}}
     void UpdateActions(){
+        generate.Enabled=!busy&&!service.Installing;
         bool receiving=selected!=null&&!selected.Sender;try{receiving|=P2PInvite.Decode(input.Text).Kind=="offer";}catch(IOException){}
         targetRow.Visible=receiving;var layout=(TableLayoutPanel)targetRow.Parent;layout.RowStyles[4].Height=receiving?76:0;
         connect.Enabled=!busy&&(selected==null||selected.Stage==null);choose.Enabled=!busy&&(selected==null||selected.Sender||!selected.Completed&&selected.Stage==null);
@@ -64,6 +66,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     void SelectSession(P2PSession session){selected=session;remotePaused=false;output.Text=session==null||!service.Engine.Running?"":service.Invitation(session);if(session!=null&&!session.Sender)destination.Text=session.Destination??destination.Text;UpdateActions();}
     void ChooseFolder(){using(var folder=new FolderBrowserDialog{Description=T("Escolha a pasta local de instalação.","Choose the local installation folder."),SelectedPath=Directory.Exists(destination.Text)?destination.Text:""})if(folder.ShowDialog(this)==DialogResult.OK)destination.Text=folder.SelectedPath;}
     async Task Connect(){
+        if(input.Text.Trim().Length==0&&(selected==null||selected.Completed)){status.Text=T("Conferindo arquivos instalados…","Verifying installed files…");await Task.Run(()=>InstalledSnapshot.Inspect(state,ids,catalog,service.ApplicationData,true));}
         if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));timer.Start();
         string code=input.Text.Trim();
         if(code.Length==0){
@@ -77,6 +80,17 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             var session=await Task.Run(()=>{var received=service.Accept(code,target,true);if(!received.Completed)service.RetryInstalled(received,target);return received;});SelectSession(session);status.Text=T("Envie o link de resposta acima ao amigo. O recebimento e a instalação continuarão automaticamente.","Send the reply link above to your friend. Receiving and installation will continue automatically.");
         }else{var session=await Task.Run(()=>service.Authorize(code));SelectSession(session);status.Text=T("Conectado. A transferência continua automaticamente.","Connected. Transfer continues automatically.");}
         input.Clear();
+    }
+    async Task GenerateModpack(){
+        status.Text=T("Conferindo os mods antes de gerar o modpack…","Verifying mods before creating the modpack…");
+        var manifest=await Task.Run(()=>InstalledSnapshot.Inspect(state,ids,catalog,service.ApplicationData,true));
+        using(var save=new SaveFileDialog{Title=T("Salvar modpack","Save modpack"),Filter="Modpack ZIP|*.zip",FileName="Modpack.zip",OverwritePrompt=false}){
+            if(save.ShowDialog(this)!=DialogResult.OK)return;
+            if(File.Exists(save.FileName))throw new IOException(T("Escolha um nome que ainda não exista.","Choose a name that does not already exist."));
+            string output=save.FileName;
+            await Task.Run(()=>InstalledSnapshot.CreateModpack(output,manifest,state.Destination,catalog,Report));
+            progress.Value=100;progress.Caption=T("Modpack gerado","Modpack created");status.Text=T("ZIP pronto. Extraia o conteúdo na pasta raiz do jogo de destino: ","ZIP ready. Extract its contents into the destination game's root folder: ")+output;
+        }
     }
     async Task Poll(){
         if(busy||polling||!service.Engine.Running||selected==null||returning)return;polling=true;var session=selected;

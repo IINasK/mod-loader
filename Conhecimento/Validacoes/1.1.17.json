@@ -1,0 +1,262 @@
+{
+  "Version": "1.1.17",
+  "ApplicationChecks": 1214,
+  "Reports": [
+    {
+      "Report": "resultado.json",
+      "Checks": 36,
+      "Passed": true,
+      "Path": "bi-2362a3d1/resultado.json"
+    },
+    {
+      "Report": "resultado-brand.json",
+      "Checks": 45,
+      "Passed": true,
+      "Path": "br-e74ebd65/resultado-brand.json"
+    },
+    {
+      "Report": "resultado-category-delete.json",
+      "Checks": 16,
+      "Passed": true,
+      "Path": "ca-88e32eab/resultado-category-delete.json"
+    },
+    {
+      "Report": "resultado-project-deletion.json",
+      "Checks": 45,
+      "Passed": true,
+      "Path": "d/resultado-project-deletion.json"
+    },
+    {
+      "Report": "resultado-floating.json",
+      "Checks": 30,
+      "Passed": true,
+      "Path": "fl-0b747562/resultado-floating.json"
+    },
+    {
+      "Report": "resultado-project-home.json",
+      "Checks": 119,
+      "Passed": true,
+      "Path": "h/resultado-project-home.json"
+    },
+    {
+      "Report": "resultado-project-hub.json",
+      "Checks": 35,
+      "Passed": true,
+      "Path": "j/resultado-project-hub.json"
+    },
+    {
+      "Report": "resultado-menu-host.json",
+      "Checks": 73,
+      "Passed": true,
+      "Path": "me-c19679dd/resultado-menu-host.json"
+    },
+    {
+      "Report": "resultado-no-copy.json",
+      "Checks": 19,
+      "Passed": true,
+      "Path": "n/resultado-no-copy.json"
+    },
+    {
+      "Report": "resultado-progresso-geral.json",
+      "Checks": 27,
+      "Passed": true,
+      "Path": "on-8a26161b/resultado-progresso-geral.json"
+    },
+    {
+      "Report": "resultado-status-presentation.json",
+      "Checks": 46,
+      "Passed": true,
+      "Path": "online-testes-status-5552e28b672e44b5bec11914c8ecef2a/resultado-status-presentation.json"
+    },
+    {
+      "Report": "resultado-p2p.json",
+      "Checks": 47,
+      "Passed": true,
+      "Path": "p2-00a8f5dd/resultado-p2p.json"
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Checks": 104,
+      "Passed": true,
+      "Path": "p2-9783c487/resultado-p2p-ui.json"
+    },
+    {
+      "Report": "resultado-app-paths.json",
+      "Checks": 7,
+      "Passed": true,
+      "Path": "pa-c147e94c/resultado-app-paths.json"
+    },
+    {
+      "Report": "resultado-popup-stability.json",
+      "Checks": 80,
+      "Passed": true,
+      "Path": "po-a2484b4d/resultado-popup-stability.json"
+    },
+    {
+      "Report": "resultado-preset-clean.json",
+      "Checks": 26,
+      "Passed": true,
+      "Path": "pr-8f003d88/resultado-preset-clean.json"
+    },
+    {
+      "Report": "resultado-project-store.json",
+      "Checks": 55,
+      "Passed": true,
+      "Path": "pr-9b2bd17b/resultado-project-store.json"
+    },
+    {
+      "Report": "resultado-preset-draft.json",
+      "Checks": 43,
+      "Passed": true,
+      "Path": "pr-a1d92edc/resultado-preset-draft.json"
+    },
+    {
+      "Report": "resultado-redesign.json",
+      "Checks": 27,
+      "Passed": true,
+      "Path": "re-8efd5530/resultado-redesign.json"
+    },
+    {
+      "Report": "resultado-loader-geral.json",
+      "Checks": 25,
+      "Passed": true,
+      "Path": "resultado-loader-geral.json"
+    },
+    {
+      "Report": "resultado-pintura-botoes.json",
+      "Checks": 36,
+      "Passed": true,
+      "Path": "resultado-pintura-botoes.json"
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 28,
+      "Passed": true,
+      "Path": "resultado-snapshot-installer.json"
+    },
+    {
+      "Report": "resultado-storage-by-mod.json",
+      "Checks": 31,
+      "Passed": true,
+      "Path": "s/resultado-storage-by-mod.json"
+    },
+    {
+      "Report": "resultado-project-search.json",
+      "Checks": 34,
+      "Passed": true,
+      "Path": "se-e2eafea1/resultado-project-search.json"
+    },
+    {
+      "Report": "resultado-snapshot.json",
+      "Checks": 47,
+      "Passed": true,
+      "Path": "ss-ed4a9d5f/resultado-snapshot.json"
+    },
+    {
+      "Report": "resultado-table-dialogs.json",
+      "Checks": 80,
+      "Passed": true,
+      "Path": "ta-a7d06d71/resultado-table-dialogs.json"
+    },
+    {
+      "Report": "resultado-ui-v2.json",
+      "Checks": 28,
+      "Passed": true,
+      "Path": "ui-f353751c/resultado-ui-v2.json"
+    },
+    {
+      "Report": "resultado-updates.json",
+      "Checks": 25,
+      "Passed": true,
+      "Path": "up-a6db1841/resultado-updates.json"
+    }
+  ],
+  "FixtureRoot": "T/O/online-testes-1bce264131bb4db3b8ffa97cf9222075",
+  "SetupChecks": 24,
+  "SetupTests": [
+    "Standard installer completed without administrator, reboot or forced application shutdown.",
+    "Installed application equals the verified payload.",
+    "A standalone uninstaller was created.",
+    "The application appears in the current user uninstall registration.",
+    "Programs list displays the correct application name.",
+    "Programs list displays the current version.",
+    "Registration points to the fixture install directory.",
+    "Programs list exposes the installed uninstaller.",
+    "Dedicated Config location was created.",
+    "Dedicated Cache location was created.",
+    "Dedicated Logs location was created.",
+    "Installer-created shortcut targets the installed executable.",
+    "Standard installer completed without administrator, reboot or forced application shutdown.",
+    "Reinstall preserves existing preferences.",
+    "Reinstall preserves existing cache.",
+    "Installed executable runs its path-preservation tests.",
+    "Uninstall target resolves inside the authorized fixture.",
+    "Standard uninstaller completed successfully.",
+    "Uninstall removes the program entry and installed application.",
+    "Uninstall preserves saved project/configuration data.",
+    "Uninstall preserves cached downloads.",
+    "Uninstall leaves an untracked user file intact.",
+    "Uninstall removes its own shortcut.",
+    "Fixture does not change the production Mod Loader registration."
+  ],
+  "SetupTestRoot": "T/S117/T/setup-6f8caeb73dab48a1bb5388d48f352855",
+  "SetupSha256": "BFBC1CBD55A2FFFBE0697A82F1F2EACA921AB92487D22741E3B4BA7C2069E944",
+  "SetupBytes": 5390979,
+  "ApplicationSha256": "68A43853F1594A176C5441A214D1A2EDE0A8B34D8517EE87DC21D7AFDFCC94FE",
+  "ApplicationBytes": 7590912,
+  "CatalogSha256": "89c68e6bdb8c192977fcace5d30a4b8b25912d8780fd6067f77f5c7d41c6dc05",
+  "InstalledApplication": {
+    "Version": "1.1.17",
+    "InstalledForCurrentUser": true,
+    "ProgramsDisplayName": "Mod Loader",
+    "ProgramsVersion": "1.1.17",
+    "PayloadHashVerified": true,
+    "DesktopAndStartMenuShortcutsVerified": true,
+    "PreviousPreferenceFilesVerified": 2,
+    "PreviousPreferencesUnchanged": true,
+    "InstalledAppSmokePassed": true,
+    "GameTouched": false,
+    "GameModsInstalled": false,
+    "ForcedAppClose": false
+  },
+  "ProductionSourceMode": {
+    "InstalledVersion": "1.1.17",
+    "ProductionConstructorUsesSourceIndex": true,
+    "ProjectCacheScopedCorrectly": true,
+    "ProjectConfigUnchanged": true,
+    "WindowShown": false,
+    "NetworkStarted": false,
+    "GameTouched": false
+  },
+  "CacheCleanup": {
+    "ExplicitUserAuthorization": true,
+    "VerifiedRemovedCopies": 124,
+    "VerifiedFreedBytes": 5231396280.0,
+    "UnknownCacheFilesPreserved": 1,
+    "PreservedUnknownBytes": 6728110,
+    "OriginalDownloadsTouched": false,
+    "GameTouched": false,
+    "AutomaticStartupCleanup": false
+  },
+  "CounterAudit": {
+    "Reported258GiBReproduced": false,
+    "PriorDefaultProjectCacheBytes": 5249111661,
+    "NewDefaultProjectSupportBytes": 34932276,
+    "NewLegacyProjectSupportBytes": 52088,
+    "CauseOfReported258GiB": "Unknown; the exact runtime measurement available during inspection did not reproduce this number.",
+    "Formula": "Union of canonical known paths, sum of FileInfo.Length. Metadata support and legacy retained packages are displayed separately. Home deduplicates registered projects and adds the shared library index; unassigned legacy package copies are visible globally."
+  },
+  "KnownLimits": [
+    "No new transfer between two real computers was run; local snapshot/P2P and dialog regressions passed.",
+    "Modpack export uses installed known files and receipts; it cannot infer ownership of arbitrary files installed outside the manager.",
+    "Offline ZIP has a game-root-relative tree and small _modloader/project.json metadata. Extract into the destination game root; keep backups of any files you choose to overwrite manually.",
+    "P2P retains its single temporary transfer ZIP while interrupted so it can resume, and deletes it after confirmed completion. Offline exported ZIP is owned by the user.",
+    "Legacy payload copies are only removed by explicit cleanup. Unknown file preserved during this approved cleanup.",
+    "Cache support can include the P2P helper binary and rollback records; it is not only JSON. No game, saves or RED4ext changes."
+  ],
+  "IntermediateFailures": [
+    "Two stale built-in menu test expectations were updated for the new read-only modpack action.",
+    "One final-suite run failed an existing floating picker visibility assertion. No UI workaround was introduced; the unchanged final build passed on repeat. Cause remains unknown.",
+    "Automatic cache purge on startup was rejected by approval review and was not implemented. The one-time 124-copy cleanup proceeded only after explicit user authorization."
+  ]
+}

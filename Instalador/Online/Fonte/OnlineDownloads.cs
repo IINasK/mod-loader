@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -41,8 +41,7 @@ public sealed partial class NexusClient {
             if(cache.Contains(a)){bytes=a.Size;notify("Concluído");return;}
             notify("Conectando");string url=DownloadUrl(m,a);
             control.Checkpoint(()=>notify("Pausado"));
-            Directory.CreateDirectory(cache.Root);Safe.NoLinks(cache.Root);
-            temp=Safe.In(cache.Root,Guid.NewGuid().ToString("N")+".part");
+            temp=cache.DownloadTemporaryPath();
             Uri uri=new Uri(url);
             for(int redirect=0;redirect<7;redirect++) {
                 control.Checkpoint(()=>notify("Pausado"));
@@ -92,7 +91,7 @@ public sealed partial class NexusClient {
     internal static void CommitDownload(DownloadCache cache,FixedAsset asset,string temp,DownloadControl control) {
         Safe.NoLinks(temp);
         if(new FileInfo(temp).Length!=asset.Size||Safe.Hash(temp)!=asset.Sha256)throw new IOException("Download incompleto ou hash diferente. Arquivo recusado.");
-        control.Checkpoint();string dest=cache.PathFor(asset);Safe.NoLinks(dest);
+        control.Checkpoint();if(cache.SourcesOnly){cache.KeepOriginalDownload(asset,temp);return;}string dest=cache.PathFor(asset);Safe.NoLinks(dest);
         if(cache.Contains(asset))return;
         if(File.Exists(dest))File.Delete(dest);
         File.Move(temp,dest);

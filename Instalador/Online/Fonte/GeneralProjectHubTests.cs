@@ -35,10 +35,10 @@ internal sealed partial class GeneralModWindow {
         string index=Safe.Hash(Path.Combine(store.Root,"projects.json"));int files=Directory.GetFiles(store.Root,"*",SearchOption.AllDirectories).Length;
         var all=GeneralProjectStorage.Measure(store,catalog,cache);long metadata=Directory.GetFiles(store.Root,"*",SearchOption.AllDirectories).Sum(path=>new FileInfo(path).Length);
         check(all.Mods==5&&all.Projects==3&&all.WithFiles==2,"Home counts projects with payloads and deduplicates a shared installed file.");
-        check(all.Total==5+metadata+new FileInfo(zip).Length+5,"Total includes referenced download, local metadata and cache once, without unrelated game files.");
+        check(all.Total==5+metadata+new FileInfo(zip).Length,"Total includes referenced download, local metadata and cache once, without unrelated game files.");
         var one=GeneralProjectStorage.Measure(store,catalog,cache,first);check(one.Mods==5&&one.Total==5+new FileInfo(zip).Length+Directory.GetFiles(store.DataPath(first),"*",SearchOption.AllDirectories).Sum(path=>new FileInfo(path).Length),"Selected project total excludes other project data and unrelated cache.");
         check(all.ModCount==2&&all.Identified==2&&one.ModCount==1&&one.Identified==1&&one.ModBytes[entry.Id]==5,"Measured counts and per-mod bytes use installed receipt ownership.");
-        check(one.Cache==Directory.GetFiles(store.DataPath(first),"*",SearchOption.AllDirectories).Sum(path=>new FileInfo(path).Length)&&all.Cache==metadata+5,"Project cache includes support files; global cache counts shared data once.");
+        check(one.Cache==Directory.GetFiles(store.DataPath(first),"*",SearchOption.AllDirectories).Sum(path=>new FileInfo(path).Length)&&all.Cache==metadata,"Project cache includes support files; global cache counts shared data once.");
         check(index==Safe.Hash(Path.Combine(store.Root,"projects.json"))&&files==Directory.GetFiles(store.Root,"*",SearchOption.AllDirectories).Length,"Storage measurement does not modify receipts, project index or game files.");
         var reading=Task.Run(()=>{for(int i=0;i<25;i++)GeneralProjectStorage.Measure(store,catalog,cache);});
         for(int i=0;i<25;i++){var state=store.Load(first);state.Language=i%2==0?"en":"pt";new GeneralModLibrary(Path.Combine(store.DataPath(first),"lista.json")).Save(state);store.SavePreferences("light","pt",root);}

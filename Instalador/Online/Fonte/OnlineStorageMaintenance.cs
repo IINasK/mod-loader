@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -12,7 +12,7 @@ internal static class StorageMaintenance {
         if(OtherLoaderProbe!=null)return OtherLoaderProbe();
         int current=Process.GetCurrentProcess().Id;
         foreach(var process in Process.GetProcesses())using(process){
-            try{if(process.Id!=current&&(process.ProcessName.StartsWith("Mod Loader",StringComparison.OrdinalIgnoreCase)||process.ProcessName.StartsWith("Cyberpunk Coop",StringComparison.OrdinalIgnoreCase)))return true;}
+            try{if(process.Id!=current&&(process.ProcessName.StartsWith("ModLoader",StringComparison.OrdinalIgnoreCase)||process.ProcessName.StartsWith("Mod Loader",StringComparison.OrdinalIgnoreCase)||process.ProcessName.StartsWith("Cyberpunk Coop",StringComparison.OrdinalIgnoreCase)))return true;}
             catch(InvalidOperationException){}
             catch(Win32Exception){}
             catch(NotSupportedException){}

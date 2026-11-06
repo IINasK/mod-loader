@@ -11,6 +11,8 @@ Indice interno de138componentes ativos do instalador. Revisao de05/11/2026; font
 
 ## Consulta
 
+- Política sem cópias, modpack da instalação e escopo de contadores: [versão1.1.17](Armazenamento-e-modpack-1.1.17.md), [validação](Validacoes/1.1.17.json).
+
 - Espaço por mod, contador e cache: [versão1.1.16](Espaco-por-mod-1.1.16.md), [validação](Validacoes/1.1.16.json).
 
 - Instalação Windows e desinstalador: [versão1.1.15](Instalacao-Windows-1.1.15.md), [validação](Validacoes/1.1.15.json).

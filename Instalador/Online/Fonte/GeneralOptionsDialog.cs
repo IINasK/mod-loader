@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -81,10 +81,10 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
         if(clearDownloads!=null){
             var cachePanel=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=new Padding(0,12,0,0)};
             cachePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));cachePanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            cachePanel.Controls.Add(new Label{Text=T("Downloads guardados podem ser removidos sem desinstalar mods.","Saved downloads can be cleared without uninstalling mods."),Dock=DockStyle.Fill,AutoSize=true,MaximumSize=new Size(330,0)},0,0);
-            var clean=GeneralStyle.Button(T("Limpar downloads","Clear downloads"),()=>{
-                if(GeneralDialog.Message(this,T("Remover os downloads guardados pelo app? Reinstalar poderá exigir baixar novamente. Seus mods instalados, saves e arquivos em Downloads serão preservados.","Remove the app's saved downloads? Reinstalling may require downloading again. Installed mods, saves and files in Downloads will be preserved."),T("Limpar downloads","Clear downloads"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-                try{long bytes=clearDownloads();error.Text=T("Liberado: ","Freed: ")+(bytes/1073741824.0).ToString("0.00")+" GB";}catch(Exception ex){error.Text=ex.Message;}
+            cachePanel.Controls.Add(new Label{Text=T("Cópias antigas do cache podem ser removidas. Os downloads originais e os mods instalados serão preservados.","Old cache copies can be removed. Original downloads and installed mods will be preserved."),Dock=DockStyle.Fill,AutoSize=true,MaximumSize=new Size(330,0)},0,0);
+            var clean=GeneralStyle.Button(T("Limpar cópias antigas","Clear old copies"),()=>{
+                if(GeneralDialog.Message(this,T("Remover os downloads guardados pelo app? Reinstalar poderá exigir baixar novamente. Seus mods instalados, saves e arquivos em Downloads serão preservados.","Remove the app's saved downloads? Reinstalling may require downloading again. Installed mods, saves and files in Downloads will be preserved."),T("Limpar cópias antigas","Clear old copies"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
+                try{long bytes=clearDownloads();error.Text=T("Liberado: ","Freed: ")+GeneralStorageSize.Format(bytes);}catch(Exception ex){error.Text=ex.Message;}
             });clean.Margin=Padding.Empty;cachePanel.Controls.Add(clean,1,0);layout.Controls.Add(cachePanel,0,2);
         }
 

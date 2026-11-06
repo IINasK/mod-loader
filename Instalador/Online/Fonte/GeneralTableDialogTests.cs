@@ -76,7 +76,7 @@ internal static class GeneralTableDialogTests {
             foreach(string theme in new[]{"light","dark","light-red"})foreach(string language in new[]{"pt","en"}){
                 GeneralStyle.UseTheme(theme);GeneralStyle.Language=language;using(var menu=new GeneralActionsMenu(true)){Open(menu);
                 var buttons=Descendants(menu).OfType<Button>().Where(button=>button.Name!="").ToArray();
-                check(buttons.Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"new","open","options"}),"Built-in menu contains only the three allowed actions: "+theme+"/"+language);
+                check(buttons.Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"new","open","options","share"}),"Built-in menu offers read-only modpack sharing alongside its three project actions: "+theme+"/"+language);
                 check(buttons.All(button=>button.Height==44&&button.Bottom<=button.Parent.Height),"Built-in menu actions fit without clipping: "+theme+"/"+language);
                 using(var bitmap=new Bitmap(menu.Width,menu.Height)){menu.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(root,"builtin-menu-"+language+"-"+theme+".png"));}
             }

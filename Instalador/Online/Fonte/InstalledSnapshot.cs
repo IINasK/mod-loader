@@ -18,7 +18,7 @@ public sealed class InstalledSnapshotFile {
     public long Size;
     public List<string> Owners=new List<string>();
 }
-public static class InstalledSnapshot {
+public static partial class InstalledSnapshot {
     public const int MaxFiles=10000;
     public const long MaxFileBytes=16L*1024*1024*1024,MaxTotalBytes=128L*1024*1024*1024;
     static readonly UTF8Encoding Utf8=new UTF8Encoding(false,true);
@@ -42,7 +42,7 @@ public static class InstalledSnapshot {
         if(variant.CyberpunkVariant!=null)throw new IOException("Variante fixa inválida.");
         return mod;
     }
-    public static InstalledSnapshotManifest Create(string zipPath,GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs,Action<string> report) {
+    public static InstalledSnapshotManifest Inspect(GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs) {
         if(state==null||state.List==null||ids==null||String.IsNullOrWhiteSpace(state.Destination))throw new IOException("Escolha uma pasta de instalação e um preset.");
         string root=Path.GetFullPath(state.Destination);Safe.NoLinks(root);
         if(!Directory.Exists(root))throw new IOException("Pasta de instalação ausente.");
@@ -63,7 +63,9 @@ public static class InstalledSnapshot {
         var fixedEngine=cyberpunk?new FixedInstaller(catalog,root):null;
         var genericEngine=cyberpunk?null:new GeneralModInstaller(root,Path.Combine(appData,"Instalacoes"));
         var receivedEngine=new InstalledSnapshotInstaller(root,appData,catalog);
+        var problems=new List<string>();
         foreach(var mod in entries) {
+            try {
             var variant=mod.Variants.Single(v=>v.Id==Selected(state,mod));
             if(cyberpunk && variant.CyberpunkId==NightCityDensity.ModId) {
                 var installed=NightCityDensity.Installed(catalog.Packages.Single(m=>m.Id==variant.CyberpunkId),root);
@@ -79,13 +81,14 @@ public static class InstalledSnapshot {
             else if(variant.CyberpunkId!=null) {
                 if(!cyberpunk)throw new IOException(mod.Name+": o destino não é Cyberpunk 2077.");
                 var recipe=FixedRecipe(catalog,variant);
+                var invalid=recipe.Files.Where(file=>!file.UserData).Where(file=>{string path=Safe.In(root,file.Path);return !File.Exists(path)||new FileInfo(path).Length!=file.Size||Safe.Hash(path)!=file.Sha256;}).Select(file=>file.Path).ToList();
+                if(invalid.Count>0)throw new IOException("Arquivos ausentes ou alterados ("+invalid.Count+"): "+String.Join("; ",invalid.Take(30)));
                 foreach(var file in recipe.Files) {
                     string installed=Safe.In(root,file.Path);
                     if(file.UserData) {
                         if(includeConfigs&&File.Exists(installed))files.Add(Config(file.Path,"json",null,InstalledSnapshotConfig.Json(InstalledSnapshotConfig.Read(installed))));
                         continue;
                     }
-                    if(!File.Exists(installed)||new FileInfo(installed).Length!=file.Size||Safe.Hash(installed)!=file.Sha256)throw new IOException(mod.Name+": arquivo instalado ausente ou alterado: "+file.Path);
                     files.Add(new InstalledSnapshotFile{Path=file.Path,Sha256=file.Sha256,Size=file.Size,Kind="file"});
                 }
                 if(includeConfigs&&catalog.Defaults!=null)foreach(var config in catalog.Defaults.Where(d=>d.ModId==recipe.Id)) {
@@ -118,7 +121,9 @@ public static class InstalledSnapshot {
                 else {if(same.Kind!=file.Kind||same.Size!=file.Size||same.Sha256!=file.Sha256)throw new IOException("Dois mods usam conteúdo diferente em "+file.Path);if(!same.Owners.Contains(work))same.Owners.Add(work);}
             }
             if(!manifest.Files.Any(f=>f.Owners.Contains(work)&&f.Kind=="file"))throw new IOException(mod.Name+": nenhum arquivo instalado foi encontrado.");
+            }catch(IOException ex){problems.Add(mod.Name+": "+ex.Message);}
         }
+        if(problems.Count>0)throw new InstalledSnapshotReviewException(problems);
         list.Categories=state.List.Categories.Concat(list.Mods.Where(m=>!String.IsNullOrWhiteSpace(m.Category)).Select(m=>m.Category)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         foreach(string category in list.Categories) {string description;if(state.List.CategoryDescriptions.TryGetValue(category,out description))list.CategoryDescriptions[category]=description;}
         var included=new HashSet<string>(list.Mods.Select(m=>m.Id),StringComparer.Ordinal);
@@ -127,6 +132,10 @@ public static class InstalledSnapshot {
         }
         if(list.Presets.Count==0)list.Presets.Add(new GeneralModPreset{Id="installed",Name=manifest.Name,ModIds=list.Mods.Select(m=>m.Id).ToList()});
         Validate(manifest,catalog);
+        return manifest;
+    }
+    public static InstalledSnapshotManifest Create(string zipPath,GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs,Action<string> report) {
+        var manifest=Inspect(state,ids,catalog,appData,includeConfigs);string root=Path.GetFullPath(state.Destination);
         string output=Path.GetFullPath(zipPath);Safe.NoLinks(output);
         bool created=false;
         try {
