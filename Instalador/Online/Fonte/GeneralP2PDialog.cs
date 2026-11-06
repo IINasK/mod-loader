@@ -10,8 +10,8 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     readonly GeneralModState state;
     readonly FixedCatalog catalog;
     readonly string[] ids;
-    readonly TextBox output=new TextBox{ReadOnly=true,Multiline=true,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None};
-    readonly TextBox input=new TextBox{Multiline=true,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,MaxLength=12000};
+    readonly TextBox output=new TextBox{ReadOnly=true,WordWrap=false,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None};
+    readonly TextBox input=new TextBox{WordWrap=false,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,MaxLength=12000};
     readonly TextBox destination=new TextBox{ReadOnly=true,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None};
     readonly Label status=new Label{Dock=DockStyle.Fill,UseMnemonic=false};
     readonly GeneralProgress progress=new GeneralProgress{Dock=DockStyle.Fill,Height=44};
@@ -28,15 +28,16 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
     internal GeneralP2PDialog(P2PService service,GeneralModState state,System.Collections.Generic.IEnumerable<string> ids,FixedCatalog catalog,DownloadCache cache,bool autoStart=true):base(T("Modpack e compartilhamento","Modpack and sharing")){
         this.service=service;this.state=state;this.ids=ids.ToArray();this.catalog=catalog;
-        ClientSize=new Size(690,540);Name="p2p-dialog";
+        ClientSize=new Size(690,500);Name="p2p-dialog";
         var body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=8,Padding=new Padding(24,8,24,20),Margin=Padding.Empty};
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-        foreach(int height in new[]{24,76,24,76,76,56,50})body.RowStyles.Add(new RowStyle(SizeType.Absolute,height));body.RowStyles.Add(new RowStyle(SizeType.Percent,100));Content.Controls.Add(body);
+        foreach(int height in new[]{24,56,24,56,76,56,50})body.RowStyles.Add(new RowStyle(SizeType.Absolute,height));body.RowStyles.Add(new RowStyle(SizeType.Percent,100));Content.Controls.Add(body);
         body.Controls.Add(Heading(T("Link para enviar ao amigo","Link to send to your friend")),0,0);
-        var send=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};send.RowStyles.Add(new RowStyle(SizeType.Percent,100));send.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));send.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
-        send.Controls.Add(Field(output),0,0);var copy=GeneralStyle.Button("",()=>{if(output.Text.Length>0)try{Clipboard.SetText(output.Text);}catch(Exception ex){status.Text=ex.Message;}});
-        ((GeneralButton)copy).IconKind="copy";((GeneralButton)copy).Bare=true;copy.AutoSize=false;copy.MinimumSize=new Size(44,44);copy.Size=copy.MinimumSize;copy.Margin=Padding.Empty;copy.Name="p2p-copy";copy.AccessibleName=T("Copiar link","Copy link");tips.SetToolTip(copy,copy.AccessibleName);send.Controls.Add(copy,1,0);body.Controls.Add(send,0,1);
-        body.Controls.Add(Heading(T("Link recebido do amigo","Link received from your friend")),0,2);body.Controls.Add(Field(input),0,3);
+        var send=Field(output);send.Padding=new Padding(14,12,66,8);
+        var copy=GeneralStyle.Button("",()=>{if(output.Text.Length>0)try{Clipboard.SetText(output.Text);}catch(Exception ex){status.Text=ex.Message;}});
+        ((GeneralButton)copy).IconKind="copy";((GeneralButton)copy).Bare=true;copy.AutoSize=false;copy.MinimumSize=new Size(44,44);copy.Size=copy.MinimumSize;copy.Margin=Padding.Empty;copy.Name="p2p-copy";copy.AccessibleName=T("Copiar link","Copy link");tips.SetToolTip(copy,copy.AccessibleName);
+        send.Controls.Add(copy);send.SizeChanged+=(s,e)=>copy.Location=new Point(send.ClientSize.Width-62,2);body.Controls.Add(send,0,1);
+        body.Controls.Add(Heading(T("Link recebido do amigo","Link received from your friend")),0,2);var receive=Field(input);receive.Padding=new Padding(14,12,14,8);body.Controls.Add(receive,0,3);
         targetRow=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};var target=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=3,Margin=Padding.Empty};target.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));target.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));target.RowStyles.Add(new RowStyle(SizeType.Absolute,24));target.RowStyles.Add(new RowStyle(SizeType.Absolute,44));target.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         target.Controls.Add(Heading(T("Instalar na pasta local","Install into local folder")),0,0);target.SetColumnSpan(target.GetControlFromPosition(0,0),2);var destinationField=Field(destination);destinationField.Margin=Padding.Empty;target.Controls.Add(destinationField,0,1);
         choose=GeneralStyle.Button(T("Escolher pasta","Choose folder"),ChooseFolder);choose.Margin=new Padding(8,0,0,0);choose.Name="p2p-folder";target.Controls.Add(choose,1,1);targetRow.Controls.Add(target);body.Controls.Add(targetRow,0,4);
@@ -48,8 +49,8 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         input.TextChanged+=(s,e)=>UpdateActions();timer.Tick+=async(s,e)=>await Poll();
         selected=service.Sessions.LastOrDefault(s=>!s.Completed)??service.Sessions.LastOrDefault(s=>!s.Sender&&s.Completed&&!s.ListImported);
         FormClosing+=(s,e)=>{if(busy){e.Cancel=true;status.Text=T("Aguarde a preparação terminar.","Wait for preparation to finish.");}};FormClosed+=(s,e)=>timer.Stop();Disposed+=(s,e)=>{timer.Dispose();tips.Dispose();};
-        GeneralStyle.Apply(this,GeneralStyle.Dark);status.Text=T("Para enviar o preset atual, deixe o segundo campo vazio e clique em Conectar. Para receber, cole o link do amigo.","To share the current preset, leave the second field empty and click Connect. To receive, paste your friend's link.");UpdateActions();
-        if(autoStart)Shown+=(s,e)=>{if(service.Engine.Running){SelectSession(selected);timer.Start();}};
+        GeneralStyle.Apply(this,GeneralStyle.Dark);status.Text=T("O link de envio é preparado automaticamente. Para receber, cole o convite do amigo e clique em Conectar.","The send link is prepared automatically. To receive, paste your friend's invitation and click Connect.");UpdateActions();
+        if(autoStart)Shown+=(s,e)=>Run(PrepareLink);
     }
     static Label Heading(string text){return new Label{Text=text,Dock=DockStyle.Fill,Font=GeneralStyle.Font(11),Margin=Padding.Empty};}
     static GeneralSurface Field(Control control){var field=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(14,9,14,9),Margin=new Padding(0,0,0,8)};field.Controls.Add(control);return field;}
@@ -65,8 +66,17 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     }
     void SelectSession(P2PSession session){selected=session;remotePaused=false;output.Text=session==null||!service.Engine.Running?"":service.Invitation(session);if(session!=null&&!session.Sender)destination.Text=session.Destination??destination.Text;UpdateActions();}
     void ChooseFolder(){using(var folder=new FolderBrowserDialog{Description=T("Escolha a pasta local de instalação.","Choose the local installation folder."),SelectedPath=Directory.Exists(destination.Text)?destination.Text:""})if(folder.ShowDialog(this)==DialogResult.OK)destination.Text=folder.SelectedPath;}
+    async Task PrepareLink(){
+        if(ids.Length==0){status.Text=T("Cole o convite do amigo e clique em Conectar.","Paste your friend's invitation and click Connect.");return;}
+        progress.Caption=T("Preparando link…","Preparing link…");progress.Indeterminate=true;
+        try{
+            if(selected!=null&&!selected.Sender&&selected.Completed){
+                if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));SelectSession(selected);timer.Start();
+            }else await Connect();
+        }finally{progress.Indeterminate=false;progress.Invalidate();}
+    }
     async Task Connect(){
-        if(input.Text.Trim().Length==0&&(selected==null||selected.Completed)){status.Text=T("Conferindo arquivos instalados…","Verifying installed files…");await Task.Run(()=>InstalledSnapshot.Inspect(state,ids,catalog,service.ApplicationData,true));}
+        if(input.Text.Trim().Length==0&&(selected==null||selected.Completed)){status.Text=T("Conferindo arquivos instalados…","Verifying installed files…");await Task.Run(()=>InstalledSnapshot.Inspect(state,ids,catalog,service.ApplicationData,true,true));}
         if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));timer.Start();
         string code=input.Text.Trim();
         if(code.Length==0){
@@ -83,7 +93,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     }
     async Task GenerateModpack(){
         status.Text=T("Conferindo os mods antes de gerar o modpack…","Verifying mods before creating the modpack…");
-        var manifest=await Task.Run(()=>InstalledSnapshot.Inspect(state,ids,catalog,service.ApplicationData,true));
+        var manifest=await Task.Run(()=>InstalledSnapshot.Inspect(state,ids,catalog,service.ApplicationData,true,true));
         using(var save=new SaveFileDialog{Title=T("Salvar modpack","Save modpack"),Filter="Modpack ZIP|*.zip",FileName="Modpack.zip",OverwritePrompt=false}){
             if(save.ShowDialog(this)!=DialogResult.OK)return;
             if(File.Exists(save.FileName))throw new IOException(T("Escolha um nome que ainda não exista.","Choose a name that does not already exist."));
@@ -96,7 +106,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         if(busy||polling||!service.Engine.Running||selected==null||returning)return;polling=true;var session=selected;
         try{
             if(session.Completed){if(Directory.Exists(service.Folder(session))){progress.Value=99;status.Text=T("Finalizando a limpeza do arquivo temporário…","Finishing temporary archive cleanup…");return;}progress.Value=100;progress.Caption=session.Sender?T("Envio concluído","Send complete"):T("Instalação concluída","Installation complete");status.Text=T("Concluído. Arquivo temporário removido.","Complete. Temporary archive removed.");
-                if(!session.Sender&&!session.ListImported){ReceivedList=service.InstalledManifest(session).List;InstalledReceiptId=session.ReceiptId;InstalledDestination=session.Destination;returning=true;Complete(DialogResult.OK);}return;}
+                if(!session.Sender&&!session.ListImported){var manifest=service.InstalledManifest(session);ReceivedList=manifest.Project??manifest.List;InstalledReceiptId=session.ReceiptId;InstalledDestination=session.Destination;returning=true;Complete(DialogResult.OK);}return;}
             if(session.Error!=null){status.Text=T("Falha: ","Failed: ")+session.Error+T(" O arquivo foi preservado. Use Conectar para tentar novamente."," The file was preserved. Use Connect to retry.");return;}
             if(session.Stage!=null){progress.Value=99;progress.Caption=T("Conferindo e instalando","Verifying and installing");status.Text=session.Stage;return;}
             var transfer=await Task.Run(()=>service.TransferStatus(session));if(IsDisposed)return;remotePaused=transfer.RemotePaused;progress.Value=transfer.Percent;progress.Caption=session.Sender?T("Enviando","Sending"):T("Recebendo","Receiving");

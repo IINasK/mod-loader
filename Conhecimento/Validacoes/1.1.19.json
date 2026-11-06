@@ -1,0 +1,145 @@
+{
+  "Version": "1.1.19",
+  "FocusedChecks": 657,
+  "Reports": [
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Checks": 116,
+      "Passed": true,
+      "Path": "T/AN/online-testes-02ea014b74e24569b42d8e9729742d93/resultado-p2p-ui.json"
+    },
+    {
+      "Report": "resultado-project-clone.json",
+      "Checks": 21,
+      "Passed": true,
+      "Path": "T/AN/online-testes-6c3859c1f1b243d58a9d65bd42427309/resultado-project-clone.json"
+    },
+    {
+      "Report": "resultado-no-copy.json",
+      "Checks": 28,
+      "Passed": true,
+      "Path": "T/AN/online-testes-9094ceaf86d84596acd38c51395c439d/resultado-no-copy.json"
+    },
+    {
+      "Report": "resultado-reporter-remocao.json",
+      "Checks": 35,
+      "Passed": true,
+      "Path": "T/AO/online-testes-51b1d548bc344123bf71d46d5573f6b8/resultado-reporter-remocao.json"
+    },
+    {
+      "Report": "resultado-pacote-retirado.json",
+      "Checks": 19,
+      "Passed": true,
+      "Path": "T/AO/retirada-pacote-2784f1f229144eb6bb77c7112d9fd95c/resultado-pacote-retirado.json"
+    },
+    {
+      "Report": "resultado-snapshot-p2p.json",
+      "Checks": 42,
+      "Passed": true,
+      "Path": "T/AO/sp-101fb1/resultado-snapshot-p2p.json"
+    },
+    {
+      "Report": "resultado-progresso-geral.json",
+      "Checks": 27,
+      "Passed": true,
+      "Path": "T/AP/online-testes-eac799c038f64d8b94101ac9b0aa3b6f/resultado-progresso-geral.json"
+    },
+    {
+      "Report": "resultado-status-presentation.json",
+      "Checks": 46,
+      "Passed": true,
+      "Path": "T/AP/online-testes-status-9283fc6070b048e4932fe091a25465db/resultado-status-presentation.json"
+    },
+    {
+      "Report": "resultado-project-home.json",
+      "Checks": 119,
+      "Passed": true,
+      "Path": "T/AQ/h/resultado-project-home.json"
+    },
+    {
+      "Report": "resultado-project-deletion.json",
+      "Checks": 45,
+      "Passed": true,
+      "Path": "T/AQ/online-testes-5f9a33c7df6b4615a6983a31b22612e9/resultado-project-deletion.json"
+    },
+    {
+      "Report": "resultado-project-hub.json",
+      "Checks": 59,
+      "Passed": true,
+      "Path": "T/AQ/online-testes-6bc447c9fcf3488d81d15a7fa6334a71/resultado-project-hub.json"
+    },
+    {
+      "Report": "resultado-project-store.json",
+      "Checks": 55,
+      "Passed": true,
+      "Path": "T/AQ/online-testes-a4c71b15f76a4e55b1a7df38fd866db6/resultado-project-store.json"
+    },
+    {
+      "Report": "resultado-brand.json",
+      "Checks": 45,
+      "Passed": true,
+      "Path": "T/AQ/online-testes-ecc5cb1f3f9942ab87ef693813986106/resultado-brand.json"
+    }
+  ],
+  "SetupChecks": 24,
+  "SetupTests": [
+    "Standard installer completed without administrator, reboot or forced application shutdown.",
+    "Installed application equals the verified payload.",
+    "A standalone uninstaller was created.",
+    "The application appears in the current user uninstall registration.",
+    "Programs list displays the correct application name.",
+    "Programs list displays the current version.",
+    "Registration points to the fixture install directory.",
+    "Programs list exposes the installed uninstaller.",
+    "Dedicated Config location was created.",
+    "Dedicated Cache location was created.",
+    "Dedicated Logs location was created.",
+    "Installer-created shortcut targets the installed executable.",
+    "Standard installer completed without administrator, reboot or forced application shutdown.",
+    "Reinstall preserves existing preferences.",
+    "Reinstall preserves existing cache.",
+    "Installed executable runs its path-preservation tests.",
+    "Uninstall target resolves inside the authorized fixture.",
+    "Standard uninstaller completed successfully.",
+    "Uninstall removes the program entry and installed application.",
+    "Uninstall preserves saved project/configuration data.",
+    "Uninstall preserves cached downloads.",
+    "Uninstall leaves an untracked user file intact.",
+    "Uninstall removes its own shortcut.",
+    "Fixture does not change the production Mod Loader registration."
+  ],
+  "SetupTestRoot": "T/S119/T/setup-64aede3cb541414b9977bdc5ae650085",
+  "ApplicationSha256": "CE529DB27F763D6A1545083E247CD9F0ADD9755106D7008C9A42C18B4697C7BE",
+  "ApplicationBytes": 7636480,
+  "SetupSha256": "5F5CD84F530595478847B7B05DC46ADCC6D2B8EE3F136D428FCA4405022C11B6",
+  "SetupBytes": 5402703,
+  "CatalogSha256": "f5c25ec949c1dc21ee2e0d19ed8441ce19dd9710df2aa629d37ea866c85190e6",
+  "CatalogRecords": 138,
+  "CatalogVisible": 135,
+  "SyncthingVersion": "2.1.7",
+  "SyncthingChanged": false,
+  "RealGameTouched": false,
+  "ProductionInstallationUpdated": false,
+  "LocalRequestedRemovalsApplied": false,
+  "ReporterInstalledInRealGame": false,
+  "FullGeneralSuitePassed": false,
+  "FullGeneralSuiteLimit": "Suite reached the closed-game guard while the real game remained open; user explicitly chose to continue without these checks. No production guard was relaxed.",
+  "KnownLimits": [
+    "Network test used two independent local profiles on loopback; no test between two PCs over the internet.",
+    "Visual checks used the current Windows DPI; no separate high-DPI session.",
+    "Invite is encoded metadata, not an HTTPS URL or encrypted secret; TLS protects the data connection. Discovery/relays can see identities/IPs.",
+    "Partial snapshots preserve public download sources. Purely local originals without a public source cannot be downloaded again automatically.",
+    "Both peers need1.1.19 to retain the full Project metadata. Older peers can only use the installed subset.",
+    "The temporary compressed ZIP is still needed during preparation/transfer and failed operations. Partial block retention is not indefinite.",
+    "Removing the five requested files and installing Advanced Crash Reporter in the real game remain pending until it is closed.",
+    "All26 reporter files were copied/hash-verified and undone in a fixture; downloaded code was never executed.",
+    "Source-only cache test uses the existing OtherLoaderProbe inside its isolated fixture and restores it; production protection remains unchanged."
+  ],
+  "IntermediateChecks": [
+    "First packaging invocation copied a stale stage binary; corrected to compile explicitly before packaging. Only compiled final payload is released.",
+    "Compiler namespace/local-name errors and fixture setup issues were corrected before successful focused tests.",
+    "An intermediate nested layout reintroduced a native textbox border; direct GeneralSurface composition and inset copy action fixed the rendered field.",
+    "The full suite guard failure is retained as a limitation, not recorded as a passing full run."
+  ],
+  "PrivateG3ReportPublished": false
+}

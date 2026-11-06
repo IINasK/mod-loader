@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -138,19 +138,20 @@ internal static class InstalledSnapshotP2PTests {
         string game=Path.Combine(root,"ui-source"),data=Path.Combine(root,"ui-data"),receivedData=Path.Combine(root,"ui-rdata"),target=Target(root,"ui-target"),original=Path.Combine(root,"ui-original.zip");Directory.CreateDirectory(game);Directory.CreateDirectory(data);Directory.CreateDirectory(receivedData);
         using(var zip=ZipFile.Open(original,ZipArchiveMode.Create))using(var writer=new StreamWriter(zip.CreateEntry("mods/ui.txt").Open()))writer.Write("dialog transfer");
         var state=State(game,original);state.List.Mods[0].Name="Meu mod da UI";state.List.Presets.Add(new GeneralModPreset{Id="amigos",Name="Meus amigos",ModIds=new List<string>{"fixture"}});state.SelectedPreset="amigos";
+        var optional=new GeneralModEntry{Id="optional",Name="Optional car",Category="Cars",DefaultVariant="main",Variants=new List<GeneralModVariant>{new GeneralModVariant{Id="main",Name="Main",Sources=new List<string>{"https://example.org/car.zip"}}}};state.List.Categories.Add("Cars");state.List.Mods.Add(optional);state.List.Presets[0].ModIds.Add("optional");
         new GeneralModInstaller(game,Path.Combine(data,"Instalacoes")).Install(original,"fixture/default/0/"+original,Ignore);File.Delete(original);var catalog=EmptyCatalog();bool animation=GeneralStyle.AnimationsEnabled;GeneralStyle.AnimationsEnabled=false;
         Exception failure=null;Action<string> phase=value=>File.WriteAllText(Path.Combine(root,"ui-phase.txt"),value);
         try{using(var sender=new P2PService(Path.Combine(root,"ui-sh"),Path.Combine(root,"ui-st"),true))using(var receiver=new P2PService(Path.Combine(root,"ui-rh"),Path.Combine(root,"ui-rt"),true)){
             sender.EnableInstalledReceive(catalog,data,true);receiver.EnableInstalledReceive(catalog,receivedData,true);sender.Start(Ignore,officialExe);receiver.Start(Ignore,officialExe);
             var receiverState=new GeneralModState{Destination=target};var cache=new DownloadCache(Path.Combine(root,"ui-cache"));
             using(var host=new Form{ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,Location=new System.Drawing.Point(-30000,-30000)})
-            using(var sending=new GeneralP2PDialog(sender,state,new[]{"fixture"},catalog,cache,false))using(var receiving=new GeneralP2PDialog(receiver,receiverState,new string[0],catalog,cache,false)){
+            using(var sending=new GeneralP2PDialog(sender,state,new[]{"fixture","optional"},catalog,cache))using(var receiving=new GeneralP2PDialog(receiver,receiverState,new string[0],catalog,cache,false)){
                 System.Threading.ThreadExceptionEventHandler onError=(s,e)=>{failure=e.Exception;phase(e.Exception.ToString());receiving.Dispose();sending.Dispose();host.Close();};Application.ThreadException+=onError;
                 host.Shown+=async(s,e)=>{
                     try{
                         foreach(var form in new[]{sending,receiving}){form.ShowInTaskbar=false;form.StartPosition=FormStartPosition.Manual;form.Location=new System.Drawing.Point(-30000,-30000);form.Show(host);}
-                        phase("source connect");((Button)sending.Content.Controls.Find("p2p-connect",true).Single()).PerformClick();await UIWait(()=>sending.Content.Controls.Find("p2p-output",true).Single().Text.Length>0,"Conectar não gerou convite na UI.");
-                        string offer=sending.Content.Controls.Find("p2p-output",true).Single().Text;Check(checks,P2PInvite.Decode(offer).Kind=="offer","Conectar sem link cria o pacote e mostra o convite real no primeiro campo.");
+                        phase("automatic preparation");await UIWait(()=>sending.Content.Controls.Find("p2p-output",true).Single().Text.Length>0,"Conectar não gerou convite na UI.");
+                        string offer=sending.Content.Controls.Find("p2p-output",true).Single().Text;Check(checks,P2PInvite.Decode(offer).Kind=="offer","Opening the sender dialog prepares the ZIP and invitation without clicking Connect.");
                         phase("receiver connect");receiving.Content.Controls.Find("p2p-input",true).Single().Text=offer;
                         using(var confirm=new System.Windows.Forms.Timer{Interval=25}){
                             confirm.Tick+=(a,b)=>{var question=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(f=>f!=sending&&f!=receiving&&f.AcceptButton!=null);if(question!=null){((Button)question.AcceptButton).PerformClick();confirm.Stop();}};confirm.Start();
@@ -158,7 +159,8 @@ internal static class InstalledSnapshotP2PTests {
                         }
                         string reply=receiving.Content.Controls.Find("p2p-output",true).Single().Text;Check(checks,P2PInvite.Decode(reply).Kind=="accept"&&receiver.Sessions.Single().Destination==target,"Conectar com convite vincula o destino local escolhido e mostra a resposta.");
                         phase("sender authorize");sending.Content.Controls.Find("p2p-input",true).Single().Text=reply;await UIWait(()=>((Button)sending.Content.Controls.Find("p2p-connect",true).Single()).Enabled,"Botão Conectar não liberou após preparar.");((Button)sending.Content.Controls.Find("p2p-connect",true).Single()).PerformClick();await UIWait(()=>sender.Sessions.Single().Peer!=null,"UI não autorizou a resposta.");Link(sender,receiver);
-                        phase("waiting install");await UIWait(()=>receiving.ReceivedList!=null,"UI não concluiu e devolveu a lista instalada.");Check(checks,receiving.ReceivedList.Mods.Single().Name=="Meu mod da UI"&&receiving.ReceivedList.Presets.Single().Name=="Meus amigos"&&receiving.InstalledReceiptId!=null,"Fluxo real dos dois botões Conectar instala e retorna nomes/presets/recibo.");
+                        phase("waiting install");await UIWait(()=>receiving.ReceivedList!=null,"UI não concluiu e devolveu a lista instalada.");Check(checks,receiving.ReceivedList.Mods.Single(m=>m.Id=="fixture").Name=="Meu mod da UI"&&receiving.ReceivedList.Presets.Single().Name=="Meus amigos"&&receiving.InstalledReceiptId!=null,"Fluxo real dos dois botões Conectar instala e retorna nomes/presets/recibo.");
+                        Check(checks,receiving.ReceivedList.Mods.Count==2&&receiving.ReceivedList.Mods.Single(m=>m.Id=="optional").Variants[0].Sources.Single()=="https://example.org/car.zip"&&receiver.InstalledManifest(receiver.Sessions.Single()).List.Mods.Count==1,"Real dialog transfer imports missing optional entries and public URLs without installed receipts or warning popups.");
                         Check(checks,File.ReadAllText(Safe.In(target,"mods/ui.txt"))=="dialog transfer"&&!Directory.Exists(receiver.Folder(receiver.Sessions.Single())),"Conclusão pela UI contém o arquivo instalado e remove o temporário recebido.");phase("complete");
                     }catch(Exception ex){failure=ex;phase(ex.ToString());}finally{receiving.Dispose();sending.Dispose();host.Close();}
                 };

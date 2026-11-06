@@ -11,6 +11,7 @@ public sealed class InstalledSnapshotManifest {
     public int Schema=1;
     public string Name,Game,GameFileVersion;
     public GeneralModList List=new GeneralModList();
+    public GeneralModList Project;
     public List<InstalledSnapshotFile> Files=new List<InstalledSnapshotFile>();
 }
 public sealed class InstalledSnapshotFile {
@@ -42,7 +43,7 @@ public static partial class InstalledSnapshot {
         if(variant.CyberpunkVariant!=null)throw new IOException("Variante fixa inválida.");
         return mod;
     }
-    public static InstalledSnapshotManifest Inspect(GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs) {
+    public static InstalledSnapshotManifest Inspect(GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs,bool allowMissing=false) {
         if(state==null||state.List==null||ids==null||String.IsNullOrWhiteSpace(state.Destination))throw new IOException("Escolha uma pasta de instalação e um preset.");
         string root=Path.GetFullPath(state.Destination);Safe.NoLinks(root);
         if(!Directory.Exists(root))throw new IOException("Pasta de instalação ausente.");
@@ -67,6 +68,7 @@ public static partial class InstalledSnapshot {
         foreach(var mod in entries) {
             try {
             var variant=mod.Variants.Single(v=>v.Id==Selected(state,mod));
+            if(allowMissing&&Uninstalled(state,mod,variant,catalog,root,appData))continue;
             if(cyberpunk && variant.CyberpunkId==NightCityDensity.ModId) {
                 var installed=NightCityDensity.Installed(catalog.Packages.Single(m=>m.Id==variant.CyberpunkId),root);
                 var density=NightCityDensity.Read(installed,root);
@@ -131,11 +133,12 @@ public static partial class InstalledSnapshot {
             var copy=Clone(original);copy.ModIds=copy.ModIds.Where(included.Contains).ToList();list.Presets.Add(copy);
         }
         if(list.Presets.Count==0)list.Presets.Add(new GeneralModPreset{Id="installed",Name=manifest.Name,ModIds=list.Mods.Select(m=>m.Id).ToList()});
+        if(allowMissing)manifest.Project=ProjectDefinition(state,manifest.List);
         Validate(manifest,catalog);
         return manifest;
     }
-    public static InstalledSnapshotManifest Create(string zipPath,GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs,Action<string> report) {
-        var manifest=Inspect(state,ids,catalog,appData,includeConfigs);string root=Path.GetFullPath(state.Destination);
+    public static InstalledSnapshotManifest Create(string zipPath,GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs,Action<string> report,bool allowMissing=false) {
+        var manifest=Inspect(state,ids,catalog,appData,includeConfigs,allowMissing);string root=Path.GetFullPath(state.Destination);
         string output=Path.GetFullPath(zipPath);Safe.NoLinks(output);
         bool created=false;
         try {
@@ -165,12 +168,13 @@ public static partial class InstalledSnapshot {
     }
     static InstalledSnapshotFile Config(string path,string kind,string section,string content){byte[] bytes=Utf8.GetBytes(content);return new InstalledSnapshotFile{Path=path,Kind=kind,Section=section,Content=content,Size=bytes.Length,Sha256=Hash(bytes)};}
     public static void Validate(InstalledSnapshotManifest manifest,FixedCatalog catalog) {
-        if(manifest==null||manifest.Schema!=1||manifest.List==null||manifest.List.Mods==null||manifest.Files==null||manifest.Files.Count==0||manifest.Files.Count>MaxFiles||String.IsNullOrWhiteSpace(manifest.Name)||manifest.Name.Length>300||!(manifest.Game=="cyberpunk2077"||manifest.Game=="generic")||(manifest.Game=="cyberpunk2077"&&manifest.GameFileVersion!=catalog.GameFileVersion)||(manifest.Game=="generic"&&manifest.GameFileVersion!=null))throw new IOException("Manifesto de arquivos instalados inválido.");
+        if(manifest==null||manifest.Schema!=1||manifest.List==null||manifest.List.Mods==null||manifest.Files==null||manifest.Files.Count==0&&manifest.Project==null||manifest.Files.Count>MaxFiles||String.IsNullOrWhiteSpace(manifest.Name)||manifest.Name.Length>300||!(manifest.Game=="cyberpunk2077"||manifest.Game=="generic")||(manifest.Game=="cyberpunk2077"&&manifest.GameFileVersion!=catalog.GameFileVersion)||(manifest.Game=="generic"&&manifest.GameFileVersion!=null))throw new IOException("Manifesto de arquivos instalados inválido.");
         GeneralModLibrary.ValidateList(manifest.List,true);
+        if(manifest.Project!=null)ValidateProject(manifest,catalog);
         var owners=new Dictionary<string,GeneralModVariant>(StringComparer.Ordinal);
         var recipes=new Dictionary<string,FixedMod>(StringComparer.Ordinal);
         var ids=new HashSet<string>(StringComparer.Ordinal);
-        if(manifest.List.Mods.Count==0||manifest.List.Mods.Count>1000)throw new IOException("Lista de instalação inválida.");
+        if(manifest.List.Mods.Count==0&&manifest.Project==null||manifest.List.Mods.Count>1000)throw new IOException("Lista de instalação inválida.");
         foreach(var mod in manifest.List.Mods) {
             if(mod==null||!Regex.IsMatch(mod.Id??"",@"\A[A-Za-z0-9_-]{1,120}\z")||!ids.Add(mod.Id)||String.IsNullOrWhiteSpace(mod.Name)||mod.Name.Length>300||mod.Variants==null||mod.Variants.Count!=1)throw new IOException("Mod instalado inválido.");
             var variant=mod.Variants[0];

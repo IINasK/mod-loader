@@ -31,7 +31,7 @@ public static partial class InstalledSnapshot {
                     }
                 }
                 // Small organization metadata is separate from the mod payload tree.
-                using(var target=zip.CreateEntry("_modloader/project.json",CompressionLevel.Optimal).Open()){byte[] bytes=Utf8.GetBytes(Safe.Json.Serialize(manifest.List));target.Write(bytes,0,bytes.Length);}
+                using(var target=zip.CreateEntry("_modloader/project.json",CompressionLevel.Optimal).Open()){byte[] bytes=Utf8.GetBytes(Safe.Json.Serialize(manifest.Project??manifest.List));target.Write(bytes,0,bytes.Length);}
             }stream.Flush(true);
         }}catch{if(created){Safe.NoLinks(output);File.Delete(output);}throw;}
     }

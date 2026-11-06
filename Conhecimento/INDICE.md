@@ -1,6 +1,6 @@
 # Conhecimento dos mods
 
-Indice interno de138componentes ativos do instalador. Revisao de05/11/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
+Indice interno de138componentes ativos do instalador. Revisao de06/11/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
 
 ## Perfis Phantom Liberty
 
@@ -10,6 +10,10 @@ Indice interno de138componentes ativos do instalador. Revisao de05/11/2026; font
 - Esta separacao e documental/estatica. Nao foi executado um jogo semDLC para validar aparencia, gameplay ou rede. Confirmacoescoop anteriores do usuario continuam atribuidas a ele.
 
 ## Consulta
+
+- Convites automáticos, projeto parcial e cobertura por categoria: [versão1.1.19](Compartilhamento-parcial-1.1.19.md), [validação](Validacoes/1.1.19.json).
+- [Advanced Crash Reporter34403](Mods/mod-34403.md): uso, requisitos, privacidade e limites. [VOIDWEAR Accessories](Mods/mod-12637.md): apenas a loja preservada. [Stockings12572](Mods/mod-12572.md): ficha histórica do conjunto retirado.
+
 
 - Duplicar projetos base/pessoais sem copiar mods e rótulo Projetos completo: [versão1.1.18](Duplicar-projeto-1.1.18.md), [validação](Validacoes/1.1.18.json).
 

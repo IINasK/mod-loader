@@ -60,8 +60,8 @@ internal sealed partial class GeneralModWindow {
         }
         var active=priorityCurrent??current??scanCurrent;
         double fraction=active==null||active.Ended?0:active.Fraction;
-        totalProgress.Value=operationTotal==0?0:(int)Math.Min(100,100*(operationFinished+fraction)/operationTotal);
-        totalProgress.Caption=T("Itens processados: ","Items processed: ")+operationFinished+" / "+operationTotal+"  ·  "+T("restantes: ","remaining: ")+Math.Max(0,operationTotal-operationFinished);
+        UpdatePackCoverage();
+
         totalProgress.Indeterminate=false;totalProgress.Invalidate();
     }
     string Root(){

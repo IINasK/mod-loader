@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -8,7 +8,7 @@ internal static class RetiredPackEntries {
     internal static bool PreparedArchive(ModImportItem item){return item!=null&&item.Kind=="Arquivo"&&item.Sha256==DroneArchiveHash;}
     internal static HashSet<string> Remove(GeneralModList list){
         // Retire only known built-in identities; a new custom item remains the user's choice.
-        var removed=new HashSet<string>(list.Mods.Where(mod=>mod.Id==DroneId||mod.Id=="file-"+DroneArchiveHash||mod.Variants.Any(v=>v.CyberpunkId==DroneId)).Select(mod=>mod.Id),StringComparer.Ordinal);
+        var removed=new HashSet<string>(list.Mods.Where(mod=>mod.Id=="mod-12572"||mod.Id==DroneId||mod.Id=="file-"+DroneArchiveHash||mod.Variants.Any(v=>v.CyberpunkId=="mod-12572"||v.CyberpunkId==DroneId)).Select(mod=>mod.Id),StringComparer.Ordinal);
         list.Mods.RemoveAll(mod=>removed.Contains(mod.Id));
         foreach(var preset in list.Presets)preset.ModIds.RemoveAll(removed.Contains);
         return removed;

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -11,6 +11,8 @@ internal static class OnlineRemovedPackageTests {
         var checks=new List<string>();Action<bool,string> check=(ok,message)=>{if(!ok)throw new IOException(message);checks.Add(message);};
         var catalog=FixedData.Load();
         check(catalog.Packages.Count==138&&!catalog.Packages.Any(mod=>mod.Id==RetiredPackEntries.DroneId),"Receita retirada; demais138componentes permanecem.");
+        check(!catalog.Packages.Any(mod=>mod.Id=="mod-12572")&&catalog.Packages.Single(mod=>mod.Id=="mod-34403").Dependencies.SequenceEqual(new[]{"CET"}),"Stockings collection retired and reporter uses the existing CET without replacing the base.");
+        var accessories=catalog.Packages.Single(mod=>mod.Id=="mod-12637");check(accessories.Files.Count==2&&accessories.Files.Any(file=>file.Path.EndsWith("voidwear-accessories.reds"))&&!accessories.Files.Any(file=>file.Path.EndsWith("voidwear-casual.reds")||file.Path.EndsWith("voidwear-tacticool.reds")),"Only the two requested VOIDWEAR stores are omitted; accessories remain available.");
         check(catalog.Defaults.Count==8&&!catalog.Defaults.Any(value=>value.ModId==RetiredPackEntries.DroneId||value.Content.Contains("profiles/NASK.json")),"Perfil, índice e atalhos do drone não são embutidos.");
         check(catalog.Packages.SelectMany(mod=>mod.Files).All(file=>file.Patch==null&&!file.Path.Contains("FPVDrone")),"Nenhum script, patch ou arquivo do drone permanece no catálogo ativo.");
         check(new[]{"NightCoop","CET","redscript","Codeware","TweakXL","Audioware","NativeSettings","ArchiveXL"}.All(id=>catalog.Packages.Any(mod=>mod.Id==id)),"Dependências compartilhadas preservadas.");
@@ -18,6 +20,8 @@ internal static class OnlineRemovedPackageTests {
         var other=new ModImportItem{Id="file-"+new string('a',64),Kind="Arquivo",Name="other.zip",Source=Path.Combine(root,"other.zip"),Sha256=new string('a',64),Size=1,State="Pendente de auditoria"};
         var seed=GeneralModLibrary.Seed(catalog,new[]{prepared,other});
         check(!seed.Mods.Any(mod=>mod.Id==prepared.Id||mod.Id==RetiredPackEntries.DroneId)&&seed.Mods.Any(mod=>mod.Id==other.Id),"Preparação antiga não reaparece na lista; outros imports são preservados.");
+        var oldStockings=new GeneralModList{Mods=new List<GeneralModEntry>{Entry("mod-12572","https://www.nexusmods.com/cyberpunk2077/mods/12572"),Entry("custom-stockings","https://www.nexusmods.com/cyberpunk2077/mods/12572")}};
+        RetiredPackEntries.Remove(oldStockings);check(oldStockings.Mods.Count==1&&oldStockings.Mods[0].Id=="custom-stockings","Opening an old list retires only the built-in stockings identity; explicit custom choices remain editable.");
         var list=new GeneralModList{Categories=new List<string>{"Principal"}};
         string page="https://www.nexusmods.com/cyberpunk2077/mods/31642?tab=files&file_id=168826";
         list.Mods.Add(Entry(RetiredPackEntries.DroneId,page));

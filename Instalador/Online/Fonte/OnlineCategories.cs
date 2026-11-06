@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
@@ -15,7 +15,7 @@ internal static class ModCategories {
     static readonly Dictionary<string, ClothingFit> clothing = new Dictionary<string, ClothingFit>(StringComparer.Ordinal);
 
     static ModCategories() {
-        Add(ModCategory.Core, "CET redscript ArchiveXL TweakXL Codeware InputLoader ModSettings Audioware Utilities2077 NativeSettings RadioExt mod-5266 mod-6945 mod-2987 mod-28744 mod-7049");
+        Add(ModCategory.Core, "mod-34403 CET redscript ArchiveXL TweakXL Codeware InputLoader ModSettings Audioware Utilities2077 NativeSettings RadioExt mod-5266 mod-6945 mod-2987 mod-28744 mod-7049");
         Add(ModCategory.Essentials, "NightCoop");
         Add(ModCategory.Gameplay, "mod-36378 mod-35886 mod-17811 mod-3486 mod-30316 mod-30304 mod-7299");
         Add(ModCategory.Stores, "mod-4454 mod-4805 mod-11964 mod-5114 mod-14299 mod-12642 mod-8704 mod-20058 mod-8183 mod-13870 mod-18890 mod-30021 mod-8688 mod-12637 mod-6779 mod-6505 mod-6985");
@@ -23,7 +23,7 @@ internal static class ModCategories {
         Add(ModCategory.Appearance, "mod-16697-109145 mod-16697-109148 mod-16697-109147 mod-16697-109146 mod-16697-109144 mod-28570 mod-19187 mod-20763 mod-24547 mod-24626 mod-25348 mod-25807 mod-31886");
         Add(ModCategory.PhotoMode, "mod-35772 mod-35353 mod-7912");
         Add(ModCategory.Audio, "SpotOnRadio");
-        AddClothes(ClothingFit.Feminine, "mod-10989 mod-11963 mod-15606 mod-15867 mod-12572 mod-5093 mod-11609 mod-7665 mod-7822 mod-18823 mod-11824 mod-24104 mod-8209 mod-26845 mod-32674 mod-33404 mod-15712 mod-17501 mod-18353 mod-18849 mod-21395 mod-23301 mod-15702 mod-7435");
+        AddClothes(ClothingFit.Feminine, "mod-10989 mod-11963 mod-15606 mod-15867 mod-5093 mod-11609 mod-7665 mod-7822 mod-18823 mod-11824 mod-24104 mod-8209 mod-26845 mod-32674 mod-33404 mod-15712 mod-17501 mod-18353 mod-18849 mod-21395 mod-23301 mod-15702 mod-7435");
         AddClothes(ClothingFit.Masculine, "mod-7640");
         AddClothes(ClothingFit.Both, "mod-29544 mod-14371 mod-16345 mod-19684 mod-6536 mod-7017");
     }

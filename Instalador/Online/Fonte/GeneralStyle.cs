@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -173,16 +174,28 @@ internal sealed class GeneralButton : Button {
 
 internal sealed class GeneralProgress : Control {
     int value;
+    internal System.Collections.Generic.List<PackCoverageSegment> Segments;
+    readonly ToolTip segmentTip=new ToolTip{UseAnimation=false,UseFading=false};
     internal int Value {get{return value;}set{this.value=Math.Max(0,Math.Min(100,value));Invalidate();}}
     internal bool Indeterminate;
     internal string Caption;
     internal GeneralProgress(){Height=37;SetStyle(ControlStyles.UserPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);}
+    protected override void OnMouseMove(MouseEventArgs e){
+        base.OnMouseMove(e);string text="";
+        if(Segments!=null){double at=0,total=Segments.Sum(s=>(double)s.Count);foreach(var segment in Segments){at+=Width*segment.Count/Math.Max(1,total);if(e.X<at){text=segment.Label+": "+segment.Count+" ("+(100.0*segment.Count/Math.Max(1,total)).ToString("0.#")+"%)";break;}}}
+        if(segmentTip.GetToolTip(this)!=text)segmentTip.SetToolTip(this,text);
+    }
+    protected override void Dispose(bool disposing){if(disposing)segmentTip.Dispose();base.Dispose(disposing);}
     protected override void OnPaint(PaintEventArgs e){
         var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;
         using(var font=GeneralStyle.Font(10.5f))TextRenderer.DrawText(g,Caption??"",font,new Rectangle(0,0,Width-52,23),GeneralStyle.Muted,TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
         using(var font=GeneralStyle.Font(10.5f,true))TextRenderer.DrawText(g,Indeterminate?"—":Value+"%",font,new Rectangle(Width-52,0,52,23),GeneralStyle.Accent,TextFormatFlags.Right|TextFormatFlags.SingleLine);
         var track=new RectangleF(0,27,Math.Max(1,Width-1),6);
         using(var path=GeneralStyle.Round(track,3))using(var brush=new SolidBrush(GeneralStyle.SoftLine))g.FillPath(brush,path);
+        if(Segments!=null&&Segments.Count>0){
+            var saved=g.Save();using(var shape=GeneralStyle.Round(track,3))g.SetClip(shape);
+            float x=0,total=Segments.Sum(s=>(float)s.Count);foreach(var segment in Segments){float part=track.Width*segment.Count/total;using(var brush=new SolidBrush(segment.Color))g.FillRectangle(brush,x,track.Y,part+.5f,track.Height);x+=part;}g.Restore(saved);return;
+        }
         float width=track.Width*(Indeterminate ? .16f : Value/100f);
         if(width>0)using(var path=GeneralStyle.Round(new RectangleF(0,27,width,6),3))using(var brush=new SolidBrush(GeneralStyle.Accent))g.FillPath(brush,path);
     }

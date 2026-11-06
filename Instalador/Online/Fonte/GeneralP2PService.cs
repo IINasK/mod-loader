@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -88,7 +88,7 @@ internal sealed class P2PService : IDisposable {
         Directory.CreateDirectory(folder);string zip=Safe.In(folder,"pack.zip");
         string preparation=Safe.In(Root,"creating.json");Safe.WriteJson(preparation,new{Id=s.Id});
         try{
-            var manifest=InstalledSnapshot.Create(zip,state,ids,catalog,appData,includeConfigs,report);
+            var manifest=InstalledSnapshot.Create(zip,state,ids,catalog,appData,includeConfigs,report,true);
             s.Name=manifest.Name;s.Hash=Safe.Hash(zip);s.Size=new FileInfo(zip).Length;
             Engine.ConfigureFolder(s.Id,folder,s.Name,true);Sessions.Add(s);Save();return s;
         }catch{Sessions.Remove(s);try{Engine.RemoveFolder(s.Id);}catch(Exception){}try{P2PPack.DeleteSnapshot(folder);}catch(Exception){}throw;}

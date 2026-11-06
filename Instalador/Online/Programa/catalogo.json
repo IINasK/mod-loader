@@ -13888,70 +13888,6 @@
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/8704?tab=files&file_id=129730"
     },
     {
-      "Id": "mod-12572",
-      "Name": "Nola · Stockings Collection (FemV padrão, 2K)",
-      "Version": "1.5",
-      "Profile": "Complementos",
-      "GameVersion": "2.5",
-      "RequiresPL": false,
-      "RequiresRedmod": false,
-      "Immutable": false,
-      "Dependencies": [
-        "NightCoop",
-        "ArchiveXL",
-        "TweakXL",
-        "redscript",
-        "CET",
-        "mod-12642",
-        "mod-6945"
-      ],
-      "Warning": "182opções de meias. Variante2K non_TF para FemV vanilla sem Toggleable Feet e sem alteração permanente dos pés para salto. Comprar na Follow Your Passion, incluída automaticamente como conveniência do pacote. Não misturar com versõesTF/HF/4K. Corpo padrão preservado; câmera/ITP podem revelar clipping.",
-      "Assets": [
-        {
-          "Id": "a0",
-          "Name": "ND_Stockings_Collection_FemV_non_TF-12572-1-5-1765567423.zip",
-          "Sha256": "51617780c760eb97fc42019c4767225505ae8ab6135747352d4cf6ee11414f21",
-          "Size": 246093660,
-          "Format": "zip",
-          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/12572?tab=files&file_id=129732",
-          "ModId": 12572,
-          "FileId": 129732
-        }
-      ],
-      "Files": [
-        {
-          "Asset": "a0",
-          "Entry": "archive/pc/mod/nd_stockings_collection.xl",
-          "Path": "archive/pc/mod/nd_stockings_collection.xl",
-          "Sha256": "71a24f022c8761e47059573bf4a2cc645b3a9647087b3728ba2c313c6fb6a383",
-          "Size": 157,
-          "UserData": false
-        },
-        {
-          "Asset": "a0",
-          "Entry": "archive/pc/mod/ND_Stockings_Collection_FemV_non_TF.archive",
-          "Path": "archive/pc/mod/ND_Stockings_Collection_FemV_non_TF.archive",
-          "Sha256": "a36a403a54372ea7604a1a0ec3291b8f055b7010fd74996f8f385ef1b9508381",
-          "Size": 246206464,
-          "UserData": false
-        },
-        {
-          "Asset": "a0",
-          "Entry": "r6/tweaks/nola_dreamer/nd_stockings_collection.yaml",
-          "Path": "r6/tweaks/nola_dreamer/nd_stockings_collection.yaml",
-          "Sha256": "e09f1936c913c9ca665170c144abdc629296348c55c3d01fb4599d317da71a17",
-          "Size": 10453,
-          "UserData": false
-        }
-      ],
-      "ThirdPerson": "Compatível por escopo, conferir clipping",
-      "ThirdPersonNotes": "182opções de meias. Variante2K non_TF para FemV vanilla sem Toggleable Feet e sem alteração permanente dos pés para salto. Comprar na Follow Your Passion, incluída automaticamente como conveniência do pacote. Não misturar com versõesTF/HF/4K. Corpo padrão preservado; câmera/ITP podem revelar clipping.",
-      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/12572?tab=description",
-      "PhantomLibertyStatus": "not-required",
-      "PhantomLibertyNotes": "Sem requisito declarado deDLC; scripts/XL/YAML examinados não dependem deEP1. Compatibilidade semDLC inferida estaticamente, não teste de jogo separado.",
-      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/12572?tab=files&file_id=129732"
-    },
-    {
       "Id": "mod-5093",
       "Name": "Nola · Pack 1 (FemV padrão + Equipment-EX)",
       "Version": "1.0",
@@ -16765,7 +16701,7 @@
     },
     {
       "Id": "mod-12637",
-      "Name": "VOIDWEAR Virtual Atelier",
+      "Name": "VOIDWEAR Accessories Virtual Atelier",
       "Version": "0.85",
       "Profile": "Complementos",
       "GameVersion": "2.5",
@@ -16776,7 +16712,7 @@
         "mod-2987",
         "redscript"
       ],
-      "Warning": "Abra Atelier no computador do apartamento. A loja lista peças dos conjuntos instalados.",
+      "Warning": "No computador: Net > Atelier > VOIDWEAR Accessories. As lojas Casual e Tacticool foram retiradas por escolha do usuário; suas roupas não são removidas por isso. A loja de acessórios permanece para os óculos.",
       "PhantomLibertyStatus": "not-required",
       "PhantomLibertyNotes": "Sem requisito de expansão declarado. Inferência documental e estática.",
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/12637",
@@ -16808,20 +16744,6 @@
           "Path": "r6/scripts/yellingintothevoid/voidwear-accessories.reds",
           "Size": 17609,
           "Sha256": "347462f8013f78f63e5c478aaef82af9aecbc4ceb8034924d820d7a25fc9d69e"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "r6/scripts/yellingintothevoid/voidwear-casual.reds",
-          "Path": "r6/scripts/yellingintothevoid/voidwear-casual.reds",
-          "Size": 24566,
-          "Sha256": "e2286db2f30732e66d0da0b644d3763f7b501aada75a4dadf9a80e0cf54cd226"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "r6/scripts/yellingintothevoid/voidwear-tacticool.reds",
-          "Path": "r6/scripts/yellingintothevoid/voidwear-tacticool.reds",
-          "Size": 22885,
-          "Sha256": "6a2b5b8d74478efcd7c71667aefacbf07b64adb1ae085fe4714637c3a773881c"
         }
       ]
     },
@@ -17266,6 +17188,246 @@
           "Path": "r6/tweaks/kwek_nose_glasses_01.yaml",
           "Size": 6716,
           "Sha256": "763f7a097e2073bb5d0cc7369bc7a5452acbd1a746906e184bf657b071b669f0"
+        }
+      ]
+    },
+    {
+      "Id": "mod-34403",
+      "Name": "Advanced Crash Reporter",
+      "Version": "1.5.0",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Dependencies": [
+        "CET"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/34403?tab=files&file_id=168418",
+      "NexusModId": 34403,
+      "NexusFileId": 168418,
+      "Warning": "Ferramenta de diagnóstico; não impede crashes. Relatórios locais em bin/x64/plugins/AdvancedCrashReporter/reports. Nenhum login ou configuração inicial é necessário. Preserve relatórios privados e revise antes de compartilhar. Compatibilidade declarada pelo autor para 2.5; ainda sem ensaio de crash neste jogo.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Advanced Crash Reporter 34403 1.5.0 2026-10-25T16-13Z mPgaPVVMK.zip",
+          "Size": 4088118,
+          "Sha256": "23d7bb242b61ec756c78af458a16a32f14a83149ecfbe8ab9404bde0c6980828",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/34403?tab=files&file_id=168418",
+          "ModId": 34403,
+          "FileId": 168418
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/CrashReporter.exe",
+          "Path": "bin/x64/CrashReporter.exe",
+          "Size": 383488,
+          "Sha256": "a526123365c1892a9d431eb7edf6ee676c9348f48886cba0d1b6d07d98ecd3f1",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter.asi",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter.asi",
+          "Size": 1389056,
+          "Sha256": "a789a4256dad3460976c45a0ed6e439a14686966097fbef7373b8726f4ac1132",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/config.ini",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/config.ini",
+          "Size": 4005,
+          "Sha256": "b79a15da83d5a6c6efd267481042cf71b2c20ee3f01bdbd0c90f4a7477be57b9",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/engine-names-LICENSE.txt",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/engine-names-LICENSE.txt",
+          "Size": 1219,
+          "Sha256": "105fc8cc600a73b7c5fa709679b19252bae229a91525ecfd9491524504e994fc",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/engine-names.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/engine-names.bin",
+          "Size": 1875073,
+          "Sha256": "6af0215422ace141b92a123b24926e423c7a8e7ff18358b75812132d723dee5d",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/AdvancedCrashReporter-0B1A4671ECFE4373B5C37FA1BB6618841F.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/AdvancedCrashReporter-0B1A4671ECFE4373B5C37FA1BB6618841F.bin",
+          "Size": 103282,
+          "Sha256": "39af530fa1e488985bfe83b2e54257dfe272d3a166a5297a566187e41c164603",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/ArchiveXL-58DD33B31CF545FB97A1EE37C05E373A5.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/ArchiveXL-58DD33B31CF545FB97A1EE37C05E373A5.bin",
+          "Size": 128633,
+          "Sha256": "034565b7355d6abdc13a055ccc37e16874b5c8c3dd2a90f9ad32117495466f81",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/ArchiveXL-713A7EC91DDA4BC8B59B15478CB129D98.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/ArchiveXL-713A7EC91DDA4BC8B59B15478CB129D98.bin",
+          "Size": 128748,
+          "Sha256": "a2d127fcaf7b017982859e93a6723aee66983510f2eea5e1c9f002a1a9c0b1c0",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/ArchiveXL-LICENSE.txt",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/ArchiveXL-LICENSE.txt",
+          "Size": 1236,
+          "Sha256": "120c35e918c0fa90d1fbab0aed086bea3227de8c7c0be24f2f09db5c59babc7e",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/Codeware-3EC6A6A75BA24EA5AD63477E26DD026217.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/Codeware-3EC6A6A75BA24EA5AD63477E26DD026217.bin",
+          "Size": 141597,
+          "Sha256": "371ea339b55d7548cf99000dfb977da12a84e8c90db879d409b8910e06859b17",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/Codeware-3EC6A6A75BA24EA5AD63477E26DD0262F.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/Codeware-3EC6A6A75BA24EA5AD63477E26DD0262F.bin",
+          "Size": 141394,
+          "Sha256": "9c93bfefc0cc0d6ea8f62f7d82b7cdcf77bfe921026f7bea972fa2b805038938",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/Codeware-LICENSE.txt",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/Codeware-LICENSE.txt",
+          "Size": 1232,
+          "Sha256": "3db804a3e2c30535c4ef20587ff2ce2cdcbeec5c368e7223ebc68c94952be62d",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/cyber_engine_tweaks-5AD790DA0CD54A488C35B7C54361E23B1.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/cyber_engine_tweaks-5AD790DA0CD54A488C35B7C54361E23B1.bin",
+          "Size": 243005,
+          "Sha256": "0b54878b5fa0e6f42bdabe6c5643f41a654d0612cca228f1c31b923c03f14449",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/cyber_engine_tweaks-LICENSE.txt",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/cyber_engine_tweaks-LICENSE.txt",
+          "Size": 1253,
+          "Sha256": "55f34beab62de03c37f3bbfbb39be50454794272b6992be11a9058ed0a00417e",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX-LICENSE.txt",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX-LICENSE.txt",
+          "Size": 1806,
+          "Sha256": "f8963e1a6f7ac76786a9397329a62689724a89b36a70bcd56c7c0b82719b8455",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX3CharacterKinematic_x64-7190D57A02214A2CA342EC37E0BA466E6F.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX3CharacterKinematic_x64-7190D57A02214A2CA342EC37E0BA466E6F.bin",
+          "Size": 9072,
+          "Sha256": "0ccf7d99a2ebb8f91d4f873c267760db8a94723d7be72cdf13d6dc515ec75d89",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX3Common_x64-7D5E7B200D4B4F668BD0D75CF84DA41371.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX3Common_x64-7D5E7B200D4B4F668BD0D75CF84DA41371.bin",
+          "Size": 17902,
+          "Sha256": "0c9b3f9e48cca1637edb7e5bc19f3a558e1e778eec4f8928a5d6414c2a239ea9",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX3Cooking_x64-52ADC9051DD14B839D297B15D300BF9E7A.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX3Cooking_x64-52ADC9051DD14B839D297B15D300BF9E7A.bin",
+          "Size": 10020,
+          "Sha256": "ca497e9efb673ac6177cb222be38602392d686037d9d2f5851f2b4a0afd173f6",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX3_x64-3FD8953FEE6E49AC871D5A511CA7A67F60.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX3_x64-3FD8953FEE6E49AC871D5A511CA7A67F60.bin",
+          "Size": 37192,
+          "Sha256": "52da3af1c5c9030461b55ba23e662ac1f5df5710db888936e62dfd8f7f3ce191",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/PxFoundation_x64-AC1A0926814D45159DCA8FB8426400B82.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/PxFoundation_x64-AC1A0926814D45159DCA8FB8426400B82.bin",
+          "Size": 10912,
+          "Sha256": "d1fa2633f3d61db0c94c7e805cb3020500eb7016763a5ca3038b51ffc5a2d421",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/RED4ext-26FF6D6A3EDD449DBBFDF45407100EB41.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/RED4ext-26FF6D6A3EDD449DBBFDF45407100EB41.bin",
+          "Size": 85425,
+          "Sha256": "cfe023d5ac19341bb71433a9918cddb56afc7fdb0861c12e4de36f0cc4a32c50",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/RED4ext-BB92AC39116C4CFA94295945061510251.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/RED4ext-BB92AC39116C4CFA94295945061510251.bin",
+          "Size": 85423,
+          "Sha256": "3c546b7b7d5e74037346301c56fb1a32cd83d8380a83a77b8c6a9e03877686c9",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/RED4ext-LICENSE.txt",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/RED4ext-LICENSE.txt",
+          "Size": 1231,
+          "Sha256": "3b9bf3d4f4315f890c886ac7ae207dbe5833c1e38b65b8d5079359bf86871e1a",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/TweakXL-DAA70F1B2B794E8093E66D6CA708DA9F1.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/TweakXL-DAA70F1B2B794E8093E66D6CA708DA9F1.bin",
+          "Size": 96052,
+          "Sha256": "e9a00a0d67d6e2ab246be6644aa44746c769d1bd62531b97de7a8c3f05de192a",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/TweakXL-E0D2E52B2DF843D3A1D2D3ECC469CF7F1.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/TweakXL-E0D2E52B2DF843D3A1D2D3ECC469CF7F1.bin",
+          "Size": 95871,
+          "Sha256": "d0f90a29b8e3bacf7a141ed5b2a1b2dade965aa6af3f8c236afd112128229115",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/TweakXL-LICENSE.txt",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/TweakXL-LICENSE.txt",
+          "Size": 1230,
+          "Sha256": "55dc9d697bfe07ca9673c4073aa26f55d7b9746e6de1438b5db9b4ff7b7c66fa",
+          "UserData": false
         }
       ]
     }

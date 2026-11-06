@@ -269,7 +269,7 @@ internal sealed partial class GeneralModWindow : Form {
         grid.InvalidateCell(0,-1);
         int installed=rows.Count(r=>{var m=state.List.Mods.Single(x=>x.Id==(string)r.Tag);string status;return statuses.TryGetValue(Key(m,Selected(m)),out status)&&GeneralStatusPresentation.Kind(status)=="installed";});
         int failed=rows.Count(r=>{var m=state.List.Mods.Single(x=>x.Id==(string)r.Tag);string status;return statuses.TryGetValue(Key(m,Selected(m)),out status)&&GeneralStatusPresentation.Kind(status)=="error";});
-        counts.Text=T("Mods na lista: ","Mods in list: ")+rows.Count+"   ·   "+T("Medidos: ","Measured: ")+rows.Count(r=>measuredMods.ContainsKey((string)r.Tag))+"/"+rows.Count+"   ·   "+T("Instalados: ","Installed: ")+installed+"   ·   "+T("Falhas: ","Failed: ")+failed;UpdatePresetCommands();
+        counts.Text=T("Mods na lista: ","Mods in list: ")+rows.Count+"   ·   "+T("Medidos: ","Measured: ")+rows.Count(r=>measuredMods.ContainsKey((string)r.Tag))+"/"+rows.Count+"   ·   "+T("Instalados: ","Installed: ")+installed+"   ·   "+T("Falhas: ","Failed: ")+failed;UpdatePresetCommands();UpdatePackCoverage();
     }
     void PaintSection(object sender,DataGridViewRowPrePaintEventArgs e){
         var section=grid.Rows[e.RowIndex].Tag as SectionRow;if(section==null)return;

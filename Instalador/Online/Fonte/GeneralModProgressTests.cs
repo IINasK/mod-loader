@@ -71,7 +71,7 @@ internal sealed partial class GeneralModWindow {
             check(form.Generic(installRoot).Status(first.Receipt(0))==GeneralModInstaller.Installed,"A primeira fonte concluída conserva recibo íntegro.");
             check(form.Status(first,installRoot)!="Instalado"&&form.statuses[first.Key]!="Instalado","Um mod parcialmente aplicado não recebe estado de instalação completa.");
             check(form.Status(following,installRoot)=="Instalado"&&form.progress[following.Key]==100,"A fila continua e só marca 100% após confirmar o próximo mod.");
-            check(form.operationTotal==2&&form.operationFinished==2&&form.totalProgress.Value==100,"Progresso geral contabiliza os dois itens processados, inclusive o pulado.");
+            check(form.operationTotal==2&&form.operationFinished==2&&form.totalProgress.Value==50,"Completed jobs do not hide missing mods: the partially skipped mod keeps coverage at 50%.");
             check(!form.next.Visible,"Pular fica oculto após concluir a fila.");
         });
 
@@ -103,7 +103,7 @@ internal sealed partial class GeneralModWindow {
             form.association=lastZip;
             await Until(()=>!form.working);
             check(form.Status(normal,priorityRoot)=="Instalado"&&pages==1,"Associação explícita conclui o mod original sem abrir outra página.");
-            check(form.operationFinished==2&&form.operationTotal==2&&form.totalProgress.Value==100,"A fila com prioridade termina com todos os trabalhos contabilizados.");
+            check(form.operationFinished==2&&form.operationTotal==2&&form.totalProgress.Value==50,"Priority queue finishes while the partially skipped entry remains visible in pack coverage.");
         });
         string editRoot=Path.Combine(root,"edit-target");Directory.CreateDirectory(editRoot);
         var editState=new GeneralModState{Destination=editRoot,DownloadFolder=downloads,List=new GeneralModList()};

@@ -9,6 +9,10 @@ public sealed partial class FixedInstaller {
         if(game.Length<=3||game.StartsWith(@"\\"))throw new IOException("Escolha uma pasta local do jogo.");
         catalog=UserFileApprovals.ResolveCatalog(sourceCatalog,game);cache=null;saves=null;fixture=false;
     }
+    internal bool HasSnapshotImportedRecord(string id){
+        string folder=Safe.In(Data,"importados");
+        return Directory.Exists(folder)&&Directory.GetFiles(folder,"*.json").Select(ReadReceipt).Any(r=>r.Operation==LocalModPackage.ReceiptOperation&&r.Status=="instalado"&&r.Mods.Contains(id));
+    }
     internal List<InstalledSnapshotFile> ExportSnapshotImportedFiles(string id) {
         Closed();
         string folder=Safe.In(Data,"importados");
@@ -37,6 +41,7 @@ public sealed partial class GeneralModInstaller {
             Safe.WriteJson(target.RecordPath(record.Key),record);
         }
     }
+    internal bool HasSnapshotRecord(string key){return ReadRecord(RecordPath(key))!=null;}
     internal List<InstalledSnapshotFile> ExportSnapshotFiles(string key) {
         Record record=ReadRecord(RecordPath(key));
         if(record==null)throw new IOException("O mod não tem recibo de instalação nesta pasta.");

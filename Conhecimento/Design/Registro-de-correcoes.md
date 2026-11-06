@@ -91,3 +91,8 @@ GeneralButton usa a mesma área de ícone/recuos para pintar e medir a largura p
 ## 2026-11-06 — 1.1.18 — duplicar projeto e campo explicativo
 
 Menu usa a ação Duplicar projeto com ícone copy adotado e linha44px, inclusive para a base. Nome da cópia e explicação sobre o destino compartilhado ficam em GeneralNameDialog reutilizado. A variante com explicação reserva52px para o campo e300px de altura total; não reduzir a área do input para encaixar texto. Cancelar preserva a biblioteca. A cópia tem presets editáveis e não duplica pacotes. Suite geral e geometria do campo aprovadas, sem alterar a skill central.
+
+
+##2026-11-06 —1.1.19 — campo com ação interna e cobertura
+
+Campos de convite de linha única reutilizam GeneralSurface e ícone Lucide copy adotado. Superfície48px, ação44px, coluna de texto reservada pelo padding e botão inteiramente dentro da face arredondada. Não colocar um fundo opaco sobre o contorno do campo; o alvo continua acessível por teclado. Copiar não abrevia o convite. Conferidos preenchido, foco/cópia, PT/EN e três temas. A barra compartilhada recorta os segmentos no track arredondado e oferece quantidade/categoria em hover; a barra de transferência comum conserva sua função. Relato de uso privado mantido fora do Git público.

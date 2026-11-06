@@ -9,6 +9,10 @@ using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
     internal static void RunNoCopyTests(string parent){
+        var previous=StorageMaintenance.OtherLoaderProbe;StorageMaintenance.OtherLoaderProbe=()=>false;
+        try{RunNoCopyCases(parent);}finally{StorageMaintenance.OtherLoaderProbe=previous;}
+    }
+    static void RunNoCopyCases(string parent){
         string root=System.Text.RegularExpressions.Regex.IsMatch(Path.GetFullPath(parent).Replace(Path.DirectorySeparatorChar,'/'),@"(?i)/online-testes-[a-f0-9]{32}(/|$)")?Path.Combine(parent,"n"):OnlineTests.NestedRoot(parent,"no-copy");Directory.CreateDirectory(root);
         var tests=new List<string>();Action<bool,string> check=(ok,text)=>{if(!ok)throw new IOException(text);tests.Add(text);};
         string downloads=Path.Combine(root,"downloads");Directory.CreateDirectory(downloads);
@@ -35,10 +39,29 @@ internal sealed partial class GeneralModWindow {
             using(var reader=new StreamReader(zip.GetEntry("_modloader/project.json").Open())){string json=reader.ReadToEnd();check(json.Contains("Meu preset")&&json.Contains("Nested mod")&&!json.Contains(downloads.Replace("\\","\\\\")),"Export preserves names and presets without private absolute download paths.");}
         }
         string snapshot=Path.Combine(root,"p2p.zip");InstalledSnapshot.Create(snapshot,state,new[]{mod.Id},catalog,data,true,null);check(InstalledSnapshot.Read(snapshot,Safe.Hash(snapshot),catalog).Files.Count==1,"P2P remains compatible and exports installed bytes after original archive deletion.");
+        var missingCar=new GeneralModEntry{Id="optional-car",Name="Optional car",Category="Cars",DefaultVariant="main",Variants=new List<GeneralModVariant>{new GeneralModVariant{Id="main",Name="Standard",Sources=new List<string>{"https://example.org/car.zip"}}}};
+        state.List.Categories.Add("Cars");state.List.Mods.Add(missingCar);state.List.Presets[0].ModIds.Add(missingCar.Id);
+        var partial=InstalledSnapshot.Inspect(state,new[]{mod.Id,missingCar.Id},catalog,data,true,true);
+        check(partial.List.Mods.Count==1&&partial.Files.Count==1&&partial.Project.Mods.Count==2&&partial.Project.Presets[0].ModIds.Contains(missingCar.Id),"Partial sharing carries the full project/preset while the payload includes only verified installed mods.");
+        string partialZip=Path.Combine(root,"partial.zip");InstalledSnapshot.Create(partialZip,state,new[]{mod.Id,missingCar.Id},catalog,data,true,null,true);var readPartial=InstalledSnapshot.Read(partialZip,Safe.Hash(partialZip),catalog);
+        check(readPartial.Project.Mods.Single(m=>m.Id==missingCar.Id).Variants[0].Sources.Single()=="https://example.org/car.zip"&&readPartial.List.Mods.Count==1,"Missing mods retain complete public sources for later download, without becoming installed owners.");
+        var privateProject=Safe.Json.Deserialize<InstalledSnapshotManifest>(Safe.Json.Serialize(partial));privateProject.Project.Mods.Single(m=>m.Id==missingCar.Id).Variants[0].Sources.Add(original);bool privateRejected=false;try{InstalledSnapshot.Validate(privateProject,catalog);}catch(IOException){privateRejected=true;}check(privateRejected,"Full-project metadata refuses private local download paths.");
+        var wrongProject=Safe.Json.Deserialize<InstalledSnapshotManifest>(Safe.Json.Serialize(partial));wrongProject.Project.Mods.Single(m=>m.Id==mod.Id).Variants[0].Sources=new List<string>{"https://example.org/different.zip"};bool mismatchRejected=false;try{InstalledSnapshot.Validate(wrongProject,catalog);}catch(IOException){mismatchRejected=true;}check(mismatchRejected,"Full-project metadata cannot replace the source identity of a transferred installed mod.");
+        string metadataZip=Path.Combine(root,"metadata.zip");InstalledSnapshot.Create(metadataZip,state,new[]{missingCar.Id},catalog,data,true,null,true);
+        var metadata=InstalledSnapshot.Read(metadataZip,Safe.Hash(metadataZip),catalog);
+        check(metadata.Files.Count==0&&metadata.List.Mods.Count==0&&metadata.Project.Mods.Count==2,"A 0%-available preset shares metadata without inventing installed files.");
+        string metadataTarget=Path.Combine(root,"metadata-target"),metadataData=Path.Combine(root,"metadata-data");Directory.CreateDirectory(metadataTarget);
+        var metadataInstaller=new InstalledSnapshotInstaller(metadataTarget,metadataData,catalog);string metadataReceipt=metadataInstaller.Install(metadataZip,Safe.Hash(metadataZip),_=>{});
+        check(metadataInstaller.ReadManifest(metadataReceipt).Project.Mods.Count==2&&Directory.GetFiles(metadataTarget,"*",SearchOption.AllDirectories).Length==0,"Metadata-only receive preserves the future download list and installs no game payload.");
+        var sample=Enumerable.Range(0,20).Select(i=>new GeneralModEntry{Id="m"+i,Category=i<17?"Main":i<19?"Cars":"FPV"}).ToList();var segments=PackCoverage.Build(sample,m=>Int32.Parse(m.Id.Substring(1))<17,"Uncategorized");
+        check(segments.Count==3&&segments[0].Count==17&&segments[1].Label=="Cars"&&segments[1].Count==2&&segments[2].Label=="FPV"&&segments[2].Count==1,"Coverage is 85% green, 10% cars and 5% FPV by mod count.");
+        check(segments[1].Color==PackCoverage.CategoryColor("Cars")&&segments[1].Color!=segments[2].Color&&PackCoverage.Build(sample,m=>true,"Uncategorized").Count==1,"Category colors are deterministic and completion leaves a single green segment.");
         File.WriteAllText(Safe.In(game,"mods/nested/one.txt"),"changed");bool changed=false;try{InstalledSnapshot.CreateModpack(Path.Combine(root,"changed.zip"),manifest,game,catalog,null);}catch(IOException){changed=true;}
         check(changed&&!File.Exists(Path.Combine(root,"changed.zip")),"Changed-during-export files stop creation and remove the incomplete output.");
         File.Delete(Safe.In(game,"mods/nested/one.txt"));bool missing=false;try{InstalledSnapshot.Inspect(state,new[]{mod.Id},catalog,data,true);}catch(InstalledSnapshotReviewException ex){missing=ex.Problems.Length==1&&ex.Message.Contains(mod.Name);}
         check(missing,"Preflight reports the incomplete mod before creating an archive or contacting a peer.");
+        bool partialGuard=false;try{InstalledSnapshot.Inspect(state,new[]{mod.Id,missingCar.Id},catalog,data,true,true);}catch(InstalledSnapshotReviewException){partialGuard=true;}
+        check(partialGuard,"Partial sharing still rejects a recorded mod with missing installed files; it is not silently treated as optional.");
         byte[] bytes=Encoding.UTF8.GetBytes("direct original");var direct=new FixedAsset{Id="direct",Name="direct.zip",Format="zip",Size=bytes.Length,Sha256=InstalledSnapshot.Hash(bytes)};
         string temp=cache.DownloadTemporaryPath();File.WriteAllBytes(temp,bytes);using(var control=new DownloadControl())NexusClient.CommitDownload(cache,direct,temp,control);
         string directPath=cache.PathFor(direct);check(directPath.StartsWith(downloads+"\\",StringComparison.OrdinalIgnoreCase)&&File.Exists(directPath)&&!File.Exists(temp),"Direct downloads finish in the user's Downloads folder, not in AppData.");

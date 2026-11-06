@@ -1,8 +1,8 @@
 {
   "Schema": 1,
-  "CheckedOn": "2026-11-05",
+  "CheckedOn": "2026-11-06",
   "CatalogId": "cp25-fixed-20261028",
-  "BaselineCatalogSha256": "89c68e6bdb8c192977fcace5d30a4b8b25912d8780fd6067f77f5c7d41c6dc05",
+  "BaselineCatalogSha256": "f5c25ec949c1dc21ee2e0d19ed8441ce19dd9710df2aa629d37ea866c85190e6",
   "Count": 138,
   "Profiles": {
     "WithPL": {
@@ -14378,123 +14378,6 @@
     {
       "CoopStatusFromExistingCatalog": "Avisos informativos",
       "GenderAndBody": "FemV com corpo padrão. Nenhum mod de corpo novo; Equipment-EX da base incluído para slots. Demais gêneros/refits não selecionados.",
-      "DocumentationSummary": "# Nola · Stockings Collection (FemV padrão, 2K)\r\n\r\n- ID: mod-12572; versão fixa do arquivo 1.5; file_id 129732.\r\n- Incluído no Mod Loader1.0.27 em02/11/2026. Arquivo original baixado e receita auditada. Não instalado no jogo real nesta correção.\r\n\r\n## Função e uso\r\n\r\nConjunto de roupas; a loja correspondente entra automaticamente na seleção para facilitar a compra.\r\n\r\n182opções de meias. Variante2K non_TF para FemV vanilla sem Toggleable Feet e sem alteração permanente dos pés para salto. Comprar na Follow Your Passion, incluída automaticamente como conveniência do pacote. Não misturar com versõesTF/HF/4K. Corpo padrão preservado; câmera/ITP podem revelar clipping.\r\n\r\n## Corpo, dependências e variantes\r\n\r\nFemV com corpo padrão. Nenhum mod de corpo novo; Equipment-EX da base incluído para slots. Demais gêneros/refits não selecionados.\r\n\r\nEscolha fixa129732:2K non_TF. Não selecionarTF/HF/4K junto. A página descreve182opções; a inspeção de placeholders base_color confirmou pelo menos152IDs presentes na loja. Isto não é contagem visual nem prova de todas as variantes.\r\n\r\nDependências selecionadas pelo pacote:\r\n- NightCoop + RED4ext 1.31.0: 0.1.2-beta [NightCoop].\r\n- ArchiveXL: v1.28.2 [ArchiveXL].\r\n- TweakXL: v1.12.0 [TweakXL].\r\n- redscript: v0.5.32 [redscript].\r\n- CET: v1.38.1 [CET].\r\n- Nola · Follow Your Passion (loja): 1.8 [mod-12642].\r\n- Equipment-EX: 1.2.10 [mod-6945].\r\n\r\nAs roupas declaramArchiveXL/TweakXL/RED4ext/redscript/CET. As lojas usamVirtualAtelier. Equipment-EX e as lojas são também conveniências da receita para a nossa base; uma loja não é dependência técnica da malha de roupa. Nenhuma atualização deRED4ext ou troca de corpo foi incorporada.\r\n\r\n## Compatibilidade e limites\r\n\r\nSem exigência declarada dePhantomLiberty ouREDmod. Os28textos .reds/.yaml/.xl destes sete componentes não apresentaram referênciasEP1 ativas. Classificação semDLC é estática, não ensaio de jogo. Não há estruturaREDmod nestes pacotes.\r\n\r\nAs roupas usam recursos/slots próprios; câmeraITP, poses, roupas sobrepostas e outros corpos podem revelar clipping. Não há evidência de código de rede nos quatro scripts de lojas. Isto não valida renderização nem sincronização coop. Alertas de2.5 ficam informativos no auditor: nenhum destes sete componentes usaBlockedReason. O comentário da autora sobre roupas na boutique5114 não prova falha universal de toda roupaNola.\r\n\r\nA APIevent.AddStore está presente noVirtualAtelier1.6.4 instalado, e os quatro métodos de registro de loja têm nomes distintos dos existentes. Não foi feita compilação ou execução dos scripts de loja nesta correção. A auditoria de instalação não verifica recursos internos dos .archive.\r\n\r\n## Arquivos e testes\r\n\r\nOrigem oficial: https://www.nexusmods.com/cyberpunk2077/mods/12572?tab=files&file_id=129732\r\nFormato zip; 246093660bytes; SHA256 51617780c760eb97fc42019c4767225505ae8ab6135747352d4cf6ee11414f21. Hash calculado sobre o download oficial, sem alegar checksum externo quando não conferido.\r\n\r\n| Caminho relativo | Bytes | SHA256 |\r\n| --- | ---: | --- |\r\n| archive/pc/mod/nd_stockings_collection.xl | 157 | 71a24f022c8761e47059573bf4a2cc645b3a9647087b3728ba2c313c6fb6a383 |\r\n| archive/pc/mod/ND_Stockings_Collection_FemV_non_TF.archive | 246206464 | a36a403a54372ea7604a1a0ec3291b8f055b7010fd74996f8f385ef1b9508381 |\r\n| r6/tweaks/nola_dreamer/nd_stockings_collection.yaml | 10453 | e09f1936c913c9ca665170c144abdc629296348c55c3d01fb4599d317da71a17 |\r\n\r\nTeste dos sete componentes em conjunto:151verificações,44arquivos, monitor/importador reais, stagingRAR real, instalação e reversão emfixture; presença de todos os sete na tabela real do aplicativo. Abrir página ou importar arquivo não marcou o mod como instalado. Suíte geral:910verificações/24relatórios. Jogo real não alterado. ZIPs/RARs não são embutidos noEXE nem enviados aoGit.\r\n\r\nFontes: https://www.nexusmods.com/cyberpunk2077/mods/12572?tab=description ; https://www.nexusmods.com/cyberpunk2077/mods/12572?tab=files&file_id=129732 ; pacotes originais e scripts inspecionados. Fichas candidatas anteriores preservam as consultas de posts e suas datas.\r\n",
-      "AuthorRequirements": [
-        "Consultar ficha: dependências técnicas distinguem-se de loja/EEX incluídos por conveniência"
-      ],
-      "BlockedReason": "",
-      "Dependencies": [
-        {
-          "FixedVersion": "0.1.2-beta",
-          "Name": "NightCoop + RED4ext 1.31.0",
-          "Id": "NightCoop"
-        },
-        {
-          "FixedVersion": "v1.28.2",
-          "Name": "ArchiveXL",
-          "Id": "ArchiveXL"
-        },
-        {
-          "FixedVersion": "v1.12.0",
-          "Name": "TweakXL",
-          "Id": "TweakXL"
-        },
-        {
-          "FixedVersion": "v0.5.32",
-          "Name": "redscript",
-          "Id": "redscript"
-        },
-        {
-          "FixedVersion": "v1.38.1",
-          "Name": "CET",
-          "Id": "CET"
-        },
-        {
-          "FixedVersion": "1.8",
-          "Name": "Nola · Follow Your Passion (loja)",
-          "Id": "mod-12642"
-        },
-        {
-          "FixedVersion": "1.2.10",
-          "Name": "Equipment-EX",
-          "Id": "mod-6945"
-        }
-      ],
-      "HowToUse": [
-        "182opções de meias. Variante2K non_TF para FemV vanilla sem Toggleable Feet e sem alteração permanente dos pés para salto. Comprar na Follow Your Passion, incluída automaticamente como conveniência do pacote. Não misturar com versõesTF/HF/4K. Corpo padrão preservado; câmera/ITP podem revelar clipping."
-      ],
-      "GameVersion": "2.5",
-      "Limitations": [
-        "Sem teste visual2.5/ITP/coop nesta etapa"
-      ],
-      "KnownConflictsAndLimits": [
-        "182opções de meias. Variante2K non_TF para FemV vanilla sem Toggleable Feet e sem alteração permanente dos pés para salto. Comprar na Follow Your Passion, incluída automaticamente como conveniência do pacote. Não misturar com versõesTF/HF/4K. Corpo padrão preservado; câmera/ITP podem revelar clipping.",
-        "Escolha fixa129732:2K non_TF. Não selecionarTF/HF/4K junto. A página descreve182opções; a inspeção de placeholders base_color confirmou pelo menos152IDs presentes na loja. Isto não é contagem visual nem prova de todas as variantes."
-      ],
-      "CoopNotesFromExistingCatalog": "Manter validações antigas do usuário atribuídas a ele. AdiçõesNola desta revisão não foram iniciadas no jogo.",
-      "Name": "Nola · Stockings Collection (FemV padrão, 2K)",
-      "Sources": [
-        "https://www.nexusmods.com/cyberpunk2077/mods/12572?tab=description",
-        "https://www.nexusmods.com/cyberpunk2077/mods/12572?tab=files&file_id=129732"
-      ],
-      "PhantomLiberty": {
-        "Status": "not-required",
-        "Notes": "Sem requisito declarado deDLC; scripts/XL/YAML examinados não dependem deEP1. Compatibilidade semDLC inferida estaticamente, não teste de jogo separado.",
-        "Sources": [
-          "https://www.nexusmods.com/cyberpunk2077/mods/12572?tab=files&file_id=129732"
-        ]
-      },
-      "CheckedOn": "2026-11-02",
-      "EvidenceGroup": "Downloads oficiais e integração isolada",
-      "CoopEvidence": "Escopo visual e lojas locais; sem validação runtime desta adição",
-      "FixedVersion": "1.5",
-      "Assets": [
-        {
-          "Id": "a0",
-          "Name": "ND_Stockings_Collection_FemV_non_TF-12572-1-5-1765567423.zip",
-          "Sha256": "51617780c760eb97fc42019c4767225505ae8ab6135747352d4cf6ee11414f21",
-          "Size": 246093660,
-          "Format": "zip",
-          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/12572?tab=files&file_id=129732",
-          "ModId": 12572,
-          "FileId": 129732
-        }
-      ],
-      "Function": "Conjunto de roupas; a loja correspondente entra automaticamente na seleção para facilitar a compra.",
-      "Id": "mod-12572",
-      "StaticInspection": true,
-      "Category": "Complementos",
-      "Files": [
-        {
-          "Asset": "a0",
-          "Entry": "archive/pc/mod/nd_stockings_collection.xl",
-          "Path": "archive/pc/mod/nd_stockings_collection.xl",
-          "Sha256": "71a24f022c8761e47059573bf4a2cc645b3a9647087b3728ba2c313c6fb6a383",
-          "Size": 157,
-          "UserData": false
-        },
-        {
-          "Asset": "a0",
-          "Entry": "archive/pc/mod/ND_Stockings_Collection_FemV_non_TF.archive",
-          "Path": "archive/pc/mod/ND_Stockings_Collection_FemV_non_TF.archive",
-          "Sha256": "a36a403a54372ea7604a1a0ec3291b8f055b7010fd74996f8f385ef1b9508381",
-          "Size": 246206464,
-          "UserData": false
-        },
-        {
-          "Asset": "a0",
-          "Entry": "r6/tweaks/nola_dreamer/nd_stockings_collection.yaml",
-          "Path": "r6/tweaks/nola_dreamer/nd_stockings_collection.yaml",
-          "Sha256": "e09f1936c913c9ca665170c144abdc629296348c55c3d01fb4599d317da71a17",
-          "Size": 10453,
-          "UserData": false
-        }
-      ],
-      "Blocked": false
-    },
-    {
-      "CoopStatusFromExistingCatalog": "Avisos informativos",
-      "GenderAndBody": "FemV com corpo padrão. Nenhum mod de corpo novo; Equipment-EX da base incluído para slots. Demais gêneros/refits não selecionados.",
       "DocumentationSummary": "# Nola · Pack 1 (FemV padrão + Equipment-EX)\r\n\r\n- ID: mod-5093; versão fixa do arquivo 1.0; file_id 133097.\r\n- Incluído no Mod Loader1.0.27 em02/11/2026. Arquivo original baixado e receita auditada. Não instalado no jogo real nesta correção.\r\n\r\n## Função e uso\r\n\r\nConjunto de roupas; a loja correspondente entra automaticamente na seleção para facilitar a compra.\r\n\r\nDez conjuntos/peças principais no AIO, diferentes deVintage/Rough/Lethal. Inclui calçados para Equipment-EX já presente na base; não instala mod de corpo. Comprar na Virtual Boutique feminina incluída na seleção. Meredith non_TF é alternativa para quem não usaEEX/TF; não sobrepor variantes. A autora alertou sobre roupas após2.5: observar resultado visual.\r\n\r\n## Corpo, dependências e variantes\r\n\r\nFemV com corpo padrão. Nenhum mod de corpo novo; Equipment-EX da base incluído para slots. Demais gêneros/refits não selecionados.\r\n\r\nAIO intacto com dez conjuntos principais. Equipamento para pés referenciaOutfitSlots.Feet; nossa base já usaEEX1.2.10. Não sobrepor Meredith nonTF ao principal. Auditoria de IDs encontrou11registros expandidos que não aparecem literalmente no script da boutique; consultar shop-item-audit.json antes de orientar obtenção desses extras.\r\n\r\nDependências selecionadas pelo pacote:\r\n- NightCoop + RED4ext 1.31.0: 0.1.2-beta [NightCoop].\r\n- ArchiveXL: v1.28.2 [ArchiveXL].\r\n- TweakXL: v1.12.0 [TweakXL].\r\n- redscript: v0.5.32 [redscript].\r\n- CET: v1.38.1 [CET].\r\n- Equipment-EX: 1.2.10 [mod-6945].\r\n- Nola · Virtual Boutique feminina: 7.6 [mod-5114].\r\n\r\nAs roupas declaramArchiveXL/TweakXL/RED4ext/redscript/CET. As lojas usamVirtualAtelier. Equipment-EX e as lojas são também conveniências da receita para a nossa base; uma loja não é dependência técnica da malha de roupa. Nenhuma atualização deRED4ext ou troca de corpo foi incorporada.\r\n\r\n## Compatibilidade e limites\r\n\r\nSem exigência declarada dePhantomLiberty ouREDmod. Os28textos .reds/.yaml/.xl destes sete componentes não apresentaram referênciasEP1 ativas. Classificação semDLC é estática, não ensaio de jogo. Não há estruturaREDmod nestes pacotes.\r\n\r\nAs roupas usam recursos/slots próprios; câmeraITP, poses, roupas sobrepostas e outros corpos podem revelar clipping. Não há evidência de código de rede nos quatro scripts de lojas. Isto não valida renderização nem sincronização coop. Alertas de2.5 ficam informativos no auditor: nenhum destes sete componentes usaBlockedReason. O comentário da autora sobre roupas na boutique5114 não prova falha universal de toda roupaNola.\r\n\r\nA APIevent.AddStore está presente noVirtualAtelier1.6.4 instalado, e os quatro métodos de registro de loja têm nomes distintos dos existentes. Não foi feita compilação ou execução dos scripts de loja nesta correção. A auditoria de instalação não verifica recursos internos dos .archive.\r\n\r\n## Arquivos e testes\r\n\r\nOrigem oficial: https://www.nexusmods.com/cyberpunk2077/mods/5093?tab=files&file_id=133097\r\nFormato tar; 23097622bytes; SHA256 26527b07f73441f335617423c3993fe13a04566c8169b8940bf53871e1c559bd. Hash calculado sobre o download oficial, sem alegar checksum externo quando não conferido.\r\n\r\n| Caminho relativo | Bytes | SHA256 |\r\n| --- | ---: | --- |\r\n| archive/pc/mod/nd_crop_sweater.xl | 141 | e0728fa67b5492e0fe6a991066c357a1df5f0b7982b034b0e137665192b06a65 |\r\n| archive/pc/mod/ND_crop_sweater_FemV.archive | 5378048 | b6222506561f6de1876ca144af654b318fdee18409e726b981ee558f5fa8da82 |\r\n| archive/pc/mod/nd_crop_turtleneck.xl | 131 | 2d0713319d547d71c6c17f94eefa63cb3898a45b23099384b353a7e72b386543 |\r\n| archive/pc/mod/ND_crop_turtleneck_FemV.archive | 2977792 | de6f0da56d3bc2299b6c3742fbfb367d8553a8ff83d0968c11095190199f14dc |\r\n| archive/pc/mod/ND_Eren_8ug8ear_boots_XL.archive | 491520 | ddfcb1a386957770e762e0bcc9805a617fc2c9c91a0adb3c1e81ffe1239510d2 |\r\n| archive/pc/mod/nd_eren_8ug8ear_boots_XL.xl | 166 | b3c53145828db6dc8af09c3e04860be0fb2e1b4dd9e3827251388618e8c638c9 |\r\n| archive/pc/mod/nd_hanako_crop_dress.xl | 151 | dac212e2fd95989ecf49c958b1c9420b790518ed94965dfb71a893ee68c54964 |\r\n| archive/pc/mod/ND_hanako_crop_dress_FemV.archive | 3801088 | 9fab8e725952d712431273e113808db86aa2f7b070030928b85188151b4a8c3e |\r\n| archive/pc/mod/ND_Hyst_chic_romper_bodysuit_FemV.archive | 3821568 | 5570fab304d2af1cc20ef47ceb32e66b49c952659b245c9309e9c02dd60de77f |\r\n| archive/pc/mod/nd_hyst_crb.xl | 117 | dcaeae35b2160337a993687404c7af74b73d33a3ee7f14458c4bc6b47db342e7 |\r\n| archive/pc/mod/ND_layered_dress_FemV.archive | 5582848 | 31826da6b1b951b56ffe1fa78773d73f5b0d372129c9bd68f7fb112e11c0ef7e |\r\n| archive/pc/mod/nd_layered_dress_XL.xl | 143 | 56ace14af048775385e4103cb9513ab1702937dddc180a8c8b7dc154d9dbd66a |\r\n| archive/pc/mod/ND_Meredith_heels_XL.archive | 1069056 | e30ecefcbc590119831299d397124af80ba17db0ca7a0ed621d25e8485e5f96e |\r\n| archive/pc/mod/nd_meredith_heels_XL.xl | 147 | f0f10a72b9c8aa661c31638d574cfd5db3be538214c2a12de86d1e36563588f7 |\r\n| archive/pc/mod/ND_mini_shorts_high_boots_FemV.archive | 2523136 | 792d61efc5354a5ecf3aca8395a8c6fdde29bf84e04e13a9e05687187b3382ee |\r\n| archive/pc/mod/nd_mini_top.xl | 117 | 5a5986f6cb4c508e3d5a707eecf40c42ce7b24bf34bee04eae8040b7d9a5e25a |\r\n| archive/pc/mod/ND_mini_top_FemV.archive | 1298432 | 1b6ba1549a53d1cf6b6f7449313ea5b33349693271fd17ca07886e41f326b738 |\r\n| archive/pc/mod/ND_ninja_boots_f_XL.archive | 356352 | 8da705bf73c216ef70556e863c7689bdea240a0f0f1aac24261833bc3426c716 |\r\n| archive/pc/mod/nd_ninja_boots_f_XL.xl | 143 | d839956fa40b16b3f30c3f2c14510b0da6dbe05ab333ae38ad5127b3f668613a |\r\n| archive/pc/mod/nd_shorts_boots_XL.xl | 141 | 4155fa3ae79eebe03873b4730ef3d098fe31e3c512b686b372265d7b83aeef46 |\r\n| r6/tweaks/nd_eren_8ug8ear_boots.yaml | 4652 | 5a848b8d1bf50710e23de7687c181f750f985a441e0538a35e341050990d55a0 |\r\n| r6/tweaks/nd_shorts_boots_XL.yaml | 20098 | 546d65b6f60354aa7bf0d3ef24212a52c8c35dd43f3633b78ac93277fe16c908 |\r\n| r6/tweaks/nola_dreamer/nd_crop_sweater.yaml | 1838 | 703ed72022e4860a57550c617cafd74efa15118c7f18e388a18be8bd6c65c8fa |\r\n| r6/tweaks/nola_dreamer/nd_crop_turtleneck.yaml | 1010 | eb4f95d6d6bbbbfb978b60e6c688518e39e77e3129f2417a323648a1f9f40951 |\r\n| r6/tweaks/nola_dreamer/nd_hanako_crop_dress.yaml | 1803 | df1e73aadd3825a178726b149facb1c0aebb507ad7596810c89a737e09e3a9bf |\r\n| r6/tweaks/nola_dreamer/nd_hyst_crb.yaml | 801 | b66abd7cf7ff22752b14f107269880f931469bf5bddb022ba66777285f48cbc7 |\r\n| r6/tweaks/nola_dreamer/nd_layered_dress_XL.yaml | 967 | 666d47e552a31d2169c96c77872a847d3f004e49a981a4efc2840745e31b925e |\r\n| r6/tweaks/nola_dreamer/nd_meredith_heels_XL.yaml | 12496 | 595bdc5553162bdc0f70f4bfd8bad3a506687dd3ac72f576a6ef9920c4e7682c |\r\n| r6/tweaks/nola_dreamer/nd_mini_top.yaml | 795 | d72ac22f3e026c4afadcd11ed9d8d654466b5779873708124fdfdb20da8aeb6a |\r\n| r6/tweaks/nola_dreamer/nd_ninja_boots_f_XL.yaml | 4834 | a21b389d598fd1af6c41319e13dfad3f09aef3ee729cd4d2257ecd5796d555ea |\r\n\r\nTeste dos sete componentes em conjunto:151verificações,44arquivos, monitor/importador reais, stagingRAR real, instalação e reversão emfixture; presença de todos os sete na tabela real do aplicativo. Abrir página ou importar arquivo não marcou o mod como instalado. Suíte geral:910verificações/24relatórios. Jogo real não alterado. ZIPs/RARs não são embutidos noEXE nem enviados aoGit.\r\n\r\nFontes: https://www.nexusmods.com/cyberpunk2077/mods/5093?tab=description ; https://www.nexusmods.com/cyberpunk2077/mods/5093?tab=files&file_id=133097 ; pacotes originais e scripts inspecionados. Fichas candidatas anteriores preservam as consultas de posts e suas datas.\r\n",
       "AuthorRequirements": [
         "Consultar ficha: dependências técnicas distinguem-se de loja/EEX incluídos por conveniência"
@@ -18818,13 +18701,13 @@
     },
     {
       "Id": "mod-12637",
-      "Name": "VOIDWEAR Virtual Atelier",
+      "Name": "VOIDWEAR Accessories Virtual Atelier",
       "FixedVersion": "0.85",
       "GameVersion": "2.5",
       "Category": "Complementos",
-      "Function": "Abra Atelier no computador do apartamento. A loja lista peças dos conjuntos instalados.",
+      "Function": "No computador: Net > Atelier > VOIDWEAR Accessories. As lojas Casual e Tacticool foram retiradas por escolha do usuário; suas roupas não são removidas por isso. A loja de acessórios permanece para os óculos.",
       "HowToUse": [
-        "Abra Atelier no computador do apartamento. A loja lista peças dos conjuntos instalados."
+        "Net > Atelier > VOIDWEAR Accessories"
       ],
       "Dependencies": [
         {
@@ -18842,13 +18725,13 @@
         "https://www.nexusmods.com/cyberpunk2077/mods/12637",
         "https://www.nexusmods.com/cyberpunk2077/mods/12637?tab=files&file_id=147075"
       ],
-      "CheckedOn": "2026-11-04",
+      "CheckedOn": "2026-11-06",
       "StaticInspection": true,
       "EvidenceGroup": "SHA256 publicado no Nexus e ZIP inspecionado",
       "CoopEvidence": "Sem teste específico em coop",
       "Blocked": false,
       "BlockedReason": "",
-      "DocumentationSummary": "# VOIDWEAR Virtual Atelier 0.85\r\n\r\nAbra Atelier no computador do apartamento. A loja lista peças dos conjuntos instalados.\r\n\r\nDependências: mod-2987, redscript.\r\nArquivo oficial conferido pelo SHA256. Sem requisito de expansão declarado. Inferência documental e estática. Sem teste específico no jogo ou em coop.\r\n\r\n[VOIDWEAR Virtual Atelier no Nexus](https://www.nexusmods.com/cyberpunk2077/mods/12637?tab=files&file_id=147075)",
+      "DocumentationSummary": "# VOIDWEAR Accessories Virtual Atelier0.85\n\nNo computador do apartamento: Net > Atelier > VOIDWEAR Accessories. A receita mantém o archive compartilhado da loja e `voidwear-accessories.reds`, necessários aos óculos VOIDWEAR Round Glasses. Dependências: Virtual Atelier1.6.4 e redscript0.5.32 existentes.\n\nPor pedido do usuário em06/11/2026, as lojas Casual e Tacticool foram excluídas da receita: `voidwear-casual.reds` e `voidwear-tacticool.reds` não serão instalados. O ZIP oficial continua o mesmo; apenas esses dois scripts são omitidos. Roupas compradas/instaladas separadamente não são apagadas por essa mudança. A remoção desses scripts já existentes no jogo aguarda o fechamento do jogo; nenhum archive compartilhado será apagado para remover apenas as duas lojas.\n\n[Arquivo oficial0.85](https://www.nexusmods.com/cyberpunk2077/mods/12637?tab=files&file_id=147075). Sem exigência declarada deDLC/REDmod. Conferência estática e ensaio de remoção/reversão em fixture; sem novo teste de loja em jogo.\n",
       "Files": [
         {
           "Asset": "a0",
@@ -18863,20 +18746,6 @@
           "Path": "r6/scripts/yellingintothevoid/voidwear-accessories.reds",
           "Size": 17609,
           "Sha256": "347462f8013f78f63e5c478aaef82af9aecbc4ceb8034924d820d7a25fc9d69e"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "r6/scripts/yellingintothevoid/voidwear-casual.reds",
-          "Path": "r6/scripts/yellingintothevoid/voidwear-casual.reds",
-          "Size": 24566,
-          "Sha256": "e2286db2f30732e66d0da0b644d3763f7b501aada75a4dadf9a80e0cf54cd226"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "r6/scripts/yellingintothevoid/voidwear-tacticool.reds",
-          "Path": "r6/scripts/yellingintothevoid/voidwear-tacticool.reds",
-          "Size": 22885,
-          "Sha256": "6a2b5b8d74478efcd7c71667aefacbf07b64adb1ae085fe4714637c3a773881c"
         }
       ],
       "Assets": [
@@ -19554,6 +19423,265 @@
         ],
         "Notes": "Sem requisito de expansão declarado. Inferência documental e estática."
       }
+    },
+    {
+      "Id": "mod-34403",
+      "Name": "Advanced Crash Reporter",
+      "FixedVersion": "1.5.0",
+      "GameVersion": "2.5",
+      "Category": "Núcleo e dependências",
+      "Function": "Diagnóstico de crashes/travamentos; não evita crashes.",
+      "HowToUse": [
+        "Inicie o jogo normalmente.",
+        "Depois de um crash, use Open report ou reports/watch."
+      ],
+      "Dependencies": [
+        {
+          "Id": "CET",
+          "FixedVersion": "v1.38.1",
+          "Name": "Cyber Engine Tweaks"
+        }
+      ],
+      "Sources": [
+        "https://www.nexusmods.com/cyberpunk2077/mods/34403?tab=description",
+        "https://www.nexusmods.com/cyberpunk2077/mods/34403?tab=files&file_id=168418"
+      ],
+      "CheckedOn": "2026-11-06",
+      "StaticInspection": true,
+      "EvidenceGroup": "ZIP oficial e26arquivos SHA256; instalação/remoção em fixture sem executar o pacote.",
+      "CoopEvidence": "Compatibilidade declarada pelo autor; sem novo teste específico em coop.",
+      "Blocked": false,
+      "BlockedReason": "",
+      "DocumentationSummary": "# Advanced Crash Reporter 1.5.0\n\nMod 34403, arquivo oficial 168418. Diagnóstico local de crashes e travamentos; substitui o diálogo de falha por um resumo e registra pilhas, módulos, inventário de mods e trechos de logs. Não corrige crashes nem comprova sozinho qual mod causou o problema.\n\n## Uso\n\nDepois de instalado, inicie o jogo normalmente. Não há tecla, login ou configuração inicial. Depois de um crash, use Open report no diálogo ou abra `bin/x64/plugins/AdvancedCrashReporter/reports/`. Em travamentos, os snapshots ficam em `reports/watch/`. Comece pelo Summary; um nome na pilha é indício, não prova. Configurações em `bin/x64/plugins/AdvancedCrashReporter/config.ini`; `[dialog] enabled=0` volta ao diálogo original. O relatório está em inglês; a janela acompanha o idioma do Windows.\n\n## Requisitos e compatibilidade\n\nA página lista somente Cyber Engine Tweaks. O pacote usa ASI, carregado pelo suporte já presente no CET. O autor declara compatibilidade com patches2.31/2.5 e com outros mods. Não exige corpo, roupa, REDmod ou Phantom Liberty. Nosso catálogo depende de CET1.38.1 existente, sem atualizar RED4ext1.31.0 ou qualquer framework. Essa é uma conclusão documental/estática; ainda não foi provocado um crash no jogo real nem feito teste específico de coop.\n\n## Pacote e privacidade\n\nZIP oficial4088118bytes, SHA256 `23d7bb242b61ec756c78af458a16a32f14a83149ecfbe8ab9404bde0c6980828`, igual ao hash do link VirusTotal apresentado pelo Nexus.26arquivos somam4995357bytes: CrashReporter.exe, AdvancedCrashReporter.asi, config.ini e tabelas/licenças de nomes para diagnóstico. Arquivos `.bin` com nomes de RED4ext/CET/ArchiveXL etc. são tabelas de símbolos, não atualizações desses frameworks. Nenhum código do pacote foi executado na validação; o ensaio copiou/conferiu os26arquivos e desfez a instalação numa fixture.\n\nSegundo o autor, não há envio de relatórios; eles permanecem no PC. Contêm inventário de mods, logs e contexto técnico: revise antes de compartilhar. O Mod Loader não deve exportar reports/watch/logs junto com um modpack. O config.ini original fica fixado na receita; alterações locais provocam revisão, em vez de sobrescrita silenciosa. MO2 com sistema de arquivos virtual pode ser incompatível. Mods archive e Lua não aparecem diretamente na pilha; o inventário e os logs ajudam na investigação.\n\n[Descrição oficial](https://www.nexusmods.com/cyberpunk2077/mods/34403?tab=description) · [Arquivo1.5.0](https://www.nexusmods.com/cyberpunk2077/mods/34403?tab=files&file_id=168418).\n\nSituação local nesta entrega: baixado e integrado; instalação no jogo aguarda seu fechamento. Não confundir ensaio de arquivos com execução no jogo.\n",
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/CrashReporter.exe",
+          "Path": "bin/x64/CrashReporter.exe",
+          "Size": 383488,
+          "Sha256": "a526123365c1892a9d431eb7edf6ee676c9348f48886cba0d1b6d07d98ecd3f1",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter.asi",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter.asi",
+          "Size": 1389056,
+          "Sha256": "a789a4256dad3460976c45a0ed6e439a14686966097fbef7373b8726f4ac1132",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/config.ini",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/config.ini",
+          "Size": 4005,
+          "Sha256": "b79a15da83d5a6c6efd267481042cf71b2c20ee3f01bdbd0c90f4a7477be57b9",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/engine-names-LICENSE.txt",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/engine-names-LICENSE.txt",
+          "Size": 1219,
+          "Sha256": "105fc8cc600a73b7c5fa709679b19252bae229a91525ecfd9491524504e994fc",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/engine-names.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/engine-names.bin",
+          "Size": 1875073,
+          "Sha256": "6af0215422ace141b92a123b24926e423c7a8e7ff18358b75812132d723dee5d",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/AdvancedCrashReporter-0B1A4671ECFE4373B5C37FA1BB6618841F.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/AdvancedCrashReporter-0B1A4671ECFE4373B5C37FA1BB6618841F.bin",
+          "Size": 103282,
+          "Sha256": "39af530fa1e488985bfe83b2e54257dfe272d3a166a5297a566187e41c164603",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/ArchiveXL-58DD33B31CF545FB97A1EE37C05E373A5.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/ArchiveXL-58DD33B31CF545FB97A1EE37C05E373A5.bin",
+          "Size": 128633,
+          "Sha256": "034565b7355d6abdc13a055ccc37e16874b5c8c3dd2a90f9ad32117495466f81",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/ArchiveXL-713A7EC91DDA4BC8B59B15478CB129D98.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/ArchiveXL-713A7EC91DDA4BC8B59B15478CB129D98.bin",
+          "Size": 128748,
+          "Sha256": "a2d127fcaf7b017982859e93a6723aee66983510f2eea5e1c9f002a1a9c0b1c0",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/ArchiveXL-LICENSE.txt",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/ArchiveXL-LICENSE.txt",
+          "Size": 1236,
+          "Sha256": "120c35e918c0fa90d1fbab0aed086bea3227de8c7c0be24f2f09db5c59babc7e",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/Codeware-3EC6A6A75BA24EA5AD63477E26DD026217.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/Codeware-3EC6A6A75BA24EA5AD63477E26DD026217.bin",
+          "Size": 141597,
+          "Sha256": "371ea339b55d7548cf99000dfb977da12a84e8c90db879d409b8910e06859b17",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/Codeware-3EC6A6A75BA24EA5AD63477E26DD0262F.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/Codeware-3EC6A6A75BA24EA5AD63477E26DD0262F.bin",
+          "Size": 141394,
+          "Sha256": "9c93bfefc0cc0d6ea8f62f7d82b7cdcf77bfe921026f7bea972fa2b805038938",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/Codeware-LICENSE.txt",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/Codeware-LICENSE.txt",
+          "Size": 1232,
+          "Sha256": "3db804a3e2c30535c4ef20587ff2ce2cdcbeec5c368e7223ebc68c94952be62d",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/cyber_engine_tweaks-5AD790DA0CD54A488C35B7C54361E23B1.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/cyber_engine_tweaks-5AD790DA0CD54A488C35B7C54361E23B1.bin",
+          "Size": 243005,
+          "Sha256": "0b54878b5fa0e6f42bdabe6c5643f41a654d0612cca228f1c31b923c03f14449",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/cyber_engine_tweaks-LICENSE.txt",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/cyber_engine_tweaks-LICENSE.txt",
+          "Size": 1253,
+          "Sha256": "55f34beab62de03c37f3bbfbb39be50454794272b6992be11a9058ed0a00417e",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX-LICENSE.txt",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX-LICENSE.txt",
+          "Size": 1806,
+          "Sha256": "f8963e1a6f7ac76786a9397329a62689724a89b36a70bcd56c7c0b82719b8455",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX3CharacterKinematic_x64-7190D57A02214A2CA342EC37E0BA466E6F.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX3CharacterKinematic_x64-7190D57A02214A2CA342EC37E0BA466E6F.bin",
+          "Size": 9072,
+          "Sha256": "0ccf7d99a2ebb8f91d4f873c267760db8a94723d7be72cdf13d6dc515ec75d89",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX3Common_x64-7D5E7B200D4B4F668BD0D75CF84DA41371.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX3Common_x64-7D5E7B200D4B4F668BD0D75CF84DA41371.bin",
+          "Size": 17902,
+          "Sha256": "0c9b3f9e48cca1637edb7e5bc19f3a558e1e778eec4f8928a5d6414c2a239ea9",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX3Cooking_x64-52ADC9051DD14B839D297B15D300BF9E7A.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX3Cooking_x64-52ADC9051DD14B839D297B15D300BF9E7A.bin",
+          "Size": 10020,
+          "Sha256": "ca497e9efb673ac6177cb222be38602392d686037d9d2f5851f2b4a0afd173f6",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX3_x64-3FD8953FEE6E49AC871D5A511CA7A67F60.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/PhysX3_x64-3FD8953FEE6E49AC871D5A511CA7A67F60.bin",
+          "Size": 37192,
+          "Sha256": "52da3af1c5c9030461b55ba23e662ac1f5df5710db888936e62dfd8f7f3ce191",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/PxFoundation_x64-AC1A0926814D45159DCA8FB8426400B82.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/PxFoundation_x64-AC1A0926814D45159DCA8FB8426400B82.bin",
+          "Size": 10912,
+          "Sha256": "d1fa2633f3d61db0c94c7e805cb3020500eb7016763a5ca3038b51ffc5a2d421",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/RED4ext-26FF6D6A3EDD449DBBFDF45407100EB41.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/RED4ext-26FF6D6A3EDD449DBBFDF45407100EB41.bin",
+          "Size": 85425,
+          "Sha256": "cfe023d5ac19341bb71433a9918cddb56afc7fdb0861c12e4de36f0cc4a32c50",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/RED4ext-BB92AC39116C4CFA94295945061510251.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/RED4ext-BB92AC39116C4CFA94295945061510251.bin",
+          "Size": 85423,
+          "Sha256": "3c546b7b7d5e74037346301c56fb1a32cd83d8380a83a77b8c6a9e03877686c9",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/RED4ext-LICENSE.txt",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/RED4ext-LICENSE.txt",
+          "Size": 1231,
+          "Sha256": "3b9bf3d4f4315f890c886ac7ae207dbe5833c1e38b65b8d5079359bf86871e1a",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/TweakXL-DAA70F1B2B794E8093E66D6CA708DA9F1.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/TweakXL-DAA70F1B2B794E8093E66D6CA708DA9F1.bin",
+          "Size": 96052,
+          "Sha256": "e9a00a0d67d6e2ab246be6644aa44746c769d1bd62531b97de7a8c3f05de192a",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/TweakXL-E0D2E52B2DF843D3A1D2D3ECC469CF7F1.bin",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/TweakXL-E0D2E52B2DF843D3A1D2D3ECC469CF7F1.bin",
+          "Size": 95871,
+          "Sha256": "d0f90a29b8e3bacf7a141ed5b2a1b2dade965aa6af3f8c236afd112128229115",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/AdvancedCrashReporter/module-names/TweakXL-LICENSE.txt",
+          "Path": "bin/x64/plugins/AdvancedCrashReporter/module-names/TweakXL-LICENSE.txt",
+          "Size": 1230,
+          "Sha256": "55dc9d697bfe07ca9673c4073aa26f55d7b9746e6de1438b5db9b4ff7b7c66fa",
+          "UserData": false
+        }
+      ],
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Advanced Crash Reporter 34403 1.5.0 2026-10-25T16-13Z mPgaPVVMK.zip",
+          "Size": 4088118,
+          "Sha256": "23d7bb242b61ec756c78af458a16a32f14a83149ecfbe8ab9404bde0c6980828",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/34403?tab=files&file_id=168418",
+          "ModId": 34403,
+          "FileId": 168418
+        }
+      ],
+      "PhantomLiberty": {
+        "Status": "not-required",
+        "Sources": [
+          "https://www.nexusmods.com/cyberpunk2077/mods/34403?tab=files&file_id=168418"
+        ],
+        "Notes": "Utilitário diagnóstico sem conteúdo da expansão."
+      }
     }
   ],
   "ArchiveReader": {
@@ -19578,6 +19706,15 @@
       "RemovedOn": "2026-11-05",
       "Name": "Night City FPV",
       "SummaryFile": "Mods/mod-31642.md"
+    },
+    {
+      "Id": "mod-12572",
+      "Name": "Nola Stockings Collection",
+      "Version": "1.5",
+      "InstallerVersion": "1.1.19",
+      "RemovedOn": "2026-11-06",
+      "Reason": "Retirado do catálogo a pedido do usuário; remoção física local aguarda jogo fechado. Fishnet7822 permanece.",
+      "SummaryFile": "Mods/mod-12572.md"
     }
   ]
 }

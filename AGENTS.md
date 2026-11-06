@@ -23,7 +23,18 @@
 - Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
   autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
 
-## Revisão atual 1.1.18 — Projetos completo e duplicação editável — 06/11/2026
+## Revisão atual1.1.19 — convites, projeto parcial e catálogo —06/11/2026
+
+- Preparar convite automaticamente ao abrir foi escolha explícita do usuário. Reusar Syncthing2.1.7 e convite/resposta existentes; não inventar URL ou trocar transporte. Campos uma linha/48px, copy interno44px recuado da borda. Projeto sem itens pode receber sem gerar ZIP. Manter ZIP compactado: a queixa de compactação anterior era sobre largura do botão Projetos.
+- Manifesto opcional Project contém definição completa sanitizada; List/Files só payload instalado verificado. Itens nunca instalados são opcionais, sem pop-up de porcentagem. Recibos incompletos/alterados e dependências ausentes continuam bloqueados. Receptor só vincula recibos aos itens de List, jamais aos ausentes de Project. Preservar todos os links públicos, variantes/presets/nomes; não exportar caminhos privados/credenciais. Fonte só local vira installed://, sem inventar URL.
+- Barra inferior por quantidade de mods do preset, sem depender de pesquisa/checks: disponíveis verdes, ausentes por categoria/cor estável e tooltip. Pular/processar não é baixar; testes da fila agora exigem50% quando só um de dois itens terminou íntegro. Paleta em memória reaproveitada, sem persistir cache pesado.
+- Advanced Crash Reporter34403/1684181.5.0:26arquivos, ZIP4088118B/SHA23d7bb242b61ec756c78af458a16a32f14a83149ecfbe8ab9404bde0c6980828; CET existente, sem REDmod/DLC ou atualizaçãoRED4ext. Símbolos .bin não são atualizações dos frameworks. Documental/estático e fixture, sem executar o pacote nem confirmar crash/coop real.
+- Usuário pediu retirar Stockings Collection12572 e VOIDWEAR Casual/Tacticool. Catálogo remove12572 e omite somente os dois scripts de loja em12637; Accessories/arquivo compartilhado/óculos15702/Fishnet7822/TogglableFeet preservados. Migração aposenta a identidade conhecida12572, sem banir import custom explícito.
+- Jogo/Mod Loader reais continuaram abertos; usuário escolheu seguir sem testes dependentes de fechá-los. Remoção física dos cinco arquivos e instalação local do reporter NÃO aplicadas. Plano privado Auditoria/Remocoes-e-reporter-20261106/plano-remocao.json, cinco hashes iguais aos esperados; reconferir guarda e hashes antes de aplicar. Não encerrar processos à força nem alegar removido/instalado no jogo.
+- Ensaios focados, transferência real em loopback, cópia/reversão de26arquivos e remoção cirúrgica em fixture, Setup24checks; limites em Conhecimento/Validacoes/1.1.19.json. Suíte geral parou na guarda de jogo aberto, sem relaxá-la. Source-only cache de teste usa OtherLoaderProbe existente apenas no self-test isolado.
+- Relato G3 privado de campo com ação interna no fallback docs/relatos-g3-design/; não publicar nem alterar a skill central. Setup/release/commit main autorizados. Pedido antigo de desligamento já cumprido; NÃO desligar novamente sem novo pedido.
+
+## Revisão 1.1.18 — Projetos completo e duplicação editável — 06/11/2026
 
 - GeneralButton.GetPreferredSize inclui texto+52px de ícone/recuos usados em OnPaint. Sem largura fixa por tela ou abreviar Projetos/Projects. Apenas ícone/apenas texto preservados. Baseline103px/texto61px/área51px; depois113px PT/112px EN, três temas e clientes1000/1240.
 - Menu de projetos oferece Duplicar projeto em padrão e pessoal. Nome próprio/ID novo/TemplateId nulo, abre a cópia diretamente. Preservar lista completa, categorias, descrições, tags/NSFW, fontes, variantes, presets e escolhas, pasta de destino e referências de downloads. Originais/padrões não são modificados; cópia pessoal pode editar presets originalmente protegidos.
