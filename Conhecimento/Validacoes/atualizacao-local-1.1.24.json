@@ -1,0 +1,24 @@
+{
+  "Version": "1.1.24",
+  "InstalledVersion": "1.1.24.0",
+  "InstalledSha256": "43f7e564ba5e11a01dae0fa1588ef6430946ea41886ce734fa44a8c88cbe063e",
+  "ConfigurationFilesPreserved": 4,
+  "SetupExit": 0,
+  "GameFilesModified": false,
+  "PreviousInstance": {
+    "Version": "1.1.23",
+    "WindowAlreadyClosed": true,
+    "GracefulCloseSucceeded": false,
+    "TerminationExplicitlyAuthorized": true,
+    "CauseOfLingeringProcess": "unknown"
+  },
+  "RecentLocalDiagnostics": {
+    "ScannedMods": 139,
+    "AllScannedModsCorrect": true,
+    "InstallFailureEventsFound": 0,
+    "Scope": "latest local diagnostic sessions only",
+    "FriendComputerInspected": false
+  },
+  "PrivateEvidence": "Auditoria/Atualizacao-local-1.1.24/",
+  "OriginalProgramBackupPreserved": true
+}
