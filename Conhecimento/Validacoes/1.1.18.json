@@ -250,5 +250,18 @@
     "Projects label regression failed before the measurement fix and passed afterward.",
     "Menu test expectations were updated for the added Duplicate action.",
     "Clone dialog initially compressed the input after adding explanatory text; final layout reserves its input row and passed the geometry check."
-  ]
+  ],
+  "SourceCommit": "b77a9fb4933e3c5d82f3a311cfd6ee8e3924d7a7",
+  "PublishedRelease": {
+    "AnonymousRequest": true,
+    "UsedPublished117Checker": true,
+    "AvailableToVersion117": "1.1.18",
+    "Version118DoesNotNotifyItself": true,
+    "ReleasePage": "https://github.com/IINasK/mod-loader/releases/tag/v1.1.18",
+    "DownloadUrl": "https://github.com/IINasK/mod-loader/releases/download/v1.1.18/Mod-Loader-1.1.18.exe",
+    "DownloadBytes": 5395786,
+    "DownloadedSha256": "3BB4F807138C951E374204B9D3DA4B260863BCC1C540704FA658BD16214F3679",
+    "DownloadedExecutableWasRun": false,
+    "TempDownloadRemoved": true
+  }
 }
