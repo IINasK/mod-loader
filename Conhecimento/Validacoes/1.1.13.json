@@ -26,5 +26,19 @@
   "RealGameTouched": false,
   "FullGeneralSuiteRepeated": false,
   "PreviousFullGeneralVersion": "1.1.12",
-  "DeletionScope": "Saved-project index only. Game files, installed mods and project data preserved."
+  "DeletionScope": "Saved-project index only. Game files, installed mods and project data preserved.",
+  "SourceCommit": "ced00b2c34ca0729b370beda031af3c82b42adcd",
+  "PublishedRelease": {
+    "AnonymousRequest": true,
+    "Runtime": "Windows PowerShell 5.1 / .NET Framework",
+    "UsedPublished112Checker": true,
+    "AvailableToVersion112": "1.1.13",
+    "Version113DoesNotNotifyItself": true,
+    "ReleasePage": "https://github.com/IINasK/mod-loader/releases/tag/v1.1.13",
+    "DownloadUrl": "https://github.com/IINasK/mod-loader/releases/download/v1.1.13/Mod-Loader-1.1.13.exe",
+    "DownloadBytes": 7447040,
+    "DownloadedSha256": "A8D05F82B726B9DAE0EC2632870B684ACD4234D5752F212BE0E6306B1B755905",
+    "DownloadedExecutableWasRun": false,
+    "TempDownloadRemoved": true
+  }
 }
