@@ -16,6 +16,10 @@
   para parent espalha fixtures e relatorios fora do projeto.
 - Destinos externos exigem pedido explicito do usuario para aquele destino;
   respeitar a instrucao especifica de relatos G3 quando aplicavel.
+- Arquivo historico da raiz D: movido por pedido do usuario em 05/11/2026
+  para Auditoria/Raiz-D-2026-11-05/: 92 pastas, 59172 arquivos, SHA256
+  conferido antes/depois. caminhos.csv relaciona origens e destinos;
+  integridade-sha256.csv e resultado.json preservam a prova da verificacao.
 - Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
   autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
 
