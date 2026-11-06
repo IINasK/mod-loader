@@ -129,5 +129,19 @@
     "T112b: teste encerrava seu message loop antes de completar await; volta real passou a ser exercitada pela Home com Application.Run."
   ],
   "G3Report": "docs/relatos-g3-design/2026-11-05-mod-loader-selecao-retangular.md",
-  "G3CentralInboxWrite": "Denied; local fallback, not published."
+  "G3CentralInboxWrite": "Denied; local fallback, not published.",
+  "SourceCommit": "a2eb137bb8be70fce27d0dd22eae98be7da68a28",
+  "PublishedRelease": {
+    "AnonymousRequest": true,
+    "Runtime": "Windows PowerShell 5.1 / .NET Framework",
+    "UsedPublished111Checker": true,
+    "AvailableToVersion111": "1.1.12",
+    "Version112DoesNotNotifyItself": true,
+    "ReleasePage": "https://github.com/IINasK/mod-loader/releases/tag/v1.1.12",
+    "DownloadUrl": "https://github.com/IINasK/mod-loader/releases/download/v1.1.12/Mod-Loader-1.1.12.exe",
+    "DownloadBytes": 7437312,
+    "DownloadedSha256": "D5730703E1C8F59A2D7FEF2F24397C4AC4875549EAA7D10DE8352FA8A87175BF",
+    "DownloadedExecutableWasRun": false,
+    "TempDownloadRemoved": true
+  }
 }
