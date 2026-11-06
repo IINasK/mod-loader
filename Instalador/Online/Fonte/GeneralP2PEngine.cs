@@ -15,6 +15,7 @@ internal sealed class P2PInvite {
     public int Schema=1;
     public string Kind, Device, Folder, ManifestHash, Name, Mode;
     public long Size;
+    public bool Deferred;
     internal string Encode(){Validate();return "ML-P2P1:"+Convert.ToBase64String(Encoding.UTF8.GetBytes(Safe.Json.Serialize(this)));}
     internal static P2PInvite Decode(string code){
         try{
@@ -25,7 +26,8 @@ internal sealed class P2PInvite {
     }
     internal void Validate(){
         if(Mode!=null&&Mode!="installed-zip")throw new IOException("Formato de compartilhamento desconhecido.");
-        if(Mode=="installed-zip"&&(Size<=0||Size>P2PPack.MaxTotal))throw new IOException("Tamanho de pacote instalado inválido.");
+        if(Deferred&&(Mode!="installed-zip"||Size!=0))throw new IOException("Convite antecipado inválido.");
+        if(Mode=="installed-zip"&&!Deferred&&(Size<=0||Size>P2PPack.MaxTotal))throw new IOException("Tamanho de pacote instalado inválido.");
         if(Schema!=1||(Kind!="offer"&&Kind!="accept")||!DeviceValid(Device)||Folder==null||!Regex.IsMatch(Folder,"\\Aml-[a-f0-9]{32}\\z")||!P2PPack.HashValid(ManifestHash)||String.IsNullOrWhiteSpace(Name)||Name.Length>300||Name.Any(Char.IsControl))throw new IOException("Convite P2P inválido.");
     }
     internal static bool DeviceValid(string device){return device!=null&&Regex.IsMatch(device,"\\A[A-Z2-7]{7}(?:-[A-Z2-7]{7}){7}\\z");}

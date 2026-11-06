@@ -1,0 +1,73 @@
+{
+  "Version": "1.1.28",
+  "Reports": [
+    {
+      "Report": "resultado-p2p-deferred.json",
+      "Passed": true,
+      "Checks": 17,
+      "Evidence": "T/R128/online-testes-ddfadf32e2884ef4a9f568f7f460c69d/resultado-p2p-deferred.json"
+    },
+    {
+      "Report": "resultado-snapshot-p2p.json",
+      "Passed": true,
+      "Checks": 42,
+      "Evidence": "T/R128/sp-e1a3a5/resultado-snapshot-p2p.json"
+    },
+    {
+      "Report": "resultado-p2p.json",
+      "Passed": true,
+      "Checks": 47,
+      "Evidence": "T/R128/online-testes-45761574ef654cc3800b8987682e9273/resultado-p2p.json"
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Passed": true,
+      "Checks": 122,
+      "Evidence": "T/R128/online-testes-75a16f2885d041cb87dd05a78a466143/resultado-p2p-ui.json"
+    },
+    {
+      "Report": "resultado-version-choice.json",
+      "Passed": true,
+      "Checks": 51,
+      "Evidence": "T/R128/online-testes-25b6ce941c0e427aaaff1a8edabeed8c/resultado-version-choice.json"
+    },
+    {
+      "Report": "resultado-updates.json",
+      "Passed": true,
+      "Checks": 30,
+      "Evidence": "T/R128/online-testes-7342398eb97847d0b5fb093fafdd549b/resultado-updates.json"
+    },
+    {
+      "Report": "resultado-automatic-update.json",
+      "Passed": true,
+      "Checks": 25,
+      "Evidence": "T/R128/online-testes-ea2f2ffae21e46f8a5aed7a38b80d9da/resultado-automatic-update.json"
+    },
+    {
+      "Report": "resultado-setup.json",
+      "Passed": true,
+      "Checks": 24,
+      "Evidence": "T/setup-60772ab2855e4d598950f13cd5f3203d/resultado-setup.json"
+    }
+  ],
+  "AppSha256": "1f25e41c753aa9a20353fc561aaa78b816b6b0cdd49ecd32a6cf5bee3e21811e",
+  "SetupSha256": "345c0cc36ece0da7465ae43a85dd994c60c9896d8c320a55ccc8d32882f8d0e3",
+  "CatalogSha256": "c6a0b3a6170e10c8d707c4d25361d30be7382bccb9a25dd8a50d27c956e2e6a2",
+  "ActualSourceReadOnlyInspection": {
+    "SelectedMods": 140,
+    "InstalledBytes": 6211971722,
+    "Mutated": false
+  },
+  "Compatibility": "Deferred invitations require both peers 1.1.28 or newer. Legacy installed-ZIP invitations remain accepted.",
+  "Limitations": [
+    "Network tests used independent official peers on loopback, not two remote computers.",
+    "Interactive native-window inspection could not focus the app; offscreen application dialog tests verified invitation and copy.",
+    "Source game, mods and saves were not modified."
+  ],
+  "ObservedAndFixedFailures": [
+    "Deferred receiver removed transport before sender observed completed delivery. Receiver now advertises its received index until sender unshares; disconnected/unknown is not acknowledgment.",
+    "Legacy configuration transfer reproduced the same early-cleanup race; shared completion logic now uses ordered cleanup for old and new installed ZIPs.",
+    "Cleanup helper restart raced with manual session removal in a fixture; serialized owned helper changes."
+  ],
+  "PrivateEvidenceOnly": true
+}

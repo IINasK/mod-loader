@@ -150,7 +150,7 @@ internal static class InstalledSnapshotP2PTests {
                 host.Shown+=async(s,e)=>{
                     try{
                         foreach(var form in new[]{sending,receiving}){form.ShowInTaskbar=false;form.StartPosition=FormStartPosition.Manual;form.Location=new System.Drawing.Point(-30000,-30000);form.Show(host);}
-                        phase("automatic preparation");await UIWait(()=>sending.Content.Controls.Find("p2p-output",true).Single().Text.Length>0,"Conectar não gerou convite na UI.");
+                        phase("automatic preparation");await UIWait(()=>sending.Content.Controls.Find("p2p-output",true).Single().Text.StartsWith("ML-P2P1:",StringComparison.Ordinal)&&((Button)sending.Content.Controls.Find("p2p-copy",true).Single()).Enabled,"Conectar não gerou convite na UI.");
                         string offer=sending.Content.Controls.Find("p2p-output",true).Single().Text;Check(checks,P2PInvite.Decode(offer).Kind=="offer","Opening the sender dialog prepares the ZIP and invitation without clicking Connect.");
                         phase("receiver connect");receiving.Content.Controls.Find("p2p-input",true).Single().Text=offer;
                         using(var confirm=new System.Windows.Forms.Timer{Interval=25}){

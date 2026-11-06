@@ -702,6 +702,7 @@ static class OnlineProgram {
         if(args.Length==2&&args[0]=="--preview-p2p"){GeneralP2PUiTests.Preview(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-no-copy"){GeneralModWindow.RunNoCopyTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-storage"){GeneralModWindow.RunStorageTests(args[1]);return 0;}
+        if(args.Length==3&&args[0]=="--self-test-p2p-deferred"){GeneralP2PDeferredTests.Run(args[1],args[2]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-versions"){ModVersionChoiceTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-updates"){GeneralUpdatesTests.Run(args[1]);GeneralAutomaticUpdateTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-paths"){GeneralAppPathsTests.Run(args[1]);return 0;}

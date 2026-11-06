@@ -1,4 +1,4 @@
-# Cyberpunk 2077 — pacote coop
+﻿# Cyberpunk 2077 — pacote coop
 
 ## Regra prioritaria: arquivos de desenvolvimento dentro do projeto
 
@@ -22,6 +22,14 @@
   integridade-sha256.csv e resultado.json preservam a prova da verificacao.
 - Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
   autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
+
+## Revisão 1.1.28 — convite antes de preparar o ZIP
+
+- Abrir P2P inicia conexão e preenche convite real antes de Inspect/Create; ícone apenas Clipboard.SetText do campo. Não atrelar teste a Text.Length: texto de progresso não é convite copiável. Falha preserva convite válido e mostra diagnóstico. Projeto vazio só recebe. Não criar URL fictícia.
+- Deferred usa capacidade aleatória32bytes, ready.json com hash/tamanho e HMAC-SHA256 vinculado à sessão. Convite/resposta estáveis; seleção/hash persistidos. Somente ZIP final e ready são sincronizados; .part ignorado. Ambos1.1.28+ nos novos links; antigos continuam aceitos. Nunca publicar convites/segredos/certificados.
+- Corrigida corrida de limpeza: receptor instalado mantém índice até remetente observar100% e unshare. unknown/offline não confirmam; retomada inclui limpeza pendente. Alteração de helper/removal serializada. Os testes reproduziram a falha também no formato legado; correção compartilhada, não ignorar falha nem aumentar timeout para ocultar.
+- Fonte real inspecionada somente leitura:140itens/6211971722bytes, nenhuma sessão/ZIP real criado por essa inspeção. Jogo/RED4ext/saves/catálogo intactos. Fixtures e evidências privadas T/R128; resultados/limites sanitizados em Conhecimento/Validacoes/1.1.28.json. Não alegar transferência remota entre PCs testada.
+- Relato G3 reutilizável registrado na entrada central autorizada em06/11/2026: estado copiável antes do trabalho pesado. Causa no adaptador local; não editar SKILL central nem publicar o relato privado.
 
 ## Revisão 1.1.27 — decisão antes de trocar versões
 

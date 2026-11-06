@@ -67,6 +67,7 @@ $extensions += '/resource:'+(Join-Path $PSScriptRoot 'Assets\Lucide-LICENSE.txt'
 $extensions += Join-Path $PSScriptRoot 'GeneralFloatingTests.cs'
 $extensions += '/resource:'+(Join-Path $PSScriptRoot 'Assets\Jost-OFL.txt')+',ModLoader.Jost-OFL.txt'
 $extensions += @('GeneralRedesignTests.cs','GeneralScroll.cs','GeneralActionsMenu.cs','GeneralTableFilters.cs','GeneralTableDialogs.cs','GeneralTableDialogTests.cs','GeneralCategoryDeleteTests.cs','OnlineStorageTests.cs','OnlineStorageMaintenance.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
+$extensions += @('GeneralP2PDeferred.cs','GeneralP2PDeferredTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += @('GeneralP2PPack.cs','GeneralP2PEngine.cs','GeneralP2PService.cs','GeneralP2PDialog.cs','GeneralP2PTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += Join-Path $PSScriptRoot 'GeneralP2PUiTests.cs'
 $extensions += @('InstalledSnapshot.cs','InstalledSnapshotProject.cs','GeneralPackCoverage.cs','InstalledSnapshotConfig.cs','InstalledSnapshotOwnership.cs','InstalledSnapshotInstaller.cs','InstalledSnapshotTests.cs','InstalledSnapshotInstallerTests.cs','InstalledSnapshotP2PTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}

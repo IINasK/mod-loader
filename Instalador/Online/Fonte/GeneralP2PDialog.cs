@@ -52,15 +52,12 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         selected=service.Sessions.LastOrDefault(s=>!s.Completed)??service.Sessions.LastOrDefault(s=>!s.Sender&&s.Completed&&!s.ListImported);
         FormClosing+=(s,e)=>{if(busy){e.Cancel=true;status.Text=T("Aguarde a preparação terminar.","Wait for preparation to finish.");}};FormClosed+=(s,e)=>timer.Stop();Disposed+=(s,e)=>{timer.Dispose();tips.Dispose();};
         GeneralStyle.Apply(this,GeneralStyle.Dark);status.Text=T("O link de envio é preparado automaticamente. Para receber, cole o convite do amigo e clique em Conectar.","The send link is prepared automatically. To receive, paste your friend's invitation and click Connect.");UpdateActions();
-        output.HandleCreated+=(s,e)=>SendMessage(output.Handle,0x1501,(IntPtr)1,T("Preparando convite automaticamente…","Preparing invitation automatically…"));
-        if(autoStart)Shown+=(s,e)=>Run(PrepareLink,false);
+        if(autoStart){output.Text=T("Iniciando conexão…","Starting connection…");Shown+=(s,e)=>Run(PrepareLink,false);}
     }
-    [System.Runtime.InteropServices.DllImport("user32.dll",CharSet=System.Runtime.InteropServices.CharSet.Unicode)]
-    static extern IntPtr SendMessage(IntPtr handle,int message,IntPtr wParam,string text);
     static Label Heading(string text){return new Label{Text=text,Dock=DockStyle.Fill,Font=GeneralStyle.Font(11),Margin=Padding.Empty};}
     static GeneralSurface Field(Control control){var field=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(14,9,14,9),Margin=new Padding(0,0,0,8)};field.Controls.Add(control);return field;}
     void Report(string text){if(!IsDisposed&&IsHandleCreated)BeginInvoke((Action)(()=>{if(!IsDisposed)status.Text=text;}));}
-    async void Run(Func<Task> action,bool showReview=true){if(busy)return;busy=true;UpdateActions();try{while(polling)await Task.Delay(40);await action();}catch(InstalledSnapshotReviewException ex){output.Clear();status.Text=ex.Message;if(showReview)GeneralDialog.Message(this,ex.Message,T("Conferência dos mods","Mod verification"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}catch(Exception ex){status.Text=T("Falha: ","Failed: ")+ex.Message;}finally{busy=false;if(!IsDisposed)UpdateActions();}}
+    async void Run(Func<Task> action,bool showReview=true){if(busy)return;busy=true;UpdateActions();try{while(polling)await Task.Delay(40);await action();}catch(InstalledSnapshotReviewException ex){if(!output.Text.StartsWith("ML-P2P1:",StringComparison.Ordinal))output.Text=T("Não foi possível preparar o convite.","Could not prepare the invitation.");OnlineDiagnostics.Record("p2p.link.failed",null,ex.Message,new{ErrorType=ex.GetType().Name});status.Text=ex.Message;if(showReview)GeneralDialog.Message(this,ex.Message,T("Conferência dos mods","Mod verification"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}catch(Exception ex){if(!output.Text.StartsWith("ML-P2P1:",StringComparison.Ordinal))output.Text=T("Não foi possível preparar o convite.","Could not prepare the invitation.");OnlineDiagnostics.Record("p2p.link.failed",null,ex.Message,new{ErrorType=ex.GetType().Name});status.Text=T("Falha: ","Failed: ")+ex.Message;}finally{busy=false;if(!IsDisposed)UpdateActions();}}
     void UpdateActions(){
         generate.Enabled=!busy&&!service.Installing;
         copy.Enabled=output.Text.StartsWith("ML-P2P1:",StringComparison.Ordinal);
@@ -70,10 +67,10 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         pause.Visible=selected!=null&&!selected.Completed;pause.Enabled=!busy&&service.Engine.Running&&selected!=null&&!selected.Completed&&selected.Stage==null&&(!remotePaused||selected.Paused);
         pause.Text=selected!=null&&selected.Paused?T("Retomar","Resume"):remotePaused?T("Pausado pelo amigo","Paused by friend"):T("Pausar","Pause");
     }
-    void SelectSession(P2PSession session){selected=session;remotePaused=false;output.Text=session==null||!service.Engine.Running?"":service.Invitation(session);if(session!=null&&!session.Sender)destination.Text=session.Destination??destination.Text;UpdateActions();}
+    void SelectSession(P2PSession session){selected=session;remotePaused=false;output.Text=session==null||!P2PInvite.DeviceValid(service.Engine.Device)?"":service.Invitation(session);if(session!=null&&!session.Sender)destination.Text=session.Destination??destination.Text;UpdateActions();}
     void ChooseFolder(){using(var folder=new FolderBrowserDialog{Description=T("Escolha a pasta local de instalação.","Choose the local installation folder."),SelectedPath=Directory.Exists(destination.Text)?destination.Text:""})if(folder.ShowDialog(this)==DialogResult.OK)destination.Text=folder.SelectedPath;}
     async Task PrepareLink(){
-        if(ids.Length==0){status.Text=T("Cole o convite do amigo e clique em Conectar.","Paste your friend's invitation and click Connect.");return;}
+        if(ids.Length==0&&selected==null){output.Text=T("Adicione mods para enviar ou cole um convite abaixo.","Add mods to send or paste an invitation below.");status.Text=T("Cole o convite do amigo e clique em Conectar.","Paste your friend's invitation and click Connect.");return;}
         status.Text=T("Conferindo mods e preparando o convite…","Verifying mods and preparing the invitation…");progress.Caption=T("Preparando link…","Preparing link…");progress.Indeterminate=true;
         try{
             if(selected!=null&&!selected.Sender&&selected.Completed){
@@ -82,12 +79,13 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         }finally{progress.Indeterminate=false;progress.Invalidate();}
     }
     async Task Connect(){
-        if(input.Text.Trim().Length==0&&(selected==null||selected.Completed)){status.Text=T("Conferindo arquivos instalados…","Verifying installed files…");await Task.Run(()=>InstalledSnapshot.Inspect(state,ids,catalog,service.ApplicationData,true,true));}
         if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));timer.Start();
         string code=input.Text.Trim();
         if(code.Length==0){
-            if(selected!=null&&!selected.Completed){if(!selected.Sender&&selected.Error!=null){string target=destination.Text;await Task.Run(()=>service.RetryInstalled(selected,target));}SelectSession(selected);status.Text=T("Compartilhamento retomado. Envie o link acima ao amigo.","Sharing resumed. Send the link above to your friend.");return;}
-            var session=await Task.Run(()=>service.ShareInstalled(state,ids,catalog,service.ApplicationData,true,Report));SelectSession(session);status.Text=T("Envie o link acima. Depois cole aqui o link de resposta do amigo e clique em Conectar.","Send the link above. Then paste your friend's reply link here and click Connect.");return;
+            if(selected!=null&&!selected.Completed){if(!selected.Sender&&selected.Error!=null){string target=destination.Text;await Task.Run(()=>service.RetryInstalled(selected,target));}SelectSession(selected);
+                if(selected.Sender&&selected.Deferred&&!service.DeferredPrepared(selected))await PrepareFiles(selected);status.Text=T("Compartilhamento retomado. Envie o link acima ao amigo.","Sharing resumed. Send the link above to your friend.");return;}
+            var session=await Task.Run(()=>service.BeginDeferred(state,ids));SelectSession(session);status.Text=T("Convite pronto para copiar. Preparando os arquivos do pacote…","Invitation ready to copy. Preparing pack files…");
+            await PrepareFiles(session);status.Text=T("Envie o link acima. Depois cole aqui o link de resposta do amigo e clique em Conectar.","Send the link above. Then paste your friend's reply link here and click Connect.");return;
         }
         var invite=P2PInvite.Decode(code);if(invite.Mode!="installed-zip")throw new IOException(T("Este link usa o formato antigo. Peça um novo link ao amigo.","This link uses the old format. Ask your friend for a new link."));
         if(invite.Kind=="offer"){
@@ -96,6 +94,12 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             var session=await Task.Run(()=>{var received=service.Accept(code,target,true);if(!received.Completed)service.RetryInstalled(received,target);return received;});SelectSession(session);status.Text=T("Envie o link de resposta acima ao amigo. O recebimento e a instalação continuarão automaticamente.","Send the reply link above to your friend. Receiving and installation will continue automatically.");
         }else{var session=await Task.Run(()=>service.Authorize(code));SelectSession(session);status.Text=T("Conectado. A transferência continua automaticamente.","Connected. Transfer continues automatically.");}
         input.Clear();
+    }
+    async Task PrepareFiles(P2PSession session){
+        progress.Caption=T("Preparando arquivos do pacote…","Preparing pack files…");progress.Indeterminate=true;
+        try{await Task.Run(()=>service.PrepareDeferred(session,state,catalog,service.ApplicationData,true,Report));progress.Caption=T("Convite e pacote prontos","Invitation and pack ready");}
+        catch{progress.Caption=T("Convite pronto; pacote aguardando correção","Invitation ready; pack needs attention");throw;}
+        finally{progress.Indeterminate=false;progress.Invalidate();}
     }
     async Task GenerateModpack(){
         status.Text=T("Conferindo os mods antes de gerar o modpack…","Verifying mods before creating the modpack…");
@@ -114,6 +118,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             if(session.Completed){if(Directory.Exists(service.Folder(session))){progress.Value=99;status.Text=T("Finalizando a limpeza do arquivo temporário…","Finishing temporary archive cleanup…");return;}progress.Value=100;progress.Caption=session.Sender?T("Envio concluído","Send complete"):T("Instalação concluída","Installation complete");status.Text=T("Concluído. Arquivo temporário removido.","Complete. Temporary archive removed.");
                 if(!session.Sender&&!session.ListImported){var manifest=service.InstalledManifest(session);ReceivedList=manifest.Project??manifest.List;InstalledReceiptId=session.ReceiptId;InstalledDestination=session.Destination;returning=true;Complete(DialogResult.OK);}return;}
             if(session.Error!=null){status.Text=T("Falha: ","Failed: ")+session.Error+T(" O arquivo foi preservado. Use Conectar para tentar novamente."," The file was preserved. Use Connect to retry.");return;}
+            if(session.Deferred&&session.PayloadHash==null&&session.Stage==null){var waiting=await Task.Run(()=>service.TransferStatus(session));if(IsDisposed)return;remotePaused=waiting.RemotePaused;progress.Value=0;progress.Caption=T("Aguardando preparo do pacote","Waiting for pack preparation");status.Text=session.Paused?T("Pausado por você. Só você pode retomar sua pausa.","Paused by you. Only you can release your pause."):remotePaused?T("Pausado pelo amigo. Aguarde ele retomar.","Paused by your friend. Wait for them to resume."):session.Sender?T("O convite já pode ser copiado. Clique em Conectar para tentar preparar os arquivos novamente.","The invitation can already be copied. Click Connect to retry preparing the files."):T("Conexão criada. Aguardando o amigo concluir o preparo dos arquivos.","Connection created. Waiting for your friend to finish preparing the files.");return;}
             if(session.Stage!=null){progress.Value=99;progress.Caption=T("Conferindo e instalando","Verifying and installing");status.Text=session.Stage;return;}
             var transfer=await Task.Run(()=>service.TransferStatus(session));if(IsDisposed)return;remotePaused=transfer.RemotePaused;progress.Value=transfer.Percent;progress.Caption=session.Sender?T("Enviando","Sending"):T("Recebendo","Receiving");
             status.Text=session.Paused?T("Pausado por você. Só você pode retomar sua pausa.","Paused by you. Only you can release your pause."):remotePaused?T("Pausado pelo amigo. Aguarde ele retomar.","Paused by your friend. Wait for them to resume."):session.Peer==null?T("Aguardando o link de resposta do amigo.","Waiting for your friend's reply link."):!transfer.Connected?T("Aguardando reconexão do amigo. A transferência será retomada.","Waiting for your friend to reconnect. Transfer will resume."):session.Sender?T("Enviando pacote…","Sending pack…"):T("Recebendo pacote; a instalação começa após a conferência.","Receiving pack; installation starts after verification.");
@@ -148,7 +153,7 @@ internal sealed partial class GeneralModWindow {
     }
     async Task ResumeP2P(){
         if(testMode||!File.Exists(Path.Combine(data,"P2P","sessions.json")))return;
-        try{PrepareP2P();if(!p2p.Sessions.Any(s=>!s.Completed))return;await Task.Run(()=>p2p.Start(_=>{}));if(!IsDisposed)detail.Text=T("Compartilhamento P2P retomado.","P2P sharing resumed.");else p2p.Dispose();}
+        try{PrepareP2P();if(!p2p.Sessions.Any(s=>!s.Completed||Directory.Exists(p2p.Folder(s))))return;await Task.Run(()=>p2p.Start(_=>{}));if(!IsDisposed)detail.Text=T("Compartilhamento P2P retomado.","P2P sharing resumed.");else p2p.Dispose();}
         catch(Exception ex){if(!IsDisposed)detail.Text=T("Retomada P2P: ","P2P resume: ")+ex.Message;}
     }
 
