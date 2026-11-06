@@ -131,7 +131,7 @@ public sealed class GeneralModLibrary {
                 ModCategories.Supports(mod.Id,ClothingFit.Feminine)?"Roupas femininas":
                 ModCategories.Supports(mod.Id,ClothingFit.Masculine)?"Roupas masculinas":null;
             var entry = new GeneralModEntry {
-                Id = mod.Id, Name = mod.Name,
+                Id = mod.Id, Name = mod.Name, Description = mod.Description,
                 Category = fit??CyberpunkCategories[(int)ModCategories.CategoryOf(mod.Id, mod.Profile)],
                 DefaultVariant = mod.DensityProfiles == null ? "default" : "low"
             };

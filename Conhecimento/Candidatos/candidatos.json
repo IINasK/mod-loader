@@ -1,7 +1,7 @@
 {
   "Schema": 1,
-  "CheckedOn": "2026-11-02",
-  "ActiveCatalogCount": 95,
+  "CheckedOn": "2026-11-06",
+  "ActiveCatalogCount": 144,
   "CandidateCount": 0,
   "Candidates": [],
   "Promoted": [
@@ -83,6 +83,61 @@
       "Id": "mod-11609",
       "InstallerVersion": "1.0.27",
       "SummaryFile": "../Mods/mod-11609.md"
+    },
+    {
+      "Id": "mod-14210",
+      "InstallerVersion": "1.1.21",
+      "SummaryFile": "../Mods/mod-14210.md"
+    },
+    {
+      "Id": "mod-15076",
+      "InstallerVersion": "1.1.21",
+      "SummaryFile": "../Mods/mod-15076.md"
+    },
+    {
+      "Id": "mod-15861",
+      "InstallerVersion": "1.1.21",
+      "SummaryFile": "../Mods/mod-15861.md"
+    },
+    {
+      "Id": "mod-17069",
+      "InstallerVersion": "1.1.21",
+      "SummaryFile": "../Mods/mod-17069.md"
+    },
+    {
+      "Id": "mod-18100",
+      "InstallerVersion": "1.1.21",
+      "SummaryFile": "../Mods/mod-18100.md"
+    },
+    {
+      "Id": "mod-19132",
+      "InstallerVersion": "1.1.21",
+      "SummaryFile": "../Mods/mod-19132.md"
+    },
+    {
+      "Id": "mod-19762",
+      "InstallerVersion": "1.1.21",
+      "SummaryFile": "../Mods/mod-19762.md"
+    },
+    {
+      "Id": "mod-24327",
+      "InstallerVersion": "1.1.21",
+      "SummaryFile": "../Mods/mod-24327.md"
+    },
+    {
+      "Id": "mod-31328",
+      "InstallerVersion": "1.1.21",
+      "SummaryFile": "../Mods/mod-31328.md"
+    },
+    {
+      "Id": "mod-18084",
+      "InstallerVersion": "1.1.21",
+      "SummaryFile": "../Mods/mod-18084.md"
+    },
+    {
+      "Id": "mod-10437",
+      "InstallerVersion": "1.1.21",
+      "SummaryFile": "../Mods/mod-10437.md"
     }
   ],
   "MetadataOnly": true,

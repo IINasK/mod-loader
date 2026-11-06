@@ -11,7 +11,7 @@ using System.Text.RegularExpressions;
 
 public sealed class FixedCatalog { public int Schema; public string Id,GameVersion,GameFileVersion; public List<FixedMod> Packages; public List<FixedDefault> Defaults; public string[] Excluded; }
 public sealed class FixedMod {
-    public string Id,Name,Version,Profile,GameVersion,Warning,ThirdPerson,ThirdPersonNotes,ThirdPersonSource,BlockedReason;
+    public string Id,Name,Version,Profile,GameVersion,Warning,Description,ThirdPerson,ThirdPersonNotes,ThirdPersonSource,BlockedReason;
     public string PhantomLibertyStatus,PhantomLibertyNotes,PhantomLibertySource;
     public bool RequiresPL,RequiresRedmod,Immutable,ManualSelection;
     public string[] Dependencies;
@@ -105,7 +105,7 @@ public static class FixedData {
             foreach(var f in mod.Files.Where(f=>!f.UserData)) {
                 string p=Safe.In(game,f.Path);
                 if(!File.Exists(p)) { if(Directory.Exists(p)) s.Different++; else s.Missing++;OnlineDiagnostics.Record("scan.file",mod.Id,"Arquivo não encontrado.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,Present=false}); }
-                else {var info=new FileInfo(p);string hash=(info.Length==f.Size||f.CanonicalSha256!=null||(f.Patch!=null&&info.Length==f.Patch.SourceSize))?Safe.Hash(p):null;bool correct=FpvCustomization.MatchesFile(f,info.Length,hash)&&!FpvCustomization.IsOriginal(f,info.Length,hash);bool original=FpvCustomization.IsOriginal(f,info.Length,hash);if(correct)s.Correct++;else if(original)s.Original++;else s.Different++;OnlineDiagnostics.Record("scan.file",mod.Id,correct?"Arquivo conferido.":original?"Original oficial reconhecido; setup NASK disponível.":"Arquivo divergente.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,ActualSize=info.Length,ActualSha256=hash,WrittenUtc=info.LastWriteTimeUtc.ToString("o"),Present=true,Correct=correct,OfficialOriginal=original});}
+                else {var info=new FileInfo(p);string hash=(info.Length==f.Size||VehicleCompatibility.HasUpgrade(f)||f.CanonicalSha256!=null||(f.Patch!=null&&info.Length==f.Patch.SourceSize))?Safe.Hash(p):null;bool correct=FpvCustomization.MatchesFile(f,info.Length,hash)&&!FpvCustomization.IsOriginal(f,info.Length,hash);bool original=FpvCustomization.IsOriginal(f,info.Length,hash);if(correct)s.Correct++;else if(original)s.Original++;else s.Different++;OnlineDiagnostics.Record("scan.file",mod.Id,correct?"Arquivo conferido.":original?"Versão anterior reconhecida; correção disponível.":"Arquivo divergente.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,ActualSize=info.Length,ActualSha256=hash,WrittenUtc=info.LastWriteTimeUtc.ToString("o"),Present=true,Correct=correct,OfficialOriginal=original});}
             }
             s.State=s.Different>0?"Diferente/alterado":s.Missing==0?(s.Original>0?"Setup NASK disponível":"Instalado correto"):s.Correct+s.Original==0?"Não instalado":"Parcial";
             s.Detail=s.Correct+" corretos; "+s.Original+" originais oficiais; "+s.Missing+" ausentes; "+s.Different+" diferentes";
@@ -340,10 +340,10 @@ public sealed partial class FixedInstaller {
                     if(Directory.Exists(dest))throw new IOException("Uma pasta ocupa o destino: "+f.Path);
                     string before=File.Exists(dest)?Safe.Hash(dest):null;
                     if(before!=null){
-                        if(!FpvCustomization.IsOriginal(f,new FileInfo(dest).Length,before))throw new IOException("Origem FPV mudou antes do backup.");
+                        if(!FpvCustomization.IsOriginal(f,new FileInfo(dest).Length,before))throw new IOException("Origem mudou antes do backup.");
                         receipt.BackupLayout="fpv-flat-v1";string backup=UpgradeBackup(receipt,f.Path);
                         Directory.CreateDirectory(Path.GetDirectoryName(backup));Safe.NoLinks(backup);File.Copy(dest,backup,false);
-                        if(Safe.Hash(backup)!=before)throw new IOException("Backup do FPV original não conferiu.");
+                        if(Safe.Hash(backup)!=before)throw new IOException("Backup da versão anterior não conferiu.");
                     }
                     string prepared=Safe.In(stage,f.Path);string after=Safe.Hash(prepared);if(!FpvCustomization.MatchesFile(f,new FileInfo(prepared).Length,after))throw new IOException("Arquivo preparado mudou antes da cópia: "+f.Path);
                     var change=new OwnedChange{Path=f.Path,Before=before,After=after};receipt.Files.Add(change);Save(ledger,receipt);

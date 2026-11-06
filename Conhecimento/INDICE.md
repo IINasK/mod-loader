@@ -118,7 +118,7 @@ Busque nome ou ID em mods.json ou nesta lista. Cada ficha tem funcao, uso, depen
 | [Suporte facial · Avacore](Mods/face-1873-56672.md) | 2.0 | not-required | Disponivel |
 | [Mecha Robotic Eyes PART 2 CCXL](Mods/face-35807-168171.md) | 1 | not-required | Disponivel |
 | [RadioExt](Mods/RadioExt.md) | 2.92 | not-required | Disponivel |
-| [Spot On Radio](Mods/SpotOnRadio.md) | 1.5 | not-required | Disponivel |
+| [Spot On Radio](Mods/SpotOnRadio.md) | retirado | — | Removido em 1.1.22 |
 | [Nola x Veegee · Vintage Outfit (FemV vanilla)](Mods/mod-11963.md) | 1.3 | not-required | Disponivel |
 | [Nola x Veegee · Rough Outfit (FemV vanilla)](Mods/mod-15606.md) | 1.2 | not-required | Disponivel |
 | [Nola x Veegee · Lethal Outfit (FemV vanilla)](Mods/mod-15867.md) | 1.2 | not-required | Disponivel |
@@ -152,7 +152,7 @@ As sete adições Nola foram promovidas ao catálogo na1.0.27; consulte a seçã
 | --- | --- | --- |
 | [Nola · Virtual Boutique feminina](Mods/mod-5114.md) | 7.6 | Com e semPL por escopo estático |
 | [Nola · Loja de acessórios](Mods/mod-14299.md) | 1.8 | Com e semPL por escopo estático |
-| [Nola · Follow Your Passion (loja)](Mods/mod-12642.md) | 1.8 | Com e semPL por escopo estático |
+| [Nola · Follow Your Passion (loja)](Mods/mod-12642.md) | 1.8 | Com e semPL por escopo estático | — retirada em 1.1.23
 | [Nola x Aquelyras · Atelier feminino](Mods/mod-8704.md) | 3.2 | Com e semPL por escopo estático |
 | [Nola · Stockings Collection (FemV padrão, 2K)](Mods/mod-12572.md) | 1.5 | Com e semPL por escopo estático |
 | [Nola · Pack 1 (FemV padrão + Equipment-EX)](Mods/mod-5093.md) | 1.0 | Com e semPL por escopo estático |
@@ -190,8 +190,8 @@ O botão Limpar mods fora da lista mostra os arquivos detectados e pede duas con
 - [Veegee Shop 1](Mods/mod-8183.md) 2.2
 - [Veegee Shop 2](Mods/mod-13870.md) 2.3.0
 - [Veegee Shop 3](Mods/mod-18890.md) 1.5.2
-- [Veegee Shop 4](Mods/mod-30021.md) 1.1.3
-- [Veegee Jewelry Atelier](Mods/mod-8688.md) 1.23
+- [Veegee Shop 4](Mods/mod-30021.md) 1.1.3 — retirada em 1.1.23
+- [Veegee Jewelry Atelier](Mods/mod-8688.md) 1.23 — retirada em 1.1.23
 - [Casual Style Outfit Pt7 (Vanilla Arms)](Mods/mod-15712.md) 1.0
 - [Casual Style Outfit Pt8 (Vanilla Arms)](Mods/mod-16345.md) 1.0
 - [Casual Style Outfit Pt14](Mods/mod-17501.md) 1.01
@@ -207,7 +207,7 @@ O botão Limpar mods fora da lista mostra os arquivos detectados e pede duas con
 - [Mercedes Brabus G 900 Rocket Edition](Mods/mod-35848.md) 1.0.1
 - [Photomode Facial Expression Mega Pack](Mods/mod-7912.md) 2.1
 - [VOIDWEAR Virtual Atelier](Mods/mod-12637.md) 0.85
-- [Kwek's Sartorial Omnibus Shop](Mods/mod-6779.md) 1.1.5
+- [Kwek's Sartorial Omnibus Shop](Mods/mod-6779.md) 1.1.5 — retirada em 1.1.23
 - [Kwek's Seawright Optometry Shop](Mods/mod-6505.md) 1.1.0
 - [Kwek's Family Jewels Shop](Mods/mod-6985.md) 1.0.9
 - [VOIDWEAR Round Glasses (FemV)](Mods/mod-15702.md) 1.2
@@ -215,3 +215,17 @@ O botão Limpar mods fora da lista mostra os arquivos detectados e pede duas con
 - [Kwek's Big Round Hoop Earrings](Mods/mod-7017.md) 1.1
 - [Kwek's Head Sporty Glasses (FemV)](Mods/mod-7435.md) 1.0.0
 - [Kwek's Nose Aviator Glasses (MascV)](Mods/mod-7640.md) 1.0.0
+
+## Coleções raem — 1.1.21
+
+- [raem's Atelier Store](Mods/mod-14210.md)
+- [V’s Bullet Necklace with Physics](Mods/mod-15076.md)
+- [Chain Jewelry Collection](Mods/mod-15861.md)
+- [Reyes Accessories](Mods/mod-17069.md)
+- [Valentino Harness and Holsters](Mods/mod-18100.md)
+- [Bomber Jackets](Mods/mod-19132.md)
+- [Claire Accessories](Mods/mod-19762.md)
+- [Accessory and Jewelry Collection](Mods/mod-24327.md)
+- [Novawear Pants](Mods/mod-31328.md)
+- [Ripper Pants and Belt](Mods/mod-18084.md)
+- [The Community Palette Project](Mods/mod-10437.md)

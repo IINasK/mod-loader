@@ -306,7 +306,7 @@
     {
       "Id": "ArchiveXL",
       "Name": "ArchiveXL",
-      "Version": "v1.28.2",
+      "Version": "v1.28.6",
       "Profile": "Kit inicial",
       "GameVersion": "2.5",
       "RequiresPL": false,
@@ -315,15 +315,15 @@
       "Dependencies": [
         "NightCoop"
       ],
-      "Warning": "",
+      "Warning": "ArchiveXL 1.28.6: correções de materiais para jogo 2.5. Mantém RED4ext 1.31.0.",
       "Assets": [
         {
           "Id": "a0",
-          "Name": "ArchiveXL-1.28.2.zip",
-          "Sha256": "840ffabb7642930403faa14ac249353cb34ca4ce3097fea5d819d5fb28c9519f",
-          "Size": 1071426,
+          "Name": "ArchiveXL-1.28.6.zip",
+          "Size": 1072116,
+          "Sha256": "25d0493a1b3e8ec4c26b7144a4d8f1a1def4d6dc840fff94b4c91c908583da09",
           "Format": "zip",
-          "Url": "https://github.com/psiberx/cp2077-archive-xl/releases/download/v1.28.2/ArchiveXL-1.28.2.zip",
+          "Url": "https://github.com/psiberx/cp2077-archive-xl/releases/download/v1.28.6/ArchiveXL-1.28.6.zip",
           "ModId": 0,
           "FileId": 0
         }
@@ -333,204 +333,204 @@
           "Asset": "a0",
           "Entry": "r6/config/redsUserHints/ArchiveXL.toml",
           "Path": "r6/config/redsUserHints/ArchiveXL.toml",
-          "Sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "Size": 0
+          "Size": 0,
+          "Sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/ArchiveXL.dll",
           "Path": "red4ext/plugins/ArchiveXL/ArchiveXL.dll",
-          "Sha256": "ca32a4285cceb70b238b7b9f1d1785b836455bbfa359bc6c819478d7e8b69955",
-          "Size": 1951744
+          "Size": 1954816,
+          "Sha256": "97692f23b03fdb87354a3e1a4aaabba7dd604a9b8a16839afb8bcccd2bfe7674"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/ArchiveXL.yaml",
           "Path": "red4ext/plugins/ArchiveXL/ArchiveXL.yaml",
-          "Sha256": "89c39c2d5dea5f591a351069d3020d19de8faeb5867d619897f93cc2ae39f942",
-          "Size": 26
+          "Size": 26,
+          "Sha256": "89c39c2d5dea5f591a351069d3020d19de8faeb5867d619897f93cc2ae39f942"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/LICENSE",
           "Path": "red4ext/plugins/ArchiveXL/LICENSE",
-          "Sha256": "dcd5cfc3e620a938b674b5b74a18bba24ac1d8c1353271dac8599b0620238629",
-          "Size": 1090
+          "Size": 1090,
+          "Sha256": "dcd5cfc3e620a938b674b5b74a18bba24ac1d8c1353271dac8599b0620238629"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/THIRD_PARTY_LICENSES",
           "Path": "red4ext/plugins/ArchiveXL/THIRD_PARTY_LICENSES",
-          "Sha256": "ed196638202f571f23e55df2a51b160273f10235fe5ac2573920a1f234c6a2cf",
-          "Size": 13077
+          "Size": 13077,
+          "Sha256": "ed196638202f571f23e55df2a51b160273f10235fe5ac2573920a1f234c6a2cf"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/ArchiveXL.archive",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/ArchiveXL.archive",
-          "Sha256": "5b84333de16a536b36523090a6fbfcef4f866554cc93094df74ca6e37932c96f",
-          "Size": 389120
+          "Size": 389120,
+          "Sha256": "8efa034dca39d563326eda65b63be87e66953b28f67145c81b2211e00d1c27d9"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/Migration.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/Migration.xl",
-          "Sha256": "830883ea3d5e50746ea698429dc51f5971e079a588c48e8fe097e90c6c25ca68",
-          "Size": 5926
+          "Size": 5926,
+          "Sha256": "830883ea3d5e50746ea698429dc51f5971e079a588c48e8fe097e90c6c25ca68"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PhotoModeScope.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PhotoModeScope.xl",
-          "Sha256": "77c10d76a8ae8ca696b63e3930fd1d4b3b14fa410ce90e4f95ab665826a82264",
-          "Size": 4848
+          "Size": 4848,
+          "Sha256": "77c10d76a8ae8ca696b63e3930fd1d4b3b14fa410ce90e4f95ab665826a82264"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PlayerBaseScope.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PlayerBaseScope.xl",
-          "Sha256": "fac81f0618a074b06472b5574aeefa4dde16bc935abe0416ac23121ec7a3ee2f",
-          "Size": 1352
+          "Size": 1352,
+          "Sha256": "fac81f0618a074b06472b5574aeefa4dde16bc935abe0416ac23121ec7a3ee2f"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationBeardFix.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationBeardFix.xl",
-          "Sha256": "c3145023b30c0d0d2533af4c9d48c306aa4d868016e3de54ece46509ba40ff39",
-          "Size": 21911
+          "Size": 21963,
+          "Sha256": "e666e6f1a9fafd03561c4a07df8dc773fdba2414370b04fa51b97035e1ec0036"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationBeardScope.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationBeardScope.xl",
-          "Sha256": "e65cfcdc09ce84768fc59a0646b6f90df5cb2b07637903bb57b834159494e94e",
-          "Size": 7845
+          "Size": 7845,
+          "Sha256": "e65cfcdc09ce84768fc59a0646b6f90df5cb2b07637903bb57b834159494e94e"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationBrowsFix.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationBrowsFix.xl",
-          "Sha256": "458fc4337ff99efe58d3bd69ab5fd0aed7a35006b8ff65bff97c948cba11c856",
-          "Size": 5621
+          "Size": 5621,
+          "Sha256": "458fc4337ff99efe58d3bd69ab5fd0aed7a35006b8ff65bff97c948cba11c856"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationBrowsPatch.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationBrowsPatch.xl",
-          "Sha256": "482a99c243bc49196e356615f3eb9bcc4f29458496940e600891e03f75337595",
-          "Size": 1900
+          "Size": 1900,
+          "Sha256": "482a99c243bc49196e356615f3eb9bcc4f29458496940e600891e03f75337595"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationBrowsScope.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationBrowsScope.xl",
-          "Sha256": "afd084003d5bfcf147026cfc6f115d41153be7d982642372859ce19cd951d2c5",
-          "Size": 9628
+          "Size": 9628,
+          "Sha256": "afd084003d5bfcf147026cfc6f115d41153be7d982642372859ce19cd951d2c5"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationEyesFix.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationEyesFix.xl",
-          "Sha256": "f2fc3657f8620f81fe58049bc2dbca13534c8a8a6da299bda70914b070854c39",
-          "Size": 4797
+          "Size": 4797,
+          "Sha256": "f2fc3657f8620f81fe58049bc2dbca13534c8a8a6da299bda70914b070854c39"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationEyesPatch.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationEyesPatch.xl",
-          "Sha256": "2b1e3736764b4de5aea6d55120703fcf5bc0249441851fc8dbee489df013c527",
-          "Size": 1209
+          "Size": 1209,
+          "Sha256": "2b1e3736764b4de5aea6d55120703fcf5bc0249441851fc8dbee489df013c527"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationEyesScope.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationEyesScope.xl",
-          "Sha256": "58d06e94151cb49de1004bee265f3dbf7e189a3a15de495a01129740bc06dbd6",
-          "Size": 1427
+          "Size": 1427,
+          "Sha256": "58d06e94151cb49de1004bee265f3dbf7e189a3a15de495a01129740bc06dbd6"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationHairFix.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationHairFix.xl",
-          "Sha256": "844060af19f21e97a23320df3e0b21c8299c66bc147da397b357a97d1a0ff95c",
-          "Size": 1077556
+          "Size": 1074964,
+          "Sha256": "9f008981d01a28e9b4ddeab85bd97cb952e99c8b11d72a805139334231d0b480"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationHairPatch.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationHairPatch.xl",
-          "Sha256": "fd7807f3f244be977aac3d4296108619743e04ef80652da75702810e5a7377b9",
-          "Size": 177
+          "Size": 177,
+          "Sha256": "fd7807f3f244be977aac3d4296108619743e04ef80652da75702810e5a7377b9"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationHairScope.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationHairScope.xl",
-          "Sha256": "f31eec0b6676dc64466034d11c5386ea4616e75b79da92ff72c7330a4f50ea83",
-          "Size": 50466
+          "Size": 50310,
+          "Sha256": "888b881d88135408cb62c80796ef607ffc18f30c56125eab23ef7abdd43df4bb"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationLashesFix.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationLashesFix.xl",
-          "Sha256": "6d2b14f747e1f99544ae9de68dcb16424ae046399a71fc810a2725891cab7e70",
-          "Size": 3272
+          "Size": 3272,
+          "Sha256": "6d2b14f747e1f99544ae9de68dcb16424ae046399a71fc810a2725891cab7e70"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationLashesPatch.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationLashesPatch.xl",
-          "Sha256": "f762902023eebbb44005525ae6d290d6a28af92f784192c04dad97c373bbb79b",
-          "Size": 594
+          "Size": 594,
+          "Sha256": "f762902023eebbb44005525ae6d290d6a28af92f784192c04dad97c373bbb79b"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationLashesScope.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationLashesScope.xl",
-          "Sha256": "c299cc8843fb8adefd471e202c53452c3f6e9087f521f27c7f9153c66928e990",
-          "Size": 1228
+          "Size": 1228,
+          "Sha256": "c299cc8843fb8adefd471e202c53452c3f6e9087f521f27c7f9153c66928e990"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationScope.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/PlayerCustomizationScope.xl",
-          "Sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "Size": 0
+          "Size": 0,
+          "Sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/QuestBaseScope.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/QuestBaseScope.xl",
-          "Sha256": "f56ceacafdf303062913e5cff589d27098a67cdf0c874d11269da4887ae23789",
-          "Size": 255
+          "Size": 255,
+          "Sha256": "f56ceacafdf303062913e5cff589d27098a67cdf0c874d11269da4887ae23789"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Bundle/VisualTags.xl",
           "Path": "red4ext/plugins/ArchiveXL/Bundle/VisualTags.xl",
-          "Sha256": "8f1d9628212514a5080b3f42c068a1092942346bf20416d51472f068e5b75020",
-          "Size": 3576
+          "Size": 3576,
+          "Sha256": "8f1d9628212514a5080b3f42c068a1092942346bf20416d51472f068e5b75020"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Scripts/ArchiveXL.DynamicAppearance.reds",
           "Path": "red4ext/plugins/ArchiveXL/Scripts/ArchiveXL.DynamicAppearance.reds",
-          "Sha256": "43acc08335e541d81d92c235706fda692070c2e2fb5c60b96952e0a9e6ed7a83",
-          "Size": 1926
+          "Size": 1926,
+          "Sha256": "bdb9ad85e5d4e956932f829ff5dae6ab66dd155244c9a09f0f6177ed48b0ee56"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Scripts/ArchiveXL.Global.reds",
           "Path": "red4ext/plugins/ArchiveXL/Scripts/ArchiveXL.Global.reds",
-          "Sha256": "b76ab91e5d405cae0d65f1905d0c78df3e9a3a8d964add5d794befa7cc18c533",
-          "Size": 369
+          "Size": 369,
+          "Sha256": "118d95b378439f14b954e2287d667f779d005fff40fb2972e303bc255f3535a7"
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Scripts/ArchiveXL.reds",
           "Path": "red4ext/plugins/ArchiveXL/Scripts/ArchiveXL.reds",
-          "Sha256": "650ec0ceb419b30cd23a77ab7b058725268572f87e15b5775b41cf1d89847bc8",
-          "Size": 39
+          "Size": 39,
+          "Sha256": "8d933d4ba814fe8bc85a065f0c449e13b3bfe61159928a10879ffe7340443e60"
         }
       ],
       "BlockedReason": "",
@@ -539,7 +539,9 @@
       "ThirdPersonSource": "https://github.com/psiberx/cp2077-archive-xl/releases/download/v1.28.2/ArchiveXL-1.28.2.zip",
       "PhantomLibertyStatus": "not-required",
       "PhantomLibertyNotes": "README oficial requer jogo2.5 e RED4ext, sem expansão. BundlePhotoModeScope inclui entradas opcionaisEP1, mas são alvos de extensão de recursos, não uma condição de possuir DLC para carregar o framework.",
-      "PhantomLibertySource": "https://github.com/psiberx/cp2077-archive-xl"
+      "PhantomLibertySource": "https://github.com/psiberx/cp2077-archive-xl",
+      "NexusModId": 0,
+      "NexusFileId": 0
     },
     {
       "Id": "TweakXL",
@@ -12950,85 +12952,6 @@
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/4591\nhttps://github.com/justarandomguyintheinternet/CP77_radioExt"
     },
     {
-      "Id": "SpotOnRadio",
-      "Name": "Spot On Radio",
-      "Version": "1.5",
-      "Profile": "Áudio",
-      "GameVersion": "2.5",
-      "RequiresPL": false,
-      "RequiresRedmod": false,
-      "Immutable": false,
-      "Dependencies": [
-        "NightCoop",
-        "CET",
-        "RadioExt"
-      ],
-      "Warning": "Áudio local: cada jogador conecta a própria conta Spotify Premium. Algumas contas recusam áudio no cliente Spotify Connect; o painel App Capture pode capturar o aplicativo Spotify. Na primeira execução o mod abre login no navegador e envia contagem anônima única ao autor. Manter somente uma cópia do plugin.",
-      "BlockedReason": null,
-      "ThirdPerson": "Áudio local",
-      "ThirdPersonNotes": "Integra a estação 54.4 ao rádio. Não altera corpo, roupas ou câmera. Não oferece transporte documentado de áudio entre jogadores.",
-      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/34305",
-      "NexusModId": 34305,
-      "NexusFileId": 169285,
-      "ExclusiveCodeDirectories": [
-        "red4ext/plugins/SpotOnRadio",
-        "bin/x64/plugins/cyber_engine_tweaks/mods/SpotOnRadio",
-        "bin/x64/plugins/cyber_engine_tweaks/mods/SpotOnRadioAppCapture"
-      ],
-      "Assets": [
-        {
-          "Id": "a0",
-          "Name": "SpotOnRadio 34305 1.5 2026-10-27T10-19Z D2ZS2nnI3.zip",
-          "Sha256": "1b55f0713673221f18e9c619f9e990456383be781ebe611dd0fa08927da62f13",
-          "Size": 4317821,
-          "Format": "zip",
-          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/34305?tab=files&file_id=169285",
-          "ModId": 34305,
-          "FileId": 169285
-        }
-      ],
-      "Files": [
-        {
-          "Asset": "a0",
-          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/SpotOnRadio/init.lua",
-          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/SpotOnRadio/init.lua",
-          "Size": 24587,
-          "Sha256": "4fd53615c1820059b798a6d3b7d355ca940fd37c994121c757eb8b509d4ff72b"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/SpotOnRadioAppCapture/init.lua",
-          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/SpotOnRadioAppCapture/init.lua",
-          "Size": 14041,
-          "Sha256": "acdec280be6199d5dc07f674c99d30fe7a254f2e9132ca8ce02e73ad9da0248e"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/radioExt/radios/SpotOnRadio/metadata.json",
-          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/radioExt/radios/SpotOnRadio/metadata.json",
-          "Size": 401,
-          "Sha256": "f9beed812a4a443c8e562427b9359f97d7e78e5154cc302df0e5ce84a5f5790e"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "red4ext/plugins/SpotOnRadio/THIRD-PARTY-NOTICES.txt",
-          "Path": "red4ext/plugins/SpotOnRadio/THIRD-PARTY-NOTICES.txt",
-          "Size": 1942,
-          "Sha256": "cda884a390ae6ab9e9d6250ebd1fac9f9d9d741fb039f47d4913d2d5c2ce5885"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "red4ext/plugins/SpotOnRadio/spot_on_radio.dll",
-          "Path": "red4ext/plugins/SpotOnRadio/spot_on_radio.dll",
-          "Size": 11513344,
-          "Sha256": "4dc5d118c084ebb98661889e3f2c649939493448686e1aefe7bcd5a18feef937"
-        }
-      ],
-      "PhantomLibertyStatus": "not-required",
-      "PhantomLibertyNotes": "Somente scripts,painel,metadata e plugin de áudio; não usa assetsDLC. Requisitos específicos1.5 sãoRED4ext1.31.0,CET1.38.1,RadioExt2.92 eSpotifyPremium paraConnect.",
-      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/34305"
-    },
-    {
       "Id": "mod-11963",
       "Name": "Nola x Veegee · Vintage Outfit (FemV vanilla)",
       "Version": "1.3",
@@ -13786,56 +13709,6 @@
       "PhantomLibertyStatus": "not-required",
       "PhantomLibertyNotes": "Sem requisito declarado deDLC; scripts/XL/YAML examinados não dependem deEP1. Compatibilidade semDLC inferida estaticamente, não teste de jogo separado.",
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/14299?tab=files&file_id=162448"
-    },
-    {
-      "Id": "mod-12642",
-      "Name": "Nola · Follow Your Passion (loja)",
-      "Version": "1.8",
-      "Profile": "Complementos",
-      "GameVersion": "2.5",
-      "RequiresPL": false,
-      "RequiresRedmod": false,
-      "Immutable": false,
-      "Dependencies": [
-        "mod-2987"
-      ],
-      "Warning": "Loja para lingerie/meias. Computador do apartamento > Net > Atelier > Follow Your Passion. Requer instalar os conjuntos escolhidos; não é um pacote de todas as roupas da vitrine.",
-      "Assets": [
-        {
-          "Id": "a0",
-          "Name": "ND_Lingerie_store_Follow_Your_Passion-12642-1-8-1757141738.zip",
-          "Sha256": "b4975e9ae3aa5afb0c73efc83119c3a4ebdc52d208d371562fbc75321325890f",
-          "Size": 34938,
-          "Format": "zip",
-          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/12642?tab=files&file_id=120442",
-          "ModId": 12642,
-          "FileId": 120442
-        }
-      ],
-      "Files": [
-        {
-          "Asset": "a0",
-          "Entry": "r6/scripts/nd_lingerie_store_follow_your_passion.reds",
-          "Path": "r6/scripts/nd_lingerie_store_follow_your_passion.reds",
-          "Sha256": "a51bb4d8cddf6a8fc4f7d6583ad52b30860935b0f9fe87f70f1d37a79197fc69",
-          "Size": 27436,
-          "UserData": false
-        },
-        {
-          "Asset": "a0",
-          "Entry": "archive/pc/mod/ND_Lingerie_store_Follow_Your_Passion.archive",
-          "Path": "archive/pc/mod/ND_Lingerie_store_Follow_Your_Passion.archive",
-          "Sha256": "0dd2e1dda79c861826e237519fc4bd6a5b078ac3e7889380b66d5b9cca80aec8",
-          "Size": 36864,
-          "UserData": false
-        }
-      ],
-      "ThirdPerson": "Compatível por escopo, conferir clipping",
-      "ThirdPersonNotes": "Loja para lingerie/meias. Computador do apartamento > Net > Atelier > Follow Your Passion. Requer instalar os conjuntos escolhidos; não é um pacote de todas as roupas da vitrine.",
-      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/12642?tab=description",
-      "PhantomLibertyStatus": "not-required",
-      "PhantomLibertyNotes": "Sem requisito declarado deDLC; scripts/XL/YAML examinados não dependem deEP1. Compatibilidade semDLC inferida estaticamente, não teste de jogo separado.",
-      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/12642?tab=files&file_id=120442"
     },
     {
       "Id": "mod-8704",
@@ -15755,102 +15628,6 @@
       ]
     },
     {
-      "Id": "mod-30021",
-      "Name": "Veegee Shop 4",
-      "Version": "1.1.3",
-      "Profile": "Complementos",
-      "GameVersion": "2.5",
-      "RequiresPL": false,
-      "RequiresRedmod": false,
-      "Immutable": false,
-      "Dependencies": [
-        "mod-2987",
-        "redscript"
-      ],
-      "Warning": "Abra Atelier no computador do apartamento. A loja lista peças dos conjuntos instalados.",
-      "PhantomLibertyStatus": "not-required",
-      "PhantomLibertyNotes": "Sem requisito de expansão declarado. Inferência documental e estática.",
-      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/30021",
-      "NexusModId": 30021,
-      "NexusFileId": 173628,
-      "Assets": [
-        {
-          "Id": "a0",
-          "Name": "Veegee Shop 4 30021 1.1.3 2026-11-04T16-50Z MTheTjfWs.zip",
-          "Size": 14505,
-          "Sha256": "1eae8079e7110b5cd28d8095fde2948fdbe1e1fcc462c0cc342f5336d4a099b8",
-          "Format": "zip",
-          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/30021?tab=files&file_id=173628",
-          "ModId": 30021,
-          "FileId": 173628
-        }
-      ],
-      "Files": [
-        {
-          "Asset": "a0",
-          "Entry": "Veegee Shop 4/archive/pc/mod/Veegee Shop 4.archive",
-          "Path": "archive/pc/mod/Veegee Shop 4.archive",
-          "Size": 16384,
-          "Sha256": "41d27cec6379f3264629347a72675a550e694811b161472dd4d5385dd0f8fd6d"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "Veegee Shop 4/r6/scripts/veegees_shop_pt4.reds",
-          "Path": "r6/scripts/veegees_shop_pt4.reds",
-          "Size": 16921,
-          "Sha256": "a47c892a7e8651c63228087d9ee944a89c6eee365b020dc8e3aac73e75a93977"
-        }
-      ]
-    },
-    {
-      "Id": "mod-8688",
-      "Name": "Veegee Jewelry Atelier",
-      "Version": "1.23",
-      "Profile": "Complementos",
-      "GameVersion": "2.5",
-      "RequiresPL": false,
-      "RequiresRedmod": false,
-      "Immutable": false,
-      "Dependencies": [
-        "mod-2987",
-        "redscript"
-      ],
-      "Warning": "Abra Atelier no computador do apartamento. A loja lista peças dos conjuntos instalados.",
-      "PhantomLibertyStatus": "not-required",
-      "PhantomLibertyNotes": "Sem requisito de expansão declarado. Inferência documental e estática.",
-      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/8688",
-      "NexusModId": 8688,
-      "NexusFileId": 100699,
-      "Assets": [
-        {
-          "Id": "a0",
-          "Name": "Veegee Jewelry Atelier-8688-1-23-1738877279.zip",
-          "Size": 158888,
-          "Sha256": "d89d2b8f549fe9f713978b323028f0d03be93dd55bd45275c5884300a0aaedf0",
-          "Format": "zip",
-          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/8688?tab=files&file_id=100699",
-          "ModId": 8688,
-          "FileId": 100699
-        }
-      ],
-      "Files": [
-        {
-          "Asset": "a0",
-          "Entry": "Veegee Jewelry Atelier/archive/pc/mod/veegee_jewelry_atelier.archive",
-          "Path": "archive/pc/mod/veegee_jewelry_atelier.archive",
-          "Size": 163840,
-          "Sha256": "17a7949a4bbe6df6224cc3fe9fd7936cd5be67dfffe55002db34f7ce4461c22f"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "Veegee Jewelry Atelier/r6/scripts/veegee_jewelry_atelier.reds",
-          "Path": "r6/scripts/veegee_jewelry_atelier.reds",
-          "Size": 9441,
-          "Sha256": "13aae83208ed5ba4cfdc278073193ac12a6dbc0c9a11eb283be77da9c0117f13"
-        }
-      ]
-    },
-    {
       "Id": "mod-15712",
       "Name": "Casual Style Outfit Pt7 (Vanilla Arms)",
       "Version": "1.0",
@@ -16413,7 +16190,7 @@
         "mod-5266",
         "mod-2987"
       ],
-      "Warning": "Compre no Car Dealer do computador do apartamento ou desbloqueie pelo CET.",
+      "Warning": "Correção 2.5: herda física e rodas da Arch base. Retirado bloco antigo com registros inexistentes; visual precisa de conferência no jogo.",
       "PhantomLibertyStatus": "unverified",
       "PhantomLibertyNotes": "Sem DLC declarada. Recursos internos sem confirmação para o perfil sem DLC.",
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/10445",
@@ -16450,8 +16227,18 @@
           "Asset": "a0",
           "Entry": "r6/tweaks/bmw_s1000rr/bmw_s1000rr.yaml",
           "Path": "r6/tweaks/bmw_s1000rr/bmw_s1000rr.yaml",
-          "Size": 1914,
-          "Sha256": "538344808d1b2afebd3a4def84481b7bd20b2d38deff20ab6e3691600099a644"
+          "Size": 1374,
+          "Sha256": "558b78c394db472cfcbf1de6267a197e14ea68a3553b141fe3ca9c9c9c1e3739",
+          "Patch": {
+            "SourceSha256": "538344808d1b2afebd3a4def84481b7bd20b2d38deff20ab6e3691600099a644",
+            "SourceSize": 1914,
+            "Changes": [
+              {
+                "Old": "  vehDriveModelData:\r\n   $base: Vehicle.v_sportbike2_arch_nemesis_inline0\r\n   center_of_mass_offset: { x: 0.0, y: 0.0, z: -0.15 }\r\n   wheelSetup:\r\n    $base: Vehicle.v_sportbike2_arch_nemesis_inline1\r\n    backPreset:\r\n     $base: Vehicle.v_sportbike2_arch_nemesis_inline3\r\n     wheelsVerticalOffset: -0,001\r\n     frictionMulLateral: 1\r\n     frictionMulLongitudinal: 1\r\n    frontPreset:\r\n     $base: Vehicle.v_v_sportbike2_arch_nemesis_inline2\r\n     wheelsVerticalOffset: -0,001\r\n     frictionMulLateral: 1\r\n     frictionMulLongitudinal: 1\r\n",
+                "New": ""
+              }
+            ]
+          }
         }
       ]
     },
@@ -16744,54 +16531,6 @@
           "Path": "r6/scripts/yellingintothevoid/voidwear-accessories.reds",
           "Size": 17609,
           "Sha256": "347462f8013f78f63e5c478aaef82af9aecbc4ceb8034924d820d7a25fc9d69e"
-        }
-      ]
-    },
-    {
-      "Id": "mod-6779",
-      "Name": "Kwek's Sartorial Omnibus Shop",
-      "Version": "1.1.5",
-      "Profile": "Complementos",
-      "GameVersion": "2.5",
-      "RequiresPL": false,
-      "RequiresRedmod": false,
-      "Immutable": false,
-      "Dependencies": [
-        "mod-2987",
-        "redscript"
-      ],
-      "Warning": "Abra Atelier no computador do apartamento. A loja lista peças dos conjuntos instalados.",
-      "PhantomLibertyStatus": "not-required",
-      "PhantomLibertyNotes": "Sem requisito de expansão declarado. Inferência documental e estática.",
-      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/6779",
-      "NexusModId": 6779,
-      "NexusFileId": 41035,
-      "Assets": [
-        {
-          "Id": "a0",
-          "Name": "Kwek's Sartorial Omnibus Shop - Regular Version-6779-1-1-5-1679005598.zip",
-          "Size": 12673,
-          "Sha256": "be221717ff154c4c81a17b0a8e9c56333302f54c0bbfd5c9e01813e3557246a9",
-          "Format": "zip",
-          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/6779?tab=files&file_id=41035",
-          "ModId": 6779,
-          "FileId": 41035
-        }
-      ],
-      "Files": [
-        {
-          "Asset": "a0",
-          "Entry": "archive/pc/mod/kwekSartorialOmnibusShopForVirtualAtelier__.archive",
-          "Path": "archive/pc/mod/kwekSartorialOmnibusShopForVirtualAtelier__.archive",
-          "Size": 16384,
-          "Sha256": "ca2d815ab8015f94bd852d11b56183e7c48d547d5e2eebe11ebc526973fb6c5c"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "r6/scripts/kwek/virtual-atelier/sartorialshop/main.reds",
-          "Path": "r6/scripts/kwek/virtual-atelier/sartorialshop/main.reds",
-          "Size": 13543,
-          "Sha256": "78f65715686b837295809905db6016a0073a1eb16f62131a4839e91cb45b80de"
         }
       ]
     },
@@ -17428,6 +17167,1165 @@
           "Size": 1230,
           "Sha256": "55dc9d697bfe07ca9673c4073aa26f55d7b9746e6de1438b5db9b4ff7b7c66fa",
           "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-14210",
+      "Name": "raem's Atelier Store",
+      "Version": "2.0",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "mod-2987",
+        "redscript"
+      ],
+      "Description": "Acesso às lojas de roupas e acessórios; o pacote principal reúne todas as lojas, sem fornecer as peças.\n\nComo usar: As lojas ficam no computador com Virtual Atelier. Roupas principais, outlet Valentino e acessórios usam lojas diferentes; uma loja pode ficar vazia sem as peças. Na atualização para 2.0, o autor pede remover os arquivos antigos da própria loja.\n\nDependências: Virtual Atelier, redscript.\n\nInstalação e arquivos conferidos. Aparência no jogo e coop ainda não testados.",
+      "Warning": "As lojas ficam no computador com Virtual Atelier. Roupas principais, outlet Valentino e acessórios usam lojas diferentes; uma loja pode ficar vazia sem as peças. Na atualização para 2.0, o autor pede remover os arquivos antigos da própria loja.",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Sem exigência explícita de expansão; runtime sem DLC não testado.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/14210",
+      "NexusModId": 14210,
+      "NexusFileId": 151536,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "raem's atelier store 14210 2.0 2026-07-09T20-38Z 9ka2kyO5I.zip",
+          "Size": 86714,
+          "Sha256": "ec3a7fcf0e03aba37e285fa9767a44c46b5aaad30a82299f79653736f105236d",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/14210?tab=files&file_id=151536",
+          "ModId": 14210,
+          "FileId": 151536
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_!atelier_accessories_collection.archive",
+          "Path": "archive/pc/mod/rm_!atelier_accessories_collection.archive",
+          "Size": 16384,
+          "Sha256": "aa99b2051e5c07eb818025ed37c748dd95a2b0b5675e51b4abaf921aac2041e3"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_!atelier_accessories_main.archive",
+          "Path": "archive/pc/mod/rm_!atelier_accessories_main.archive",
+          "Size": 16384,
+          "Sha256": "7084f0a5873e9b1d14dac9d888c74159ee5b959321887b6b62fda1d36211cf2c"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_!atelier_accessories_pearls.archive",
+          "Path": "archive/pc/mod/rm_!atelier_accessories_pearls.archive",
+          "Size": 16384,
+          "Sha256": "809202ebf124f7e598cec317099c8221a23d8a0f99c410b02dd3c0bac2b2fdb5"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_!atelier_clothes_main.archive",
+          "Path": "archive/pc/mod/rm_!atelier_clothes_main.archive",
+          "Size": 20480,
+          "Sha256": "dbc4b34226ae62c474a7cca8e8bf10a1ae391b8a9760dfb861b871a461f0ece3"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_!atelier_clothes_rc.archive",
+          "Path": "archive/pc/mod/rm_!atelier_clothes_rc.archive",
+          "Size": 16384,
+          "Sha256": "a40eb8b9e1f2b247c6ac513fa3b240782cb851d5155a094eba020737eb192739"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_!atelier_clothes_valentino.archive",
+          "Path": "archive/pc/mod/rm_!atelier_clothes_valentino.archive",
+          "Size": 24576,
+          "Sha256": "9e5020fc0f245e4bda202e99979607b52bdc29bc74335acc2ce76f7ced84e4b2"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/raem/rm_atelier_accessories_collection.reds",
+          "Path": "r6/scripts/raem/rm_atelier_accessories_collection.reds",
+          "Size": 39896,
+          "Sha256": "4e2a2221ad2d0f7345a6e57109f1dfc5584733e5064953b16f8ad1ced2a96315"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/raem/rm_atelier_accessories_main.reds",
+          "Path": "r6/scripts/raem/rm_atelier_accessories_main.reds",
+          "Size": 39767,
+          "Sha256": "efa2a0c4ed4190624b4c22c16eb56aaa548708371d57109f11abe94fab7bdc4a"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/raem/rm_atelier_accessories_pearls.reds",
+          "Path": "r6/scripts/raem/rm_atelier_accessories_pearls.reds",
+          "Size": 23575,
+          "Sha256": "9a28466b4d3971bdf7de0b41e2edd217c27cbf0cb55384c6a9450b1d2cce0643"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/raem/rm_atelier_clothes_main.reds",
+          "Path": "r6/scripts/raem/rm_atelier_clothes_main.reds",
+          "Size": 39800,
+          "Sha256": "7da1ac064ea8f60c13356dbef37d37c9a964b56560f0671a022546bca56ad822"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/raem/rm_atelier_clothes_rc.reds",
+          "Path": "r6/scripts/raem/rm_atelier_clothes_rc.reds",
+          "Size": 28808,
+          "Sha256": "392d39cd0ab31204fe365c96911ffbea9f8458494c4f6add5285b3d56a7acd9a"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/raem/rm_atelier_clothes_valentino.reds",
+          "Path": "r6/scripts/raem/rm_atelier_clothes_valentino.reds",
+          "Size": 20598,
+          "Sha256": "67975c5c942f717b0fca6b85298aceb2e38f3bdffaf3cd6268047c1d621371cb"
+        }
+      ]
+    },
+    {
+      "Id": "mod-15076",
+      "Name": "V’s Bullet Necklace with Physics",
+      "Version": "1.1",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "mod-6945",
+        "CET",
+        "mod-14210"
+      ],
+      "Description": "Colar de bala para ambos os V, dois comprimentos e dez cores.\n\nComo usar: Usar Necklace Short/Long no Equipment-EX. Evitar mover para slots de rosto/cabeça: o autor relata invisibilidade em primeira pessoa. Física incompatível com ACM; pode atravessar roupas e corpos modificados.\n\nDependências: ArchiveXL, TweakXL, Equipment-EX, CET, raem's Atelier Store.\n\nInstalação e arquivos conferidos. Aparência no jogo e coop ainda não testados.",
+      "Warning": "Usar Necklace Short/Long no Equipment-EX. Evitar mover para slots de rosto/cabeça: o autor relata invisibilidade em primeira pessoa. Física incompatível com ACM; pode atravessar roupas e corpos modificados.",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Sem exigência explícita de expansão; runtime sem DLC não testado.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/15076",
+      "NexusModId": 15076,
+      "NexusFileId": 84049,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "V's Bullet Necklace - Main-15076-1-1-1722784499.zip",
+          "Size": 2032189,
+          "Sha256": "e2bff614a5357245c56e7f1793c56fbf60e1473fb09b254a5cacadbf29c9f19e",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/15076?tab=files&file_id=84049",
+          "ModId": 15076,
+          "FileId": 84049
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_neck_bulletv.archive",
+          "Path": "archive/pc/mod/rm_acc_neck_bulletv.archive",
+          "Size": 2056192,
+          "Sha256": "58b427db09de83539a6529ef01aaf7131f7751f030fedc3d6c296c648aee7cd4"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_neck_bulletv.xl",
+          "Path": "archive/pc/mod/rm_acc_neck_bulletv.xl",
+          "Size": 173,
+          "Sha256": "50175fa1d5bb7201971063a7fe2fee55060d0753eadd470d71b198310f32265f"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_neck_bulletv.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_neck_bulletv.yaml",
+          "Size": 2129,
+          "Sha256": "8a9965306cb298f054fe26b2c184ed2a3ae774cdd5125d27249432b967b63dda"
+        }
+      ]
+    },
+    {
+      "Id": "mod-15861",
+      "Name": "Chain Jewelry Collection",
+      "Version": "1.2",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "mod-6945",
+        "CET",
+        "mod-14210",
+        "mod-10437"
+      ],
+      "Description": "Seis colares e duas pulseiras para ambos os pulsos; 300 itens para ambos os V.\n\nComo usar: Main 1.2 é a coleção completa. Opcionais são refits para braços Arasaka e altura do colar 6 masculino. Colares 1–4 têm física e não funcionam com ACM; usar Necklace Short no Equipment-EX. Encaixe pensado para corpos padrão.\n\nDependências: ArchiveXL, TweakXL, Equipment-EX, CET, raem's Atelier Store, The Community Palette Project.\n\nInstalação e arquivos conferidos. Aparência no jogo e coop ainda não testados.",
+      "Warning": "Main 1.2 é a coleção completa. Opcionais são refits para braços Arasaka e altura do colar 6 masculino. Colares 1–4 têm física e não funcionam com ACM; usar Necklace Short no Equipment-EX. Encaixe pensado para corpos padrão.",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Sem exigência explícita de expansão; runtime sem DLC não testado.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/15861",
+      "NexusModId": 15861,
+      "NexusFileId": 89127,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Chain Jewelry - Main-15861-1-2-1728769757.zip",
+          "Size": 10040728,
+          "Sha256": "ba0ce930f05c500333494acf743a28c5427e3cf98a9b710b2dfe4d21517a9781",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/15861?tab=files&file_id=89127",
+          "ModId": 15861,
+          "FileId": 89127
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_set_doll.archive",
+          "Path": "archive/pc/mod/rm_acc_set_doll.archive",
+          "Size": 10178560,
+          "Sha256": "71307238bc5046fe7024ceb66d47ef26fb3c543896ed927a5968c78a480f73c8"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_set_doll.xl",
+          "Path": "archive/pc/mod/rm_acc_set_doll.xl",
+          "Size": 1096,
+          "Sha256": "1d9d2402f5826e1552efb63477d998e86a63bb7c9d0f9721ebe9d12ab2fd2409"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_set_doll.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_set_doll.yaml",
+          "Size": 19827,
+          "Sha256": "8b4a991f6040a1abe9bc07d462b00c8a55df6d8bbccbbc262858a4d175ae65c0"
+        }
+      ]
+    },
+    {
+      "Id": "mod-17069",
+      "Name": "Reyes Accessories",
+      "Version": "1.1",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "mod-6945",
+        "CET",
+        "mod-14210",
+        "mod-10437"
+      ],
+      "Description": "Relógio, pulseiras e anéis para ambos os V, com posição dinâmica e opções de aparência.\n\nComo usar: Equipar relógio em Hand, pulseiras em Wrist e anéis em Fingers. Versão 1.1 combina com Claire e Chain. Monowire pode atravessar pulseiras; anéis precisam remover os nós dos Gorilla Arms e podem flutuar com Projectile Launcher.\n\nDependências: ArchiveXL, TweakXL, Equipment-EX, CET, raem's Atelier Store, The Community Palette Project.\n\nInstalação e arquivos conferidos. Aparência no jogo e coop ainda não testados.",
+      "Warning": "Equipar relógio em Hand, pulseiras em Wrist e anéis em Fingers. Versão 1.1 combina com Claire e Chain. Monowire pode atravessar pulseiras; anéis precisam remover os nós dos Gorilla Arms e podem flutuar com Projectile Launcher.",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Sem exigência explícita de expansão; runtime sem DLC não testado.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/17069",
+      "NexusModId": 17069,
+      "NexusFileId": 103915,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Reyes Accessories - Main File-17069-1-1-1741904576.zip",
+          "Size": 23431438,
+          "Sha256": "0516aedfea51a2f7583154122823ae32740285bb95d8de104e1306e458924c95",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/17069?tab=files&file_id=103915",
+          "ModId": 17069,
+          "FileId": 103915
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_rings_reyes.archive",
+          "Path": "archive/pc/mod/rm_acc_rings_reyes.archive",
+          "Size": 1687552,
+          "Sha256": "33ca60ea7a0ff3accaec8fc4c2d1cb0c00cc0d99439b46cbb351a30821d21fa4"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_rings_reyes.xl",
+          "Path": "archive/pc/mod/rm_acc_rings_reyes.xl",
+          "Size": 1155,
+          "Sha256": "3039b7bf46ccd5e89d9a30bdf01502443d0a43587756688fbc025992f5ddc10b"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_reyesbrac.archive",
+          "Path": "archive/pc/mod/rm_acc_wrist_reyesbrac.archive",
+          "Size": 5103616,
+          "Sha256": "9a284a8665753d5c2de56b5de61b2ba23f6b9c60dff2219181267234570f9e1b"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_reyesbrac.xl",
+          "Path": "archive/pc/mod/rm_acc_wrist_reyesbrac.xl",
+          "Size": 4277,
+          "Sha256": "6a5972498223df7d306e21f3a8d906fe6b758d4c2c304ca86b2e74e528c1dea0"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_reyeswatch.archive",
+          "Path": "archive/pc/mod/rm_acc_wrist_reyeswatch.archive",
+          "Size": 16719872,
+          "Sha256": "6f67b7e6f60d8a49d5b438b6bea9992846fe53bb970f7145b339b68410304b66"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_reyeswatch.xl",
+          "Path": "archive/pc/mod/rm_acc_wrist_reyeswatch.xl",
+          "Size": 1563,
+          "Sha256": "f2609be3c65a5badba6c368157803d53fb398cfe3ee4bae260df852eebe52878"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_rings_reyes.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_rings_reyes.yaml",
+          "Size": 4482,
+          "Sha256": "1c383d2939946b90219eb29ccee32ffb7eceb71cdb8b0fcf37c931e99171bf32"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_wrist_reyesbrac.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_wrist_reyesbrac.yaml",
+          "Size": 11767,
+          "Sha256": "46b1291aea66a6a15e31f738ad1ba16399e8d28019b4dcc464dc2da318c06ffc"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_wrist_reyeswatch.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_wrist_reyeswatch.yaml",
+          "Size": 4365,
+          "Sha256": "34325e75f49c75a16712363d316729827167b146afd0a45263c234c6f41b2a3d"
+        }
+      ]
+    },
+    {
+      "Id": "mod-18100",
+      "Name": "Valentino Harness and Holsters",
+      "Version": "2.02",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "mod-6945",
+        "CET",
+        "mod-14210",
+        "mod-10437"
+      ],
+      "Description": "Harness, cinto e coldres de coxa para ambos os V, com armas decorativas e ajustes de encaixe.\n\nComo usar: Refits automáticos dependem da tag corporal correta. Comprar no outlet Valentino. Phantom Liberty é opcional para parte das aparências de armas; sem DLC, evitar essas aparências. A integração Visual Holsters precisa ser validada separadamente. Algumas aparências de armas exigem Phantom Liberty; Visual Holsters é opcional.\n\nDependências: ArchiveXL, TweakXL, Equipment-EX, CET, raem's Atelier Store, The Community Palette Project.\n\nInstalação e arquivos conferidos. Aparência no jogo e coop ainda não testados.",
+      "Warning": "Refits automáticos dependem da tag corporal correta. Comprar no outlet Valentino. Phantom Liberty é opcional para parte das aparências de armas; sem DLC, evitar essas aparências. A integração Visual Holsters precisa ser validada separadamente. Algumas aparências de armas exigem Phantom Liberty; Visual Holsters é opcional.",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "DLC opcional para algumas aparências de armas.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/18100",
+      "NexusModId": 18100,
+      "NexusFileId": 136826,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Valentino Holsters - Main File-18100-2-02-1771665783.zip",
+          "Size": 113881833,
+          "Sha256": "ebe5eff9d7a37fea6b1a8302137d737e3679806940afecf411386c542f0e1986",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/18100?tab=files&file_id=136826",
+          "ModId": 18100,
+          "FileId": 136826
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_holster_valentino.archive",
+          "Path": "archive/pc/mod/rm_acc_holster_valentino.archive",
+          "Size": 114135040,
+          "Sha256": "de3be410b1a428a6b9e1d1052977d4ed7d4a2db164f91367825427b9f0a99f65"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_holster_valentino.xl",
+          "Path": "archive/pc/mod/rm_acc_holster_valentino.xl",
+          "Size": 52366,
+          "Sha256": "80c280938f4768c0d6ffef3e7d40305d40b06a0fa6498a70a42a828f79072c50"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_holster_valentino.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_holster_valentino.yaml",
+          "Size": 4753,
+          "Sha256": "c2a5a9bb8178d35ec2692626b45618a1d1ec6a879ff27e74b1799a743f7a08fc"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_holster_valentino_addons.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_holster_valentino_addons.yaml",
+          "Size": 39207,
+          "Sha256": "35956351dd67db1a06641bbbb0e95bb86570143cea5b8c0673f46412b0f9b26d"
+        }
+      ]
+    },
+    {
+      "Id": "mod-19132",
+      "Name": "Bomber Jackets",
+      "Version": "1.2",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "mod-6945",
+        "CET",
+        "mod-14210",
+        "mod-10437"
+      ],
+      "Description": "Jaquetas para ambos os V, 70 aparências e ajustes de mangas, fechamento e capuz.\n\nComo usar: Toggles são itens adicionais: Torso Aux para mangas/fechamento e Back para capuz. O principal inclui refits automáticos. Escolher somente um replacer opcional de textura. GarmentSupport depende também da outra roupa.\n\nDependências: ArchiveXL, TweakXL, Equipment-EX, CET, raem's Atelier Store, The Community Palette Project.\n\nInstalação e arquivos conferidos. Aparência no jogo e coop ainda não testados.",
+      "Warning": "Toggles são itens adicionais: Torso Aux para mangas/fechamento e Back para capuz. O principal inclui refits automáticos. Escolher somente um replacer opcional de textura. GarmentSupport depende também da outra roupa.",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Sem exigência explícita de expansão; runtime sem DLC não testado.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/19132",
+      "NexusModId": 19132,
+      "NexusFileId": 151535,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Bomber Jackets - Main File 19132 1.2 2026-07-09T20-23Z n1B61wEdF.zip",
+          "Size": 27744249,
+          "Sha256": "cd015db419ff78664e332c64e62e064d0ab03347004d589d3a79d737a1e5dfdc",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/19132?tab=files&file_id=151535",
+          "ModId": 19132,
+          "FileId": 151535
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_outer_bjacket.archive",
+          "Path": "archive/pc/mod/rm_outer_bjacket.archive",
+          "Size": 27963392,
+          "Sha256": "67c36b662f84212f28b2492d6ed86e30b989136ecfe7b26470e505fa1649590f"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_outer_bjacket.xl",
+          "Path": "archive/pc/mod/rm_outer_bjacket.xl",
+          "Size": 3075,
+          "Sha256": "2c5c62b572c72308f97fe82de774e8e45aeecfa65460a1c52086cb26bac4ee0c"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_outer_bjacket.yaml",
+          "Path": "r6/tweaks/raem/rm_outer_bjacket.yaml",
+          "Size": 6094,
+          "Sha256": "66c9c7aba402cf6690b9603cc936dbc0c2af449cf87cc3fd1eecc6e3902ab23a"
+        }
+      ]
+    },
+    {
+      "Id": "mod-19762",
+      "Name": "Claire Accessories",
+      "Version": "1.0",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "mod-6945",
+        "CET",
+        "mod-14210",
+        "mod-10437"
+      ],
+      "Description": "Relógio, pulseiras e anéis para ambos os V, com telas animadas e ajustes modulares.\n\nComo usar: O autor prevê combinação com Reyes atualizado e Chain. Relógio em Hand, pulseiras em Wrist, anéis em Fingers. Monowire pode atravessar pulseiras; Gorilla Arms exige remover nós dos dedos para anéis. Braços modificados não têm suporte garantido.\n\nDependências: ArchiveXL, TweakXL, Equipment-EX, CET, raem's Atelier Store, The Community Palette Project.\n\nInstalação e arquivos conferidos. Aparência no jogo e coop ainda não testados.",
+      "Warning": "O autor prevê combinação com Reyes atualizado e Chain. Relógio em Hand, pulseiras em Wrist, anéis em Fingers. Monowire pode atravessar pulseiras; Gorilla Arms exige remover nós dos dedos para anéis. Braços modificados não têm suporte garantido.",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Sem exigência explícita de expansão; runtime sem DLC não testado.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/19762",
+      "NexusModId": 19762,
+      "NexusFileId": 103913,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Claire Accessories - Main File-19762-1-0-1741900881.zip",
+          "Size": 11335688,
+          "Sha256": "95b22a4bac7e2e28ee0eea5064cbe180d504294f5e1abb27d147bf15e4eadf83",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/19762?tab=files&file_id=103913",
+          "ModId": 19762,
+          "FileId": 103913
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_rings_claire.archive",
+          "Path": "archive/pc/mod/rm_acc_rings_claire.archive",
+          "Size": 974848,
+          "Sha256": "4ed9e04d606f63dd1b857157b359334a426d988383548d65711d4206c5198b3c"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_rings_claire.xl",
+          "Path": "archive/pc/mod/rm_acc_rings_claire.xl",
+          "Size": 3089,
+          "Sha256": "85ff8e3cd48156816ea513eb42438da6be40849cf39aa36dca64214f6f9b5d8f"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_clairebrac.archive",
+          "Path": "archive/pc/mod/rm_acc_wrist_clairebrac.archive",
+          "Size": 4464640,
+          "Sha256": "dc9831003398724d3c22dcc46f366c396288b7626fbfa49332447a0d507c0a54"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_clairebrac.xl",
+          "Path": "archive/pc/mod/rm_acc_wrist_clairebrac.xl",
+          "Size": 4335,
+          "Sha256": "528895a3e40ff537e557ad0e0ea0f8b780a5e705e8d7689b08a44e2c9a498412"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_clairewatch.archive",
+          "Path": "archive/pc/mod/rm_acc_wrist_clairewatch.archive",
+          "Size": 5984256,
+          "Sha256": "32422f78490faf25e342ed53656233d368bb83ca1f97bb719d9e1543e758ff27"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_clairewatch.xl",
+          "Path": "archive/pc/mod/rm_acc_wrist_clairewatch.xl",
+          "Size": 1548,
+          "Sha256": "35cddf1ab285bf783116fc47712e83cdb7b08e7aa56319283892178c70cc75fb"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_rings_claire.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_rings_claire.yaml",
+          "Size": 7591,
+          "Sha256": "12e11ee9081aaec1fac616d1c0bf9d04c40a4a81cfc3091c3103588fe1d4d2e5"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_wrist_clairebrac.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_wrist_clairebrac.yaml",
+          "Size": 11648,
+          "Sha256": "919b2d940535964c9992bfa1fc71cc41e1b6d64204564e3da7b94cf459b9253d"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_wrist_clairewatch.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_wrist_clairewatch.yaml",
+          "Size": 4707,
+          "Sha256": "32d38eeaf4011833a38c4c2dcaac49ffb14aca3f0dd0298c93d20ddb43d7edb2"
+        }
+      ]
+    },
+    {
+      "Id": "mod-24327",
+      "Name": "Accessory and Jewelry Collection",
+      "Version": "1.01",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "mod-6945",
+        "CET",
+        "mod-14210",
+        "mod-10437"
+      ],
+      "Description": "Coleção de 18 acessórios, incluindo bolsas, colares, pulseiras, óculos e relógios para ambos os V.\n\nComo usar: O arquivo Main File – AiO contém todos os itens. Usar o principal ou os opcionais individuais. Refits automáticos cobrem corpos padrão e alguns corpos modificados; comprar na loja accessories – acc collection.\n\nDependências: ArchiveXL, TweakXL, Equipment-EX, CET, raem's Atelier Store, The Community Palette Project.\n\nInstalação e arquivos conferidos. Aparência no jogo e coop ainda não testados.",
+      "Warning": "O arquivo Main File – AiO contém todos os itens. Usar o principal ou os opcionais individuais. Refits automáticos cobrem corpos padrão e alguns corpos modificados; comprar na loja accessories – acc collection.",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Sem exigência explícita de expansão; runtime sem DLC não testado.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/24327",
+      "NexusModId": 24327,
+      "NexusFileId": 136862,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Accessory and Jewelry collection - Main File - AiO-24327-1-01-1771675637.zip",
+          "Size": 94038072,
+          "Sha256": "ddc409687029b57c805ab39d2526e144568d15955405ce442a5d964424307f2c",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/24327?tab=files&file_id=136862",
+          "ModId": 24327,
+          "FileId": 136862
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_arm_arasakad.archive",
+          "Path": "archive/pc/mod/rm_acc_arm_arasakad.archive",
+          "Size": 5111808,
+          "Sha256": "832f85dce7f946e4016ac5bce76ca62754a4bd1c997d70533f571deee41994b5"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_arm_arasakad.xl",
+          "Path": "archive/pc/mod/rm_acc_arm_arasakad.xl",
+          "Size": 2375,
+          "Sha256": "fad99f44ecd2cdb43c3b151fdd49d8cf346b9234af2afaf273277958c19fdd25"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_back_chestbag.archive",
+          "Path": "archive/pc/mod/rm_acc_back_chestbag.archive",
+          "Size": 19537920,
+          "Sha256": "e033c558c9605263c310779185ef932116fe17d90cdc8e6c6a7a404c34a46ce4"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_back_chestbag.xl",
+          "Path": "archive/pc/mod/rm_acc_back_chestbag.xl",
+          "Size": 3945,
+          "Sha256": "28f357c5c863bb54db03c7c65d4b0f59f08ec34ad053c22d10d3da790ff75a1b"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_back_claire.archive",
+          "Path": "archive/pc/mod/rm_acc_back_claire.archive",
+          "Size": 19779584,
+          "Sha256": "0b31b388396d2ae02c58f20353e97dce21df8581217ad12b20805070d7638571"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_back_claire.xl",
+          "Path": "archive/pc/mod/rm_acc_back_claire.xl",
+          "Size": 2665,
+          "Sha256": "4d573e6db76b3522716b263103b133fc08ad1d2d2098f6a88ecf8ad878648a54"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_belt_jackie.archive",
+          "Path": "archive/pc/mod/rm_acc_belt_jackie.archive",
+          "Size": 6533120,
+          "Sha256": "b433945dfbf319021dc0957971fba64c96fac17b7386cf859e4eedd881bafa0f"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_belt_jackie.xl",
+          "Path": "archive/pc/mod/rm_acc_belt_jackie.xl",
+          "Size": 3003,
+          "Sha256": "6b8955d56eaaac2066a4a9e00e7ae280aa005ae97ae3acb61bf16d8f9b83746c"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_belt_waistbag.archive",
+          "Path": "archive/pc/mod/rm_acc_belt_waistbag.archive",
+          "Size": 7798784,
+          "Sha256": "932cd85abf7a2506f32db3bff85f3441bc8d010485c3b73bc79f0457b5d4ccad"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_belt_waistbag.xl",
+          "Path": "archive/pc/mod/rm_acc_belt_waistbag.xl",
+          "Size": 1539,
+          "Sha256": "abbb3982ea086438028ea42fe99fd06df0c06133e79a119df7749ae835712c36"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_head_glasses1.archive",
+          "Path": "archive/pc/mod/rm_acc_head_glasses1.archive",
+          "Size": 2367488,
+          "Sha256": "1f187cda81c52065454743e532b05c6ff7f64b9eafbcf98ab61140324b4287fe"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_head_glasses1.xl",
+          "Path": "archive/pc/mod/rm_acc_head_glasses1.xl",
+          "Size": 2407,
+          "Sha256": "a5f67abcddd8ecc6cb6b6ae51e48fed326df9a64bf6253da5c01323b861eea8f"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_neck_alt.archive",
+          "Path": "archive/pc/mod/rm_acc_neck_alt.archive",
+          "Size": 1720320,
+          "Sha256": "9d49a96f276dd256efd20181902db35722687439cd949858169298e307ab4204"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_neck_alt.xl",
+          "Path": "archive/pc/mod/rm_acc_neck_alt.xl",
+          "Size": 757,
+          "Sha256": "8056035344751ffe7d22af64da7e1ee7267c6815c1e8e2941bc18043a66e97c4"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_neck_dawn.archive",
+          "Path": "archive/pc/mod/rm_acc_neck_dawn.archive",
+          "Size": 1273856,
+          "Sha256": "a3d62372b85903cf572a7c94633da31f1d45484d97b4240f564c43830561273c"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_neck_dawn.xl",
+          "Path": "archive/pc/mod/rm_acc_neck_dawn.xl",
+          "Size": 712,
+          "Sha256": "dbe8e006f682a00fc87c916628cca8b260a1d369c81504e0f6e6ede8b9037a88"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_neck_jackie.archive",
+          "Path": "archive/pc/mod/rm_acc_neck_jackie.archive",
+          "Size": 5193728,
+          "Sha256": "0e1fc239778ccb9995c7c00c287139d331f93091a2f1210a46632938fce28a0c"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_neck_jackie.xl",
+          "Path": "archive/pc/mod/rm_acc_neck_jackie.xl",
+          "Size": 3141,
+          "Sha256": "dc29807e3d9ab0a0749208510b69199cecf0e02416771288e25f7f3e146baa28"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_neck_johnnytagsalt.archive",
+          "Path": "archive/pc/mod/rm_acc_neck_johnnytagsalt.archive",
+          "Size": 2129920,
+          "Sha256": "8d36614265c23fd50574c68c1b861537b46afbb3a7d455a2a4eb4db57df45560"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_neck_johnnytagsalt.xl",
+          "Path": "archive/pc/mod/rm_acc_neck_johnnytagsalt.xl",
+          "Size": 1562,
+          "Sha256": "f3b0bb965c4936dce2dea7c58e821aca1494cbe30772f1838cc54909a1782e8d"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_neck_river.archive",
+          "Path": "archive/pc/mod/rm_acc_neck_river.archive",
+          "Size": 3026944,
+          "Sha256": "1856902ee88068adb6e0f6b6c7a60941dc12325c668a0adae3f531ba99631434"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_neck_river.xl",
+          "Path": "archive/pc/mod/rm_acc_neck_river.xl",
+          "Size": 2409,
+          "Sha256": "336d7e06de0331ae0871b0f62d12411552a533cb7b9c3c21f7b8b632b19ceb97"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_neck_wilson.archive",
+          "Path": "archive/pc/mod/rm_acc_neck_wilson.archive",
+          "Size": 397312,
+          "Sha256": "86ad047230519d03905bc6f4c54d966c1169fd2924d96963758c80ffe05e349b"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_neck_wilson.xl",
+          "Path": "archive/pc/mod/rm_acc_neck_wilson.xl",
+          "Size": 171,
+          "Sha256": "6da90e97008ca758b905aea142820de99c5d7e94cb01e8a98fb142a4b260ba08"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_dawn.archive",
+          "Path": "archive/pc/mod/rm_acc_wrist_dawn.archive",
+          "Size": 1531904,
+          "Sha256": "519fdbff4b6cadf62bfaeeb235bd082bf69a399afda6125d072942c39b8c0100"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_dawn.xl",
+          "Path": "archive/pc/mod/rm_acc_wrist_dawn.xl",
+          "Size": 2391,
+          "Sha256": "29b80f18b2a2bad66db2325eda5dfacfadcd523ceb3233c8042fce811cdcc84e"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_dexbrac.archive",
+          "Path": "archive/pc/mod/rm_acc_wrist_dexbrac.archive",
+          "Size": 2232320,
+          "Sha256": "afb899b643b5827f327fc2cf5604a00488570221a8716f123a3fea05029d2944"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_dexbrac.xl",
+          "Path": "archive/pc/mod/rm_acc_wrist_dexbrac.xl",
+          "Size": 1878,
+          "Sha256": "55f0bc32e00220eb68290b0d55c0ceb18c71b728d95c70e4024ee610c893f0ab"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_militarywatch.archive",
+          "Path": "archive/pc/mod/rm_acc_wrist_militarywatch.archive",
+          "Size": 3022848,
+          "Sha256": "37eb9b0d4ca6d7e941e932f225cfb71d1ac7f790ecc4565b1db1e59570d7ea7f"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_militarywatch.xl",
+          "Path": "archive/pc/mod/rm_acc_wrist_militarywatch.xl",
+          "Size": 1789,
+          "Sha256": "8e88e0016badfe4b26f72b2d3391d4062488b945646e3c942317ae6d55d3f811"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_mox.archive",
+          "Path": "archive/pc/mod/rm_acc_wrist_mox.archive",
+          "Size": 2527232,
+          "Sha256": "4109dc209b91e3732e12f763ce66ab55895ba7ba742a55f04a78241a3683be06"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_mox.xl",
+          "Path": "archive/pc/mod/rm_acc_wrist_mox.xl",
+          "Size": 1717,
+          "Sha256": "b684bf5e55336b97674607945911260d6890ef490711c5228298898d9f76f2d9"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_rolex.archive",
+          "Path": "archive/pc/mod/rm_acc_wrist_rolex.archive",
+          "Size": 4857856,
+          "Sha256": "b5fb9364884fbbab59e9e0d51eb9a4da6e2eed13af151402d02bd167c8e1aca9"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_rolex.xl",
+          "Path": "archive/pc/mod/rm_acc_wrist_rolex.xl",
+          "Size": 2077,
+          "Sha256": "149cdc2a564cceae97165c8129f9e8cf68c80fdfbd79a3f882d6041f22b1bda6"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_steel.archive",
+          "Path": "archive/pc/mod/rm_acc_wrist_steel.archive",
+          "Size": 5943296,
+          "Sha256": "0af1b448f2bdf7f57bd6f445c12f1fb3bef4f7b231069faeca71e81ba1165147"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_acc_wrist_steel.xl",
+          "Path": "archive/pc/mod/rm_acc_wrist_steel.xl",
+          "Size": 4637,
+          "Sha256": "df5b26fa7d8a05e966389666b04c26e3a93878c81491f48da28de75d17bf6753"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_arm_arasakad.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_arm_arasakad.yaml",
+          "Size": 7281,
+          "Sha256": "2567e6f5412ab09b244be4b9a42cafd349d4285cc148575bd7c2f10b330b9431"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_back_chestbag.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_back_chestbag.yaml",
+          "Size": 5642,
+          "Sha256": "46a58f3c5b3f7a7e76524560810df12af843c732693de3f5636b2c6202b315cc"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_back_claire.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_back_claire.yaml",
+          "Size": 3252,
+          "Sha256": "d0141bb44277d0074ffa5256d8d20e737f582fcc4ddaf041e1bc6fdead559384"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_back_claire_decals.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_back_claire_decals.yaml",
+          "Size": 1245,
+          "Sha256": "17159d2defe9bd24c49333df0cd068b5d6b749e4e4eb659c4cedc0164dd61016"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_belt_jackie.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_belt_jackie.yaml",
+          "Size": 5746,
+          "Sha256": "ee9f08c22086ab9c2cb71c09574fbfa89a255a37c1619992db0a60c4ac477cc7"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_belt_waistbag.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_belt_waistbag.yaml",
+          "Size": 4720,
+          "Sha256": "f3db4e98338b85fd43061c4da805e9032bf002e277586e88f063562cc21aec6f"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_head_glasses1.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_head_glasses1.yaml",
+          "Size": 3381,
+          "Sha256": "4f7fbe37e2dc291ae3129738b6f7f31a1420982d19b8c8a25b25d182ab9de94f"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_neck_alt.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_neck_alt.yaml",
+          "Size": 1904,
+          "Sha256": "04ff2283bd1393c181e9ae65ba2b789883957d6a37809afa978c4a3a2d89ede7"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_neck_dawn.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_neck_dawn.yaml",
+          "Size": 3061,
+          "Sha256": "82ce8d2b6ee38790bc277081d22af75e61906e622b9784d1fba616f4e16a88d2"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_neck_jackie.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_neck_jackie.yaml",
+          "Size": 5805,
+          "Sha256": "d9426e42fce6e5b4059d6353fc11ca21d64b8017868f606daed6c939ce903aed"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_neck_johnnytagsalt.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_neck_johnnytagsalt.yaml",
+          "Size": 3493,
+          "Sha256": "0c55ada16a42fb6adae7efa370d53b4391093dd9e2d932d3a9f516c0f47bb7f3"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_neck_river.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_neck_river.yaml",
+          "Size": 5730,
+          "Sha256": "e8e9c7ba87dafdcafde790ddd5a6092ab40a0fd6d54d7b7a4c33bb1a196892aa"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_neck_wilson.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_neck_wilson.yaml",
+          "Size": 1092,
+          "Sha256": "1988a398446d90ad306a4130f9f87fb613ae6d4fa22e90acb66a7bf59e124c94"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_wrist_dawn.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_wrist_dawn.yaml",
+          "Size": 3925,
+          "Sha256": "f1749c1b96b78a6f1aa46aa3929ade851dbb84bfbf3b5326370cdef6bf825e17"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_wrist_dex.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_wrist_dex.yaml",
+          "Size": 1866,
+          "Sha256": "142ae79a137f4b478d06ce4d4895c39958efbba5e484974d192d085aca48ea0e"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_wrist_military.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_wrist_military.yaml",
+          "Size": 4584,
+          "Sha256": "72af103b05781ccccc812554f14057d2e47db64438f8fb1c5720f53f722a1b5e"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_wrist_mox.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_wrist_mox.yaml",
+          "Size": 4884,
+          "Sha256": "5377a15f4571550944c7529039c1005054707917ed3ba88d8887257421bf116f"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_wrist_rolex.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_wrist_rolex.yaml",
+          "Size": 2029,
+          "Sha256": "e3d79573958ab6a6779459533f9b3988239dc7d60c81d225bd2f4446fd0d98f0"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_acc_wrist_steel.yaml",
+          "Path": "r6/tweaks/raem/rm_acc_wrist_steel.yaml",
+          "Size": 5780,
+          "Sha256": "dfd2ae5d699ce43ad98a602ff2ee93760b1d11b5f5d2c13af74f8998a6992f82"
+        }
+      ]
+    },
+    {
+      "Id": "mod-31328",
+      "Name": "Novawear Pants",
+      "Version": "1.0",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "mod-6945",
+        "CET",
+        "mod-14210",
+        "mod-10437"
+      ],
+      "Description": "Calças para ambos os V, 50 cores, detalhes extras e ajustes nas pernas.\n\nComo usar: Toggles adicionais: Legs Inner para detalhes e Legs Outer para barras. Inclui corpos padrão, RB, Eve, Angel e Gymfiend; outros carregam o modelo padrão. GarmentSupport exige suporte da outra roupa. Comprar em clothes – main store.\n\nDependências: ArchiveXL, TweakXL, Equipment-EX, CET, raem's Atelier Store, The Community Palette Project.\n\nInstalação e arquivos conferidos. Aparência no jogo e coop ainda não testados.",
+      "Warning": "Toggles adicionais: Legs Inner para detalhes e Legs Outer para barras. Inclui corpos padrão, RB, Eve, Angel e Gymfiend; outros carregam o modelo padrão. GarmentSupport exige suporte da outra roupa. Comprar em clothes – main store.",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Sem exigência explícita de expansão; runtime sem DLC não testado.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/31328",
+      "NexusModId": 31328,
+      "NexusFileId": 151521,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Novawear Pants - Main File 31328 1.0 2026-07-09T17-50Z lcXrcZH2A.zip",
+          "Size": 15144200,
+          "Sha256": "37ec71afa54433bd5783e3c3d9ff48496256b7cda87595cc7342741bb256285e",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/31328?tab=files&file_id=151521",
+          "ModId": 31328,
+          "FileId": 151521
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_legs_novawear.archive",
+          "Path": "archive/pc/mod/rm_legs_novawear.archive",
+          "Size": 15306752,
+          "Sha256": "0e30ca69d227cc54410511bad0384b8a8ad3d15a5a489dd3814b69d22989d2bc"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_legs_novawear.xl",
+          "Path": "archive/pc/mod/rm_legs_novawear.xl",
+          "Size": 3178,
+          "Sha256": "b0ee8ef3234df6bd3f977fd37a2935eaa4c0910d1c7b45bb2ebc6d4d6ffb9927"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_legs_novawear.yaml",
+          "Path": "r6/tweaks/raem/rm_legs_novawear.yaml",
+          "Size": 4975,
+          "Sha256": "853a3728087d201ef33b345491b627fadb86ef1b003cf2a3e4ea2ab5567c6b0e"
+        }
+      ]
+    },
+    {
+      "Id": "mod-18084",
+      "Name": "Ripper Pants and Belt",
+      "Version": "1.2",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "mod-6945",
+        "CET",
+        "mod-14210",
+        "mod-10437"
+      ],
+      "Description": "Calças em três comprimentos e 36 cores por comprimento; cinto em 40 cores para ambos os V.\n\nComo usar: Refits automáticos incluídos. Toggle em Thigh Left esconde bolsos e tiras. Física do cinto é um download opcional e não é recomendada com rig deform. Comprar em clothes – main store.\n\nDependências: ArchiveXL, TweakXL, Equipment-EX, CET, raem's Atelier Store, The Community Palette Project.\n\nInstalação e arquivos conferidos. Aparência no jogo e coop ainda não testados.",
+      "Warning": "Refits automáticos incluídos. Toggle em Thigh Left esconde bolsos e tiras. Física do cinto é um download opcional e não é recomendada com rig deform. Comprar em clothes – main store.",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Sem exigência explícita de expansão; runtime sem DLC não testado.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/18084",
+      "NexusModId": 18084,
+      "NexusFileId": 151532,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Ripper pants - Main File 18084 1.2 2026-07-09T20-08Z OCk3C5LI5.zip",
+          "Size": 47944944,
+          "Sha256": "1b777f045286f9914a7888324438709aa7e4fa890ff00dbc5ba1c514c503750e",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/18084?tab=files&file_id=151532",
+          "ModId": 18084,
+          "FileId": 151532
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_legs_ripper.archive",
+          "Path": "archive/pc/mod/rm_legs_ripper.archive",
+          "Size": 48381952,
+          "Sha256": "c24bacb008671c0c5abe66acb71362519c754fa3e07298f3f0ec72f818e76bf6"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_legs_ripper.xl",
+          "Path": "archive/pc/mod/rm_legs_ripper.xl",
+          "Size": 9200,
+          "Sha256": "3f5afa9125de45965af5db1be5a273a8139e62fbca7ef9be77dea406d9fa2613"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_legs_ripper.yaml",
+          "Path": "r6/tweaks/raem/rm_legs_ripper.yaml",
+          "Size": 3939,
+          "Sha256": "728c3c291e3be8179a09e5b7d6bf7bd586b14b72d7467372b728e0ad3bf84357"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_legs_ripper_belt.yaml",
+          "Path": "r6/tweaks/raem/rm_legs_ripper_belt.yaml",
+          "Size": 2205,
+          "Sha256": "773afc2313304d9f9c762f8676af5bd8ca516769e92eba6180e66962b3add3f6"
+        }
+      ]
+    },
+    {
+      "Id": "mod-10437",
+      "Name": "The Community Palette Project",
+      "Version": "1.1",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [],
+      "Description": "Recurso compartilhado de materiais e cores exigido por parte das peças.\n\nComo usar: ZIP contém um archive na raiz: destino correto é archive/pc/mod. Não é uma coleção de roupas nem adiciona itens equipáveis por si só.\n\nDependências: nenhuma dependência adicional.\n\nInstalação e arquivos conferidos. Aparência no jogo e coop ainda não testados.",
+      "Warning": "ZIP contém um archive na raiz: destino correto é archive/pc/mod. Não é uma coleção de roupas nem adiciona itens equipáveis por si só.",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Sem exigência explícita de expansão; runtime sem DLC não testado.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/10437",
+      "NexusModId": 10437,
+      "NexusFileId": 71181,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "The Community Palette Project-10437-1-1-1710101546.zip",
+          "Size": 3881735,
+          "Sha256": "0d8e831f8570f7e3843fcdb66b2c50db2bee27fdcd423939ca22588ef73e4f08",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/10437?tab=files&file_id=71181",
+          "ModId": 10437,
+          "FileId": 71181
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "TheCommunityPaletteProject_MLTemplateResource.archive",
+          "Path": "archive/pc/mod/TheCommunityPaletteProject_MLTemplateResource.archive",
+          "Size": 4268032,
+          "Sha256": "950aa6fb1e2bbfa08eb30e67e585f27629eddb90458d4f0be7657926bca121e2"
         }
       ]
     }

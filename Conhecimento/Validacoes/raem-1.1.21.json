@@ -1,0 +1,15 @@
+{
+  "Version": "1.1.21",
+  "Recipes": 149,
+  "Sha256": "75C7E6ACF28C5571AB10298BD031CD933CEC022B77B7F4E7F2C3FF15C2C3A848",
+  "Backup": "Auditoria/Raem-1.1.21/Anterior-144409",
+  "Installed": "<LocalAppData>/Programs/Mod Loader/ModLoader.exe",
+  "Added": 11,
+  "InstalledFiles": 106,
+  "PreviousRecipesPreserved": 138,
+  "SpecificTestsPassed": true,
+  "FullSuitePassed": false,
+  "VisualTested": false,
+  "CoopTested": false,
+  "Evidence": "Auditoria/Raem-1.1.21"
+}

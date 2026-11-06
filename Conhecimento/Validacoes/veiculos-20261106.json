@@ -1,0 +1,24 @@
+{
+  "CheckedOn": "2026-11-06",
+  "Ids": [
+    "mod-13847",
+    "mod-8827",
+    "mod-10445",
+    "mod-11331"
+  ],
+  "ReportedVehicles": 4,
+  "UserReportsAdditionalVehicles": true,
+  "CheckedFiles": 53,
+  "AllHashesMatch": true,
+  "ArchiveXL": "1.28.2",
+  "RED4ext": "1.31.0",
+  "LeadingHypothesis": "Renderizacao de materiais no jogo 2.5 com ArchiveXL anterior as correcoes 1.28.4/1.28.5",
+  "CausalityConfirmedByAB": false,
+  "ConfirmedSeparateError": "S1000RR: vehDriveModelData clona registro inexistente Vehicle.v_sportbike2_arch_nemesis_inline0",
+  "ProposedArchiveXL": "1.28.6 stable, sem trocar RED4ext",
+  "GameModified": false,
+  "CatalogModified": false,
+  "PackageDownloaded": false,
+  "AgentLaunchedGame": false,
+  "Evidence": "Fotos do usuario, SHA256, logs locais e documentacao dos autores"
+}
