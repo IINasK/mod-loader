@@ -224,5 +224,20 @@
     "Configuration, projects and cache are retained when uninstalling the manager. Game mods remain independent.",
     "New installations use modern directories; existing legacy library/cache/log paths are reused rather than moved.",
     "Nexus anonymous lookup limitation from 1.1.14 remains."
-  ]
+  ],
+  "SourceCommit": "a37c861fef798a9f78a1c627d1e16be5a3f98855",
+  "PublishedRelease": {
+    "AnonymousRequest": true,
+    "Runtime": "Windows PowerShell 5.1 / .NET Framework",
+    "UsedPublished114Checker": true,
+    "AvailableToVersion114": "1.1.15",
+    "Version115DoesNotNotifyItself": true,
+    "ReleasePage": "https://github.com/IINasK/mod-loader/releases/tag/v1.1.15",
+    "DownloadUrl": "https://github.com/IINasK/mod-loader/releases/download/v1.1.15/Mod-Loader-1.1.15.exe",
+    "DownloadBytes": 5379836,
+    "DownloadedSha256": "1EEC71C0EE175A6DC1999AEBCD9EDD5437D8EBE29A1560F2375679A097FFFB07",
+    "DownloadedExecutableWasRun": false,
+    "TempDownloadRemoved": true,
+    "AssetIsWindowsInstaller": true
+  }
 }
