@@ -18731,7 +18731,7 @@
       "CoopEvidence": "Sem teste específico em coop",
       "Blocked": false,
       "BlockedReason": "",
-      "DocumentationSummary": "# VOIDWEAR Accessories Virtual Atelier0.85\n\nNo computador do apartamento: Net > Atelier > VOIDWEAR Accessories. A receita mantém o archive compartilhado da loja e `voidwear-accessories.reds`, necessários aos óculos VOIDWEAR Round Glasses. Dependências: Virtual Atelier1.6.4 e redscript0.5.32 existentes.\n\nPor pedido do usuário em06/11/2026, as lojas Casual e Tacticool foram excluídas da receita: `voidwear-casual.reds` e `voidwear-tacticool.reds` não serão instalados. O ZIP oficial continua o mesmo; apenas esses dois scripts são omitidos. Roupas compradas/instaladas separadamente não são apagadas por essa mudança. A remoção desses scripts já existentes no jogo aguarda o fechamento do jogo; nenhum archive compartilhado será apagado para remover apenas as duas lojas.\n\n[Arquivo oficial0.85](https://www.nexusmods.com/cyberpunk2077/mods/12637?tab=files&file_id=147075). Sem exigência declarada deDLC/REDmod. Conferência estática e ensaio de remoção/reversão em fixture; sem novo teste de loja em jogo.\n",
+      "DocumentationSummary": "# VOIDWEAR Accessories Virtual Atelier0.85\n\nNo computador do apartamento: Net > Atelier > VOIDWEAR Accessories. A receita mantém o archive compartilhado da loja e `voidwear-accessories.reds`, necessários aos óculos VOIDWEAR Round Glasses. Dependências: Virtual Atelier1.6.4 e redscript0.5.32 existentes.\n\nPor pedido do usuário em06/11/2026, as lojas Casual e Tacticool foram excluídas da receita: `voidwear-casual.reds` e `voidwear-tacticool.reds` não serão instalados. O ZIP oficial continua o mesmo; apenas esses dois scripts são omitidos. Roupas compradas/instaladas separadamente não são apagadas por essa mudança. Os dois scripts foram removidos localmente em06/11/2026, com backup e jogo fechado. O archive compartilhado e a loja Accessories permaneceram iguais.\n\n[Arquivo oficial0.85](https://www.nexusmods.com/cyberpunk2077/mods/12637?tab=files&file_id=147075). Sem exigência declarada deDLC/REDmod. Conferência estática e ensaio de remoção/reversão em fixture; sem novo teste de loja em jogo.\n",
       "Files": [
         {
           "Asset": "a0",
@@ -18766,7 +18766,9 @@
           "https://www.nexusmods.com/cyberpunk2077/mods/12637"
         ],
         "Notes": "Sem requisito de expansão declarado. Inferência documental e estática."
-      }
+      },
+      "LocalInstallationVerifiedOn": "2026-11-06",
+      "RuntimeTested": false
     },
     {
       "Id": "mod-6779",
@@ -19452,7 +19454,7 @@
       "CoopEvidence": "Compatibilidade declarada pelo autor; sem novo teste específico em coop.",
       "Blocked": false,
       "BlockedReason": "",
-      "DocumentationSummary": "# Advanced Crash Reporter 1.5.0\n\nMod 34403, arquivo oficial 168418. Diagnóstico local de crashes e travamentos; substitui o diálogo de falha por um resumo e registra pilhas, módulos, inventário de mods e trechos de logs. Não corrige crashes nem comprova sozinho qual mod causou o problema.\n\n## Uso\n\nDepois de instalado, inicie o jogo normalmente. Não há tecla, login ou configuração inicial. Depois de um crash, use Open report no diálogo ou abra `bin/x64/plugins/AdvancedCrashReporter/reports/`. Em travamentos, os snapshots ficam em `reports/watch/`. Comece pelo Summary; um nome na pilha é indício, não prova. Configurações em `bin/x64/plugins/AdvancedCrashReporter/config.ini`; `[dialog] enabled=0` volta ao diálogo original. O relatório está em inglês; a janela acompanha o idioma do Windows.\n\n## Requisitos e compatibilidade\n\nA página lista somente Cyber Engine Tweaks. O pacote usa ASI, carregado pelo suporte já presente no CET. O autor declara compatibilidade com patches2.31/2.5 e com outros mods. Não exige corpo, roupa, REDmod ou Phantom Liberty. Nosso catálogo depende de CET1.38.1 existente, sem atualizar RED4ext1.31.0 ou qualquer framework. Essa é uma conclusão documental/estática; ainda não foi provocado um crash no jogo real nem feito teste específico de coop.\n\n## Pacote e privacidade\n\nZIP oficial4088118bytes, SHA256 `23d7bb242b61ec756c78af458a16a32f14a83149ecfbe8ab9404bde0c6980828`, igual ao hash do link VirusTotal apresentado pelo Nexus.26arquivos somam4995357bytes: CrashReporter.exe, AdvancedCrashReporter.asi, config.ini e tabelas/licenças de nomes para diagnóstico. Arquivos `.bin` com nomes de RED4ext/CET/ArchiveXL etc. são tabelas de símbolos, não atualizações desses frameworks. Nenhum código do pacote foi executado na validação; o ensaio copiou/conferiu os26arquivos e desfez a instalação numa fixture.\n\nSegundo o autor, não há envio de relatórios; eles permanecem no PC. Contêm inventário de mods, logs e contexto técnico: revise antes de compartilhar. O Mod Loader não deve exportar reports/watch/logs junto com um modpack. O config.ini original fica fixado na receita; alterações locais provocam revisão, em vez de sobrescrita silenciosa. MO2 com sistema de arquivos virtual pode ser incompatível. Mods archive e Lua não aparecem diretamente na pilha; o inventário e os logs ajudam na investigação.\n\n[Descrição oficial](https://www.nexusmods.com/cyberpunk2077/mods/34403?tab=description) · [Arquivo1.5.0](https://www.nexusmods.com/cyberpunk2077/mods/34403?tab=files&file_id=168418).\n\nSituação local nesta entrega: baixado e integrado; instalação no jogo aguarda seu fechamento. Não confundir ensaio de arquivos com execução no jogo.\n",
+      "DocumentationSummary": "# Advanced Crash Reporter 1.5.0\n\nMod 34403, arquivo oficial 168418. Diagnóstico local de crashes e travamentos; substitui o diálogo de falha por um resumo e registra pilhas, módulos, inventário de mods e trechos de logs. Não corrige crashes nem comprova sozinho qual mod causou o problema.\n\n## Uso\n\nDepois de instalado, inicie o jogo normalmente. Não há tecla, login ou configuração inicial. Depois de um crash, use Open report no diálogo ou abra `bin/x64/plugins/AdvancedCrashReporter/reports/`. Em travamentos, os snapshots ficam em `reports/watch/`. Comece pelo Summary; um nome na pilha é indício, não prova. Configurações em `bin/x64/plugins/AdvancedCrashReporter/config.ini`; `[dialog] enabled=0` volta ao diálogo original. O relatório está em inglês; a janela acompanha o idioma do Windows.\n\n## Requisitos e compatibilidade\n\nA página lista somente Cyber Engine Tweaks. O pacote usa ASI, carregado pelo suporte já presente no CET. O autor declara compatibilidade com patches2.31/2.5 e com outros mods. Não exige corpo, roupa, REDmod ou Phantom Liberty. Nosso catálogo depende de CET1.38.1 existente, sem atualizar RED4ext1.31.0 ou qualquer framework. Essa é uma conclusão documental/estática; ainda não foi provocado um crash no jogo real nem feito teste específico de coop.\n\n## Pacote e privacidade\n\nZIP oficial4088118bytes, SHA256 `23d7bb242b61ec756c78af458a16a32f14a83149ecfbe8ab9404bde0c6980828`, igual ao hash do link VirusTotal apresentado pelo Nexus.26arquivos somam4995357bytes: CrashReporter.exe, AdvancedCrashReporter.asi, config.ini e tabelas/licenças de nomes para diagnóstico. Arquivos `.bin` com nomes de RED4ext/CET/ArchiveXL etc. são tabelas de símbolos, não atualizações desses frameworks. Nenhum código do pacote foi executado na validação; o ensaio copiou/conferiu os26arquivos e desfez a instalação numa fixture.\n\nSegundo o autor, não há envio de relatórios; eles permanecem no PC. Contêm inventário de mods, logs e contexto técnico: revise antes de compartilhar. O Mod Loader não deve exportar reports/watch/logs junto com um modpack. O config.ini original fica fixado na receita; alterações locais provocam revisão, em vez de sobrescrita silenciosa. MO2 com sistema de arquivos virtual pode ser incompatível. Mods archive e Lua não aparecem diretamente na pilha; o inventário e os logs ajudam na investigação.\n\n[Descrição oficial](https://www.nexusmods.com/cyberpunk2077/mods/34403?tab=description) · [Arquivo1.5.0](https://www.nexusmods.com/cyberpunk2077/mods/34403?tab=files&file_id=168418).\n\nAplicação local autorizada em06/11/2026: instalado pelo motor1.1.19 com o jogo fechado; os26hashes e o recibo foram conferidos. RED4ext/CET e demais arquivos protegidos iguais. Não houve abertura do jogo ou teste de crash: instalação verificada não é confirmação do diagnóstico em execução. Ver [registro local sanitizado](../Validacoes/aplicacao-local-20261106.json).\n",
       "Files": [
         {
           "Asset": "a0",
@@ -19681,7 +19683,9 @@
           "https://www.nexusmods.com/cyberpunk2077/mods/34403?tab=files&file_id=168418"
         ],
         "Notes": "Utilitário diagnóstico sem conteúdo da expansão."
-      }
+      },
+      "LocalInstallationVerifiedOn": "2026-11-06",
+      "RuntimeTested": false
     }
   ],
   "ArchiveReader": {
@@ -19713,8 +19717,9 @@
       "Version": "1.5",
       "InstallerVersion": "1.1.19",
       "RemovedOn": "2026-11-06",
-      "Reason": "Retirado do catálogo a pedido do usuário; remoção física local aguarda jogo fechado. Fishnet7822 permanece.",
-      "SummaryFile": "Mods/mod-12572.md"
+      "Reason": "Retirado do catálogo e três arquivos removidos localmente a pedido do usuário, com backup conferido. Fishnet7822 permanece.",
+      "SummaryFile": "Mods/mod-12572.md",
+      "LocalRemovalVerifiedOn": "2026-11-06"
     }
   ]
 }

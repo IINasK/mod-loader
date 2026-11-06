@@ -23,6 +23,14 @@
 - Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
   autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
 
+## Aplicação local posterior concluída —06/11/2026
+
+- Usuário autorizou remover os cinco arquivos e instalar Reporter. Jogo estava fechado; não foi encerrado ou iniciado pelo agente. Esta aplicação SUPERA a pendência local registrada na entrega1.1.19 abaixo.
+- Stockings12572: archive+XL+YAML removidos; VOIDWEAR Casual/Tacticool: somente os dois scripts removidos. Cinco backups SHA verificados em Auditoria/Remocoes-e-reporter-20261106/Aplicacao-.../removidos. Accessories/archive compartilhado/óculos/Fishnet/TogglableFeet preservados. Remoção manual cirúrgica tem seu próprio registro/backup; não alegar restauração pelo Desfazer do app.
+- Reporter34403/1684181.5.0 instalado pelo FixedInstaller1.1.19:26hashes/recibo conferidos independentemente.127arquivos protegidos iguais,39FPV iguais,172saves iguais e172backups nativos iguais. Nenhuma atualização de RED4ext/CET ou alteração de corpo. Não foi executado o código do mod nem testado um crash real.
+- Primeiro preflight parou SEM mutações: recibo antigo de31642 fora do catálogo. Helper operacional usou catálogo original1.1.18 e definição FPV recuperada do Git (cat87a1039e..., commit6fcb9c72^), somente para validação do histórico; seleção de instalação apenas34403. Não reintroduzir FPV no app nem tocar perfis para resolver essa leitura.
+- Limitação real para próxima manutenção: EnsureNoIncomplete/ReadReceipt atuais podem bloquear operação por mod aposentado no histórico; o executável público NÃO foi modificado aqui. Preservar os registros e resolver com histórico confiável em vez de ignorar recibos ou relaxar validação. Ver registro-final.md e verificacao-independente.json no grupo privado; resumo público Validacoes/aplicacao-local-20261106.json. Falhas readonly de verificação foram corrigidas e registradas. Não incluir backups, saves, logs pessoais ou helpers na publicação.
+
 ## Revisão atual1.1.19 — convites, projeto parcial e catálogo —06/11/2026
 
 - Preparar convite automaticamente ao abrir foi escolha explícita do usuário. Reusar Syncthing2.1.7 e convite/resposta existentes; não inventar URL ou trocar transporte. Campos uma linha/48px, copy interno44px recuado da borda. Projeto sem itens pode receber sem gerar ZIP. Manter ZIP compactado: a queixa de compactação anterior era sobre largura do botão Projetos.

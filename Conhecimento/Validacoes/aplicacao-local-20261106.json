@@ -1,0 +1,28 @@
+{
+  "Date": "2026-11-06",
+  "InstallerVersion": "1.1.19",
+  "Applied": true,
+  "Removed": [
+    "Nola Stockings Collection: archive, XL and YAML",
+    "VOIDWEAR Casual store script",
+    "VOIDWEAR Tacticool store script"
+  ],
+  "RemovedFilesAbsent": 5,
+  "RemovalBackupsVerified": 5,
+  "ReporterVersion": "1.5.0",
+  "ReporterFilesVerified": 26,
+  "ProtectedFilesUnchanged": 127,
+  "FpvFilesUnchanged": 39,
+  "SaveFilesUnchanged": 172,
+  "SaveBackupsVerified": 172,
+  "FrameworksUpdated": false,
+  "GameLaunched": false,
+  "ModCodeExecuted": false,
+  "PrivateEvidence": "Auditoria/Remocoes-e-reporter-20261106/",
+  "KnownLimits": [
+    "Runtime/crash dialog was not tested.",
+    "Only receipt validation used historical retired definitions; no retired mod was reinstalled.",
+    "The five removed files have a private project backup, separate from the app Undo operation.",
+    "The active-catalog-only historical receipt reader remains a future maintenance item; no production validation was relaxed."
+  ]
+}
