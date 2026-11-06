@@ -1,59 +1,62 @@
 {
-  "Version": "1.1.24",
-  "Checks": 235,
-  "Reports": [
-    {
-      "Report": "resultado-progresso-geral.json",
-      "Checks": 32,
-      "Passed": true,
-      "Evidence": "T/R124/online-testes-94b76f095e104e119d291ba76a2ae7c7/resultado-progresso-geral.json"
-    },
-    {
-      "Report": "resultado-historico.json",
-      "Checks": 7,
-      "Passed": true,
-      "Evidence": "T/R124/online-testes-993da46c217140f89438599f940d059b/resultado-historico.json"
-    },
-    {
-      "Report": "resultado-p2p-ui.json",
-      "Checks": 122,
-      "Passed": true,
-      "Evidence": "T/R124/online-testes-acbda169919944bab6043b0f352fc1d6/resultado-p2p-ui.json"
-    },
-    {
-      "Report": "resultado-snapshot-density.json",
-      "Checks": 8,
-      "Passed": true,
-      "Evidence": "T/R124/online-testes-39272865e6b54df1bd50f08311891349/resultado-snapshot-density.json"
-    },
-    {
-      "Report": "resultado-snapshot-p2p.json",
-      "Checks": 42,
-      "Passed": true,
-      "Evidence": "T/R124/sp-3ad871/resultado-snapshot-p2p.json"
-    },
-    {
-      "Report": "resultado-setup.json",
-      "Checks": 24,
-      "Passed": true,
-      "Evidence": "T/setup-b0370b59fbe344a4a56def810d791813/resultado-setup.json"
-    }
-  ],
-  "AppSha256": "43f7e564ba5e11a01dae0fa1588ef6430946ea41886ce734fa44a8c88cbe063e",
-  "SetupSha256": "11521250f48ac69db2c1707e3592672a5dee5e29fd23bd9850575356f730d033",
-  "SetupBytes": 5420414,
-  "CatalogSha256": "c6a0b3a6170e10c8d707c4d25361d30be7382bccb9a25dd8a50d27c956e2e6a2",
-  "RealLocalReadOnly": {
-    "ReceiptsVerified": 104,
-    "Errors": 0,
-    "Density": "legacy-low",
-    "SnapshotFilesIncludingDependencies": 68
-  },
-  "RealGameModified": false,
-  "RealGameClosedOrLaunched": false,
-  "PeerTest": "two independent Syncthing profiles on loopback, including automatic dialog invite, interruption, resume, remote pause and cleanup",
-  "TwoRealPCsTested": false,
-  "FullGeneralSuiteRun": false,
-  "FullGeneralSuiteReason": "Real game and Mod Loader remain open; focused independent fixtures used. Earlier general-suite catalog assertions remain outside this patch.",
-  "ReleaseVerified": false
+    "Version":  "1.1.24",
+    "Checks":  235,
+    "Reports":  [
+                    {
+                        "Report":  "resultado-progresso-geral.json",
+                        "Checks":  32,
+                        "Passed":  true,
+                        "Evidence":  "T/R124/online-testes-94b76f095e104e119d291ba76a2ae7c7/resultado-progresso-geral.json"
+                    },
+                    {
+                        "Report":  "resultado-historico.json",
+                        "Checks":  7,
+                        "Passed":  true,
+                        "Evidence":  "T/R124/online-testes-993da46c217140f89438599f940d059b/resultado-historico.json"
+                    },
+                    {
+                        "Report":  "resultado-p2p-ui.json",
+                        "Checks":  122,
+                        "Passed":  true,
+                        "Evidence":  "T/R124/online-testes-acbda169919944bab6043b0f352fc1d6/resultado-p2p-ui.json"
+                    },
+                    {
+                        "Report":  "resultado-snapshot-density.json",
+                        "Checks":  8,
+                        "Passed":  true,
+                        "Evidence":  "T/R124/online-testes-39272865e6b54df1bd50f08311891349/resultado-snapshot-density.json"
+                    },
+                    {
+                        "Report":  "resultado-snapshot-p2p.json",
+                        "Checks":  42,
+                        "Passed":  true,
+                        "Evidence":  "T/R124/sp-3ad871/resultado-snapshot-p2p.json"
+                    },
+                    {
+                        "Report":  "resultado-setup.json",
+                        "Checks":  24,
+                        "Passed":  true,
+                        "Evidence":  "T/setup-b0370b59fbe344a4a56def810d791813/resultado-setup.json"
+                    }
+                ],
+    "AppSha256":  "43f7e564ba5e11a01dae0fa1588ef6430946ea41886ce734fa44a8c88cbe063e",
+    "SetupSha256":  "11521250f48ac69db2c1707e3592672a5dee5e29fd23bd9850575356f730d033",
+    "SetupBytes":  5420414,
+    "CatalogSha256":  "c6a0b3a6170e10c8d707c4d25361d30be7382bccb9a25dd8a50d27c956e2e6a2",
+    "RealLocalReadOnly":  {
+                              "ReceiptsVerified":  104,
+                              "Errors":  0,
+                              "Density":  "legacy-low",
+                              "SnapshotFilesIncludingDependencies":  68
+                          },
+    "RealGameModified":  false,
+    "RealGameClosedOrLaunched":  false,
+    "PeerTest":  "two independent Syncthing profiles on loopback, including automatic dialog invite, interruption, resume, remote pause and cleanup",
+    "TwoRealPCsTested":  false,
+    "FullGeneralSuiteRun":  false,
+    "FullGeneralSuiteReason":  "Real game and Mod Loader remain open; focused independent fixtures used. Earlier general-suite catalog assertions remain outside this patch.",
+    "ReleaseVerified":  true,
+    "ReleaseUrl":  "https://github.com/IINasK/mod-loader/releases/download/v1.1.24/Mod-Loader-1.1.24.exe",
+    "PublicDownloadSha256":  "11521250f48ac69db2c1707e3592672a5dee5e29fd23bd9850575356f730d033",
+    "UpdateFrom1123":  "1.1.24"
 }
