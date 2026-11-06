@@ -9,7 +9,7 @@ using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
     internal static void RunProjectSearchTests(string parent){
-        string root=Path.Combine(parent,"search-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
+        string root=OnlineTests.NestedRoot(parent,"search-");Directory.CreateDirectory(root);
         var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
         check(GeneralModSearch.Matches(GeneralModSearch.Terms("veiculos"),"Veículos"),"Search ignores accents and case.");
         check(GeneralModSearch.Matches(GeneralModSearch.Terms("wolf"),"Wolfcut Hair"),"Name fragments match.");
@@ -52,13 +52,13 @@ internal sealed partial class GeneralModWindow {
             form.ResetColumnFilters();form.DrawRows();check(form.searchBox.Text==""&&form.VisibleMods().Count==3,"Reset clears the query and column filters together.");
             check(Safe.Json.Serialize(state.List)==projectBefore,"Search/filter/expand preserve names, categories and preset members.");
             form.optionsButton.PerformClick();var menu=(GeneralActionsMenu)form.menus.Current;
-            check(AllControls(menu).OfType<Button>().Any(button=>button.Name=="home"),"The real project menu offers Back to main menu.");form.menus.Close();
+            check(form.homeButton.Visible&&!AllControls(menu).OfType<Button>().Any(button=>button.Name=="home"),"Back to main menu is outside the project menu.");form.menus.Close();
         });
         GeneralStyle.UseTheme("light");GeneralStyle.Language="pt";
         Safe.WriteJson(Path.Combine(root,"resultado-project-search.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});
     }
     internal static void RunRedesignTests(string parent){
-        string root=Path.Combine(parent,"redesign-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
+        string root=OnlineTests.NestedRoot(parent,"redesign-");Directory.CreateDirectory(root);
         string archive=TestZip(root,"original.zip","mods/item.txt","unchanged");
         var first=NewEntry("Alpha",archive);first.Category="Principal";
         var second=NewEntry("Beta",archive);second.Category="Veículos";second.Variants[0].Name="Alternativa";
@@ -91,7 +91,7 @@ internal sealed partial class GeneralModWindow {
             CaptureUi(form,Path.Combine(root,"tabela-clara.png"));
             using(var menu=new GeneralActionsMenu()){
                 menu.StartPosition=FormStartPosition.Manual;menu.Location=new Point(-30000,-30000);menu.Show(form);Application.DoEvents();
-                check(menu.Width==350&&menu.Height==468&&AllControls(menu).OfType<Button>().Count(button=>button.Name!="")==7,"Menu em coluna reúne listas, compartilhar e opções.");
+                check(menu.Width==350&&menu.Height==420&&AllControls(menu).OfType<Button>().Count(button=>button.Name!="")==6,"Menu em coluna reúne listas, compartilhar e opções.");
                 CaptureUi(menu,Path.Combine(root,"menu-unico.png"));menu.Close();
             }
             using(var editor=new GeneralCategoryDetails("Principal","",false,true)){

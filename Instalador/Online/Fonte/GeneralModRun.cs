@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -140,7 +140,7 @@ internal sealed partial class GeneralModWindow {
                 if(visible!=null){visible.Cells["Status"].Value=GeneralStatusPresentation.Label(statuses[work.Key]);visible.Cells["Status"].ToolTipText=GeneralStyle.Status(statuses[work.Key]);grid.InvalidateRow(visible.Index);UpdateCounts();}
                 operationFinished++;work.Ended=true;UpdateFlow(work,statuses[work.Key],skipped?(int?)null:found=="Instalado"?100:0);Stage(work,"scan.end");
             }
-            DrawRows();
+            DrawRows();RefreshStorageSize();
         }finally{scanCurrent=null;detail.Text=previous;scanning=false;Busy(false);}
     }
     void StartSelected(){

@@ -1,11 +1,12 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
-internal sealed class GeneralModEditor : GeneralDialog {
+internal sealed partial class GeneralModEditor : GeneralDialog {
     readonly TextBox modName = new TextBox { Dock = DockStyle.Fill, MaxLength = 300 };
     readonly GeneralPicker category = new GeneralPicker { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDown, MaxLength = 120 };
     readonly TextBox tags = new TextBox { Dock = DockStyle.Fill, MaxLength = 2015 };
@@ -17,6 +18,11 @@ internal sealed class GeneralModEditor : GeneralDialog {
     readonly TextBox sources = new TextBox { Dock = DockStyle.Fill, Multiline = true, ScrollBars = ScrollBars.Vertical, MaxLength = 131104 };
     readonly Label validation = new Label { AutoSize = true, Dock = DockStyle.Fill, UseMnemonic = false };
     readonly Label installNote;
+    readonly Label sourceInfo=new Label{Name="SourceMetadata",AutoSize=true,Dock=DockStyle.Fill,UseMnemonic=false};
+    readonly Timer sourceDelay=new Timer{Interval=650};
+    readonly Func<string,Task<GeneralSourceInfo>> lookup;
+    string lastAutoName;
+    int sourceGeneration;
     readonly Button save, install, removeVariant, browse;
     readonly FlowLayoutPanel variantActions;
     readonly List<GeneralModVariant> model;
@@ -28,9 +34,10 @@ internal sealed class GeneralModEditor : GeneralDialog {
     internal bool InstallRequested { get; private set; }
     internal bool AttachRequested { get; private set; }
 
-    internal GeneralModEditor(GeneralModEntry entry, IEnumerable<string> categories, string selected, bool allowInstall, string installInfo) {
+    internal GeneralModEditor(GeneralModEntry entry, IEnumerable<string> categories, string selected, bool allowInstall, string installInfo,Func<string,Task<GeneralSourceInfo>> lookup=null) {
+        this.lookup=lookup;
         model = entry.Variants.Select(v => new GeneralModVariant {
-            Id = v.Id, Name = v.Name, Sources = v.Sources.ToList(), CyberpunkId = v.CyberpunkId, CyberpunkVariant = v.CyberpunkVariant
+            Id = v.Id, Name = v.Name, Sources = v.Sources.ToList(), SourceInfo=v.SourceInfo==null?new Dictionary<string,GeneralSourceInfo>():v.SourceInfo.ToDictionary(pair=>pair.Key,pair=>new GeneralSourceInfo{Name=pair.Value.Name,FileName=pair.Value.FileName,Bytes=pair.Value.Bytes}), CyberpunkId = v.CyberpunkId, CyberpunkVariant = v.CyberpunkVariant
         }).ToList();
         if (model.Count == 0) model.Add(new GeneralModVariant { Id = Guid.NewGuid().ToString("N"), Name = T("Principal", "Default") });
         principal = model.Any(v => v.Id == entry.DefaultVariant) ? entry.DefaultVariant : model[0].Id;
@@ -41,12 +48,14 @@ internal sealed class GeneralModEditor : GeneralDialog {
         MinimumSize = new Size(700, 710);
         StartPosition = FormStartPosition.CenterParent;
         MinimizeBox = false;
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(20, 12, 20, 18), ColumnCount = 2, RowCount = 10 };
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(20, 12, 20, 18), ColumnCount = 2, RowCount = 9 };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         for (int i = 0; i < layout.RowCount; i++)
             layout.RowStyles.Add(new RowStyle(i == 3 ? SizeType.Absolute : i == 6 ? SizeType.Percent : SizeType.AutoSize, i == 3 ? 84 : i == 6 ? 100 : 0));
-        Controls.Add(layout);
+        layout.MinimumSize=new Size(0,760);
+        var shell=new TableLayoutPanel{Dock=DockStyle.Fill,RowCount=3,ColumnCount=1,Margin=Padding.Empty};shell.RowStyles.Add(new RowStyle(SizeType.Percent,100));shell.RowStyles.Add(new RowStyle(SizeType.AutoSize));shell.RowStyles.Add(new RowStyle(SizeType.AutoSize));shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        shell.Controls.Add(new GeneralScrollView(layout,true),0,0);Controls.Add(shell);
         layout.Controls.Add(LabelFor(T("Nome do mod *", "Mod name *")), 0, 0);
         layout.Controls.Add(FieldFor(modName, false), 1, 0);
         modName.Text = entry.Name;
@@ -123,9 +132,10 @@ internal sealed class GeneralModEditor : GeneralDialog {
         feedback.Controls.Add(installNote);
         feedback.Controls.Add(usePending);
         feedback.Controls.Add(validation);
+        sourceInfo.Margin=new Padding(20,4,20,0);shell.Controls.Add(sourceInfo,0,1);
         layout.Controls.Add(feedback, 0, 8);
         layout.SetColumnSpan(feedback, 2);
-        var commands = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Margin = new Padding(0, 6, 0, 0) };
+        var commands = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Margin = new Padding(0), Padding=new Padding(20,8,20,18) };
         install = GeneralStyle.Button(T("Instalar", "Install"), () => Finish(entry.Id, true), true);
         install.Visible = allowInstall;
         commands.Controls.Add(install);
@@ -133,8 +143,7 @@ internal sealed class GeneralModEditor : GeneralDialog {
         commands.Controls.Add(save);
         var close = GeneralStyle.Button(T("Cancelar", "Cancel"), () => { DialogResult = DialogResult.Cancel; }, false);
         commands.Controls.Add(close);
-        layout.Controls.Add(commands, 0, 9);
-        layout.SetColumnSpan(commands, 2);
+        shell.Controls.Add(commands, 0, 2);
         AcceptButton = save;
         CancelButton = close;
         variants.SelectedIndexChanged += (s, e) => {
@@ -149,6 +158,9 @@ internal sealed class GeneralModEditor : GeneralDialog {
         GeneralStyle.Apply(this, GeneralStyle.Dark);
         RemoveFieldBorders(this);
         RefreshVariants(selected);
+        sourceInfo.Font=GeneralStyle.Font(10);sources.TextChanged+=(s,e)=>ScheduleSourceInfo();
+        sourceDelay.Tick+=async(s,e)=>{sourceDelay.Stop();await UpdateSourceInfo();};
+        Shown+=(s,e)=>ScheduleSourceInfo();Disposed+=(s,e)=>sourceDelay.Dispose();
     }
 
     internal void ConfigureAttachment(string file) {
@@ -203,7 +215,7 @@ internal sealed class GeneralModEditor : GeneralDialog {
 
     void ResizeFeedback(int width) {
         var maximum = new Size(Math.Max(120, width - 8), 0);
-        installNote.MaximumSize = validation.MaximumSize = usePending.MaximumSize = maximum;
+        installNote.MaximumSize = validation.MaximumSize = usePending.MaximumSize = sourceInfo.MaximumSize = maximum;
     }
 
     void SaveCurrent() {
@@ -211,6 +223,8 @@ internal sealed class GeneralModEditor : GeneralDialog {
         current.Name = variantName.Text.Trim();
         if (String.IsNullOrEmpty(current.CyberpunkId))
             current.Sources = sources.Lines.Select(line => line.Trim()).Where(line => line.Length > 0).Distinct().ToList();
+        if(current.SourceInfo==null)current.SourceInfo=new Dictionary<string,GeneralSourceInfo>();
+        foreach(string key in current.SourceInfo.Keys.Where(key=>!current.Sources.Contains(key)).ToArray())current.SourceInfo.Remove(key);
     }
 
     void RefreshVariants(string id) {
@@ -225,7 +239,7 @@ internal sealed class GeneralModEditor : GeneralDialog {
         sources.ReadOnly = !String.IsNullOrEmpty(current.CyberpunkId);
         removeVariant.Enabled = model.Count > 1;
         changing = false;
-        ValidateInputs();
+        ValidateInputs();ScheduleSourceInfo();
     }
 
     string VariantLabel(GeneralModVariant variant) { return variant.Name + (variant.Id == principal ? T(" (principal)", " (default)") : ""); }
@@ -278,7 +292,7 @@ internal sealed class GeneralModEditor : GeneralDialog {
         GeneralModEntry draft = Draft(id);
         string error = ValidationMessage(draft);
         if (error.Length != 0) { validation.Text = error; return; }
-        foreach (var variant in draft.Variants) variant.Sources = variant.Sources.Select(GeneralModLibrary.ValidateSource).ToList();
+        foreach (var variant in draft.Variants) GeneralModLibrary.NormalizeSources(variant);
         Result = draft;
         SelectedVariant = current.Id;
         AttachRequested = usePending.Checked;

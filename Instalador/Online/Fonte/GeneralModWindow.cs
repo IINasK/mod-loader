@@ -23,7 +23,8 @@ internal sealed partial class GeneralModWindow : Form {
     GeneralPicker preset;
     DataGridView grid;
     Label detail,counts;
-    Button next,reloadButton,optionsButton,expandList;
+    Button next,reloadButton,optionsButton,expandList,projectsButton,homeButton;
+    Label storageSize;
     TableLayoutPanel mainLayout;
     bool listExpanded;
     int hoveredRow=-1;
@@ -75,6 +76,7 @@ internal sealed partial class GeneralModWindow : Form {
             else if(!ConfirmPresetNavigation())e.Cancel=true;
         };
         Disposed+=(s,e)=>menus.Dispose();
+        Shown+=(s,e)=>RefreshStorageSize();
         if(fixture==null)Shown+=async(s,e)=>{CheckUpdatesOnStartup();await Scan();if(!IsDisposed)await ResumeP2P();};
     }
     void BuildInterface(){
@@ -87,8 +89,8 @@ internal sealed partial class GeneralModWindow : Form {
         for(int i=0;i<9;i++)layout.RowStyles.Add(i==5?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.AutoSize));
         Controls.Add(layout);mainLayout=layout;
         menus.Close();
-        var heading=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=Padding.Empty};
-        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
+        var heading=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=4,Margin=Padding.Empty};
+        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         var titles=new FlowLayoutPanel{AutoSize=true,Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false,Margin=Padding.Empty};
         var brand=new FlowLayoutPanel{AutoSize=true,WrapContents=false,Margin=Padding.Empty};
         brand.Controls.Add(new ModLoaderLogo{Size=new Size(44,44),Margin=new Padding(0,0,12,0),Name="ProjectLogo"});
@@ -97,7 +99,9 @@ internal sealed partial class GeneralModWindow : Form {
         titles.Controls.Add(new Label{Text=T("Criado por Nask e Codex. Se achou ruim, faz você.","Made by Nask and Codex. If you don't like it, make your own."),AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(0,0,0,14)});
         heading.Controls.Add(titles,0,0);
         optionsButton=IconButton("menu",T("Menu","Menu"),ToggleListMenu,true);((GeneralButton)optionsButton).Bare=true;optionsButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;optionsButton.Margin=Padding.Empty;
-        heading.Controls.Add(optionsButton,1,0);layout.Controls.Add(heading,0,0);
+        projectsButton=Command(T("Projetos","Projects"),ToggleProjectsPanel,true);projectsButton.Name="ProjectsButton";((GeneralButton)projectsButton).IconKind="folder";projectsButton.Margin=new Padding(0,0,8,0);heading.Controls.Add(projectsButton,1,0);
+        homeButton=IconButton("home",T("Voltar ao menu principal","Back to main menu"),BackToProjects,true);homeButton.Name="BackHome";((GeneralButton)homeButton).Bare=true;homeButton.Margin=Padding.Empty;heading.Controls.Add(homeButton,2,0);
+        heading.Controls.Add(optionsButton,3,0);layout.Controls.Add(heading,0,0);
         var path=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=new Padding(0,0,0,14)};
         path.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));path.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         var pathSurface=new GeneralSurface{Dock=DockStyle.Fill,Height=44,MinimumSize=new Size(100,44),MaximumSize=new Size(0,44),Padding=new Padding(16,11,16,0),Margin=new Padding(0,0,12,0)};
@@ -110,6 +114,8 @@ internal sealed partial class GeneralModWindow : Form {
         reloadButton=IconButton("refresh",T("Atualizar lista","Refresh list"),async()=>await Scan(),true);((GeneralButton)reloadButton).Bare=true;reloadButton.Margin=Padding.Empty;
         var summary=Flow();summary.Margin=new Padding(0,0,0,12);layout.Controls.Add(summary,0,3);
         counts=new Label{AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=Padding.Empty};summary.Controls.Add(counts);
+        storageSize=new Label{Name="ProjectStorage",AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(16,0,0,0)};summary.Controls.Add(storageSize);
+        tips.SetToolTip(storageSize,T("Soma dos arquivos de mods identificados, downloads referenciados e dados locais do projeto. O mesmo caminho não é contado duas vezes.","Sum of identified mod files, referenced downloads and local project data. The same path is counted once."));
         AddUpdateNotice(summary);
         var tableHeading=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=7,Height=52,Margin=Padding.Empty,Padding=new Padding(14,4,0,4),BackColor=GeneralStyle.Surface};
         tableHeading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));for(int i=1;i<7;i++)tableHeading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
@@ -201,8 +207,8 @@ internal sealed partial class GeneralModWindow : Form {
         var button=(GeneralButton)Command("",action,onlyIdle);button.IconKind=kind;button.AutoSize=false;button.MinimumSize=new Size(44,44);button.Size=new Size(44,44);button.AccessibleName=title;tips.SetToolTip(button,title);return button;
     }
     void EnableDrops(Control target){
-        target.AllowDrop=true;target.DragEnter+=(s,e)=>e.Effect=e.Data.GetDataPresent(DataFormats.FileDrop)?DragDropEffects.Copy:DragDropEffects.None;
-        target.DragDrop+=(s,e)=>Guard(()=>Drop((string[])e.Data.GetData(DataFormats.FileDrop)));
+        target.AllowDrop=true;target.DragEnter+=(s,e)=>e.Effect=e.Data.GetDataPresent(DataFormats.FileDrop)?DragDropEffects.Copy:DroppedText(e.Data)!=null?DragDropEffects.Link:DragDropEffects.None;
+        target.DragDrop+=(s,e)=>Guard(()=>{if(e.Data.GetDataPresent(DataFormats.FileDrop))Drop((string[])e.Data.GetData(DataFormats.FileDrop));else ImportWebSources(DroppedText(e.Data));});
         foreach(Control child in target.Controls)EnableDrops(child);
     }
     void Guard(Action action){try{action();}catch(Exception ex){ShowError(ex);}}
@@ -341,7 +347,7 @@ internal sealed partial class GeneralModWindow : Form {
             bool existing=state.List.Mods.Contains(item);var selected=Selected(item);
             string info=T("Destino: ","Destination: ")+(state.Destination??T("Escolha uma pasta na tela principal.","Choose a folder on the main screen."));
             var recipe=catalog.Packages.FirstOrDefault(m=>m.Id==selected.CyberpunkId);if(recipe!=null)info=T("Versão do pacote: ","Package version: ")+recipe.Version+"   ·   "+info;
-            using(var dialog=new GeneralModEditor(item,PresetCategories(),selected.Id,!working||current!=null,info)){
+            using(var dialog=new GeneralModEditor(item,PresetCategories(),selected.Id,!working||current!=null,info,LookupSourceInfo)){
                 if(dialog.ShowDialog(this)!=DialogResult.OK)return;
                 ApplyEdited(item,dialog.Result,dialog.SelectedVariant,existing);DrawRows();
                 if(dialog.InstallRequested)Enqueue(new[]{MakeWork(dialog.Result)},true);else if(!working)await Scan();

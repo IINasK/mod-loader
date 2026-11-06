@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -8,7 +8,7 @@ using System.Text;
 
 internal static class GeneralProjectStoreTests {
     internal static int Run(string parent) {
-        string root = Path.Combine(Path.GetFullPath(parent), "projects-" + Guid.NewGuid().ToString("N"));
+        string root = OnlineTests.NestedRoot(parent,"projects-");
         Directory.CreateDirectory(root);
         var checks = new List<string>(); var skipped = new List<string>();
         Action<bool, string> check = (ok, message) => { if (!ok) throw new IOException(message); checks.Add(message); };

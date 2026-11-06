@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -30,12 +30,12 @@ internal sealed class GeneralProjectStore {
         Safe.NoLinks(Root);
     }
 
-    internal GeneralProjectIndex Read() {
+    internal GeneralProjectIndex Read(bool inspection=false) {
         lock (gate) {
             Safe.NoLinks(IndexPath);
             if (File.Exists(IndexPath)) {
                 try {
-                    using (var stream = File.OpenRead(IndexPath)) {
+                    using (var stream = new FileStream(IndexPath,FileMode.Open,FileAccess.Read,inspection?FileShare.ReadWrite|FileShare.Delete:FileShare.Read)) {
                         if (stream.Length > MaxIndexBytes) throw new IOException("O índice de projetos excede 1 MB.");
                         using (var reader = new StreamReader(stream)) {
                             var fields = Safe.Json.DeserializeObject(reader.ReadToEnd()) as Dictionary<string, object>;
@@ -63,7 +63,7 @@ internal sealed class GeneralProjectStore {
                     }
                 } catch (IOException) { }
                 initial.Projects.Add(legacy);
-                Write(initial);
+                if(!inspection)Write(initial);
             }
             return initial;
         }
@@ -103,10 +103,10 @@ internal sealed class GeneralProjectStore {
         }
     }
 
-    internal GeneralModState Load(GeneralProject project) {
+    internal GeneralModState Load(GeneralProject project,bool inspection=false) {
         lock (gate) {
-            var registered = Registered(Read(), project);
-            var state = new GeneralModLibrary(Path.Combine(DataPath(registered), "lista.json")).Load();
+            var registered = Registered(Read(inspection), project);
+            var state = new GeneralModLibrary(Path.Combine(DataPath(registered), "lista.json")).LoadForInspection(inspection);
             if (state == null) throw new IOException("O arquivo deste projeto não foi encontrado. Nenhum dado foi substituído.");
             return state;
         }

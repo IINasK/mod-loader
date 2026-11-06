@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -42,12 +42,14 @@ internal sealed class GeneralScrollView : Panel {
     readonly Panel viewport=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};
     readonly GeneralScrollBar bar=new GeneralScrollBar{Dock=DockStyle.Right,Margin=Padding.Empty};
     readonly Control content;
+    readonly bool panelContent;
     NativeEvents events;
     bool queued,refreshing;
     internal Control Content {get{return content;}}
     internal GeneralScrollBar Bar {get{return bar;}}
     [DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr handle,int message,IntPtr first,IntPtr second);
-    internal GeneralScrollView(Control content){
+    internal GeneralScrollView(Control content,bool panelContent=false){
+        this.panelContent=panelContent;
         this.content=content;Dock=DockStyle.Fill;Margin=Padding.Empty;Padding=Padding.Empty;BackColor=GeneralStyle.Surface;
         content.Dock=DockStyle.None;content.Margin=Padding.Empty;viewport.Controls.Add(content);Controls.Add(viewport);Controls.Add(bar);
         var text=content as TextBox;if(text!=null&&text.Multiline){text.ScrollBars=ScrollBars.None;text.WordWrap=true;}
@@ -63,7 +65,8 @@ internal sealed class GeneralScrollView : Panel {
         try{
             int total=0,page=1,value=0;
             var grid=content as DataGridView;var list=content as ListBox;var text=content as TextBox;
-            if(grid!=null){
+            if(panelContent){total=content.MinimumSize.Height;page=Math.Max(1,viewport.ClientSize.Height);value=Math.Max(0,-content.Top);}
+            else if(grid!=null){
                 total=grid.RowCount;page=Math.Max(1,grid.DisplayedRowCount(false));value=Math.Max(0,grid.FirstDisplayedScrollingRowIndex);
                 if(grid.Rows.GetRowsHeight(DataGridViewElementStates.Visible)<=grid.ClientSize.Height-grid.ColumnHeadersHeight)page=Math.Max(1,total);
             }
@@ -71,14 +74,15 @@ internal sealed class GeneralScrollView : Panel {
             else if(text!=null&&text.Multiline){total=(int)SendMessage(text.Handle,0x00ba,IntPtr.Zero,IntPtr.Zero);page=Math.Max(1,text.ClientSize.Height/Math.Max(1,text.Font.Height));value=(int)SendMessage(text.Handle,0x00ce,IntPtr.Zero,IntPtr.Zero);}
             bar.Configure(total,page,value);bool visible=total>page;if(bar.Visible!=visible){bar.Visible=visible;PerformLayout();}
             int nativeWidth=list==null?0:Math.Max(0,list.Width-list.ClientSize.Width);
-            var bounds=new Rectangle(0,0,Math.Max(1,viewport.ClientSize.Width+nativeWidth),Math.Max(1,viewport.ClientSize.Height));
+            var bounds=new Rectangle(0,panelContent?-Math.Min(value,Math.Max(0,total-page)):0,Math.Max(1,viewport.ClientSize.Width+nativeWidth),Math.Max(1,panelContent?Math.Max(total,page):viewport.ClientSize.Height));
             if(content.Bounds!=bounds)content.Bounds=bounds;
         }finally{refreshing=false;}
     }
     internal void ScrollTo(int value){
         if(content.IsDisposed)return;
         var grid=content as DataGridView;var list=content as ListBox;var text=content as TextBox;
-        if(grid!=null&&grid.RowCount>0)grid.FirstDisplayedScrollingRowIndex=Math.Min(value,grid.RowCount-1);
+        if(panelContent)content.Top=-Math.Max(0,value);
+        else if(grid!=null&&grid.RowCount>0)grid.FirstDisplayedScrollingRowIndex=Math.Min(value,grid.RowCount-1);
         else if(list!=null&&list.Items.Count>0)list.TopIndex=Math.Min(value,list.Items.Count-1);
         else if(text!=null){int current=(int)SendMessage(text.Handle,0x00ce,IntPtr.Zero,IntPtr.Zero);SendMessage(text.Handle,0x00b6,IntPtr.Zero,(IntPtr)(value-current));}
         RefreshScroll();

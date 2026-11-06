@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -31,6 +31,7 @@ public sealed class GeneralModEntry {
 public sealed class GeneralModVariant {
     public string Id, Name, CyberpunkId, CyberpunkVariant;
     public List<string> Sources = new List<string>();
+    public Dictionary<string,GeneralSourceInfo> SourceInfo = new Dictionary<string,GeneralSourceInfo>();
 }
 
 public sealed class GeneralModState {
@@ -55,10 +56,11 @@ public sealed class GeneralModLibrary {
         this.statePath = Path.GetFullPath(statePath);
     }
 
-    public GeneralModState Load() {
+    public GeneralModState Load(){return LoadForInspection(false);}
+    internal GeneralModState LoadForInspection(bool inspection) {
         Safe.NoLinks(statePath);
         if (!File.Exists(statePath)) return null;
-        var state = Read<GeneralModState>(statePath, "List");
+        var state = Read<GeneralModState>(statePath, inspection,"List");
         ValidateList(state.List, true);
         ValidateChoices(state);
         RetiredPackEntries.Remove(state);
@@ -81,7 +83,7 @@ public sealed class GeneralModLibrary {
             list.Schema, list.Categories, list.CategoryDescriptions, list.Presets, list.UncategorizedName, list.UncategorizedDescription,
             Mods = list.Mods.Select(mod => new {
                 mod.Id, mod.Name, mod.Category, mod.DefaultVariant, mod.Description, mod.Tags, mod.Nsfw,
-                Variants = mod.Variants.Select(variant => new { variant.Id, variant.Name, variant.Sources }).ToList()
+                Variants = mod.Variants.Select(variant => new { variant.Id, variant.Name, variant.Sources, variant.SourceInfo }).ToList()
             }).ToList()
         });
     }
@@ -182,9 +184,14 @@ public sealed class GeneralModLibrary {
         return uri.AbsoluteUri;
     }
 
+    internal static void NormalizeSources(GeneralModVariant variant){
+        var info=new Dictionary<string,GeneralSourceInfo>();foreach(var pair in variant.SourceInfo)info[ValidateSource(pair.Key)]=pair.Value;
+        variant.Sources=variant.Sources.Select(ValidateSource).Distinct().ToList();variant.SourceInfo=info;
+    }
+
     static bool IsPublicNexusQuery(Uri uri) {
         if (!(uri.Host == "www.nexusmods.com" || uri.Host == "nexusmods.com") || !uri.IsDefaultPort ||
-            !Regex.IsMatch(uri.AbsolutePath, @"^/[^/]+/mods/[0-9]+/?$", RegexOptions.IgnoreCase)) return false;
+            !Regex.IsMatch(uri.AbsolutePath, @"^/(?:[a-z]{2}/)?(?:games/)?[a-z0-9][a-z0-9_-]{0,99}/mods/[0-9]+/?$", RegexOptions.IgnoreCase)) return false;
         var parameters = new HashSet<string>(StringComparer.Ordinal);
         foreach (string pair in uri.Query.Substring(1).Split('&')) {
             string[] parts = pair.Split('=');
@@ -241,7 +248,9 @@ public sealed class GeneralModLibrary {
                 if (variant == null || !ValidId(variant.Id) || !variantIds.Add(variant.Id) || variant.Sources == null || variant.Sources.Count == 0 || variant.Sources.Count > 32)
                     throw new IOException("Versão inválida ou repetida em " + mod.Name + ".");
                 variant.Name = RequiredText(variant.Name, 300, "Nome da versão");
-                for (int index = 0; index < variant.Sources.Count; index++) variant.Sources[index] = ValidateSource(variant.Sources[index]);
+                if(variant.SourceInfo==null)variant.SourceInfo=new Dictionary<string,GeneralSourceInfo>();
+                if(variant.SourceInfo.Count>32||variant.SourceInfo.Any(pair=>!variant.Sources.Contains(pair.Key)||pair.Value==null||pair.Value.Bytes<0||pair.Value.Bytes>128L*1024*1024*1024||String.IsNullOrWhiteSpace(pair.Value.Name)||pair.Value.Name.Length>300||pair.Value.Name.Any(Char.IsControl)||(pair.Value.FileName??"").Length>300||(pair.Value.FileName??"").Any(Char.IsControl)))throw new IOException("Metadados de arquivo inválidos.");
+                NormalizeSources(variant);
                 if (!trustRecipes) { variant.CyberpunkId = null; variant.CyberpunkVariant = null; }
             }
             if (!variantIds.Contains(mod.DefaultVariant)) throw new IOException("Escolha a versão principal de " + mod.Name + ".");
@@ -306,10 +315,11 @@ public sealed class GeneralModLibrary {
         return id != null && Regex.IsMatch(id, @"\A[A-Za-z0-9_-]{1,120}\z");
     }
 
-    static T Read<T>(string path, params string[] requiredFields) {
+    static T Read<T>(string path, params string[] requiredFields){return Read<T>(path,false,requiredFields);}
+    static T Read<T>(string path,bool inspection, params string[] requiredFields) {
         Safe.NoLinks(path);
         try {
-            using (var stream = File.OpenRead(path)) {
+            using (var stream = new FileStream(path,FileMode.Open,FileAccess.Read,inspection?FileShare.ReadWrite|FileShare.Delete:FileShare.Read)) {
                 if (stream.Length > MaxJsonBytes) throw new IOException("A lista excede o limite de 8 MB.");
                 using (var reader = new StreamReader(stream)) {
                     string text = reader.ReadToEnd();

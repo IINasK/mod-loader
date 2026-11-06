@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -8,7 +8,7 @@ using System.Windows.Forms;
 
 internal static class GeneralMenuHostTests {
     internal static void Run(string parent){
-        string root=Path.Combine(parent,"menu-host-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
+        string root=OnlineTests.NestedRoot(parent,"menu-host-");Directory.CreateDirectory(root);
         var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
         bool animations=GeneralStyle.AnimationsEnabled,dark=GeneralStyle.Dark,red=GeneralStyle.RedTheme;string language=GeneralStyle.Language;
         Exception failure=null;bool completed=false;

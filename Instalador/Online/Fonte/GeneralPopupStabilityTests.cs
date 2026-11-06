@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -7,7 +7,7 @@ using System.Windows.Forms;
 
 internal static class GeneralPopupStabilityTests {
     internal static void Run(string parent){
-        string root=Path.Combine(parent,"popup-stability-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
+        string root=OnlineTests.NestedRoot(parent,"popup-stability-");Directory.CreateDirectory(root);
         var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
         bool dark=GeneralStyle.Dark,red=GeneralStyle.RedTheme,animations=GeneralStyle.AnimationsEnabled;string language=GeneralStyle.Language;
         Exception failure=null;bool completed=false;

@@ -695,7 +695,7 @@ static class OnlineProgram {
         var cache=new DownloadCache(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CyberpunkCoop","Downloads"));
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
         if(args.Length==2&&args[0]=="--self-test-general"){GeneralModWindow.RunGeneralTests(args[1]);return 0;}
-        if(args.Length==2&&args[0]=="--self-test-projects"){GeneralProjectStoreTests.Run(args[1]);GeneralModWindow.RunProjectHomeTests(args[1]);GeneralBrandTests.Run(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--self-test-projects"){GeneralProjectStoreTests.Run(args[1]);GeneralModWindow.RunProjectHomeTests(args[1]);GeneralModWindow.RunProjectDeletionTests(args[1]);GeneralModWindow.RunProjectHubTests(args[1]);GeneralBrandTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-menus"){GeneralMenuHostTests.Run(args[1]);GeneralModWindow.RunPresetDraftTests(args[1]);GeneralTableDialogTests.Run(args[1]);GeneralPopupStabilityTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-p2p-ui"){GeneralP2PUiTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--preview-p2p"){GeneralP2PUiTests.Preview(args[1]);return 0;}

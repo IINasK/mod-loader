@@ -1,4 +1,4 @@
-﻿# Conhecimento dos mods
+# Conhecimento dos mods
 
 Indice interno de138componentes ativos do instalador. Revisao de05/11/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
 
@@ -10,6 +10,8 @@ Indice interno de138componentes ativos do instalador. Revisao de05/11/2026; font
 - Esta separacao e documental/estatica. Nao foi executado um jogo semDLC para validar aparencia, gameplay ou rede. Confirmacoescoop anteriores do usuario continuam atribuidas a ele.
 
 ## Consulta
+
+- Projetos, Nexus, espaço e exclusão permanente: [versão1.1.14](Projetos-nexus-espaco-1.1.14.md), [validação](Validacoes/1.1.14.json).
 
 - Lixeira e confirmação dupla nos projetos salvos: [versão1.1.13](Excluir-projetos-1.1.13.md), [validação](Validacoes/1.1.13.json).
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -8,7 +8,7 @@ using System.Windows.Forms;
 
 internal static class GeneralP2PUiTests {
     internal static int Run(string parent){
-        string root=Path.Combine(parent,"p2p-ui-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);var checks=new List<string>();
+        string root=OnlineTests.NestedRoot(parent,"p2p-ui-");Directory.CreateDirectory(root);var checks=new List<string>();
         Action<bool,string> check=(ok,text)=>{if(!ok)throw new IOException(text);checks.Add(text);};
         bool dark=GeneralStyle.Dark,red=GeneralStyle.RedTheme,animation=GeneralStyle.AnimationsEnabled;string language=GeneralStyle.Language;
         try{

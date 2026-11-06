@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -8,7 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 
-public sealed class InstalledSnapshotInstaller {
+public sealed partial class InstalledSnapshotInstaller {
     public sealed class Receipt {
         public string Id, Root, Status;
         public bool Recoverable;
@@ -329,14 +329,15 @@ public sealed class InstalledSnapshotInstaller {
         byte[] content = Encoding.UTF8.GetBytes(Safe.Json.Serialize(receipt));
         Safe.WriteJson(ReceiptPath(receipt.Id), new ReceiptEnvelope { Protected = Convert.ToBase64String(ProtectedData.Protect(content, null, DataProtectionScope.CurrentUser)) });
     }
-    Receipt Read(string id) {
+    Receipt Read(string id){return ReadCore(id,false);}
+    Receipt ReadCore(string id,bool inspection) {
         string path = ReceiptPath(id);
         if (!File.Exists(path)) return null;
         if (new FileInfo(path).Length > 24000000) throw new IOException("Recibo de snapshot excessivo.");
         Receipt receipt;
         try {
             ReceiptEnvelope envelope;
-            using (var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (var input = new FileStream(path, FileMode.Open, FileAccess.Read, inspection?FileShare.ReadWrite|FileShare.Delete:FileShare.Read))
                 envelope = Safe.Json.Deserialize<ReceiptEnvelope>(Encoding.UTF8.GetString(InstalledSnapshot.ReadBytes(input, 24000000)));
             receipt = Safe.Json.Deserialize<Receipt>(Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(envelope.Protected), null, DataProtectionScope.CurrentUser)));
         } catch (Exception ex) {
@@ -361,10 +362,10 @@ public sealed class InstalledSnapshotInstaller {
         if (receipt.Status == "installed" && paths.Count != receipt.Manifest.Files.Select(f => f.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count()) throw new IOException("Recibo de snapshot incompleto.");
         return receipt;
     }
-    IEnumerable<Receipt> AllReceipts() {
+    IEnumerable<Receipt> AllReceipts(bool inspection=false) {
         Safe.NoLinks(records);
         if (!Directory.Exists(records)) yield break;
-        foreach (string path in Directory.GetFiles(records, "*.json")) { var receipt = Read(Path.GetFileNameWithoutExtension(path)); if (receipt != null) yield return receipt; }
+        foreach (string path in Directory.GetFiles(records, "*.json")) { var receipt = ReadCore(Path.GetFileNameWithoutExtension(path),inspection); if (receipt != null) yield return receipt; }
     }
     bool Matches(Change file) { string path = Safe.In(destination, file.Path); return File.Exists(path) && new FileInfo(path).Length == file.Size && Safe.Hash(path) == file.After; }
     void Rollback(Receipt receipt, Dictionary<string,string> beforeHashes, HashSet<string> written, string stage) {

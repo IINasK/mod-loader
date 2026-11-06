@@ -365,9 +365,10 @@ public sealed partial class FixedInstaller {
         }
     }
     void Save(string path,OnlineReceipt r){var plain=Encoding.UTF8.GetBytes(Safe.Json.Serialize(r));Safe.WriteJson(path,new ReceiptEnvelope{Protected=Convert.ToBase64String(ProtectedData.Protect(plain,null,DataProtectionScope.CurrentUser))});}
-    OnlineReceipt ReadReceipt(string path) {
+    OnlineReceipt ReadReceipt(string path){return ReadReceiptCore(path,false);}
+    OnlineReceipt ReadReceiptCore(string path,bool inspection) {
         Safe.NoLinks(path);if(new FileInfo(path).Length>8000000)throw new IOException("Registro excessivo.");OnlineReceipt r;
-        try{var envelope=Safe.Json.Deserialize<ReceiptEnvelope>(File.ReadAllText(path));r=Safe.Json.Deserialize<OnlineReceipt>(Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(envelope.Protected),null,DataProtectionScope.CurrentUser)));}
+        try{var envelope=Safe.Json.Deserialize<ReceiptEnvelope>(inspection?GeneralProjectStorage.ReadText(path,8000000):File.ReadAllText(path));r=Safe.Json.Deserialize<OnlineReceipt>(Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(envelope.Protected),null,DataProtectionScope.CurrentUser)));}
         catch(Exception ex){if(ex is OutOfMemoryException)throw;throw new IOException("Registro alterado, corrompido ou criado por outra conta do Windows. Nenhum arquivo será removido.");}
         if(r==null||r.CatalogId!=catalog.Id||!Regex.IsMatch(r.Id??"","^[a-f0-9]{32}$")||Path.GetFileName(path)!=r.Id+".json"||r.Files==null||r.Files.Count>20000||r.Mods==null)throw new IOException("Registro inválido. Não foi alterado nenhum arquivo.");
         if(r.Operation==ExtraResetOperation){ValidateExtraResetReceipt(r,path);return r;}

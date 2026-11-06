@@ -1,10 +1,14 @@
-﻿# Mod Loader
+# Mod Loader
 
 <p><img src="Instalador/Online/Fonte/Assets/ModLoader.svg" alt="Mod Loader" width="112"></p>
 
 Repositório público: [IINasK/mod-loader](https://github.com/IINasK/mod-loader). [Baixar o executável mais recente](https://github.com/IINasK/mod-loader/releases/latest).
 
 Gerenciador de mods para Windows, com projetos, presets e categorias definidos pelo usuário. Cyberpunk2077 2.5 é um pacote incluído; outros jogos podem ter suas próprias listas e destinos. Mantém downloads oficiais, identificação por SHA256, monitor da pasta Downloads, backup e desfazer. O usuário conclui os downloads gratuitos Manual/Slow no Nexus; o aplicativo confere o arquivo original e continua a fila autorizada. Receitas específicas e verificações de versão do pacote Cyberpunk não são inferidas para outros jogos.
+
+A versão **1.1.14** traz o painel Projetos, o botão de voltar junto ao cabeçalho, consulta informativa de nome/arquivo/tamanho do Nexus e contadores de espaço. A lixeira permite excluir só do app ou apagar os mods rastreados após revisão, sem Desfazer. O editor mantém avisos e ações visíveis em janelas menores. Consultas novas podem ser bloqueadas pelo Nexus; preenchimento manual continua disponível. [Uso e limites atuais](Conhecimento/Projetos-nexus-espaco-1.1.14.md) · [Validação](Conhecimento/Validacoes/1.1.14.json).
+
+As notas abaixo são históricas; a navegação atual é a descrita na1.1.14.
 
 A versão **1.1.13** troca a seta dos projetos salvos por uma lixeira com duas confirmações, preservando mods e arquivos do jogo. [Uso e validação](Conhecimento/Excluir-projetos-1.1.13.md).
 

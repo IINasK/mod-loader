@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -8,7 +8,7 @@ using System.Text;
 
 internal static class InstalledSnapshotTests {
     internal static int Run(string parent) {
-        string root=Path.Combine(parent,"ss-"+Guid.NewGuid().ToString("N").Substring(0,6));Directory.CreateDirectory(root);
+        string root=OnlineTests.NestedRoot(parent,"ss-");Directory.CreateDirectory(root);
         var checks=new List<string>();
         Action<bool,string> check=(ok,label)=>{if(!ok)throw new IOException(label);checks.Add(label);};
         Action<Action,string> refuse=(action,label)=>{try{action();}catch(IOException){checks.Add(label);return;}throw new IOException("Não bloqueou: "+label);};

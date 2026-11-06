@@ -12,7 +12,7 @@ internal sealed partial class GeneralModWindow {
         if(working||scanning)return;
         menus.Toggle(this,optionsButton,()=>new GeneralActionsMenu(BuiltInProject),dialog=>Guard(()=>{
             string action=((GeneralActionsMenu)dialog).ActionId;
-            if(action=="new")ProjectCommand("new");else if(action=="open"||action=="home")BackToProjects();
+            if(action=="new")ProjectCommand("new");else if(action=="open")BackToProjects();
             else if(!BuiltInProject&&action=="import")ProjectCommand("import");else if(!BuiltInProject&&action=="export")ProjectCommand("export");
             else if(!BuiltInProject&&action=="share")ShowP2P();else if(action=="options")ShowOptions();
         }));

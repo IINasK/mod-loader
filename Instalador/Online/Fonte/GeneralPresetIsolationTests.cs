@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -8,7 +8,7 @@ using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
     internal static void RunPresetIsolationTests(string parent){
-        string root=Path.Combine(parent,"preset-clean-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
+        string root=OnlineTests.NestedRoot(parent,"preset-clean-");Directory.CreateDirectory(root);
         var list=new GeneralModList{Categories=new List<string>{"Jogabilidade","Lojas","Veículos","Aparência"}};
         var item=NewEntry("Existente","https://example.com/mod.zip");item.Category="Lojas";list.Mods.Add(item);
         var original=new GeneralModPreset{Id="old",Name="Original",ModIds=new List<string>{item.Id}};list.Presets.Add(original);

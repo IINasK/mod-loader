@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -258,7 +258,7 @@ internal static class GeneralP2PTests {
         var timer = Stopwatch.StartNew();
         while(!ready()) { if(timer.ElapsedMilliseconds >= 30000)throw new IOException(message); Thread.Sleep(100); }
     }
-    static string NewRoot(string parent,string prefix) { string root = Path.Combine(Path.GetFullPath(parent),prefix+Guid.NewGuid().ToString("N").Substring(0,8)); Directory.CreateDirectory(root); return root; }
+    static string NewRoot(string parent,string prefix) { string root = OnlineTests.NestedRoot(parent,prefix); Directory.CreateDirectory(root); return root; }
     static void Check(List<string> checks,bool ok,string message) { if(!ok)throw new IOException(message); checks.Add(message); }
     static void Reject(List<string> checks,Action action,string message) { bool rejected=false; try{action();}catch(IOException){rejected=true;} Check(checks,rejected,message); }
     static P2PInvite Invitation() { return new P2PInvite{Kind="offer",Device=Device,Folder="ml-"+new string('a',32),ManifestHash=new string('a',64),Name="Preset compartilhado"}; }

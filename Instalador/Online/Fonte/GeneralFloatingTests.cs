@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -11,7 +11,7 @@ using System.Windows.Forms;
 internal sealed partial class GeneralModWindow {
     [DllImport("dwmapi.dll")]static extern int DwmGetWindowAttribute(IntPtr window,int attribute,out int value,int size);
     internal static void RunFloatingTests(string parent){
-        string root=Path.Combine(parent,"floating-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
+        string root=OnlineTests.NestedRoot(parent,"floating-");Directory.CreateDirectory(root);
         string target=Path.Combine(root,"game");Directory.CreateDirectory(target);
         var a=NewEntry("Mod instalado","https://example.com/a.zip");var b=NewEntry("Mod pendente","https://example.com/b.zip");var c=NewEntry("Mod com erro","https://example.com/c.zip");var d=NewEntry("Download em andamento","https://example.com/d.zip");
         var list=new GeneralModList{Mods=new List<GeneralModEntry>{a,b,c,d}};list.Presets.Add(new GeneralModPreset{Id="test",Name="Kit teste",ModIds=new List<string>{a.Id,b.Id,c.Id,d.Id}});

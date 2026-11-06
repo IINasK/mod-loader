@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -7,7 +7,7 @@ using System.Windows.Forms;
 
 internal static class GeneralCategoryDeleteTests {
     internal static int Run(string parent) {
-        string root = Path.Combine(Path.GetFullPath(parent), "category-delete-" + Guid.NewGuid().ToString("N"));
+        string root = OnlineTests.NestedRoot(parent,"category-delete-");
         Directory.CreateDirectory(root);
         var checks = new List<string>();
         Action<bool, string> check = (ok, message) => { if (!ok) throw new IOException(message); checks.Add(message); };
@@ -52,7 +52,9 @@ internal static class GeneralCategoryDeleteTests {
         foreach (string invalid in new[] { null, "", "Avulsos", "Missing" }) {
             bool rejected = false;
             try { GeneralModLibrary.DeleteCategory(loaded.List, invalid); } catch (IOException) { rejected = true; }
-            check(rejected && before == Safe.Json.Serialize(loaded.List), "Invalid or root category deletion is rejected without changes: " + (invalid ?? "null"));
+            string after=Safe.Json.Serialize(loaded.List);
+            if(!rejected||before!=after)Safe.WriteJson(Path.Combine(root,"invalid-category-diagnostic.json"),new{Invalid=invalid,Rejected=rejected,Before=before,After=after});
+            check(rejected && before == after, "Invalid or root category deletion is rejected without changes: " + (invalid ?? "null"));
         }
         check(Safe.Hash(archive) == archiveHash, "Category deletion never touches the referenced mod archive.");
 

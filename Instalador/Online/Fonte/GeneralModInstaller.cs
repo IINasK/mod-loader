@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -195,11 +195,11 @@ public sealed partial class GeneralModInstaller {
         return Safe.In(records, Fingerprint(key) + ".json");
     }
 
-    Record ReadRecord(string path) {
+    Record ReadRecord(string path,bool inspection=false) {
         Safe.NoLinks(path);
         if (!File.Exists(path)) return null;
         var serializer = new JavaScriptSerializer { MaxJsonLength = Safe.Json.MaxJsonLength };
-        Record record = serializer.Deserialize<Record>(File.ReadAllText(path));
+        Record record = serializer.Deserialize<Record>(inspection?GeneralProjectStorage.ReadText(path,16000000):File.ReadAllText(path));
         if (record == null || record.Files == null || record.Files.Count == 0 || RecordPath(record.Key) != path)
             throw new IOException("Registro de instalação inválido: " + path);
         foreach (RecordFile file in record.Files) {

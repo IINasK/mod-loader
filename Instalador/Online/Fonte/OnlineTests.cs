@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -8,6 +8,10 @@ using System.Security.Cryptography;
 using System.Text;
 
 public static class OnlineTests {
+    internal static string NestedRoot(string parent,string name){
+        string path=Path.GetFullPath(parent);return Path.Combine(path,System.Text.RegularExpressions.Regex.IsMatch(path.Replace(Path.DirectorySeparatorChar,'/'),@"(?i)/online-testes-[a-f0-9]{32}(/|$)")?name.Substring(0,Math.Min(2,name.Length))+"-"+Guid.NewGuid().ToString("N").Substring(0,8):"online-testes-"+Guid.NewGuid().ToString("N"));
+    }
+
     static readonly List<string> passed=new List<string>();
     static void Check(bool value,string name){if(!value)throw new Exception("TESTE FALHOU: "+name);passed.Add(name);}
     static void Refuse(Action action,string name){bool refused=false;try{action();}catch(Exception){refused=true;}Check(refused,name);}

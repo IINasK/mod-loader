@@ -1,4 +1,4 @@
-﻿# Cyberpunk 2077 — pacote coop
+# Cyberpunk 2077 — pacote coop
 
 ## Regra prioritaria: arquivos de desenvolvimento dentro do projeto
 
@@ -23,7 +23,17 @@
 - Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
   autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
 
-## Revisão atual 1.1.13 — lixeira dos projetos salvos — 05/11/2026
+## Revisão atual 1.1.14 — projetos, Nexus, espaço e exclusão — 06/11/2026
+
+- Cabeçalho: Projetos, casa (voltar à Home), hamburger. Voltar saiu do menu. Painel Projetos reutiliza a navegação da Home, criar/importar e pessoais antes do Cyberpunk pronto. Repetir clique fecha. Importar do painel cria outro projeto pessoal mesmo partindo do padrão; as proteções do projeto padrão permanecem.
+- ZIP/RAR/7z e URL abrem o editor. Nexus: recomendar tela Slow/Premium com file_id, sem proibir página geral. Tenta nome/rótulo/bytes por metadados públicos, sem API-chave/cookies. Catálogo conhecido dispensa consulta. Consulta anônima real recebeu403: manter preenchimento manual e não contornar bloqueio. Respostas atrasadas não sobrescrevem outra fonte/variante nem nome digitado. SourceInfo persiste/exporta; é informativo, nunca aprovação de hash/status. Snapshot remove metadados de fontes locais.
+- Mods e total conhecido por projeto/Home: logical bytes, caminhos canônicos deduplicados, recibos/catalogo/arquivos referenciados e dados locais; não varrer todo o jogo/Downloads. Mede em background, sem hash/ZIP/cache novo. Leitura de inspeção permite gravação/substituição concorrente; modo transacional padrão dos leitores preservado.
+- Pedido explícito de exclusão substitui a regra de só índice da1.1.13: escolha app-only ou apagar instalados conhecidos, seguida de revisão final. Cancelar padrão. Hash/autoria/compartilhamento/base protegida conferidos com locks. Apaga diretamente arquivos confirmados, sem backup pesado/Undo, sem excluir pastas inteiras/downloads/saves. Mantém preexistentes/alterados/sem rastreio/compartilhados e dependências externas. Diário pequeno; índice só é removido após concluir. Falha mantém projeto e informa que arquivos já apagados não têm volta. Projetos padrão protegidos.
+- Editor: corpo rolável com GeneralScrollView, avisos e ações fixos; ações compactas do painel em linha de altura explícita. Evidências em T/V e Conhecimento/Validacoes/1.1.14.json. Harness usa NestedRoot compacto para caber dentro de T sem mover para raiz do SSD; nenhuma guarda relaxada. Não modificar jogo real para validar.
+- Relato privado G3 sobre conteúdo assíncrono/clipping em docs/relatos-g3-design/2026-11-06-mod-loader-dialogo-conteudo-assincrono.md, fallback da caixa central indisponível. Não publicar nem editar skill central. Registro de design público contém só decisões de interface.
+- Entrega somente EXE via Releases, commit/push main autorizados. Fonte/publicação e limites em Conhecimento/Projetos-nexus-espaco-1.1.14.md. Catálogo138/135/8 e RED4ext1.31.0 intactos; nenhuma operação nos mods/saves/projetos reais.
+
+## Revisão 1.1.13 — lixeira dos projetos salvos — 05/11/2026
 
 - Trocar somente a seta das linhas da Home por lixeira Lucide/Danger, alvo44px, texto reservado. Clique no nome/Enter continuam abrindo; clique na lixeira/Delete usam DeleteSavedProject. Duas confirmações YesNo, ambas com Não por padrão; nome explícito e CRLF para separação no TextBox nativo. Cancelar/fechar/Não preservam dados sem rebuild da Home.
 - Usar GeneralProjectStore.Delete existente: excluir referência do índice, não arquivos do jogo/dados locais/recibos/backups. Padrões seguem protegidos. Não criar limpeza recursiva nem desinstalar mods como parte dessa ação. ToolTip é descartado com a Home.

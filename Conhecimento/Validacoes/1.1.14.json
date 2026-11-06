@@ -1,0 +1,189 @@
+{
+  "Version": "1.1.14",
+  "Checks": 1143,
+  "Reports": [
+    {
+      "Report": "resultado.json",
+      "Checks": 36,
+      "Passed": true,
+      "Path": "bi-0c7b1820\\resultado.json"
+    },
+    {
+      "Report": "resultado-brand.json",
+      "Checks": 45,
+      "Passed": true,
+      "Path": "br-7eb0441d\\resultado-brand.json"
+    },
+    {
+      "Report": "resultado-category-delete.json",
+      "Checks": 16,
+      "Passed": true,
+      "Path": "ca-904d8fe2\\resultado-category-delete.json"
+    },
+    {
+      "Report": "resultado-project-deletion.json",
+      "Checks": 45,
+      "Passed": true,
+      "Path": "d\\resultado-project-deletion.json"
+    },
+    {
+      "Report": "resultado-floating.json",
+      "Checks": 30,
+      "Passed": true,
+      "Path": "fl-06c207d0\\resultado-floating.json"
+    },
+    {
+      "Report": "resultado-project-home.json",
+      "Checks": 119,
+      "Passed": true,
+      "Path": "h\\resultado-project-home.json"
+    },
+    {
+      "Report": "resultado-project-hub.json",
+      "Checks": 33,
+      "Passed": true,
+      "Path": "j\\resultado-project-hub.json"
+    },
+    {
+      "Report": "resultado-menu-host.json",
+      "Checks": 73,
+      "Passed": true,
+      "Path": "me-fd9e5543\\resultado-menu-host.json"
+    },
+    {
+      "Report": "resultado-progresso-geral.json",
+      "Checks": 27,
+      "Passed": true,
+      "Path": "on-46afc08d\\resultado-progresso-geral.json"
+    },
+    {
+      "Report": "resultado-status-presentation.json",
+      "Checks": 46,
+      "Passed": true,
+      "Path": "online-testes-status-e6921c6fdf09457088cc7f4422f67235\\resultado-status-presentation.json"
+    },
+    {
+      "Report": "resultado-p2p.json",
+      "Checks": 47,
+      "Passed": true,
+      "Path": "p2-be6d3f6c\\resultado-p2p.json"
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Checks": 92,
+      "Passed": true,
+      "Path": "p2-fd01463b\\resultado-p2p-ui.json"
+    },
+    {
+      "Report": "resultado-popup-stability.json",
+      "Checks": 80,
+      "Passed": true,
+      "Path": "po-30b491a5\\resultado-popup-stability.json"
+    },
+    {
+      "Report": "resultado-preset-clean.json",
+      "Checks": 26,
+      "Passed": true,
+      "Path": "pr-1ee1fdd7\\resultado-preset-clean.json"
+    },
+    {
+      "Report": "resultado-project-store.json",
+      "Checks": 55,
+      "Passed": true,
+      "Path": "pr-2fcfc345\\resultado-project-store.json"
+    },
+    {
+      "Report": "resultado-preset-draft.json",
+      "Checks": 43,
+      "Passed": true,
+      "Path": "pr-ab7afc5a\\resultado-preset-draft.json"
+    },
+    {
+      "Report": "resultado-redesign.json",
+      "Checks": 27,
+      "Passed": true,
+      "Path": "re-57cd92fa\\resultado-redesign.json"
+    },
+    {
+      "Report": "resultado-loader-geral.json",
+      "Checks": 25,
+      "Passed": true,
+      "Path": "resultado-loader-geral.json"
+    },
+    {
+      "Report": "resultado-pintura-botoes.json",
+      "Checks": 36,
+      "Passed": true,
+      "Path": "resultado-pintura-botoes.json"
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 28,
+      "Passed": true,
+      "Path": "resultado-snapshot-installer.json"
+    },
+    {
+      "Report": "resultado-project-search.json",
+      "Checks": 34,
+      "Passed": true,
+      "Path": "se-265626bc\\resultado-project-search.json"
+    },
+    {
+      "Report": "resultado-snapshot.json",
+      "Checks": 47,
+      "Passed": true,
+      "Path": "ss-ca06410f\\resultado-snapshot.json"
+    },
+    {
+      "Report": "resultado-table-dialogs.json",
+      "Checks": 80,
+      "Passed": true,
+      "Path": "ta-012c8a12\\resultado-table-dialogs.json"
+    },
+    {
+      "Report": "resultado-ui-v2.json",
+      "Checks": 28,
+      "Passed": true,
+      "Path": "ui-a85a2730\\resultado-ui-v2.json"
+    },
+    {
+      "Report": "resultado-updates.json",
+      "Checks": 25,
+      "Passed": true,
+      "Path": "up-4c2e0669\\resultado-updates.json"
+    }
+  ],
+  "FixtureRoot": "D:\\Projetos\\Mod Loader Cyberpunk coop\\T\\V\\online-testes-932838076aba44d79636efeebc7fa0b2",
+  "ExecutableSha256": "E83BF97FEFC01EB441C03C7A4C7598EA537B012550EBAD695B5AB4C7821CF54A",
+  "ExecutableBytes": 7545856,
+  "CatalogSha256": "89c68e6bdb8c192977fcace5d30a4b8b25912d8780fd6067f77f5c7d41c6dc05",
+  "RealProjectsDeleted": false,
+  "RealGameTouched": false,
+  "FullGeneralSuiteRepeated": true,
+  "NetworkTests": {
+    "NexusAnonymousLookup": "HTTP 403; manual fallback tested",
+    "IntegratedBrowserPublicMetadataInspected": true,
+    "NewP2PAcrossComputers": false
+  },
+  "IntermediateFailures": [
+    "Long fixture paths were shortened inside the project T directory; no path guards were relaxed. Attempts to opt the fixture runtime into long paths did not resolve all file APIs and were not kept in production.",
+    "Fixture setup corrected cache directory, receipt key, manifest entry name and locale-dependent byte formatting assertions.",
+    "Inspection reads initially competed with metadata writes; shared inspection reads and concurrent-save stress test added.",
+    "Historical category-null serialization assertion failed once before this hub change; subsequent full runs passed, cause unknown.",
+    "Visual review found clipped actions and a compressed source row despite passing structural tests; corrected fixed rows and a scrollable editor body, with visible footer actions and advice.",
+    "An unavailable helper in the first visual correction caused compilation failure; replaced with the existing scroll view reference."
+  ],
+  "DeletionScope": "Two stages: app-only removal or permanent deletion of known owned unchanged unshared installed files. No Undo; external downloads, preexisting/edited/untracked/shared/protected files retained.",
+  "MetadataTrust": "Advisory only. Does not approve package hashes, download completion or installation.",
+  "KnownLimits": [
+    "Nexus may block anonymous metadata lookup; name remains manually editable.",
+    "Published file label may differ from physical archive filename.",
+    "Storage is logical known-file size, deduplicated by canonical path, not NTFS physical allocation/hard-link identity.",
+    "No testing on another PC or a live game."
+  ],
+  "UiEvidence": [
+    "j/projects-panel.png",
+    "j/source-overview-warning.png",
+    "d/delete-review-light-red-en.png"
+  ]
+}

@@ -1,11 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
 public static class GeneralModLibraryV2Tests {
     public static int Run(string parent) {
-        string root = Path.Combine(Path.GetFullPath(parent), "biblioteca-v2-" + Guid.NewGuid().ToString("N"));
+        string root = OnlineTests.NestedRoot(parent,"biblioteca-v2-");
         Directory.CreateDirectory(root);
         int passed = 0;
         Action<bool, string> check = (ok, message) => {

@@ -1,10 +1,10 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 
 internal sealed partial class GeneralModWindow {
     internal static void RunProgressTests(string parent) {
-        string root=Path.Combine(Path.GetFullPath(parent),"online-testes-progress-"+Guid.NewGuid().ToString("N"));
+        string root=OnlineTests.NestedRoot(parent,"online-testes-progress-");
         Directory.CreateDirectory(root);
         string downloads=Path.Combine(root,"downloads");
         Directory.CreateDirectory(downloads);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 internal static class GeneralUpdatesTests {
     internal static void Run(string parent){
-        string root=Path.Combine(parent,"updates-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
+        string root=OnlineTests.NestedRoot(parent,"updates-");Directory.CreateDirectory(root);
         var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
         Func<string,string> payload=tag=>Safe.Json.Serialize(new{tag_name=tag,draft=false,prerelease=false,assets=new[]{new{name="Mod Loader "+tag.TrimStart('v')+".exe",state="uploaded",size=12345,
             browser_download_url="https://github.com/"+GeneralUpdateChecker.Repository+"/releases/download/"+tag+"/Mod%20Loader%20"+tag.TrimStart('v')+".exe"}}});

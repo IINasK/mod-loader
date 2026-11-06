@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -20,7 +20,7 @@ public static class InstalledSnapshotInstallerTests {
         }
     }
     static void RunChecks(string parent) {
-        string root = Path.Combine(parent, "online-testes-" + Guid.NewGuid().ToString("N"));
+        string root = OnlineTests.NestedRoot(parent,"online-testes-");
         string target = Path.Combine(root, "game"), data = Path.Combine(root, "data");
         Directory.CreateDirectory(target); File.WriteAllText(Path.Combine(target, ".fixture-only"), "fixture");
         var catalog = new FixedCatalog { Packages = new List<FixedMod>() };

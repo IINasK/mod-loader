@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -108,6 +108,7 @@ public static class InstalledSnapshot {
             }
             mod.Variants=new List<GeneralModVariant>{variant};mod.DefaultVariant=variant.Id;
             if(variant.CyberpunkId==null){variant.Sources=originalSources.Where(GeneralModDownload.IsWebSource).ToList();if(variant.Sources.Count==0)variant.Sources.Add("installed://"+mod.Id+"/"+variant.Id);}
+            if(variant.SourceInfo!=null)variant.SourceInfo=variant.SourceInfo.Where(pair=>variant.Sources.Contains(pair.Key)&&GeneralModDownload.IsWebSource(pair.Key)).ToDictionary(pair=>pair.Key,pair=>pair.Value);
             list.Mods.Add(mod);
             foreach(var file in files) {
                 if(!includeConfigs&&file.Kind!="file")continue;

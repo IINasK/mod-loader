@@ -7,7 +7,7 @@ using System.Windows.Forms;
 
 internal static class GeneralTableDialogTests {
     internal static int Run(string parent) {
-        string root = Path.Combine(Path.GetFullPath(parent), "table-dialogs-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
+        string root = OnlineTests.NestedRoot(parent,"table-dialogs-"); Directory.CreateDirectory(root);
         var checks = new List<string>(); Action<bool, string> check = (ok, message) => { if (!ok) throw new IOException(message); checks.Add(message); };
         bool animations = GeneralStyle.AnimationsEnabled, originalDark = GeneralStyle.Dark, originalRed = GeneralStyle.RedTheme; string originalLanguage = GeneralStyle.Language; GeneralStyle.AnimationsEnabled = false;
         try {
@@ -55,14 +55,14 @@ internal static class GeneralTableDialogTests {
                 GeneralStyle.UseTheme(theme);GeneralStyle.Language=language;
                 using(var menu=new GeneralActionsMenu()){
                     Open(menu);var buttons=Descendants(menu).OfType<Button>().Where(button=>button.Name!="").ToArray();
-                    check(buttons.Length==7&&buttons.Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"export","home","import","new","open","options","share"}),"List menu contains only the six requested actions: "+theme+"/"+language);
+                    check(buttons.Length==6&&buttons.Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"export","import","new","open","options","share"}),"List menu contains only the six requested actions: "+theme+"/"+language);
                     check(Find<Label>(menu,"ProjectSection").Text==(language=="pt"?"Projetos":"Projects"),"List section heading is translated: "+language);
-                    var create=Find<Button>(menu,"new");var open=Find<Button>(menu,"open");var sequence=new[]{"new","open","export","import","home","share","options"}.Select(id=>Find<Button>(menu,id)).ToArray();
+                    var create=Find<Button>(menu,"new");var open=Find<Button>(menu,"open");var sequence=new[]{"new","open","export","import","share","options"}.Select(id=>Find<Button>(menu,id)).ToArray();
                     check(((TableLayoutPanel)create.Parent).ColumnCount==1&&sequence.Select(button=>button.Left).Distinct().Count()==1&&sequence.Zip(sequence.Skip(1),(a,b)=>a.Bottom<=b.Top).All(value=>value),"List actions form one aligned vertical column: "+theme+"/"+language);
                     check(buttons.All(button=>button.Height==44&&button.Width==create.Width&&button.Bottom<=button.Parent.ClientSize.Height),"Buttons have matching sizes and remain inside the popup: "+theme+"/"+language+" "+String.Join(";",buttons.Select(button=>button.Name+"="+button.Bounds+" parent="+button.Parent.ClientSize)));
                     check(buttons.Cast<GeneralButton>().All(button=>!String.IsNullOrEmpty(button.IconKind)&&button.TextAlign==ContentAlignment.MiddleLeft&&!button.Destructive),"Every menu row has an icon and left aligned text: "+theme+"/"+language);
                     var divider=Find<Panel>(menu,"MenuDivider");int lineY=divider.Top+divider.Height/2;
-                    check(lineY-Find<Button>(menu,"home").Bottom==Find<Button>(menu,"share").Top-lineY,"Section divider is centered between the painted action bounds: "+theme+"/"+language);
+                    check(lineY-Find<Button>(menu,"import").Bottom==Find<Button>(menu,"share").Top-lineY,"Section divider is centered between the painted action bounds: "+theme+"/"+language);
                     check(create.Text==(language=="pt"?"Novo projeto":"New project")&&open.Text==(language=="pt"?"Abrir projeto":"Open project"),"New/open labels match the selected language: "+language);
                     check(Descendants(menu).OfType<Button>().Single(button=>button.AccessibleName==(language=="pt"?"Fechar":"Close")).Visible==false,"The menu does not display an X close button: "+theme+"/"+language);
                     using(var bitmap=new Bitmap(menu.Width,menu.Height)){menu.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(root,"list-menu-"+language+"-"+theme+".png"),System.Drawing.Imaging.ImageFormat.Png);}
@@ -70,13 +70,13 @@ internal static class GeneralTableDialogTests {
                 }
 
             }
-            foreach(string id in new[]{"new","open","export","import","home","share","options"})using(var menu=new GeneralActionsMenu()){
+            foreach(string id in new[]{"new","open","export","import","share","options"})using(var menu=new GeneralActionsMenu()){
                 Open(menu);Find<Button>(menu,id).PerformClick();check(menu.ActionId==id&&menu.DialogResult==DialogResult.OK,"List action returns its explicit identifier: "+id);
             }
             foreach(string theme in new[]{"light","dark","light-red"})foreach(string language in new[]{"pt","en"}){
                 GeneralStyle.UseTheme(theme);GeneralStyle.Language=language;using(var menu=new GeneralActionsMenu(true)){Open(menu);
                 var buttons=Descendants(menu).OfType<Button>().Where(button=>button.Name!="").ToArray();
-                check(buttons.Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"home","new","open","options"}),"Built-in menu contains only the four allowed actions: "+theme+"/"+language);
+                check(buttons.Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"new","open","options"}),"Built-in menu contains only the three allowed actions: "+theme+"/"+language);
                 check(buttons.All(button=>button.Height==44&&button.Bottom<=button.Parent.Height),"Built-in menu actions fit without clipping: "+theme+"/"+language);
                 using(var bitmap=new Bitmap(menu.Width,menu.Height)){menu.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(root,"builtin-menu-"+language+"-"+theme+".png"));}
             }

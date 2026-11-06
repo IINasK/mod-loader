@@ -5,7 +5,7 @@ using System.Windows.Forms;
 internal sealed class GeneralActionsMenu : GeneralDialog {
     internal string ActionId {get;private set;}
     internal GeneralActionsMenu(bool builtIn=false){
-        Text=GeneralStyle.T("Menu","Menu");ClientSize=new Size(350,builtIn?324:468);ShowCloseButton(false);
+        Text=GeneralStyle.T("Menu","Menu");ClientSize=new Size(350,builtIn?276:420);ShowCloseButton(false);
         var body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,Padding=new Padding(14,6,14,14),Margin=Padding.Empty};
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));Content.Controls.Add(body);
         body.RowStyles.Add(new RowStyle(SizeType.Absolute,28));
@@ -13,7 +13,6 @@ internal sealed class GeneralActionsMenu : GeneralDialog {
         Add(body,"new","Novo projeto","New project","new");
         Add(body,"open","Abrir projeto","Open project","open");
         if(!builtIn){Add(body,"export","Exportar projeto","Export project","export");Add(body,"import","Importar projeto","Import project","import");}
-        Add(body,"home","Voltar ao menu principal","Back to main menu","home");
         int row=body.RowStyles.Count;body.RowStyles.Add(new RowStyle(SizeType.Absolute,18));
         var divider=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty,Name="MenuDivider"};
         divider.Paint+=(s,e)=>{using(var pen=new Pen(GeneralStyle.SoftLine))e.Graphics.DrawLine(pen,8,divider.Height/2,divider.Width-9,divider.Height/2);};body.Controls.Add(divider,0,row);

@@ -9,7 +9,7 @@ using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
     internal static void RunUiTests(string parent){
-        string root=Path.Combine(parent,"ui-v2-"+Guid.NewGuid().ToString("N"));
+        string root=OnlineTests.NestedRoot(parent,"ui-v2-");
         Directory.CreateDirectory(root);
         string target=Path.Combine(root,"game");Directory.CreateDirectory(target);
         string archive=TestZip(root,"test.zip","mods/test.txt","sample");
@@ -30,7 +30,7 @@ internal sealed partial class GeneralModWindow {
             check(((SectionRow)form.grid.Rows[form.grid.RowCount-1].Tag).Kind=="new","A lista termina com Criar nova categoria.");
             check(form.preset.Height==44&&form.presetSettings.PointToScreen(Point.Empty).Y==form.preset.PointToScreen(Point.Empty).Y,"Seletor e salvar preset ficam alinhados na mesma linha.");
             check(((GeneralButton)form.optionsButton).Bare&&form.optionsButton.Text==""&&((GeneralButton)form.optionsButton).IconKind=="menu","Opções usa apenas ícone de menu sem moldura.");
-            check(!AllControls(form).OfType<Button>().Any(button=>button.Text=="Projetos"||button.Text=="Projects")&&form.optionsButton.Parent.Controls.OfType<Button>().Count()==1,"Cabeçalho tem só o hamburger, sem seletor Projetos.");
+            check(form.projectsButton.Right<=form.homeButton.Left&&form.homeButton.Right<=form.optionsButton.Left&&form.optionsButton.Parent.Controls.OfType<Button>().Count()==3,"Projetos, voltar e hamburger aparecem nesta ordem no cabeçalho.");
             check(form.destination.Parent.Height==44,"Campo da pasta mantém altura compacta alinhada ao botão.");
             check(form.Font.FontFamily.Name.IndexOf("Jost",StringComparison.OrdinalIgnoreCase)>=0,"A fonte Jost está embutida e em uso.");
             var click=new DataGridViewCellMouseEventArgs(0,-1,1,1,new MouseEventArgs(MouseButtons.Left,1,1,1,0));
@@ -45,7 +45,7 @@ internal sealed partial class GeneralModWindow {
             form.ClientSize=new Size(1440,900);form.PerformLayout();Application.DoEvents();CaptureUi(form,Path.Combine(root,"claro-1440.png"));
             using(var menu=new GeneralActionsMenu()){
                 menu.StartPosition=FormStartPosition.Manual;menu.Location=new Point(-30000,-30000);menu.Show(form);Application.DoEvents();
-                check(AllControls(menu).OfType<Button>().Where(button=>button.Name!="").Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"export","home","import","new","open","options","share"}),"Menu reúne listas, compartilhar e opções em uma coluna.");
+                check(AllControls(menu).OfType<Button>().Where(button=>button.Name!="").Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"export","import","new","open","options","share"}),"Menu reúne listas, compartilhar e opções em uma coluna.");
                 CaptureUi(menu,Path.Combine(root,"menu-principal.png"));menu.Close();
                 check(!menu.Visible,"Menu fecha sem alterar a lista.");
             }

@@ -1,4 +1,4 @@
-﻿# Registro de correções do Mod Loader
+# Registro de correções do Mod Loader
 
 Registro solicitado por Douglas em 05/11/2026 para preparar um relatório futuro de melhoria da skill de design. Guardar as decisões e evidências do aplicativo; não alterar a skill global automaticamente a partir deste registro.
 
@@ -77,3 +77,7 @@ Registro solicitado por Douglas em 05/11/2026 para preparar um relatório futuro
 
 - Nas linhas de projetos salvos, lixeira no lugar da seta, alvo44px e margem de texto. Abrir pelo nome/Enter, excluir pelo ícone/Delete; ações separadas.
 - Duas confirmações identificadas, Não por padrão; cancelar não reconstrói a tela. Exclusão só do índice, dados/jogo preservados. Rotina de tela, sem alteração da skill central.
+
+## 1.1.14 — layout com metadados variáveis
+
+Painel Projetos volta a ser uma navegação compacta da Home, com ações44px e lista que ocupa sua largura. Casa fica entre Projetos e hamburger. O editor precisa acomodar mensagens de consulta que aparecem depois: corpo rolável e ações/avisos em linhas fixas. Verificar a janela mínima com fonte preenchida, ajuda longa e consulta indisponível; build e tamanho lógico dos controles não substituem a conferência da captura. Relato detalhado permanece privado no consumidor, sem atribuir a causa à skill.

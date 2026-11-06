@@ -8,7 +8,7 @@ using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
     internal static void RunPresetDraftTests(string parent){
-        string root=Path.Combine(parent,"preset-draft-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
+        string root=OnlineTests.NestedRoot(parent,"preset-draft-");Directory.CreateDirectory(root);
         var a=NewEntry("Primeiro","https://example.com/a.zip");var b=NewEntry("Segundo","https://example.com/b.zip");
         var saved=new GeneralModPreset{Id="kit",Name="Original",ModIds=new List<string>{a.Id,b.Id}};
         var state=new GeneralModState{Destination=root,DownloadFolder=root,SelectedPreset="kit",List=new GeneralModList{Mods=new List<GeneralModEntry>{a,b},Presets=new List<GeneralModPreset>{saved}}};
@@ -63,7 +63,7 @@ internal sealed partial class GeneralModWindow {
             check(form.ProtectedPreset&&form.tableName.ReadOnly&&!form.deletePreset.Enabled,"Presets fornecidos pelo projeto padrão não podem ser renomeados nem excluídos.");
             string presetName=form.ActivePreset.Name;int count=form.state.List.Presets.Count;
             form.optionsButton.PerformClick();var menu=(GeneralActionsMenu)form.menus.Current;
-            check(AllControls(menu).OfType<Button>().Where(button=>button.Name!="").Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"home","new","open","options"}),"Projeto padrão oferece somente novo/abrir/voltar/opções.");
+            check(AllControls(menu).OfType<Button>().Where(button=>button.Name!="").Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"new","open","options"}),"Projeto padrão oferece somente novo/abrir/opções.");
             form.optionsButton.PerformClick();await Task.Delay(30);
             string beforeExport=Safe.Hash(Path.Combine(builtInStore.DataPath(builtIn),"lista.json"));form.ProjectCommand("export");form.ProjectCommand("import");
             check(form.Visible&&form.ProjectAction==null&&beforeExport==Safe.Hash(Path.Combine(builtInStore.DataPath(builtIn),"lista.json")),"Projeto padrão também recusa importação/exportação no despacho, sem alterar dados.");
