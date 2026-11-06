@@ -23,6 +23,12 @@
 - Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
   autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
 
+## Revisão 1.1.26 — atualização silenciosa na abertura
+
+- Reutilizar Inno Setup e GeneralUpdateChecker.Session. Instalação registrada somente: toda nova execução confere Release antes de abrir projetos, valida URL/tamanho/SHA-256 do GitHub e identidade ProductVersion/FileDescription do Setup; encerra normalmente, instala e reabre. Inno FileVersion pode ser vazio e metadados podem ter espaços de preenchimento. Não relaxar hash nem executar portable como Setup.
+- Nunca forçar fechamento, elevar ou reiniciar PC. Outro loader ativo adia; offline/falha de download preserva programa. Uma instalação inicial de1.1.26 é necessária; versões anteriores não ganham código retroativamente. Tentativa de mesmo Setup tem cooldown24h. Cache temporário de suporte com propriedade explícita, limpo após sucesso; desconhecidos preservados. Não criar cópias de mods ou alterar jogo/RED4ext.
+- 79 verificações focadas e substituição/reabertura reais em fixture aprovadas, transporte HTTPS de produção e identificação da instalação real conferidos. Conhecimento/Validacoes/1.1.26.json e Atualizacao-automatica-1.1.26.md registram limites. Não alegar teste no PC remoto ou resiliência à queda de energia durante gravação do instalador. Sem relato G3 porque a alteração é funcional.
+
 ## Revisão1.1.25 — mensagens completas e diagnóstico remoto
 
 - RowStatus guarda detalhe por item/variante separado da etiqueta; DrawRows reutiliza o detalhe e não o sobrescreve. Rechecagem, troca de projeto/fonte limpam dados antigos. Menu contextual oferece ver erro e copiar todos os erros com versão/catálogo/IDs. Logs existentes guardam exceção completa; não criar cache de pacotes nem exportar logs dentro de modpacks.

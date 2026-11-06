@@ -80,12 +80,18 @@ Name: "{autoprograms}\Mod Loader"; Filename: "{app}\ModLoader.exe"; WorkingDir: 
 Name: "{autodesktop}\Mod Loader"; Filename: "{app}\ModLoader.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 #endif
 
-#ifndef FixtureId
 [Run]
+#ifndef FixtureId
 Filename: "{app}\ModLoader.exe"; Description: "{cm:StartProgram}"; Flags: nowait postinstall skipifsilent
 #endif
+Filename: "{app}\ModLoader.exe"; WorkingDir: "{app}"; Flags: nowait; Check: IsAutomaticUpdate
 
 [Code]
+function IsAutomaticUpdate(): Boolean;
+begin
+  Result := WizardSilent and (ExpandConstant('{param:MODLOADERUPDATE|0}') = '1');
+end;
+
 function ConfigDir(Param: String): String;
 var Modern, Legacy: String;
 begin

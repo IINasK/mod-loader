@@ -22,6 +22,11 @@ internal static class GeneralUpdatesTests {
             new[]{"https://github.com/","https://evil.example/"},new[]{"Mod%20Loader%201.1.10.exe","evil.exe"},new[]{"Mod Loader 1.1.10.exe","Mod Loader 1.1.9.exe"}})
             check(GeneralUpdateChecker.Parse(valid.Replace(change[0],change[1]),"1.1.6")==null,"Não anuncia release sem executável válido: "+change[0]);
         check(GeneralUpdateChecker.Parse("null","1.1.6")==null&&GeneralUpdateChecker.Parse("{\"tag_name\":\"v1.1.10\"}","1.1.6")==null,"Resposta vazia ou sem asset é ignorada.");
+        string setupJson=Safe.Json.Serialize(new{tag_name="v1.1.10",draft=false,prerelease=false,assets=new[]{new{name="Mod-Loader-1.1.10.exe",state="uploaded",size=12345,digest="sha256:"+new string('a',64),browser_download_url="https://github.com/"+GeneralUpdateChecker.Repository+"/releases/download/v1.1.10/Mod-Loader-1.1.10.exe"}}});
+        var automatic=GeneralUpdateChecker.Parse(setupJson,"1.1.6");
+        check(automatic!=null&&automatic.Url.EndsWith("Mod-Loader-1.1.10.exe")&&automatic.Sha256==new string('a',64)&&automatic.Size==12345,"Instalador automático exige URL oficial, tamanho e digest SHA256 da Release.");
+        check(newer.Url==null,"Executáveis portáteis antigos continuam só como aviso; nunca são executados como Setup.");
+        foreach(string invalid in new[]{"", "sha256:bad", "md5:"+new string('a',64)}){var unsigned=GeneralUpdateChecker.Parse(setupJson.Replace("sha256:"+new string('a',64),invalid),"1.1.6");check(unsigned!=null&&unsigned.Url==null,"Sem digest válido oferece aviso manual e não atualização automática: "+invalid);}
         int calls=0;var source=new TaskCompletionSource<string>();
         var checker=new GeneralUpdateChecker(()=>{calls++;return source.Task;});
         var first=checker.CheckOnce();var second=checker.CheckOnce();

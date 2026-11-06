@@ -108,7 +108,7 @@ internal sealed partial class GeneralModWindow {
         InstalledSnapshotTests.Run(root);InstalledSnapshotInstallerTests.Run(root);
         GeneralStatusPresentationTests.Run(root);
         RunFloatingTests(root);GeneralCategoryDeleteTests.Run(root);GeneralTableDialogTests.Run(root);RunRedesignTests(root);
-        GeneralUpdatesTests.Run(root);RunPresetIsolationTests(root);
+        GeneralUpdatesTests.Run(root);GeneralAutomaticUpdateTests.Run(root);RunPresetIsolationTests(root);
         GeneralBrandTests.Run(root);
         GeneralProjectStoreTests.Run(root);RunProjectHomeTests(root);RunProjectDeletionTests(root);RunProjectHubTests(root);GeneralAppPathsTests.Run(root);RunStorageTests(root);RunNoCopyTests(root);RunProjectCloneTests(root);
         GeneralMenuHostTests.Run(root);RunPresetDraftTests(root);
