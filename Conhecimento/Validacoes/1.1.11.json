@@ -148,5 +148,19 @@
     "Real game installation or gameplay"
   ],
   "PrivateG3ReportsRecorded": true,
-  "CentralSkillEdited": false
+  "CentralSkillEdited": false,
+  "SourceCommit": "d6309d00ad024f6e5035d6ac00c31d0c0dcb3102",
+  "LiveReleaseVerification": {
+    "AnonymousRequest": true,
+    "Runtime": "Windows PowerShell 5.1 / .NET Framework",
+    "UsedPublished110Checker": true,
+    "AvailableToVersion110": "1.1.11",
+    "Version111DoesNotNotifyItself": true,
+    "ReleasePage": "https://github.com/IINasK/mod-loader/releases/tag/v1.1.11",
+    "DownloadUrl": "https://github.com/IINasK/mod-loader/releases/download/v1.1.11/Mod-Loader-1.1.11.exe",
+    "DownloadBytes": 7427072,
+    "DownloadedSha256": "AFC4AE5F0C277893A8DB1F64D092AACC13094AD934B21D82947D63AEB59B749E",
+    "DownloadedExecutableWasRun": false,
+    "TempDownloadRemoved": true
+  }
 }
