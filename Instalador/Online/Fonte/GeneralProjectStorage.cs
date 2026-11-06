@@ -4,52 +4,89 @@ using System.IO;
 using System.Linq;
 
 internal sealed class GeneralStorageSize {
-    internal long Mods,Total;
+    internal long Mods,Total,Cache;
+    internal int ModCount,Identified;
+    internal readonly Dictionary<string,long> ModBytes=new Dictionary<string,long>(StringComparer.Ordinal);
     internal int Projects,WithFiles,Unavailable;
     internal static string Format(long bytes){double value=bytes;string[] units={"B","KiB","MiB","GiB","TiB"};int at=0;while(value>=1024&&at<units.Length-1){value/=1024;at++;}return value.ToString(at==0?"0":"0.##")+" "+units[at];}
-    internal static string ProjectText(GeneralStorageSize size){return GeneralStyle.T("Mods: ","Mods: ")+Format(size.Mods)+"   ·   "+GeneralStyle.T("Total do projeto: ","Project total: ")+Format(size.Total)+(size.Unavailable>0?GeneralStyle.T(" (parcial)"," (partial)"):"");}
-    internal static string HomeText(GeneralStorageSize size){return GeneralStyle.T("Projetos com arquivos: ","Projects with files: ")+size.WithFiles+" / "+size.Projects+"   ·   "+GeneralStyle.T("Mods: ","Mods: ")+Format(size.Mods)+"   ·   "+GeneralStyle.T("Total: ","Total: ")+Format(size.Total)+(size.Unavailable>0?GeneralStyle.T(" (parcial)"," (partial)"):"");}
+    internal static string ProjectText(GeneralStorageSize size){return GeneralStyle.T("Mods: ","Mods: ")+Format(size.Mods)+"   ·   "+GeneralStyle.T("Total do projeto: ","Project total: ")+Format(size.Total)+"   ·   "+GeneralStyle.T("Cache do projeto: ","Project cache: ")+Format(size.Cache)+(size.Unavailable>0?GeneralStyle.T(" (parcial)"," (partial)"):"");}
+    internal static string HomeText(GeneralStorageSize size){return GeneralStyle.T("Projetos com arquivos: ","Projects with files: ")+size.WithFiles+" / "+size.Projects+"   ·   "+GeneralStyle.T("Mods: ","Mods: ")+Format(size.Mods)+"   ·   "+GeneralStyle.T("Total: ","Total: ")+Format(size.Total)+"   ·   "+GeneralStyle.T("Cache: ","Cache: ")+Format(size.Cache)+(size.Unavailable>0?GeneralStyle.T(" (parcial)"," (partial)"):"");}
 }
 internal static class GeneralProjectStorage {
     internal static GeneralStorageSize Measure(GeneralProjectStore store,FixedCatalog catalog,DownloadCache cache,GeneralProject selected=null){
-        var result=new GeneralStorageSize();var mods=new HashSet<string>(StringComparer.OrdinalIgnoreCase);var total=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var seed=GeneralModLibrary.Seed(catalog,new ModImportItem[0]);
+        var result=new GeneralStorageSize();var mods=Paths();var total=Paths();var overhead=Paths();var errors=Paths();
+        var sizes=new Dictionary<string,long>(StringComparer.OrdinalIgnoreCase);var seed=GeneralModLibrary.Seed(catalog,new ModImportItem[0]);
         foreach(var project in store.Read(true).Projects.Where(item=>selected==null||item.Id==selected.Id)){
-            result.Projects++;int found=0;
+            result.Projects++;var projectFiles=Paths();string data=store.DataPath(project);
             try{
-                var state=store.Load(project,true);string data=store.DataPath(project);var projectFiles=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var paths=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var state=store.Load(project,true);result.ModCount+=state.List.Mods.Count;
+                var perMod=state.List.Mods.ToDictionary(mod=>mod.Id,mod=>Paths(),StringComparer.Ordinal);
+                var aliases=new Dictionary<string,HashSet<string>>(StringComparer.Ordinal);
+                foreach(var pair in state.CyberpunkImports){
+                    string id=pair.Key.Split('/')[0];if(!perMod.ContainsKey(id))continue;
+                    HashSet<string> names;if(!aliases.TryGetValue(pair.Value,out names))aliases[pair.Value]=names=new HashSet<string>();names.Add(id);
+                }
+                var paths=Paths();
                 if(!String.IsNullOrWhiteSpace(state.Destination)&&Directory.Exists(state.Destination)){
-                    string root=Path.GetFullPath(state.Destination).TrimEnd('\\');
-                    foreach(var file in new GeneralModInstaller(root,Path.Combine(data,"Instalacoes")).ProjectDeletionFiles(true))paths.Add(Safe.In(root,file.Path));
-                    foreach(var file in new InstalledSnapshotInstaller(root,data,catalog).ProjectDeletionFiles(true))paths.Add(Safe.In(root,file.Path));
+                    string root=Path.GetFullPath(state.Destination).TrimEnd(Path.DirectorySeparatorChar);
+                    Action<ProjectDeleteFile> record=file=>{
+                        string path=Safe.In(root,file.Path);paths.Add(path);
+                        foreach(string owner in file.OwnerKeys??new List<string>()){
+                            string id=owner.Split('/')[0];HashSet<string> own;if(perMod.TryGetValue(id,out own))own.Add(path);
+                            HashSet<string> names;if(aliases.TryGetValue(owner,out names))foreach(string name in names)perMod[name].Add(path);
+                        }
+                    };
+                    foreach(var file in new GeneralModInstaller(root,Path.Combine(data,"Instalacoes")).ProjectDeletionFiles(true))record(file);
+                    foreach(var file in new InstalledSnapshotInstaller(root,data,catalog).ProjectDeletionFiles(true))record(file);
                     foreach(var mod in state.List.Mods){
                         var original=seed.Mods.FirstOrDefault(item=>item.Id==mod.Id);if(original==null)continue;
-                        foreach(var variant in mod.Variants){var trusted=original.Variants.FirstOrDefault(item=>item.Id==variant.Id&&item.Sources.SequenceEqual(variant.Sources));if(trusted==null)continue;
+                        foreach(var variant in mod.Variants){var trusted=original.Variants.FirstOrDefault(item=>item.Id==variant.Id&&item.Sources.SequenceEqual(variant.Sources));if(trusted==null||trusted.CyberpunkId==null)continue;
                             foreach(var recipe in FixedData.Expand(catalog,new[]{trusted.CyberpunkId})){
-                                var actual=recipe.Id==NightCityDensity.ModId?NightCityDensity.Installed(recipe,root):recipe;foreach(var file in actual.Files)paths.Add(Safe.In(root,file.Path));
+                                var known=recipe.Id==NightCityDensity.ModId?NightCityDensity.KnownFiles(recipe):recipe.Files;
+                                foreach(var file in known){string path=Safe.In(root,file.Path);paths.Add(path);if(recipe.Id==trusted.CyberpunkId)perMod[mod.Id].Add(path);}
                             }
                         }
                     }
-                    var imports=new HashSet<string>(state.CyberpunkImports.Values,StringComparer.Ordinal);foreach(var mod in state.List.Mods.Where(item=>item.Id.StartsWith("file-",StringComparison.Ordinal)&&item.Id.Length==69))imports.Add(mod.Id);
-                    if(File.Exists(Safe.In(root,"bin/x64/Cyberpunk2077.exe")))foreach(var file in new FixedInstaller(catalog,root).ProjectDeletionFiles(imports,true))paths.Add(Safe.In(root,file.Path));
+                    var imports=new HashSet<string>(state.CyberpunkImports.Values,StringComparer.Ordinal);
+                    foreach(var mod in state.List.Mods.Where(item=>item.Id.StartsWith("file-",StringComparison.Ordinal)&&item.Id.Length==69))imports.Add(mod.Id);
+                    if(File.Exists(Safe.In(root,"bin/x64/Cyberpunk2077.exe")))foreach(var file in new FixedInstaller(catalog,root).ProjectDeletionFiles(imports,true))record(file);
                 }
-                foreach(string path in paths)if(Add(path,projectFiles)){found++;Add(path,mods);Add(path,total);}
-                foreach(string path in state.ResolvedDownloads.Values.Concat(state.List.Mods.SelectMany(mod=>mod.Variants).SelectMany(variant=>variant.Sources)).Where(GeneralModDownload.IsArchivePath)){if(Add(path,projectFiles))found++;Add(path,total);}
-                foreach(var mod in state.List.Mods){var original=seed.Mods.FirstOrDefault(item=>item.Id==mod.Id);if(original==null)continue;foreach(var asset in catalog.Packages.Where(recipe=>original.Variants.Any(v=>v.CyberpunkId==recipe.Id)).SelectMany(recipe=>recipe.Assets)){if(Add(cache.PathFor(asset),projectFiles))found++;Add(cache.PathFor(asset),total);}}
-                Walk(data,total);if(found>0)result.WithFiles++;
+                foreach(string path in paths)if(Add(path,projectFiles,sizes,errors)){Add(path,mods,sizes,errors);Add(path,total,sizes,errors);}
+                foreach(var pair in perMod){
+                    var present=Paths();foreach(string path in pair.Value)Add(path,present,sizes,errors);
+                    if(present.Count>0&&!pair.Value.Any(errors.Contains)){result.Identified++;if(selected!=null)result.ModBytes[pair.Key]=Bytes(present,sizes);}
+                }
+                foreach(string path in state.ResolvedDownloads.Values.Concat(state.List.Mods.SelectMany(mod=>mod.Variants).SelectMany(variant=>variant.Sources)).Where(GeneralModDownload.IsArchivePath)){
+                    Add(path,projectFiles,sizes,errors);Add(path,total,sizes,errors);if(Inside(path,cache.Root)||Inside(path,data))Add(path,overhead,sizes,errors);
+                }
+                foreach(var mod in state.List.Mods){var original=seed.Mods.FirstOrDefault(item=>item.Id==mod.Id);if(original==null)continue;
+                    var ids=mod.Variants.SelectMany(variant=>original.Variants.Where(v=>v.Id==variant.Id&&v.Sources.SequenceEqual(variant.Sources)&&v.CyberpunkId!=null).Select(v=>v.CyberpunkId)).Distinct();
+                    foreach(var asset in FixedData.Expand(catalog,ids).SelectMany(recipe=>recipe.Id==NightCityDensity.ModId?NightCityDensity.Assets(recipe):recipe.Assets)){
+                        string path=cache.PathFor(asset);Add(path,projectFiles,sizes,errors);Add(path,overhead,sizes,errors);
+                    }
+                }
             }catch(IOException){result.Unavailable++;}catch(UnauthorizedAccessException){result.Unavailable++;}
+            Walk(data,overhead,sizes,errors);if(projectFiles.Count>0)result.WithFiles++;
         }
-        if(selected==null){Walk(store.Root,total);Walk(cache.Root,total);}
-        result.Mods=Bytes(mods);result.Total=Bytes(total);return result;
+        if(selected==null){Walk(store.Root,overhead,sizes,errors);Walk(cache.Root,overhead,sizes,errors);}
+        total.UnionWith(overhead);result.Mods=Bytes(mods,sizes);result.Cache=Bytes(overhead,sizes);result.Total=Bytes(total,sizes);result.Unavailable+=errors.Count;return result;
     }
+    static HashSet<string> Paths(){return new HashSet<string>(StringComparer.OrdinalIgnoreCase);}
+    static bool Inside(string path,string root){return Path.GetFullPath(path).StartsWith(Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar)+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase);}
     // Metrics never hold a read lock over files which the installer may replace.
     internal static string ReadText(string path,int max){
         Safe.NoLinks(path);using(var input=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete)){
             if(input.Length>max)throw new IOException("Registro excessivo.");using(var reader=new StreamReader(input)){var text=reader.ReadToEnd();if(text.Length>max)throw new IOException("Registro excessivo.");return text;}
         }
     }
-    static bool Add(string path,HashSet<string> files){try{Safe.NoLinks(path);if(!File.Exists(path))return false;return files.Add(Path.GetFullPath(path));}catch(IOException){return false;}catch(UnauthorizedAccessException){return false;}}
-    static void Walk(string root,HashSet<string> files){try{Safe.NoLinks(root);if(!Directory.Exists(root))return;foreach(string file in Directory.GetFiles(root))Add(file,files);foreach(string folder in Directory.GetDirectories(root))Walk(folder,files);}catch(IOException){}catch(UnauthorizedAccessException){}}
-    static long Bytes(IEnumerable<string> paths){long sum=0;foreach(string path in paths)try{sum=checked(sum+new FileInfo(path).Length);}catch(IOException){}catch(UnauthorizedAccessException){}return sum;}
+    static bool Add(string path,HashSet<string> files,Dictionary<string,long> sizes,HashSet<string> errors){
+        string full=Path.GetFullPath(path);
+        try{if(!sizes.ContainsKey(full)){Safe.NoLinks(full);var info=new FileInfo(full);if(!info.Exists)return false;sizes[full]=info.Length;}return files.Add(full);}
+        catch(IOException){errors.Add(full);return false;}catch(UnauthorizedAccessException){errors.Add(full);return false;}
+    }
+    static void Walk(string root,HashSet<string> files,Dictionary<string,long> sizes,HashSet<string> errors){
+        try{Safe.NoLinks(root);if(!Directory.Exists(root))return;foreach(string file in Directory.GetFiles(root))Add(file,files,sizes,errors);foreach(string folder in Directory.GetDirectories(root))Walk(folder,files,sizes,errors);}
+        catch(IOException){errors.Add(root);}catch(UnauthorizedAccessException){errors.Add(root);}
+    }
+    static long Bytes(IEnumerable<string> paths,Dictionary<string,long> sizes){return paths.Sum(path=>sizes[path]);}
 }

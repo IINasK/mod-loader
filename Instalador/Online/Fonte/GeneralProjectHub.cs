@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -15,12 +15,24 @@ internal sealed partial class GeneralModWindow {
         if(testMode)return null;
         info=await GeneralNexusInfo.Read(source);if(info!=null){if(sourceMetadata.Count>=128)sourceMetadata.Clear();sourceMetadata[source]=info;}return info;
     }
+    bool storageReading,storageQueued;
+    Dictionary<string,long> measuredMods=new Dictionary<string,long>(StringComparer.Ordinal);
     async void RefreshStorageSize(){
         if(projectStore==null||project==null||storageSize==null)return;
-        int generation=++storageGeneration;var label=storageSize;
-        try{var size=await Task.Run(()=>GeneralProjectStorage.Measure(projectStore,catalog,cache,project));if(!IsDisposed&&generation==storageGeneration&&!label.IsDisposed)label.Text=GeneralStorageSize.ProjectText(size);}
-        catch(Exception){if(!IsDisposed&&generation==storageGeneration&&!label.IsDisposed)label.Text=T("Espaço indisponível","Size unavailable");}
+        if(storageReading){storageQueued=true;return;}storageReading=true;
+        try{do{
+            storageQueued=false;int generation=++storageGeneration;var label=storageSize;
+            try{var size=await Task.Run(()=>GeneralProjectStorage.Measure(projectStore,catalog,cache,project));if(!IsDisposed&&generation==storageGeneration&&!label.IsDisposed){label.Text=GeneralStorageSize.ProjectText(size);measuredMods=size.ModBytes;UpdateMeasuredRows();}}
+            catch(Exception){if(!IsDisposed&&generation==storageGeneration&&!label.IsDisposed){label.Text=T("Espaço indisponível","Size unavailable");measuredMods.Clear();UpdateMeasuredRows();}}
+        }while(storageQueued&&!IsDisposed);}finally{storageReading=false;}
     }
+    string ModSpace(string id){long bytes;return measuredMods.TryGetValue(id,out bytes)?GeneralStorageSize.Format(bytes):"—";}
+    void UpdateMeasuredRows(){
+        if(grid==null||grid.IsDisposed)return;
+        foreach(var row in ModRows()){string id=(string)row.Tag;row.Cells["Size"].Value=ModSpace(id);row.Cells["Size"].ToolTipText=SpaceTip(id);}
+        UpdateCounts();
+    }
+    string SpaceTip(string id){return measuredMods.ContainsKey(id)?T("Arquivos instalados deste mod. Arquivos compartilhados aparecem em cada mod; o total do projeto os conta uma vez.","Installed files for this mod. Shared files appear for each mod; the project total counts them once."):T("Tamanho não identificado: nenhum arquivo instalado foi localizado ou a leitura não foi concluída. O tamanho do download não é usado como tamanho instalado.","Size not identified: no installed files were found or measurement is incomplete. Download size is not used as installed size.");}
     void ToggleProjectsPanel(){
         if(working||scanning)return;
         menus.Toggle(this,projectsButton,()=>new GeneralProjectsPanel(projectStore,catalog,cache,project==null?null:project.Id),dialog=>Guard(()=>{

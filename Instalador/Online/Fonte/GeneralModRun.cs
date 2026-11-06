@@ -200,7 +200,7 @@ internal sealed partial class GeneralModWindow {
             RowStatus(work,"Falhou",null,message);
             if(!interrupt&&!testMode)GeneralDialog.Message(this,message,T("Falha na instalação","Installation failed"),MessageBoxButtons.OK,MessageBoxIcon.Warning);
         }
-        finally{work.Ended=true;operationFinished++;UpdateFlow(null,"");skipRequests.Remove(work);Stage(work,"work.end");}
+        finally{RefreshStorageSize();work.Ended=true;operationFinished++;UpdateFlow(null,"");skipRequests.Remove(work);Stage(work,"work.end");}
     }
     async Task InstallKnown(Work work,string root){
         if(!IsCyberpunk(root))throw new IOException(T("Selecione a pasta do Cyberpunk 2077 para usar este mod do pacote.","Select the Cyberpunk 2077 folder to use this pack item."));

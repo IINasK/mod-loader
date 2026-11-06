@@ -11,6 +11,8 @@ Indice interno de138componentes ativos do instalador. Revisao de05/11/2026; font
 
 ## Consulta
 
+- Espaço por mod, contador e cache: [versão1.1.16](Espaco-por-mod-1.1.16.md), [validação](Validacoes/1.1.16.json).
+
 - Instalação Windows e desinstalador: [versão1.1.15](Instalacao-Windows-1.1.15.md), [validação](Validacoes/1.1.15.json).
 
 - Projetos, Nexus, espaço e exclusão permanente: [versão1.1.14](Projetos-nexus-espaco-1.1.14.md), [validação](Validacoes/1.1.14.json).

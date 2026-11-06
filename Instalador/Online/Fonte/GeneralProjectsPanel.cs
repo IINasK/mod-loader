@@ -10,10 +10,10 @@ internal sealed class GeneralProjectsPanel : GeneralDialog {
     internal GeneralProjectsPanel(GeneralProjectStore store,FixedCatalog catalog,DownloadCache cache,string current=null):base(GeneralStyle.T("Projetos","Projects")){
         ClientSize=new Size(580,490);ShowCloseButton(false);
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=6,Padding=new Padding(18,6,18,18)};
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));foreach(int height in new[]{54,30,28})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,height));layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,32));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,48));Content.Controls.Add(layout);
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));foreach(int height in new[]{54,48,28})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,height));layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,32));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,48));Content.Controls.Add(layout);
         var actions=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};actions.RowStyles.Add(new RowStyle(SizeType.Absolute,48));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
         Add(actions,"new","Criar projeto","Create project","new",0);Add(actions,"import","Importar projeto","Import project","import",1);layout.Controls.Add(actions,0,0);
-        var metrics=new Label{Name="ProjectsStorage",Text=GeneralStyle.T("Calculando espaço…","Calculating size…"),Dock=DockStyle.Fill,Font=GeneralStyle.Font(10),ForeColor=GeneralStyle.Muted,Margin=Padding.Empty};layout.Controls.Add(metrics,0,1);
+        var metrics=new Label{Name="ProjectsStorage",AutoEllipsis=true,Text=GeneralStyle.T("Calculando espaço…","Calculating size…"),Dock=DockStyle.Fill,Font=GeneralStyle.Font(10),ForeColor=GeneralStyle.Muted,Margin=Padding.Empty};layout.Controls.Add(metrics,0,1);
         layout.Controls.Add(new Label{Text=GeneralStyle.T("Projetos salvos","Saved projects"),Font=GeneralStyle.Font(12,true),Dock=DockStyle.Fill,Margin=Padding.Empty},0,2);
         var field=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(8),Margin=Padding.Empty};layout.Controls.Add(field,0,3);
         var projects=store==null?new GeneralProject[0]:store.Read().Projects.Where(item=>item.TemplateId==null).Reverse().ToArray();

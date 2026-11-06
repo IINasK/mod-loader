@@ -23,7 +23,15 @@
 - Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
   autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
 
-## Revisão atual 1.1.15 — instalador Windows — 06/11/2026
+## Revisão atual 1.1.16 — espaço por mod e cache — 06/11/2026
+
+- Usuário cancelou a troca da fonte após conferência: manter Jost e GeneralStyle. Não criar relato G3 falso de tipografia. Alterações comuns de tela não são achados da skill.
+- Coluna Espaço ao lado do nome, físico índice5/DisplayIndex2 para preservar filtros Variant2/Status3. Medidos: conhecido/visíveis acompanha preset/filtros/pesquisa, nunca checkboxes. Zero B conhecido difere de — desconhecido. Per-mod usa donos dos recibos/importações/P2P e receitas fixas confiáveis; download esperado não substitui tamanho instalado.
+- Cache do projeto ao lado do total soma dados próprios de apoio e pacotes internos referenciados, incluindo dependências/variantes. Downloads originais fora do cache entram no total, não no cache. Home deduplica biblioteca/cache globais. Caminhos compartilhados contam em cada mod, uma vez no agregado. Espaço lógico usado, não cota/reserva ou alocação física do Windows.
+- Medição em background/coalescida, somente metadados, uma consulta por caminho; não calcular hash de payload nem chamar reconhecimento NCA por hash na medição. Validadores de integridade/variante seguem separados. Refresh por item concluído. Sem varredura arbitrária de todo jogo/Downloads, cópias novas ou exclusões.
+- Suíte geral e Setup isolado aprovados; provas em Conhecimento/Validacoes/1.1.16.json e T/Q. Correções intermediárias foram do harness (preset fixture e MAX_PATH); T permanece interno, sem relaxar guardas. Jogo/mods/saves reais intactos. Setup público e commit/push main autorizados; aplicativo1.1.15 aberto não será fechado à força para atualizar.
+
+## Revisão 1.1.15 — instalador Windows — 06/11/2026
 
 - Pedido atual substitui a distribuição portátil: entregar um único Setup EXE, asset canônico Mod-Loader-X.Y.Z.exe. Inno Setup6 padrão, por usuário, sem admin. AppId estável IINasK.ModLoader; programa em LocalAppData/Programs/Mod Loader, atalhos Iniciar/desktop e entrada de desinstalação HKCU64. Desinstalador próprio do Inno; não criar desinstalador artesanal nem remover pastas inteiras.
 - Config/cache/logs novos em LocalAppData/ModLoader/{Config,Cache,Logs}. GeneralAppPaths reconhece biblioteca antiga ModLoaderGeral se não houver biblioteca moderna; cache/logs CyberpunkCoop existentes continuam em uso, sem copiar/mover payloads. Dirs vazios não escondem dados antigos. Desinstalar app preserva projetos/config/cache/mods. Não executar instalação de mods durante Setup.

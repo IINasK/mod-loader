@@ -1,0 +1,223 @@
+{
+  "Version": "1.1.16",
+  "ApplicationChecks": 1183,
+  "Reports": [
+    {
+      "Report": "resultado.json",
+      "Checks": 36,
+      "Passed": true,
+      "Path": "bi-7871e926/resultado.json"
+    },
+    {
+      "Report": "resultado-brand.json",
+      "Checks": 45,
+      "Passed": true,
+      "Path": "br-0ee5120d/resultado-brand.json"
+    },
+    {
+      "Report": "resultado-category-delete.json",
+      "Checks": 16,
+      "Passed": true,
+      "Path": "ca-9285e022/resultado-category-delete.json"
+    },
+    {
+      "Report": "resultado-project-deletion.json",
+      "Checks": 45,
+      "Passed": true,
+      "Path": "d/resultado-project-deletion.json"
+    },
+    {
+      "Report": "resultado-floating.json",
+      "Checks": 30,
+      "Passed": true,
+      "Path": "fl-e5514242/resultado-floating.json"
+    },
+    {
+      "Report": "resultado-project-home.json",
+      "Checks": 119,
+      "Passed": true,
+      "Path": "h/resultado-project-home.json"
+    },
+    {
+      "Report": "resultado-project-hub.json",
+      "Checks": 35,
+      "Passed": true,
+      "Path": "j/resultado-project-hub.json"
+    },
+    {
+      "Report": "resultado-menu-host.json",
+      "Checks": 73,
+      "Passed": true,
+      "Path": "me-e6cc838a/resultado-menu-host.json"
+    },
+    {
+      "Report": "resultado-progresso-geral.json",
+      "Checks": 27,
+      "Passed": true,
+      "Path": "on-b01e5225/resultado-progresso-geral.json"
+    },
+    {
+      "Report": "resultado-status-presentation.json",
+      "Checks": 46,
+      "Passed": true,
+      "Path": "online-testes-status-40a8c3d0d567401aae375a60a30c8eaa/resultado-status-presentation.json"
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Checks": 92,
+      "Passed": true,
+      "Path": "p2-2d48174d/resultado-p2p-ui.json"
+    },
+    {
+      "Report": "resultado-p2p.json",
+      "Checks": 47,
+      "Passed": true,
+      "Path": "p2-b80419f3/resultado-p2p.json"
+    },
+    {
+      "Report": "resultado-app-paths.json",
+      "Checks": 7,
+      "Passed": true,
+      "Path": "pa-a7ea9cb4/resultado-app-paths.json"
+    },
+    {
+      "Report": "resultado-popup-stability.json",
+      "Checks": 80,
+      "Passed": true,
+      "Path": "po-1389eba9/resultado-popup-stability.json"
+    },
+    {
+      "Report": "resultado-project-store.json",
+      "Checks": 55,
+      "Passed": true,
+      "Path": "pr-0bcc64f6/resultado-project-store.json"
+    },
+    {
+      "Report": "resultado-preset-draft.json",
+      "Checks": 43,
+      "Passed": true,
+      "Path": "pr-d50c2f75/resultado-preset-draft.json"
+    },
+    {
+      "Report": "resultado-preset-clean.json",
+      "Checks": 26,
+      "Passed": true,
+      "Path": "pr-d984ca2c/resultado-preset-clean.json"
+    },
+    {
+      "Report": "resultado-redesign.json",
+      "Checks": 27,
+      "Passed": true,
+      "Path": "re-86b7c0c7/resultado-redesign.json"
+    },
+    {
+      "Report": "resultado-loader-geral.json",
+      "Checks": 25,
+      "Passed": true,
+      "Path": "resultado-loader-geral.json"
+    },
+    {
+      "Report": "resultado-pintura-botoes.json",
+      "Checks": 36,
+      "Passed": true,
+      "Path": "resultado-pintura-botoes.json"
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 28,
+      "Passed": true,
+      "Path": "resultado-snapshot-installer.json"
+    },
+    {
+      "Report": "resultado-storage-by-mod.json",
+      "Checks": 31,
+      "Passed": true,
+      "Path": "s/resultado-storage-by-mod.json"
+    },
+    {
+      "Report": "resultado-project-search.json",
+      "Checks": 34,
+      "Passed": true,
+      "Path": "se-1eb4ca52/resultado-project-search.json"
+    },
+    {
+      "Report": "resultado-snapshot.json",
+      "Checks": 47,
+      "Passed": true,
+      "Path": "ss-cfbbb972/resultado-snapshot.json"
+    },
+    {
+      "Report": "resultado-table-dialogs.json",
+      "Checks": 80,
+      "Passed": true,
+      "Path": "ta-23ae4156/resultado-table-dialogs.json"
+    },
+    {
+      "Report": "resultado-ui-v2.json",
+      "Checks": 28,
+      "Passed": true,
+      "Path": "ui-08a823a7/resultado-ui-v2.json"
+    },
+    {
+      "Report": "resultado-updates.json",
+      "Checks": 25,
+      "Passed": true,
+      "Path": "up-da1a437b/resultado-updates.json"
+    }
+  ],
+  "FixtureRoot": "T/Q/online-testes-b03df6c8d230489ea27fd7b21d9eeb6b",
+  "SetupChecks": 24,
+  "SetupTestRoot": "T/S116/T/setup-3ab15957021a41f5b5d31db0e9dd952c",
+  "SetupTests": [
+    "Standard installer completed without administrator, reboot or forced application shutdown.",
+    "Installed application equals the verified payload.",
+    "A standalone uninstaller was created.",
+    "The application appears in the current user uninstall registration.",
+    "Programs list displays the correct application name.",
+    "Programs list displays the current version.",
+    "Registration points to the fixture install directory.",
+    "Programs list exposes the installed uninstaller.",
+    "Dedicated Config location was created.",
+    "Dedicated Cache location was created.",
+    "Dedicated Logs location was created.",
+    "Installer-created shortcut targets the installed executable.",
+    "Standard installer completed without administrator, reboot or forced application shutdown.",
+    "Reinstall preserves existing preferences.",
+    "Reinstall preserves existing cache.",
+    "Installed executable runs its path-preservation tests.",
+    "Uninstall target resolves inside the authorized fixture.",
+    "Standard uninstaller completed successfully.",
+    "Uninstall removes the program entry and installed application.",
+    "Uninstall preserves saved project/configuration data.",
+    "Uninstall preserves cached downloads.",
+    "Uninstall leaves an untracked user file intact.",
+    "Uninstall removes its own shortcut.",
+    "Fixture does not change the production Mod Loader registration."
+  ],
+  "SetupSha256": "F0F9FE2172341AA224428F32BBA6128C072399FAE6F575AFD46F5CA20CD25E3D",
+  "SetupBytes": 5386200,
+  "ApplicationSha256": "BD0F480720B361F180009DCCD22A9BB8B6E473124D6210E532D0AB14152D59C6",
+  "ApplicationBytes": 7572480,
+  "CatalogSha256": "89c68e6bdb8c192977fcace5d30a4b8b25912d8780fd6067f77f5c7d41c6dc05",
+  "CompilerSha256": "0A8757031B33777E4C9CBFFEE40F11A5062B36D25CBE144C1DB73B6102B80AD7",
+  "FontChanged": false,
+  "GameTouched": false,
+  "ProductionInstallationUpdated": false,
+  "FullGeneralSuiteRepeated": true,
+  "MeasurementUsesPayloadHashes": false,
+  "KnownLimits": [
+    "Logical bytes of known paths, not filesystem allocation or reserved disk quota.",
+    "Unknown or inaccessible installed size displays a dash; partial totals are marked.",
+    "Shared paths appear for each owning mod but only once in aggregate. Home deduplicates shared data across projects.",
+    "Identified count follows visible preset, search and filters, independently of checkbox selection.",
+    "Project cache counts own support files and referenced internal packages, including dependencies. Original archives outside internal storage remain in total but not cache. Global unrelated cache is only counted on Home.",
+    "No game files or saves were changed; no other computer was tested.",
+    "Measurement is asynchronous and not an atomic snapshot of ongoing installation. A queued refresh updates it after completion.",
+    "Existing archive and integrity validation remains independent of size metadata."
+  ],
+  "HarnessCorrections": [
+    "Fixture selection explicitly reset to all rows instead of the automatically selected custom preset.",
+    "Fixed test catalog presets cleared after trimming recipes.",
+    "Storage fixture uses a compact internal child path to fit Windows MAX_PATH; no outside-directory fallback or weakened guard."
+  ]
+}
