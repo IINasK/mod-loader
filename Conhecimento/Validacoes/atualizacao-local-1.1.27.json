@@ -1,0 +1,13 @@
+{
+  "Passed": true,
+  "PreviousVersion": "1.1.26.0",
+  "InstalledVersion": "1.1.27.0",
+  "InstalledSha256": "d822920c0432c3f228957f527063be6a843332df04da7fb067f18e1b121cb7cd",
+  "OldProcessExited": true,
+  "NewProcessRunning": true,
+  "SettingsFilesPreserved": 4,
+  "SettingsFilesChanged": 0,
+  "ForcedClose": false,
+  "GameModified": false,
+  "UsedAutomaticUpdater": true
+}

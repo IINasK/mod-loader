@@ -65,10 +65,12 @@
   "FullGeneralSuiteRun": false,
   "TwoComputerTransferRepeated": false,
   "FriendComputerDirectlyTested": false,
-  "ReleaseVerified": false,
+  "ReleaseVerified": true,
   "Limits": [
     "Unknown versions are not guessed.",
     "Unsupported file-tree changes and Cyberpunk custom collisions require removing the previous installation first.",
     "Keeping current defers the entire received pack; other queue items may continue."
-  ]
+  ],
+  "ReleaseUrl": "https://github.com/IINasK/mod-loader/releases/download/v1.1.27/Mod-Loader-1.1.27.exe",
+  "PublicDownloadSha256": "04281a8c34ddc91b072c074f22ffa5ee961bae48922a6dbe1592c70ca9dadcf8"
 }
