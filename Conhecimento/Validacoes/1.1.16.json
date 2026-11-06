@@ -219,5 +219,19 @@
     "Fixture selection explicitly reset to all rows instead of the automatically selected custom preset.",
     "Fixed test catalog presets cleared after trimming recipes.",
     "Storage fixture uses a compact internal child path to fit Windows MAX_PATH; no outside-directory fallback or weakened guard."
-  ]
+  ],
+  "SourceCommit": "f511e1000fdb6f215882f9b0a090b05059b1bf1a",
+  "PublishedRelease": {
+    "AnonymousRequest": true,
+    "Runtime": "Windows PowerShell 5.1 / .NET Framework",
+    "UsedPublished115Checker": true,
+    "AvailableToVersion115": "1.1.16",
+    "Version116DoesNotNotifyItself": true,
+    "ReleasePage": "https://github.com/IINasK/mod-loader/releases/tag/v1.1.16",
+    "DownloadUrl": "https://github.com/IINasK/mod-loader/releases/download/v1.1.16/Mod-Loader-1.1.16.exe",
+    "DownloadBytes": 5386200,
+    "DownloadedSha256": "F0F9FE2172341AA224428F32BBA6128C072399FAE6F575AFD46F5CA20CD25E3D",
+    "DownloadedExecutableWasRun": false,
+    "TempDownloadRemoved": true
+  }
 }
