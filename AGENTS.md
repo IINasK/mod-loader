@@ -1,4 +1,4 @@
-﻿# Cyberpunk 2077 — pacote coop
+# Cyberpunk 2077 — pacote coop
 
 ## Regra prioritaria: arquivos de desenvolvimento dentro do projeto
 
@@ -439,3 +439,5 @@ Pedido de Douglas, 28/10/2026: configurar mods com o coop, registrar processos v
 - Release1.1.11 publicada https://github.com/IINasK/mod-loader/releases/tag/v1.1.11 ; código d6309d0. Asset Mod-Loader-1.1.11.exe7427072bytes/SHA AFC4AE5F0C277893A8DB1F64D092AACC13094AD934B21D82947D63AEB59B749E. Consulta anônima pelo checker compilado1.1.10 detectou1.1.11;1.1.11não avisa a si mesma. Download público conferiu tamanho/hash, temporário removido sem execução. Resultado em Validacoes/1.1.11.json. Main enviada; sem mods/saves/relatos privados no Git. Jogo real não alterado.
 
 - Fechamento1.1.12:1022checks/23relatórios em D:\T112verified aprovados; EXE7437312bytes/SHA D5730703E1C8F59A2D7FEF2F24397C4AC4875549EAA7D10DE8352FA8A87175BF. Catálogo idêntico. Commitmain e Release devem corresponder a esse binário; não incluir relato privado no Git.
+
+- Publicação concluída: v1.1.28, código60b50bb, Setup SHA345c0cc36ece0da7465ae43a85dd994c60c9896d8c320a55ccc8d32882f8d0e3. Download público conferido pelo transporte de produção; checker detecta atualização a partir de1.1.27. Instância real aberta foi preservada: instalação local1.1.28 não executada nesta etapa, atualizar na próxima abertura. Prova sanitizada Validacoes/publicacao-1.1.28.json.

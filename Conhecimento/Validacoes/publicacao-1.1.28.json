@@ -1,0 +1,11 @@
+{
+  "Version": "1.1.28",
+  "PublicDownloadVerified": true,
+  "SetupSha256": "345c0cc36ece0da7465ae43a85dd994c60c9896d8c320a55ccc8d32882f8d0e3",
+  "SourceCommit": "60b50bb",
+  "Release": "https://github.com/IINasK/mod-loader/releases/tag/v1.1.28",
+  "ProductionUpdateCheckerPreviousVersion": "1.1.27",
+  "LocalSetupExecuted": false,
+  "Reason": "Existing user application left running; update is available on next launch.",
+  "GameModified": false
+}
