@@ -23,7 +23,18 @@
 - Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
   autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
 
-## Revisão atual 1.1.17 — sem cópias permanentes e modpack instalado — 06/11/2026
+## Revisão atual 1.1.18 — Projetos completo e duplicação editável — 06/11/2026
+
+- GeneralButton.GetPreferredSize inclui texto+52px de ícone/recuos usados em OnPaint. Sem largura fixa por tela ou abreviar Projetos/Projects. Apenas ícone/apenas texto preservados. Baseline103px/texto61px/área51px; depois113px PT/112px EN, três temas e clientes1000/1240.
+- Menu de projetos oferece Duplicar projeto em padrão e pessoal. Nome próprio/ID novo/TemplateId nulo, abre a cópia diretamente. Preservar lista completa, categorias, descrições, tags/NSFW, fontes, variantes, presets e escolhas, pasta de destino e referências de downloads. Originais/padrões não são modificados; cópia pessoal pode editar presets originalmente protegidos.
+- Copiar somente índice sources.json e metadados de reconhecimento. Nunca copiar pacotes, arquivos instalados, backups, auxiliar P2P, sessões ou certificados. Recibos genéricos/snapshots clonados sem Owned/Before para não assumir remoção/rollback dos arquivos originais. Referências Cyberpunk continuam na mesma instalação. Jogo indisponível: copiar organização e limpar bindings de snapshot inacessíveis, sem falso instalado.
+- Diálogo informa a mesma pasta do jogo; clone não é instalação isolada. GeneralNameDialog com descrição reserva linha fixa52px para campo (mínimo44) e300px de altura, sem sobrepor explicação/borda. Defaults de diálogos sem descrição mantidos.
+- Menu base já mostrava share, mas o despacho ainda o ignorava: branch corrigido para abrir modpack sem editar a definição base. Não reintroduzir bloqueio de clone/share no padrão; import/export de definição e exclusão do padrão continuam protegidos.
+- Suíte geral final,21 checks de clone e Setup aprovados; provas em Conhecimento/Validacoes/1.1.18.json e T/AD. Jogo/cache/saves/RED4ext reais inalterados. Ver Conhecimento/Duplicar-projeto-1.1.18.md.
+- G3 Design1.2.0: central Access denied; relato privado docs/relatos-g3-design/2026-11-06-mod-loader-largura-botao-com-icone.md. Não publicar/contornar acesso/editar skill central. Causa no adaptador local, não imputada à skill. Registro público só das decisões locais.
+- Setup/release/main seguem autorizados. App aberto não será fechado à força para atualizar. Usuário pediu desligamento forçado do PC somente depois de tudo concluído; executar apenas após testes, publicação, verificação e push final.
+
+## Revisão 1.1.17 — sem cópias permanentes e modpack instalado — 06/11/2026
 
 - Regra crucial do usuário: somente original em Downloads (remoção manual pelo usuário) e arquivos instalados no jogo. Nunca voltar a reter uma cópia permanente de pacotes por projeto. Produção usa DownloadCache(rootDoProjeto/Cache, funcPastaDownloads, cacheAntigo): sources.json pequeno aponta para os originais. Construtor de payload de um argumento só para compatibilidade/fixtures legadas; não reutilizá-lo em nova UI de projeto. Downloads diretos terminam em Downloads, não AppData.
 - Recibos existentes e receitas fixas + raiz do destino são o mapa de caminhos; não espelhar conteúdo no cache. GeneralModInstaller/importações protegidas/snapshots já registram arquivos. Não adivinhar a autoria de instalações manuais desconhecidas. Preservar validações, rollback e privacidade das configurações.

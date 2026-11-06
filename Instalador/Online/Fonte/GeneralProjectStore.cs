@@ -103,6 +103,22 @@ internal sealed class GeneralProjectStore {
         }
     }
 
+    internal GeneralProject Duplicate(GeneralProject source,string name,FixedCatalog catalog){
+        lock(gate){
+            name=ProjectName(name);var original=Load(source);var index=Read();
+            if(index.Projects.Count>=200)throw new IOException("Use no máximo 200 projetos nesta biblioteca.");
+            var state=Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(original));
+            var copy=new GeneralProject{Id=Guid.NewGuid().ToString("N"),Name=name};string target=DataPath(copy),from=DataPath(source);
+            DownloadCache.DuplicateSources(Path.Combine(from,"Cache"),Path.Combine(target,"Cache"));
+            if(!String.IsNullOrWhiteSpace(state.Destination)&&Directory.Exists(state.Destination)){
+                new GeneralModInstaller(state.Destination,Path.Combine(from,"Instalacoes")).DuplicateRecognition(Path.Combine(target,"Instalacoes"));
+                new InstalledSnapshotInstaller(state.Destination,from,catalog).DuplicateRecognition(target);
+            }else state.SnapshotReceipts.Clear();
+            new GeneralModLibrary(Path.Combine(target,"lista.json")).Save(state);
+            index.Projects.Add(copy);Write(index);return copy;
+        }
+    }
+
     internal GeneralModState Load(GeneralProject project,bool inspection=false) {
         lock (gate) {
             var registered = Registered(Read(inspection), project);

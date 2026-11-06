@@ -152,6 +152,15 @@ internal sealed partial class GeneralModWindow {
     void ProjectCommand(string action){
         if(working||scanning||p2p!=null&&p2p.Installing)return;
         if(BuiltInProject&&(action=="export"||action=="import"||action=="delete-project"))return;
+        if(action=="clone"){
+            if(projectStore==null||project==null||!ConfirmPresetNavigation())return;
+            string initial=T("Cópia de ","Copy of ")+project.Name;initial=initial.Substring(0,Math.Min(120,initial.Length));
+            using(var name=new GeneralNameDialog(T("Duplicar projeto","Duplicate project"),initial,T("A cópia usa a mesma pasta do jogo. Os arquivos dos mods não são duplicados.","The copy uses the same game folder. Mod files are not duplicated."))){
+                if(name.ShowDialog(this)!=DialogResult.OK)return;
+                var copy=projectStore.Duplicate(project,name.ResultName,catalog);ProjectCommand("project/"+copy.Id);
+            }
+            return;
+        }
         if(action=="export"){
             using(var save=new SaveFileDialog{Filter=T("Projeto Mod Loader|*.json","Mod Loader project|*.json"),FileName=project==null?"projeto.json":String.Concat(project.Name.Where(c=>!Path.GetInvalidFileNameChars().Contains(c)))+".json"})
                 if(save.ShowDialog(this)==DialogResult.OK)library.Export(save.FileName,state.List);

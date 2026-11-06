@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -29,6 +29,14 @@ public sealed partial class FixedInstaller {
 }
 
 public sealed partial class GeneralModInstaller {
+    internal void DuplicateRecognition(string targetData){
+        Safe.NoLinks(records);if(!Directory.Exists(records))return;var target=new GeneralModInstaller(destination,targetData);
+        foreach(string path in Directory.GetFiles(records,"*.json")){
+            var record=ReadRecord(path,true);if(record==null)continue;
+            foreach(var file in record.Files)file.Owned=false;
+            Safe.WriteJson(target.RecordPath(record.Key),record);
+        }
+    }
     internal List<InstalledSnapshotFile> ExportSnapshotFiles(string key) {
         Record record=ReadRecord(RecordPath(key));
         if(record==null)throw new IOException("O mod não tem recibo de instalação nesta pasta.");
@@ -39,5 +47,16 @@ public sealed partial class GeneralModInstaller {
             result.Add(new InstalledSnapshotFile{Path=file.Path,Sha256=file.Sha256,Size=file.Size,Kind="file"});
         }
         return result;
+    }
+}
+
+public sealed partial class InstalledSnapshotInstaller {
+    internal void DuplicateRecognition(string targetData){
+        var target=new InstalledSnapshotInstaller(destination,targetData,catalog);
+        foreach(var receipt in AllReceipts(true).Where(item=>item.Status=="installed")){
+            receipt.Recoverable=false;
+            foreach(var file in receipt.Files){file.Owned=false;file.Before=null;}
+            target.Save(receipt);
+        }
     }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -8,11 +8,12 @@ internal sealed class GeneralNameDialog : GeneralDialog {
     readonly TextBox input = new TextBox { Name = "NameInput", MaxLength = 120, Dock = DockStyle.Fill };
     internal string ResultName { get; private set; }
 
-    internal GeneralNameDialog(string title, string initialName) : base(title) {
-        ClientSize = new Size(500, 220);
+    internal GeneralNameDialog(string title, string initialName,string description=null) : base(title) {
+        ClientSize = new Size(500, description==null?220:300);
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(20, 8, 20, 20), ColumnCount = 1, RowCount = 3 };
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(description==null?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.Absolute,52));
+        if(description!=null)layout.RowStyles.Add(new RowStyle(SizeType.Absolute,52));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.Controls.Add(GeneralModEditor.LabelFor(GeneralStyle.T("Nome *", "Name *")), 0, 0);
         input.AccessibleName = GeneralStyle.T("Nome", "Name");
@@ -25,7 +26,8 @@ internal sealed class GeneralNameDialog : GeneralDialog {
         var cancel = GeneralStyle.Button(GeneralStyle.T("Cancelar", "Cancel"), () => Complete(DialogResult.Cancel));
         cancel.Name = "CancelName";
         commands.Controls.Add(save); commands.Controls.Add(cancel);
-        layout.Controls.Add(commands, 0, 2); Content.Controls.Add(layout);
+        if(description!=null){layout.RowCount=4;layout.Controls.Add(new Label{Name="NameDescription",Text=description,Dock=DockStyle.Fill,Font=GeneralStyle.Font(10.5f),Margin=new Padding(0,4,0,0)},0,2);}
+        layout.Controls.Add(commands, 0, description==null?2:3); Content.Controls.Add(layout);
         Action validate = () => save.Enabled = !String.IsNullOrWhiteSpace(input.Text) && !input.Text.Any(Char.IsControl);
         input.TextChanged += (s, e) => validate();
         input.Text = initialName ?? ""; validate();

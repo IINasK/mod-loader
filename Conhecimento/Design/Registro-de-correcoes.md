@@ -81,3 +81,13 @@ Registro solicitado por Douglas em 05/11/2026 para preparar um relatório futuro
 ## 1.1.14 — layout com metadados variáveis
 
 Painel Projetos volta a ser uma navegação compacta da Home, com ações44px e lista que ocupa sua largura. Casa fica entre Projetos e hamburger. O editor precisa acomodar mensagens de consulta que aparecem depois: corpo rolável e ações/avisos em linhas fixas. Verificar a janela mínima com fonte preenchida, ajuda longa e consulta indisponível; build e tamanho lógico dos controles não substituem a conferência da captura. Relato detalhado permanece privado no consumidor, sem atribuir a causa à skill.
+
+
+## 2026-11-06 — 1.1.18 — largura de botões com ícone
+
+GeneralButton usa a mesma área de ícone/recuos para pintar e medir a largura preferida. Projetos/Projects aparecem completos, mantendo alvos e vizinhos do cabeçalho. Não transformar navegação em abreviação ou elipse por erro de medição. Regressão reproduzida antes do ajuste e conferida em PT/EN, três temas e larguras1000/1240; pintura dos botões e menus existentes aprovados. Ícones e fontes adotados preservados, sem novo desenho ou dependência. Sem mudanças nas regras de instalação, cache ou arquivos do jogo. Detalhes públicos em Validacoes/1.1.18.json; relato G3 separado e privado no fallback local.
+
+
+## 2026-11-06 — 1.1.18 — duplicar projeto e campo explicativo
+
+Menu usa a ação Duplicar projeto com ícone copy adotado e linha44px, inclusive para a base. Nome da cópia e explicação sobre o destino compartilhado ficam em GeneralNameDialog reutilizado. A variante com explicação reserva52px para o campo e300px de altura total; não reduzir a área do input para encaixar texto. Cancelar preserva a biblioteca. A cópia tem presets editáveis e não duplica pacotes. Suite geral e geometria do campo aprovadas, sem alterar a skill central.

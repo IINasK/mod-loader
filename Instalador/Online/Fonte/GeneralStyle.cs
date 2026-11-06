@@ -145,6 +145,11 @@ internal sealed class GeneralButton : Button {
     internal bool Primary,Destructive,Bare;
     internal string IconKind;
     internal GeneralButton(){SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.Opaque,true);BackColor=GeneralStyle.Background;Cursor=Cursors.Hand;FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;UseVisualStyleBackColor=false;}
+    public override Size GetPreferredSize(Size proposedSize){
+        var size=base.GetPreferredSize(proposedSize);
+        if(!String.IsNullOrEmpty(IconKind)&&!String.IsNullOrEmpty(Text))size.Width=Math.Max(size.Width,TextRenderer.MeasureText(Text,Font,Size.Empty,TextFormatFlags.SingleLine).Width+52);
+        return size;
+    }
     protected override void OnPaintBackground(PaintEventArgs e){}
     protected override void OnPaint(PaintEventArgs e){
         var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;

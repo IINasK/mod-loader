@@ -55,9 +55,9 @@ internal static class GeneralTableDialogTests {
                 GeneralStyle.UseTheme(theme);GeneralStyle.Language=language;
                 using(var menu=new GeneralActionsMenu()){
                     Open(menu);var buttons=Descendants(menu).OfType<Button>().Where(button=>button.Name!="").ToArray();
-                    check(buttons.Length==6&&buttons.Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"export","import","new","open","options","share"}),"List menu contains only the six requested actions: "+theme+"/"+language);
+                    check(buttons.Length==7&&buttons.Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"clone","export","import","new","open","options","share"}),"List menu contains the seven project actions including duplicate: "+theme+"/"+language);
                     check(Find<Label>(menu,"ProjectSection").Text==(language=="pt"?"Projetos":"Projects"),"List section heading is translated: "+language);
-                    var create=Find<Button>(menu,"new");var open=Find<Button>(menu,"open");var sequence=new[]{"new","open","export","import","share","options"}.Select(id=>Find<Button>(menu,id)).ToArray();
+                    var create=Find<Button>(menu,"new");var open=Find<Button>(menu,"open");var sequence=new[]{"new","open","clone","export","import","share","options"}.Select(id=>Find<Button>(menu,id)).ToArray();
                     check(((TableLayoutPanel)create.Parent).ColumnCount==1&&sequence.Select(button=>button.Left).Distinct().Count()==1&&sequence.Zip(sequence.Skip(1),(a,b)=>a.Bottom<=b.Top).All(value=>value),"List actions form one aligned vertical column: "+theme+"/"+language);
                     check(buttons.All(button=>button.Height==44&&button.Width==create.Width&&button.Bottom<=button.Parent.ClientSize.Height),"Buttons have matching sizes and remain inside the popup: "+theme+"/"+language+" "+String.Join(";",buttons.Select(button=>button.Name+"="+button.Bounds+" parent="+button.Parent.ClientSize)));
                     check(buttons.Cast<GeneralButton>().All(button=>!String.IsNullOrEmpty(button.IconKind)&&button.TextAlign==ContentAlignment.MiddleLeft&&!button.Destructive),"Every menu row has an icon and left aligned text: "+theme+"/"+language);
@@ -70,13 +70,13 @@ internal static class GeneralTableDialogTests {
                 }
 
             }
-            foreach(string id in new[]{"new","open","export","import","share","options"})using(var menu=new GeneralActionsMenu()){
+            foreach(string id in new[]{"new","open","clone","export","import","share","options"})using(var menu=new GeneralActionsMenu()){
                 Open(menu);Find<Button>(menu,id).PerformClick();check(menu.ActionId==id&&menu.DialogResult==DialogResult.OK,"List action returns its explicit identifier: "+id);
             }
             foreach(string theme in new[]{"light","dark","light-red"})foreach(string language in new[]{"pt","en"}){
                 GeneralStyle.UseTheme(theme);GeneralStyle.Language=language;using(var menu=new GeneralActionsMenu(true)){Open(menu);
                 var buttons=Descendants(menu).OfType<Button>().Where(button=>button.Name!="").ToArray();
-                check(buttons.Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"new","open","options","share"}),"Built-in menu offers read-only modpack sharing alongside its three project actions: "+theme+"/"+language);
+                check(buttons.Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"clone","new","open","options","share"}),"Built-in menu offers read-only modpack sharing alongside its three project actions: "+theme+"/"+language);
                 check(buttons.All(button=>button.Height==44&&button.Bottom<=button.Parent.Height),"Built-in menu actions fit without clipping: "+theme+"/"+language);
                 using(var bitmap=new Bitmap(menu.Width,menu.Height)){menu.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(root,"builtin-menu-"+language+"-"+theme+".png"));}
             }

@@ -47,7 +47,18 @@ internal sealed partial class GeneralModWindow {
         string snapshot=Path.Combine(root,"snapshot.zip");InstalledSnapshot.Create(snapshot,store.Load(first),new[]{entry.Id},catalog,store.DataPath(first),false,null);
         using(var archive=System.IO.Compression.ZipFile.OpenRead(snapshot))using(var reader=new StreamReader(archive.GetEntry("manifest.json").Open()))check(!reader.ReadToEnd().Contains(zip.Replace("\\","\\\\")),"Installed sharing does not retain local metadata source paths.");
         TestForm(catalog,new GeneralModState{List=new GeneralModList(),Destination=game,DownloadFolder=root},Path.Combine(root,"ui"),root,async form=>{
-            form.AttachProject(store,first);form.ClientSize=new Size(1100,760);form.PerformLayout();
+            form.AttachProject(store,first);
+            foreach(string locale in new[]{"pt","en"})foreach(string theme in new[]{"light","light-red","dark"}){
+                form.state.Language=locale;form.state.Theme=theme;GeneralStyle.Language=locale;GeneralStyle.UseTheme(theme);form.BuildInterface();
+                foreach(var dimensions in new[]{new Size(1000,680),new Size(1240,820)}){
+                    form.ClientSize=dimensions;form.PerformLayout();await Task.Delay(40);
+                    int textWidth=TextRenderer.MeasureText(form.projectsButton.Text,form.projectsButton.Font,Size.Empty,TextFormatFlags.SingleLine).Width;
+                    CaptureUi(form,Path.Combine(root,"projects-button-"+locale+"-"+theme+"-"+dimensions.Width+".png"));
+                    check(form.projectsButton.Width-52>=textWidth,"Projects navigation reserves the full label plus icon: "+locale+"/"+theme+"/"+dimensions.Width+" (button="+form.projectsButton.Width+", text="+textWidth+")");
+                    check(form.projectsButton.Right<=form.homeButton.Left&&form.homeButton.Right<=form.optionsButton.Left,"Projects button stays separate from neighboring header actions: "+locale+"/"+theme+"/"+dimensions.Width);
+                }
+            }
+            form.state.Language="pt";form.state.Theme="light";GeneralStyle.Language="pt";GeneralStyle.UseTheme("light");form.BuildInterface();form.ClientSize=new Size(1100,760);form.PerformLayout();
             check(form.projectsButton.Right<=form.homeButton.Left&&form.homeButton.Right<=form.optionsButton.Left,"Back button sits between Projects and the hamburger.");
             form.projectsButton.PerformClick();var panel=form.menus.Current as GeneralProjectsPanel;check(panel!=null&&panel.Visible,"Projects opens a compact Home panel.");
             var choices=AllControls(panel).OfType<ListBox>().Single(box=>box.Name=="ProjectChoices");check(choices.Items.Cast<string>().SequenceEqual(new[]{"Empty","Second","First"}),"Saved custom projects appear before the built-in project.");

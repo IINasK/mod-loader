@@ -11,6 +11,8 @@ Indice interno de138componentes ativos do instalador. Revisao de05/11/2026; font
 
 ## Consulta
 
+- Duplicar projetos base/pessoais sem copiar mods e rótulo Projetos completo: [versão1.1.18](Duplicar-projeto-1.1.18.md), [validação](Validacoes/1.1.18.json).
+
 - Política sem cópias, modpack da instalação e escopo de contadores: [versão1.1.17](Armazenamento-e-modpack-1.1.17.md), [validação](Validacoes/1.1.17.json).
 
 - Espaço por mod, contador e cache: [versão1.1.16](Espaco-por-mod-1.1.16.md), [validação](Validacoes/1.1.16.json).

@@ -18,6 +18,12 @@ public sealed partial class DownloadCache {
         if(map==null||map.Count>2048||map.Any(pair=>!FixedData.HashValid(pair.Key)||String.IsNullOrWhiteSpace(pair.Value)||!Path.IsPathRooted(pair.Value)))throw new IOException("Índice de downloads inválido.");
         return map;
     }
+    internal static void DuplicateSources(string source,string target){
+        string file=Safe.In(source,"sources.json");if(!File.Exists(file))return;
+        var map=Safe.Json.Deserialize<Dictionary<string,string>>(GeneralProjectStorage.ReadText(file,2097152));
+        if(map==null||map.Count>2048||map.Any(pair=>!FixedData.HashValid(pair.Key)||String.IsNullOrWhiteSpace(pair.Value)||!Path.IsPathRooted(pair.Value)))throw new IOException("Índice de downloads inválido.");
+        Safe.WriteJson(Safe.In(target,"sources.json"),map);
+    }
     string OriginalFor(FixedAsset asset){lock(sourceGate){string path;return ReadSources().TryGetValue(asset.Sha256,out path)?path:Safe.In(Root,asset.Sha256+".missing");}}
     internal void Remember(FixedAsset asset,string source){
         source=Path.GetFullPath(source);Safe.NoLinks(source);
