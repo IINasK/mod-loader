@@ -18,7 +18,7 @@ internal sealed class P2PSession {
     public long PreparationBytes,PreparationTotal;
     public string PayloadHash;
     public string[] SelectedMods;
-    public bool Sender, Paused, AutoInstall, Completed, ListImported;
+    public bool Sender, Paused, AutoInstall, Completed, ListImported, HistoryDismissed;
     public override string ToString(){return GeneralStyle.T(Sender?"Enviando · ":"Recebendo · ",Sender?"Sending · ":"Receiving · ")+Name;}
 }
 internal sealed class P2PTransferStatus {
@@ -112,6 +112,14 @@ internal sealed partial class P2PService : IDisposable {
     }
     internal P2PSession[] SnapshotSessions(){lock(Sessions)return Sessions.ToArray();}
     void Save(){lock(Sessions){Safe.WriteJson(statePath,Sessions);RefreshSessions();}}
+    internal void DismissCompletedSend(P2PSession session){
+        lock(Sessions){
+            if(!Sessions.Contains(session)||!session.Sender||!session.Completed||session.Discarded||session.HistoryDismissed)return;
+            session.HistoryDismissed=true;
+            try{Save();}
+            catch{session.HistoryDismissed=false;throw;}
+        }
+    }
     void AddSession(P2PSession session){lock(Sessions){Sessions.Add(session);try{Save();}catch{Sessions.Remove(session);throw;}}}
     void ForgetSession(P2PSession session){lock(Sessions){Sessions.Remove(session);Save();}}
     internal void EnableInstalledReceive(FixedCatalog catalog,string appData,bool fixture=false){installedCatalog=catalog;installedData=appData;installedFixture=fixture;}

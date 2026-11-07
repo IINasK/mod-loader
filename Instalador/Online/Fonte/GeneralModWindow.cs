@@ -214,7 +214,7 @@ internal sealed partial class GeneralModWindow : Form {
         bars.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         bars.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
         bars.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
-        next=Command(T("Pular mod","Skip mod"),RequestSkip);next.Visible=false;next.MinimumSize=new Size(112,44);next.Margin=new Padding(0,3,14,0);bars.Controls.Add(next,0,0);
+        next=Command(T("Pular mod","Skip mod"),RequestSkip);next.Visible=false;next.MinimumSize=new Size(112,44);next.Margin=new Padding(0,0,14,0);bars.Controls.Add(next,0,0);
         currentProgress=new GeneralProgress{Dock=DockStyle.Fill,Caption=T("Item atual","Current item"),Margin=new Padding(0,3,8,0)};
         totalProgress=new GeneralProgress{Dock=DockStyle.Fill,Caption=T("Progresso geral","Overall progress"),Margin=new Padding(8,3,0,0)};
         bars.Controls.Add(currentProgress,1,0);bars.Controls.Add(totalProgress,2,0);layout.Controls.Add(bars,0,6);

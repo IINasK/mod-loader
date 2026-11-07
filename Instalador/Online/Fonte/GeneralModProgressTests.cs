@@ -37,6 +37,8 @@ internal sealed partial class GeneralModWindow {
             form.testStage=(key,stage)=>{
                 if(stage=="scan.begin"&&key==skippedKey){
                     check(form.next.Visible&&form.currentProgress.Value<100,"Verificação começa com Pular visível e sem declarar 100%.");
+                    check(form.next.Parent.ClientRectangle.Contains(form.next.Bounds),
+                        "O botão Pular cabe inteiro na linha de progresso: "+form.next.Bounds+" em "+form.next.Parent.ClientRectangle);
                     form.RequestSkip();requested=true;
                 }
                 if(stage=="scan.begin"&&key==form.MakeWork(scanSecond).Key)following=true;

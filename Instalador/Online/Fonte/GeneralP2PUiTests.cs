@@ -87,6 +87,25 @@ internal static class GeneralP2PUiTests {
                             check(dialog.Content.ClientSize.Height-Position(lastCard,dialog.Content).Bottom==field.Left,
                                 "The last transfer keeps the bottom inset at the scroll limit.");
                             service.Sessions.RemoveRange(2,10);update();
+                            var dismiss=Find<Button>(cards[0],"p2p-dismiss");
+                            check(!dismiss.Visible,"An active send cannot be removed from the panel.");
+                            outgoing.Completed=true;
+                            update();
+                            check(dismiss.Visible&&Inside(dismiss,cards[0]),"The completed send shows an unclipped X.");
+                            using(var image=new Bitmap(dialog.Width,dialog.Height)){
+                                dialog.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));
+                                image.Save(Path.Combine(root,"completed-send.png"),System.Drawing.Imaging.ImageFormat.Png);
+                            }
+                            dismiss.PerformClick();
+                            DateTime deadline=DateTime.UtcNow.AddSeconds(4);
+                            while(!cards[0].IsDisposed&&DateTime.UtcNow<deadline){
+                                Application.DoEvents();
+                                System.Threading.Thread.Sleep(10);
+                            }
+                            check(cards[0].IsDisposed&&!cards[1].IsDisposed,"The X removes only the completed send card.");
+                            using(var reopened=new P2PService(service.Root,service.Store,true))
+                                check(reopened.SnapshotSessions().Single(session=>session.Id==outgoing.Id).HistoryDismissed,
+                                    "The completed send stays removed after reopening.");
                         }
                         service.Sessions.Clear();
                         using(var image=new Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(root,"p2p-"+theme+"-"+locale+".png"),System.Drawing.Imaging.ImageFormat.Png);}dialog.Close();

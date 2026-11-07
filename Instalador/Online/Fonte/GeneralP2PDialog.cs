@@ -173,7 +173,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         cardStack.SuspendLayout();
         int order=0;
         foreach(var session in sessions){
-            if(session.Discarded||session.Mode!="installed-zip")continue;
+            if(session.Discarded||session.HistoryDismissed||session.Mode!="installed-zip")continue;
             if(session.Sender&&session.Peer==null&&session.Recipients.Length==0)continue;
             if(session.Completed&&!cards.ContainsKey(session)&&(session.Sender?session!=latestSent:session.ListImported))continue;
             TransferCard card;
@@ -187,7 +187,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             views.TryGetValue(session,out view);
             card.Refresh(view);
         }
-        foreach(var session in cards.Keys.Where(s=>s.Discarded||!sessions.Contains(s)).ToArray()){
+        foreach(var session in cards.Keys.Where(s=>s.Discarded||s.HistoryDismissed||!sessions.Contains(s)).ToArray()){
             cards[session].Frame.Dispose();cards.Remove(session);
         }
         LayoutCards();
@@ -265,7 +265,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         if(busy||polling||IsDisposed||ReceivedList!=null)return;
         polling=true;
         try{
-            var sessions=service.SnapshotSessions().Where(s=>!s.Discarded&&s.Mode=="installed-zip"&&
+            var sessions=service.SnapshotSessions().Where(s=>!s.Discarded&&!s.HistoryDismissed&&s.Mode=="installed-zip"&&
                 (s.Peer!=null||s.Recipients.Length!=0)).ToArray();
             var views=await Task.Run(()=>{
                 var result=new Dictionary<P2PSession,P2PTransferStatus>();
@@ -296,7 +296,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         readonly List<GeneralProgress> progress=new List<GeneralProgress>();
         readonly Label detail=new Label{Dock=DockStyle.Fill,AutoEllipsis=true,Margin=Padding.Empty,UseMnemonic=false,Name="p2p-transfer-status"};
         readonly FlowLayoutPanel actions=new FlowLayoutPanel{Dock=DockStyle.Fill,Margin=Padding.Empty,WrapContents=false};
-        readonly Button pause,retry,discard,import,reply;
+        readonly Button pause,retry,discard,import,reply,dismiss;
         P2PTransferStatus last;
         internal int Order,Height;
 
@@ -307,7 +307,15 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             foreach(int height in new[]{28,42,42,0,0})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
             layout.RowCount=5;Frame.Controls.Add(layout);
             var title=Heading(session.ToString());title.Font=GeneralStyle.Font(13,true);title.AutoEllipsis=true;title.UseMnemonic=false;
-            layout.Controls.Add(title,0,0);layout.Controls.Add(preparation,0,1);layout.Controls.Add(bars,0,2);
+            title.TextAlign=ContentAlignment.MiddleLeft;
+            var header=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            header.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            dismiss=GeneralStyle.Button("",()=>owner.Run(()=>Task.Run(()=>owner.service.DismissCompletedSend(session))));
+            owner.IconButton(dismiss,"close",T("Remover envio concluído","Remove completed send"));dismiss.Name="p2p-dismiss";
+            header.Controls.Add(title,0,0);header.Controls.Add(dismiss,1,0);
+            layout.Controls.Add(header,0,0);layout.Controls.Add(preparation,0,1);layout.Controls.Add(bars,0,2);
             layout.Controls.Add(detail,0,3);layout.Controls.Add(actions,0,4);
             bars.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
             bars.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,0));
@@ -390,11 +398,16 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             bool showReply=!session.Sender&&!session.Completed&&!session.Automatic&&P2PInvite.DeviceValid(owner.service.Engine.Device);
             retry.Visible=showRetry;discard.Visible=showDiscard;import.Visible=showImport;reply.Visible=showReply;
             foreach(Control action in actions.Controls)action.Enabled=!owner.busy;
+            bool showDismiss=session.Sender&&session.Completed;
+            dismiss.Visible=showDismiss;
+            dismiss.Enabled=showDismiss&&!owner.busy;
+            int titleHeight=showDismiss?dismiss.MinimumSize.Height:28;
+            layout.RowStyles[0].Height=titleHeight;
             int actionsHeight=showRetry||showDiscard||showImport||showReply?50:0;
             layout.RowStyles[2].Height=44*entries.Length;
             layout.RowStyles[3].Height=message.Length==0?0:28;
             layout.RowStyles[4].Height=actionsHeight;
-            Height=Frame.Padding.Vertical+28+(installing?0:42)+44*entries.Length+(message.Length==0?0:28)+actionsHeight;
+            Height=Frame.Padding.Vertical+titleHeight+(installing?0:42)+44*entries.Length+(message.Length==0?0:28)+actionsHeight;
         }
     }
 }
