@@ -31,6 +31,8 @@
 - Tema black é adicional, neutro RGB, validado em preferências de home/projeto; não converter dark anterior nem alterar preferência do usuário por iniciativa própria. GeneralStyle/GeneralPicker/Lucide oficiais existentes. Altura do diálogo segue linhas visíveis, sem espaço vazio fixo; achado G3 na entrada central autorizada06/11/2026, SKILL central intacta e relato privado fora da publicação.
 - Fonte/catalogo/jogo/RED4ext/saves reais inalterados. Pares novos e conhecidos, migração, pausas, duas UIs/retomada/limpeza e Setup testados em fixtures; resultados sanitizados Conhecimento/Validacoes/1.1.29.json, evidências privadas T/R129. Não alegar teste entre PCs pela Internet/NAT/relay. Main/Release continuam autorizadas; não encerrar app aberto à força.
 
+- Publicação/aplicação concluídas: v1.1.29, código3af0cd3, Setup SHA377374f4fab01d67d389cda8ac89ff4af13a0d7583b00e3cf888dc1ed6278454. Download público conferido via transporte de produção e checker de1.1.28. Aplicação local REAL pelo Setup oficial silencioso com app fechado:1.1.28.0→1.1.29.0, exit0, payload590f94b9... idêntico à build e quatro JSONs iguais. Não alegar que essa aplicação foi pelo disparo automático; ela foi atualização manual silenciosa. Sem fechamento forçado, abertura do app/jogo ou alteração de mods. Prova sanitizada Validacoes/publicacao-1.1.29.json; evidências privadas T/R129/local-*.
+
 ## Revisão 1.1.28 — convite antes de preparar o ZIP
 
 - Abrir P2P inicia conexão e preenche convite real antes de Inspect/Create; ícone apenas Clipboard.SetText do campo. Não atrelar teste a Text.Length: texto de progresso não é convite copiável. Falha preserva convite válido e mostra diagnóstico. Projeto vazio só recebe. Não criar URL fictícia.
