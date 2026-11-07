@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -62,6 +62,7 @@ internal sealed partial class P2PService {
     }
 
     void RestoreSession(P2PSession session,bool skipPayload) {
+        if(session.Sender&&session.Discarded)return;
         if(session.Lifecycle&&session.Sender) {
             foreach(var recipient in session.Recipients.Where(peer=>!peer.ReceiptClosed)) {
                 Engine.ConfigurePeer(recipient.Device);
@@ -157,7 +158,7 @@ internal sealed partial class P2PService {
     }
 
     void StartDeferredPreparation(P2PSession session,Func<bool> ready){
-        if(session.Paused||session.Stage!=null||session.Error!=null||DeferredPrepared(session))return;
+        if(session.Discarded||session.Paused||session.Stage!=null||session.Error!=null||DeferredPrepared(session))return;
         var state=preparationState;
         if(state==null||installedCatalog==null||installedData==null||!ready())return;
         if(!String.Equals(session.Destination,state.Destination,StringComparison.OrdinalIgnoreCase)){
@@ -170,7 +171,7 @@ internal sealed partial class P2PService {
         session.Stage="Preparando pacote…";
         Task.Run(()=>{
             try{PrepareDeferred(session,state,installedCatalog,installedData,true,null,delta);}
-            catch(Exception ex){if(!disposed){session.Error=ex.Message;session.Stage=null;Save();}}
+            catch(Exception ex){session.Stage=null;if(!disposed&&!session.Discarded){session.Error=ex.Message;Save();}}
         });
     }
 
@@ -331,6 +332,7 @@ internal sealed partial class P2PService {
         lock(session){
             if(session.Sender||session.Completed||session.Stage!=null)
                 throw new IOException("Selecione um recebimento interrompido.");
+            if(session.Discarded)return;
             PreserveInterrupted(session);
             string zip=Safe.In(Folder(session),"pack.zip");
             string expectedHash=session.Deferred?session.PayloadHash:session.Hash;
@@ -356,7 +358,7 @@ internal sealed partial class P2PService {
 
     internal void RetryPreparation(P2PSession session) {
         lock(session){
-            if(!session.Sender||session.Stage!=null||session.Completed)return;
+            if(!session.Sender||session.Stage!=null||session.Completed||session.Discarded)return;
             session.Error=null;
             Save();
         }

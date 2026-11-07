@@ -1,9 +1,16 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
+
+internal sealed class P2PVerificationIssue {
+    internal readonly string ModName, Message;
+    internal readonly TaskCompletionSource<bool> Decision=new TaskCompletionSource<bool>();
+    internal P2PVerificationIssue(string modName,string message){ModName=modName;Message=message;}
+}
 
 internal sealed partial class P2PService {
     // Deferred links authorize a connection first; HMAC binds its finished ZIP later.
@@ -30,11 +37,12 @@ internal sealed partial class P2PService {
         }
     }
     internal void PrepareDeferred(P2PSession session,GeneralModState state,FixedCatalog catalog,string appData,bool includeConfigs,Action<string> report,InstalledSnapshotManifest delta=null){
-        if(!SnapshotSessions().Contains(session)||!session.Sender||!session.Deferred||session.Completed)throw new IOException("Envio antecipado inválido.");
+        if(!SnapshotSessions().Contains(session)||!session.Sender||!session.Deferred||session.Completed||session.Discarded)throw new IOException("Envio antecipado inválido.");
         string zip=Safe.In(Folder(session),"pack.zip"),part=zip+".part";Safe.NoLinks(zip);Safe.NoLinks(part);
         DateTime nextCheck=DateTime.MinValue;bool remotePaused=false;
         Action checkpoint=()=>{
             while(true){
+                if(session.Discarded)throw new OperationCanceledException();
                 if(disposed)throw new IOException("Preparação interrompida; sessão preservada.");
                 if(DateTime.UtcNow>=nextCheck){
                     nextCheck=DateTime.UtcNow.AddSeconds(1);
@@ -56,8 +64,13 @@ internal sealed partial class P2PService {
                 if(File.Exists(part))File.Delete(part);
                 if(report!=null)report(session.Stage);
                 Action<long,long> progress=(done,total)=>{session.PreparationBytes=done;session.PreparationTotal=total;};
-                if(delta==null)InstalledSnapshot.Create(part,ExportState(state,session.ExportPreset,session.SelectedMods,session.ExportAllPresets),session.SelectedMods,catalog,appData,includeConfigs,report,true,checkpoint,progress);
-                else InstalledSnapshot.Write(part,state.Destination,delta,report,checkpoint,progress);
+                if(delta==null){
+                    Action<int,int,string> scan=(done,total,item)=>session.SyncProgress=item==null?null:new P2PSyncProgress{Done=done,Total=total,Item=item};
+                    var manifest=InstalledSnapshot.Inspect(ExportState(state,session.ExportPreset,session.SelectedMods,session.ExportAllPresets),
+                        session.SelectedMods,catalog,appData,includeConfigs,true,checkpoint,
+                        (id,name,message)=>ReviewSnapshotProblem(session,id,name,message),scan);
+                    InstalledSnapshot.Write(part,state.Destination,manifest,report,checkpoint,progress);
+                }else InstalledSnapshot.Write(part,state.Destination,delta,report,checkpoint,progress);
                 checkpoint();
                 string hash=Safe.Hash(part);
                 lock(Sessions){session.PayloadHash=hash;session.Size=new FileInfo(part).Length;Save();}
@@ -67,11 +80,37 @@ internal sealed partial class P2PService {
                 File.Move(part,zip);
             }
             if(!File.Exists(zip)||new FileInfo(zip).Length!=session.Size||Safe.Hash(zip)!=session.PayloadHash)throw new IOException("O pacote preparado foi alterado ou removido. Preserve os registros.");
-            var ready=new ReadyPack{Hash=session.PayloadHash,Size=session.Size};ready.Tag=ReadyTag(session.Hash,session.Id,ready.Hash,ready.Size);
-            Safe.WriteJson(Safe.In(Folder(session),"ready.json"),ready);
-            lock(startGate)Engine.Request("POST","db/scan?folder="+session.Id,null);
-            session.Error=null;session.Stage=null;Save();
-        }catch(Exception ex){session.Stage=null;session.Error=ex.Message;Save();throw;}
+            lock(session){
+                if(session.Discarded)throw new OperationCanceledException();
+                var ready=new ReadyPack{Hash=session.PayloadHash,Size=session.Size};
+                ready.Tag=ReadyTag(session.Hash,session.Id,ready.Hash,ready.Size);
+                Safe.WriteJson(Safe.In(Folder(session),"ready.json"),ready);
+                lock(startGate)Engine.Request("POST","db/scan?folder="+session.Id,null);
+                session.Error=null;session.Stage=null;Save();
+            }
+        }catch(Exception ex){session.Stage=null;if(!session.Discarded){session.Error=ex.Message;Save();}throw;}
+        finally{session.SyncProgress=null;}
+    }
+    bool ReviewSnapshotProblem(P2PSession session,string modId,string name,string message){
+        if(session.SkippedVerificationMods!=null&&session.SkippedVerificationMods.Contains(modId,StringComparer.Ordinal))return true;
+        var issue=new P2PVerificationIssue(name,message);
+        session.VerificationIssue=issue;
+        try{
+            while(!issue.Decision.Task.Wait(100)){
+                if(disposed||session.Discarded||session.Completed)throw new OperationCanceledException();
+            }
+            lock(session){
+                if(disposed||session.Discarded||session.Completed)throw new OperationCanceledException();
+                bool skip=issue.Decision.Task.Result;
+                OnlineDiagnostics.Record(skip?"p2p.verify.skipped":"p2p.verify.failed",modId,message);
+                if(skip){
+                    var previous=session.SkippedVerificationMods;
+                    session.SkippedVerificationMods=(previous??new string[0]).Concat(new[]{modId}).ToArray();
+                    try{Save();}catch{session.SkippedVerificationMods=previous;throw;}
+                }
+                return skip;
+            }
+        }finally{session.VerificationIssue=null;}
     }
     internal static GeneralModState ExportState(GeneralModState state,string presetId,string[] ids,bool exportAllPresets=false){
         if(presetId==null&&!exportAllPresets)return state;

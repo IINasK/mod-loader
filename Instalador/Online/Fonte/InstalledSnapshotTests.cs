@@ -79,11 +79,16 @@ internal static class InstalledSnapshotTests {
         Write(secretGame,"mods/config.json","{\"access_token\":\"private\"}");WriteGenericRecord(secretGame,secretData,work+"/0/"+original,new[]{"mods/config.json"});
         refuse(()=>InstalledSnapshot.Create(Path.Combine(root,"secret.zip"),State(secretGame,original),new[]{"fixture"},catalog,secretData,true,s=>{}),"JSON personalizado não vaza credenciais apesar de recibo válido.");
         check(!File.Exists(Path.Combine(root,"secret.zip")),"Remove ZIP falhado durante inspeção do conteúdo privado.");
+        var withoutPrivate=InstalledSnapshot.Inspect(State(secretGame,original),new[]{"fixture"},catalog,secretData,true,true,
+            skipProblem:(id,name,error)=>id=="fixture"&&name=="Fixture");
+        check(withoutPrivate.List.Mods.Count==0&&withoutPrivate.Files.Count==0&&withoutPrivate.Project.Mods.Count==1,
+            "Pular mod com configuração privada não exporta os bytes e mantém sua definição sem caminho local.");
         var core=Fixed("NightCoop","red4ext/RED4ext.dll","pinned core",new string[0]);core.Immutable=true;
         var addon=Fixed("Audioware","red4ext/plugins/Audioware/plugin.dll","pinned addon",new[]{"NightCoop"});
+        var independent=Fixed("ArchiveXL","red4ext/plugins/ArchiveXL/ArchiveXL.dll","pinned independent",new string[0]);
         string userPath="bin/x64/plugins/cyber_engine_tweaks/mods/Fixture/settings.json";
         addon.Files.Add(new FixedFile{Asset="asset",Entry="settings.json",Path=userPath,UserData=true,Size=2,Sha256=InstalledSnapshot.Hash(Encoding.UTF8.GetBytes("{}"))});
-        var fixedCatalog=new FixedCatalog{Schema=1,Id="fixedfixture",GameVersion="2.5",GameFileVersion="2.5.0.0",Packages=new List<FixedMod>{core,addon},Defaults=new List<FixedDefault>{new FixedDefault{Id="default",ModId=addon.Id,Version=addon.Version,Path="red4ext/plugins/mod_settings/user.ini",Format="ini-section",Section="Audioware.AudiowareConfig",Content="{\"enabled\":\"true\"}",Sha256=InstalledSnapshot.Hash(Encoding.UTF8.GetBytes("{\"enabled\":\"true\"}"))}}};
+        var fixedCatalog=new FixedCatalog{Schema=1,Id="fixedfixture",GameVersion="2.5",GameFileVersion="2.5.0.0",Packages=new List<FixedMod>{core,addon,independent},Defaults=new List<FixedDefault>{new FixedDefault{Id="default",ModId=addon.Id,Version=addon.Version,Path="red4ext/plugins/mod_settings/user.ini",Format="ini-section",Section="Audioware.AudiowareConfig",Content="{\"enabled\":\"true\"}",Sha256=InstalledSnapshot.Hash(Encoding.UTF8.GetBytes("{\"enabled\":\"true\"}"))}}};
         string fixedGame=Path.Combine(root,"f"),fixedData=Path.Combine(root,"fd");Directory.CreateDirectory(fixedGame);Directory.CreateDirectory(fixedData);
         Write(fixedGame,"bin/x64/Cyberpunk2077.exe","fixture only");Write(fixedGame,core.Files[0].Path,"pinned core");Write(fixedGame,addon.Files[0].Path,"pinned addon");Write(fixedGame,userPath,"{\"volume\":2}");
         Write(fixedGame,"red4ext/plugins/mod_settings/user.ini","[Other]\npassword = PRIVATE_DO_NOT_SEND\n[Audioware.AudiowareConfig]\nenabled = false\n");
@@ -102,6 +107,16 @@ internal static class InstalledSnapshotTests {
         corrupt=Copy(fixedManifest);corrupt.List.Mods.RemoveAll(m=>m.Id==core.Id);corrupt.Files.RemoveAll(f=>f.Owners.Contains(core.Id+"/default"));refuse(()=>InstalledSnapshot.Validate(corrupt,fixedCatalog),"Bloqueia pacote sem dependência transitiva.");
         corrupt=Copy(fixedManifest);corrupt.List.Mods.Single(m=>m.Id==addon.Id).Variants[0].Sources[0]="https://example.com/wrong.zip";refuse(()=>InstalledSnapshot.Validate(corrupt,fixedCatalog),"Bloqueia fonte alterada de componente conhecido.");
         Write(fixedGame,core.Files[0].Path,"different RED4ext");refuse(()=>InstalledSnapshot.Create(Path.Combine(root,"wrong-core.zip"),fixedState,new[]{addon.Id},fixedCatalog,fixedData,true,s=>{}),"Recusa exportar base instalada diferente da versão fixada.");
+        Write(fixedGame,independent.Files[0].Path,"pinned independent");
+        var reviewed=new List<string>();var steps=new List<int>();
+        var continued=InstalledSnapshot.Inspect(fixedState,new[]{addon.Id,independent.Id},fixedCatalog,fixedData,true,true,
+            skipProblem:(id,name,error)=>{reviewed.Add(name);return id==core.Id&&error.Contains(core.Files[0].Path);},
+            inspectProgress:(done,total,name)=>steps.Add(done));
+        check(reviewed.SequenceEqual(new[]{core.Name})&&steps.SequenceEqual(new[]{0,1,2,3}),"Informa o mod com falha e avança a conferência após pular.");
+        check(continued.List.Mods.Single().Id==independent.Id&&continued.Files.Single().Owners.Single()==independent.Id+"/default"&&
+            continued.Project.Mods.Any(mod=>mod.Id==addon.Id),"Pular a base exclui seus dependentes da transferência e mantém a definição do projeto.");
+        refuse(()=>InstalledSnapshot.Inspect(fixedState,new[]{addon.Id,independent.Id},fixedCatalog,fixedData,true,true,skipProblem:(id,name,error)=>false),
+            "Recusar a opção de pular mantém a verificação bloqueada.");
         RunDensityTests(root);
         Safe.WriteJson(Path.Combine(root,"resultado-snapshot.json"),new{Passed=true,Checks=checks.Count,Tests=checks,RealGameTouched=false,OriginalArchivesRequired=false,NetworkUsed=false});
         return checks.Count;

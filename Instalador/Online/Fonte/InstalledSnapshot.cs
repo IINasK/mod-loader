@@ -49,7 +49,8 @@ public static partial class InstalledSnapshot {
         if(variant.CyberpunkVariant!=null)throw new IOException("Variante fixa inválida.");
         return mod;
     }
-    public static InstalledSnapshotManifest Inspect(GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs,bool allowMissing=false,Action checkpoint=null) {
+    public static InstalledSnapshotManifest Inspect(GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs,bool allowMissing=false,Action checkpoint=null,
+        Func<string,string,string,bool> skipProblem=null,Action<int,int,string> inspectProgress=null) {
         if(state==null||state.List==null||ids==null||String.IsNullOrWhiteSpace(state.Destination))throw new IOException("Escolha uma pasta de instalação e um preset.");
         string root=Path.GetFullPath(state.Destination);Safe.NoLinks(root);
         if(!Directory.Exists(root))throw new IOException("Pasta de instalação ausente.");
@@ -71,8 +72,11 @@ public static partial class InstalledSnapshot {
         var genericEngine=cyberpunk?null:new GeneralModInstaller(root,Path.Combine(appData,"Instalacoes"));
         var receivedEngine=new InstalledSnapshotInstaller(root,appData,catalog);
         var problems=new List<string>();
-        foreach(var mod in entries) {
+        var byPath=new Dictionary<string,InstalledSnapshotFile>(StringComparer.Ordinal);
+        for(int index=0;index<entries.Count;index++){
+            var mod=entries[index];
             if(checkpoint!=null)checkpoint();
+            if(inspectProgress!=null)inspectProgress(index,entries.Count,mod.Name);
             try {
             var variant=mod.Variants.Single(v=>v.Id==Selected(state,mod));
             if(allowMissing&&Uninstalled(state,mod,variant,catalog,root,appData))continue;
@@ -120,19 +124,49 @@ public static partial class InstalledSnapshot {
             mod.Variants=new List<GeneralModVariant>{variant};mod.DefaultVariant=variant.Id;
             if(variant.CyberpunkId==null){variant.Sources=originalSources.Where(GeneralModDownload.IsWebSource).ToList();if(variant.Sources.Count==0)variant.Sources.Add("installed://"+mod.Id+"/"+variant.Id);}
             if(variant.SourceInfo!=null)variant.SourceInfo=variant.SourceInfo.Where(pair=>variant.Sources.Contains(pair.Key)&&GeneralModDownload.IsWebSource(pair.Key)).ToDictionary(pair=>pair.Key,pair=>pair.Value);
-            list.Mods.Add(mod);
+            var additions=new Dictionary<string,InstalledSnapshotFile>(StringComparer.Ordinal);
+            var shared=new HashSet<InstalledSnapshotFile>();
             foreach(var file in files) {
                 if(!includeConfigs&&file.Kind!="file")continue;
-                file.ReuseLocal=false;
-                file.Owners=new List<string>{work};
-                var same=manifest.Files.FirstOrDefault(f=>String.Equals(f.Path,file.Path,StringComparison.OrdinalIgnoreCase)&&f.Section==file.Section);
-                if(same==null)manifest.Files.Add(file);
-                else {if(same.Kind!=file.Kind||same.Size!=file.Size||same.Sha256!=file.Sha256)throw new IOException("Dois mods usam conteúdo diferente em "+file.Path);if(!same.Owners.Contains(work))same.Owners.Add(work);}
+                if(skipProblem!=null&&variant.CyberpunkId==null&&file.Kind=="file"&&IsCustomConfig(file.Path))
+                    using(var input=File.OpenRead(Safe.In(root,file.Path)))ValidateCustomConfig(file,input);
+                string key=file.Path.ToUpperInvariant()+"\n"+file.Section;
+                InstalledSnapshotFile same;
+                if(byPath.TryGetValue(key,out same)||additions.TryGetValue(key,out same)){
+                    if(same.Kind!=file.Kind||same.Size!=file.Size||same.Sha256!=file.Sha256)
+                        throw new IOException("Dois mods usam conteúdo diferente em "+file.Path);
+                    shared.Add(same);
+                }else{
+                    file.ReuseLocal=false;
+                    file.Owners=new List<string>{work};
+                    additions.Add(key,file);
+                }
             }
-            if(!manifest.Files.Any(f=>f.Owners.Contains(work)&&f.Kind=="file"))throw new IOException(mod.Name+": nenhum arquivo instalado foi encontrado.");
-            }catch(IOException ex){problems.Add(mod.Name+": "+ex.Message);}
+            if(!files.Any(f=>f.Kind=="file"))throw new IOException("Nenhum arquivo instalado foi encontrado.");
+            list.Mods.Add(mod);
+            foreach(var pair in additions){byPath.Add(pair.Key,pair.Value);manifest.Files.Add(pair.Value);}
+            foreach(var file in shared)if(!file.Owners.Contains(work))file.Owners.Add(work);
+            }catch(Exception ex){
+                if(!(ex is IOException)&&!(ex is UnauthorizedAccessException))throw;
+                if(skipProblem==null)problems.Add(mod.Name+": "+ex.Message);
+                else if(!skipProblem(mod.Id,mod.Name,ex.Message))
+                    throw new InstalledSnapshotReviewException(new[]{mod.Name+": "+ex.Message});
+            }
         }
+        if(inspectProgress!=null)inspectProgress(entries.Count,entries.Count,null);
         if(problems.Count>0)throw new InstalledSnapshotReviewException(problems);
+        if(cyberpunk&&skipProblem!=null){
+            var includedRecipes=new HashSet<string>(list.Mods.Select(m=>m.Variants[0].CyberpunkId).Where(id=>id!=null),StringComparer.Ordinal);
+            var removed=new HashSet<string>(StringComparer.Ordinal);
+            list.Mods.RemoveAll(mod=>{
+                var variant=mod.Variants[0];
+                if(variant.CyberpunkId==null||FixedData.Expand(catalog,new[]{variant.CyberpunkId}).All(recipe=>includedRecipes.Contains(recipe.Id)))return false;
+                removed.Add(Owner(mod,variant));
+                return true;
+            });
+            foreach(var file in manifest.Files)file.Owners.RemoveAll(removed.Contains);
+            manifest.Files.RemoveAll(file=>file.Owners.Count==0);
+        }
         list.Categories=state.List.Categories.Concat(list.Mods.Where(m=>!String.IsNullOrWhiteSpace(m.Category)).Select(m=>m.Category)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         foreach(string category in list.Categories) {string description;if(state.List.CategoryDescriptions.TryGetValue(category,out description))list.CategoryDescriptions[category]=description;}
         var included=new HashSet<string>(list.Mods.Select(m=>m.Id),StringComparer.Ordinal);
@@ -259,15 +293,19 @@ public static partial class InstalledSnapshot {
         }
     }
     internal static void ValidateCustomData(InstalledSnapshotManifest manifest,InstalledSnapshotFile file,Stream input) {
-        bool custom=file.Owners.Any(owner=>manifest.List.Mods.Any(m=>m.Variants.Any(v=>Owner(m,v)==owner&&v.CyberpunkId==null)));
-        if(!custom)return;
-        string extension=System.IO.Path.GetExtension(file.Path).ToLowerInvariant();
-        if(extension!=".json"&&extension!=".ini"&&extension!=".toml")return;
+        if(IsCustomConfig(file.Path)&&file.Owners.Any(owner=>manifest.List.Mods.Any(m=>m.Variants.Any(v=>Owner(m,v)==owner&&v.CyberpunkId==null))))
+            ValidateCustomConfig(file,input);
+    }
+    static bool IsCustomConfig(string path){
+        string extension=System.IO.Path.GetExtension(path).ToLowerInvariant();
+        return extension==".json"||extension==".ini"||extension==".toml";
+    }
+    static void ValidateCustomConfig(InstalledSnapshotFile file,Stream input){
         if(file.Size>262144)throw new IOException("Configuração personalizada grande demais: "+file.Path);
         using(var memory=new MemoryStream()) {
             byte[] content=ReadBytes(input,262144);memory.Write(content,0,content.Length);
             string text=InstalledSnapshotConfig.Decode(memory.ToArray());
-            if(extension==".json")InstalledSnapshotConfig.Object(text);
+            if(System.IO.Path.GetExtension(file.Path).Equals(".json",StringComparison.OrdinalIgnoreCase))InstalledSnapshotConfig.Object(text);
             else if(Regex.IsMatch(text,@"(?im)^\s*[^\r\n=]*(?:password|passwd|secret|credential|oauth|cookie|bearer|authorization|access.?token|refresh.?token|client.?id|api.?key|\btoken\b)[^\r\n=]*="))throw new IOException("Configuração personalizada contém dados privados: "+file.Path);
         }
     }

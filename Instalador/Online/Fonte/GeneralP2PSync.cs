@@ -6,6 +6,11 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
+internal sealed class P2PSyncProgress {
+    internal int Done, Total;
+    internal string Item;
+}
+
 internal sealed class P2PSyncComparison {
     internal P2PSession Session;
     internal string PreviewHash, Destination;
@@ -89,13 +94,15 @@ internal sealed partial class P2PService {
                 try{
                     var source=ExportState(state,session.ExportPreset,session.SelectedMods,session.ExportAllPresets);
                     var preview=InstalledSnapshot.Inspect(source,session.SelectedMods,installedCatalog,installedData,false,true,()=>{
-                        if(disposed||session.Completed)throw new OperationCanceledException();
-                    });
+                        if(disposed||session.Completed||session.Discarded)throw new OperationCanceledException();
+                    },skipProblem:(id,name,error)=>ReviewSnapshotProblem(session,id,name,error),
+                      inspectProgress:(done,total,item)=>session.SyncProgress=new P2PSyncProgress{Done=done,Total=total,Item=item});
+                    if(disposed||session.Completed||session.Discarded)return;
                     WriteSyncMessage(session,device,PreviewPath(session),PreviewName,preview);
                     ScanSyncFolder(session.Id);
                 }catch(Exception ex){
-                    if(!disposed){session.Error=ex.Message;Save();}
-                }finally{session.Stage=null;}
+                    if(!disposed&&!session.Discarded){session.Error=ex.Message;Save();}
+                }finally{session.SyncProgress=null;session.Stage=null;}
             });
             return false;
         }
@@ -119,7 +126,7 @@ internal sealed partial class P2PService {
         return true;
     }
 
-    internal P2PSyncComparison CompareIncoming(P2PSession session,GeneralModState local=null) {
+    internal P2PSyncComparison CompareIncoming(P2PSession session,GeneralModState local=null,Action<int,int,string> report=null,bool full=false) {
         if(session.Sender||session.Completed||session.Discarded||!session.CompareBeforePack||HasSyncChoice(session)||!HasSyncPreview(session))
             throw new IOException("A comparação ainda não está disponível.");
         string hash;
@@ -131,16 +138,26 @@ internal sealed partial class P2PService {
         if(cyberpunk!=(preview.Game=="cyberpunk2077"))
             throw new IOException("O pacote e a pasta de instalação pertencem a tipos de jogo diferentes.");
 
+        if(full)return new P2PSyncComparison{Session=session,PreviewHash=hash,Destination=destination,Required=new string[0]};
+
         var missing=new HashSet<string>(StringComparer.Ordinal);
         var different=new HashSet<string>(StringComparer.Ordinal);
+        int done=0;
         foreach(var file in preview.Files){
+            if(disposed||session.Discarded)throw new OperationCanceledException();
+            if(report!=null)report(done,preview.Files.Count,file.Path);
+            done++;
             string path=Safe.In(destination,file.Path);
             if(File.Exists(path)){
-                if(new FileInfo(path).Length==file.Size&&Safe.Hash(path)==file.Sha256)continue;
-                different.UnionWith(file.Owners);
+                bool matching;
+                try{matching=new FileInfo(path).Length==file.Size&&Safe.Hash(path)==file.Sha256;}
+                catch(IOException){matching=false;}
+                catch(UnauthorizedAccessException){matching=false;}
+                if(!matching)different.UnionWith(file.Owners);
             }else if(Directory.Exists(path))different.UnionWith(file.Owners);
             else missing.UnionWith(file.Owners);
         }
+        if(report!=null)report(preview.Files.Count,preview.Files.Count,null);
         var absentNames=new List<string>();
         var differentNames=new List<string>();
         var required=new List<string>();
@@ -155,6 +172,7 @@ internal sealed partial class P2PService {
         if(local!=null&&String.Equals(local.Destination,destination,StringComparison.OrdinalIgnoreCase)){
             var hostIds=new HashSet<string>(preview.List.Mods.Select(mod=>mod.Id),StringComparer.Ordinal);
             foreach(var mod in local.List.Mods.Where(mod=>!hostIds.Contains(mod.Id))){
+                if(disposed||session.Discarded)throw new OperationCanceledException();
                 string chosen;
                 if(!local.ChosenVariants.TryGetValue(mod.Id,out chosen))chosen=mod.DefaultVariant;
                 var variant=mod.Variants.SingleOrDefault(item=>item.Id==chosen);
@@ -172,6 +190,30 @@ internal sealed partial class P2PService {
         string ignored;
         var choice=Safe.Json.Deserialize<SyncChoice>(ReadSyncMessage(session,Engine.Device,ChoicePath(session,Engine.Device),ChoiceName,out ignored));
         return choice!=null&&!choice.Full;
+    }
+
+    internal async Task ChooseIncoming(P2PSession session,bool full) {
+        lock(session){
+            if(session.SyncMode!=0||session.Sender||session.Completed||session.Discarded||!session.CompareBeforePack||HasSyncChoice(session))return;
+            session.SyncMode=full?2:1;
+        }
+        try{
+            while(!HasSyncPreview(session)){
+                if(disposed||session.Discarded)return;
+                await Task.Delay(250).ConfigureAwait(false);
+            }
+            await Task.Run(()=>{
+                if(disposed||session.Discarded)return;
+                var comparison=CompareIncoming(session,report:(done,total,item)=>
+                    session.SyncProgress=new P2PSyncProgress{Done=done,Total=total,Item=item},full:full);
+                if(!disposed&&!session.Discarded)SubmitSyncChoice(comparison,full);
+            }).ConfigureAwait(false);
+        }catch(Exception ex){
+            if(!disposed&&!session.Discarded){
+                session.Error=ex.Message;
+                Save();
+            }
+        }finally{session.SyncProgress=null;session.SyncMode=0;}
     }
 
     internal void SubmitSyncChoice(P2PSyncComparison comparison,bool full) {

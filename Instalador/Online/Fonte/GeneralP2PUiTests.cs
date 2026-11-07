@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -88,7 +88,7 @@ internal static class GeneralP2PUiTests {
                                 "The last transfer keeps the bottom inset at the scroll limit.");
                             service.Sessions.RemoveRange(2,10);update();
                             var dismiss=Find<Button>(cards[0],"p2p-dismiss");
-                            check(!dismiss.Visible,"An active send cannot be removed from the panel.");
+                            check(dismiss.Visible&&dismiss.Enabled&&Inside(dismiss,cards[0]),"An active send can be canceled from an unclipped X.");
                             outgoing.Completed=true;
                             update();
                             check(dismiss.Visible&&Inside(dismiss,cards[0]),"The completed send shows an unclipped X.");
@@ -106,7 +106,33 @@ internal static class GeneralP2PUiTests {
                             using(var reopened=new P2PService(service.Root,service.Store,true))
                                 check(reopened.SnapshotSessions().Single(session=>session.Id==outgoing.Id).HistoryDismissed,
                                     "The completed send stays removed after reopening.");
+                            var activeSend=new P2PSession{Id="ml-"+new string('d',32),Name="Active export",Hash=offered.ManifestHash,Sender=true,Lifecycle=true,Mode="installed-zip",Size=1024,
+                                Stage="Preparing pack",Recipients=new[]{new P2PRecipient{Device=offered.Device}}};
+                            service.Sessions.Add(activeSend);
+                            update();
+                            var activeCard=Children(viewport.Content).Single(c=>c.Name=="p2p-card"&&c.AccessibleName==activeSend.ToString());
+                            Find<Button>(activeCard,"p2p-dismiss").PerformClick();
+                            deadline=DateTime.UtcNow.AddSeconds(4);
+                            while(!activeCard.IsDisposed&&DateTime.UtcNow<deadline){
+                                Application.DoEvents();
+                                System.Threading.Thread.Sleep(10);
+                            }
+                            check(activeCard.IsDisposed&&!cards[1].IsDisposed&&!incoming.Discarded,"Canceling preparation removes only the selected send.");
+                            using(var reopened=new P2PService(service.Root,service.Store,true))
+                                check(reopened.SnapshotSessions().Single(session=>session.Id==activeSend.Id).Discarded,
+                                    "An interrupted canceled send cannot resume on reopen.");
                         }
+                        incoming.Completed=false;incoming.Phase=null;incoming.PayloadHash=null;incoming.Size=0;incoming.Lifecycle=true;incoming.CompareBeforePack=true;
+                        views[incoming].Connected=true;
+                        update();
+                        var updateMods=Find<Button>(cards[1],"p2p-update");
+                        var fullPack=Find<Button>(cards[1],"p2p-full");
+                        check(updateMods.Visible&&updateMods.Enabled&&fullPack.Visible&&fullPack.Enabled,
+                            "After connecting, both choices are immediately visible before the host preview arrives: "+theme+locale);
+                        incoming.SyncMode=1;incoming.SyncProgress=new P2PSyncProgress{Done=2,Total=5,Item="mods/different.txt"};
+                        update();
+                        check(!updateMods.Enabled&&!fullPack.Enabled&&prep.Visible&&prep.Value==40&&
+                            Find<Label>(cards[1],"p2p-transfer-status").Text=="mods/different.txt","The receiver shows the current local file and comparison progress: "+theme+locale);
                         service.Sessions.Clear();
                         using(var image=new Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(root,"p2p-"+theme+"-"+locale+".png"),System.Drawing.Imaging.ImageFormat.Png);}dialog.Close();
                     }

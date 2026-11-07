@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -29,7 +29,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     readonly Dictionary<P2PSession,TransferCard> cards=new Dictionary<P2PSession,TransferCard>();
     readonly Button connect,choose,generate,copy;
     P2PSession offer;
-    bool busy,polling;
+    bool busy,polling,reviewingVerification;
     internal GeneralModList ReceivedList {get;private set;}
     internal bool InstallAfterReceive {get{return false;}}
     internal string InstalledReceiptId {get;private set;}
@@ -129,7 +129,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     void UpdateActions(){
         generate.Enabled=!busy&&!service.Installing&&ExportIds.Length!=0;
         presets.Enabled=!busy;
-        copy.Enabled=output.Text.StartsWith("ML-P2P1:",StringComparison.Ordinal)&&(offer==null||!offer.Completed);
+        copy.Enabled=output.Text.StartsWith("ML-P2P1:",StringComparison.Ordinal)&&(offer==null||!offer.Completed&&!offer.Discarded);
         connect.Enabled=!busy&&!String.IsNullOrWhiteSpace(input.Text);
         choose.Enabled=!busy;
         bool receiving=false;
@@ -202,7 +202,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         output.Text=T("Iniciando conexão…","Starting connection…");
         if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));
         var sessions=service.SnapshotSessions();
-        offer=sessions.LastOrDefault(s=>s.Sender&&s.Deferred&&s.CompareBeforePack&&!s.Completed&&s.Recipients.Length==0&&s.ExportPreset==preset&&(preset!=null||s.ExportAllPresets||state.SelectedPreset==null)&&
+        offer=sessions.LastOrDefault(s=>s.Sender&&s.Deferred&&s.CompareBeforePack&&!s.Completed&&!s.Discarded&&s.Recipients.Length==0&&s.ExportPreset==preset&&(preset!=null||s.ExportAllPresets||state.SelectedPreset==null)&&
             s.SelectedMods!=null&&s.SelectedMods.SequenceEqual(selected)&&(s.Lifecycle||s.Peer==null));
         if(offer==null){
             service.SetPreparationState(state);
@@ -231,39 +231,22 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         }
         input.Clear();status.Text="";
     }
-    void Compare(P2PSession session){Run(async()=>{
-        var result=await Task.Run(()=>service.CompareIncoming(session,state));
-        using(var dialog=new GeneralDialog(T("Comparação de mods","Mod comparison")){ClientSize=new Size(660,385)}){
-            var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(24,8,24,24)};
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute,56));
-            var lines=new List<string>{String.Format(T("{0} iguais · {1} faltando · {2} diferentes","{0} matching · {1} missing · {2} different"),result.Matching,result.Missing.Length,result.Different.Length)};
-            if(result.Unavailable>0)lines.Add(String.Format(T("{0} mods da lista ainda faltam no anfitrião.","{0} mods in the list are missing on the host."),result.Unavailable));
-            lines.Add("");
-            lines.Add(T("Sincronizar envia os mods que faltam ou diferem. Baixar tudo envia o pacote disponível inteiro.","Sync sends missing or different mods. Download all sends the whole available pack."));
-            if(result.Missing.Length>0){lines.Add("");lines.Add(T("Faltando","Missing"));lines.AddRange(result.Missing);}
-            if(result.Different.Length>0){lines.Add("");lines.Add(T("Diferentes","Different"));lines.AddRange(result.Different);}
-            if(result.LocalOnly.Length>0){
-                lines.Add("");
-                lines.Add(T("Mods do seu projeto fora do pacote (serão mantidos)","Mods from your project outside the pack (kept)"));
-                lines.AddRange(result.LocalOnly);
-            }
-            var details=new TextBox{Multiline=true,ReadOnly=true,WordWrap=true,BorderStyle=BorderStyle.None,Text=String.Join("\r\n",lines)};
-            layout.Controls.Add(new GeneralScrollView(details),0,0);
-            var actions=GeneralTableDialogLayout.Commands();
-            var sync=GeneralStyle.Button(T("Sincronizar","Sync differences"),()=>dialog.Complete(DialogResult.Yes),true);
-            var full=GeneralStyle.Button(T("Baixar tudo","Download all"),()=>dialog.Complete(DialogResult.No));
-            actions.Controls.Add(sync);actions.Controls.Add(full);layout.Controls.Add(actions,0,1);
-            dialog.Content.Controls.Add(layout);GeneralStyle.Apply(dialog,GeneralStyle.Dark);
-            var choice=dialog.ShowDialog(this);
-            if(choice==DialogResult.Yes||choice==DialogResult.No)
-                await Task.Run(()=>service.SubmitSyncChoice(result,choice==DialogResult.No));
-        }
-    });}
+    async void ChooseIncoming(P2PSession session,bool full){
+        try{await service.ChooseIncoming(session,full);}
+        catch(Exception ex){if(!IsDisposed)Failed(ex);}
+        if(!IsDisposed)await Poll();
+    }
     void Retry(P2PSession session){Run(async()=>{
         if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));
         await Task.Run(()=>{if(session.Sender)service.RetryPreparation(session);else service.RetryInstalled(session,session.Destination);});
     });}
+    void CloseTransfer(P2PSession session){
+        if(!session.Completed&&!session.Sender){Discard(session);return;}
+        Run(()=>Task.Run(()=>{
+            if(session.Completed)service.DismissCompletedTransfer(session);
+            else service.CancelSend(session);
+        }));
+    }
     void Discard(P2PSession session){Run(async()=>{
         if(GeneralDialog.Message(this,T("Descartar o arquivo recebido e reverter a parte registrada de uma instalação interrompida?","Discard the download and roll back the recorded part of an interrupted installation?"),T("Descartar recebimento","Discard download"),MessageBoxButtons.YesNo)==DialogResult.Yes)
             await Task.Run(()=>service.DiscardIncoming(session));
@@ -291,6 +274,19 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             status.Text=T("ZIP pronto. Extraia o conteúdo na pasta raiz do jogo de destino.","ZIP ready. Extract its contents into the destination game's root folder.");
         }
     }
+    void AskToSkipVerification(){
+        if(reviewingVerification||IsDisposed||!Visible)return;
+        var issue=service.SnapshotSessions().Where(session=>!session.Discarded).Select(session=>session.VerificationIssue)
+            .FirstOrDefault(pending=>pending!=null&&!pending.Decision.Task.IsCompleted);
+        if(issue==null)return;
+        reviewingVerification=true;
+        try{
+            var answer=GeneralDialog.Message(this,T("Erro ao verificar o mod ","Error verifying mod ")+issue.ModName+"\n\n"+issue.Message+"\n\n"+
+                T("Deseja pular este mod e continuar? Mods que dependem dele também ficarão fora.","Skip this mod and continue? Mods that depend on it will also be left out."),
+                T("Conferência dos mods","Mod verification"),MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2);
+            issue.Decision.TrySetResult(answer==DialogResult.Yes);
+        }finally{reviewingVerification=false;}
+    }
     async Task Poll(){
         if(busy||polling||IsDisposed||ReceivedList!=null)return;
         polling=true;
@@ -311,7 +307,8 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             UpdateActions();
         }catch(Exception ex){if(!IsDisposed)Failed(ex);}
         finally{polling=false;}
-        if(!IsDisposed&&autoStart&&offer!=null&&(offer.Completed||offer.CompareBeforePack&&offer.Recipients.Length>0)&&!busy){
+        AskToSkipVerification();
+        if(!IsDisposed&&autoStart&&offer!=null&&(offer.Completed||offer.Discarded||offer.CompareBeforePack&&offer.Recipients.Length>0)&&!busy){
             offer=null;Run(PrepareLink);
         }
     }
@@ -326,7 +323,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         readonly List<GeneralProgress> progress=new List<GeneralProgress>();
         readonly Label detail=new Label{Dock=DockStyle.Fill,AutoEllipsis=true,Margin=Padding.Empty,UseMnemonic=false,Name="p2p-transfer-status"};
         readonly FlowLayoutPanel actions=new FlowLayoutPanel{Dock=DockStyle.Fill,Margin=Padding.Empty,WrapContents=false};
-        readonly Button pause,retry,discard,import,reply,dismiss,compare;
+        readonly Button pause,retry,import,reply,dismiss,update,full;
         P2PTransferStatus last;
         internal int Order,Height;
 
@@ -342,8 +339,8 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
             header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             header.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-            dismiss=GeneralStyle.Button("",()=>owner.Run(()=>Task.Run(()=>owner.service.DismissCompletedSend(session))));
-            owner.IconButton(dismiss,"close",T("Remover envio concluído","Remove completed send"));dismiss.Name="p2p-dismiss";
+            dismiss=GeneralStyle.Button("",()=>owner.CloseTransfer(session));
+            owner.IconButton(dismiss,"close",T("Cancelar transferência","Cancel transfer"));dismiss.Name="p2p-dismiss";
             header.Controls.Add(title,0,0);header.Controls.Add(dismiss,1,0);
             layout.Controls.Add(header,0,0);layout.Controls.Add(preparation,0,1);layout.Controls.Add(bars,0,2);
             layout.Controls.Add(detail,0,3);layout.Controls.Add(actions,0,4);
@@ -352,32 +349,53 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             pause=GeneralStyle.Button("",()=>owner.Run(()=>Task.Run(()=>owner.service.Pause(session))));
             owner.IconButton(pause,"pause",T("Pausar","Pause"));pause.Name="p2p-pause";bars.Controls.Add(pause,1,0);
             retry=GeneralStyle.Button(T("Retomar","Resume"),()=>owner.Retry(session));retry.Name="p2p-retry";
-            discard=GeneralStyle.Button(T("Descartar recebimento","Discard download"),()=>owner.Discard(session));
             import=GeneralStyle.Button(T("Importar lista","Import list"),()=>owner.Import(session));import.Name="p2p-import-list";
             reply=GeneralStyle.Button(T("Copiar resposta","Copy reply"),()=>owner.Copy(owner.service.Invitation(session)));
-            compare=GeneralStyle.Button(T("Comparar mods","Compare mods"),()=>owner.Compare(session),true);
-            compare.Name="p2p-compare";
-            actions.Controls.AddRange(new Control[]{compare,retry,discard,import,reply});
+            update=GeneralStyle.Button(T("Atualizar mods","Update mods"),()=>owner.ChooseIncoming(session,false),true);
+            update.Name="p2p-update";
+            full=GeneralStyle.Button(T("Pacote completo","Full pack"),()=>owner.ChooseIncoming(session,true));
+            full.Name="p2p-full";
+            actions.Controls.AddRange(new Control[]{update,full,retry,import,reply});
         }
         internal void Refresh(P2PTransferStatus view){
             if(view!=null&&(last==null||!session.Paused))last=view;
             view=last??new P2PTransferStatus();
             bool prepared=session.PayloadHash!=null||session.Completed||!session.Deferred;
-            preparation.Indeterminate=session.Sender&&session.Stage!=null&&session.PreparationTotal==0;
-            preparation.Caption=prepared?T("Pacote preparado","Pack prepared"):session.Sender?T("Preparando pacote","Preparing pack"):T("Aguardando preparo do amigo","Waiting for your friend's pack");
-            preparation.Value=prepared?100:session.PreparationTotal>0?(int)(session.PreparationBytes*100/session.PreparationTotal):0;
             bool awaiting=session.CompareBeforePack&&!session.Completed&&session.PayloadHash==null&&!owner.service.HasSyncChoice(session);
             bool preview=awaiting&&owner.service.HasSyncPreview(session);
+            var scan=session.SyncProgress;
+            var issue=session.VerificationIssue;
+            bool scanning=scan!=null||session.Sender&&awaiting&&!preview&&session.Stage!=null;
+            bool waitingForHost=!session.Sender&&session.CompareBeforePack&&!prepared&&session.Error==null&&
+                !session.Held&&!session.RecoveryPending&&!session.Paused&&!view.RemotePaused&&(!awaiting||session.SyncMode!=0);
+            if(scanning){
+                string phase=session.Sender?T("Conferindo mods do anfitrião","Checking host mods"):T("Comparando seus arquivos","Comparing your files");
+                preparation.Caption=phase+(scan!=null&&scan.Total>0?" · "+scan.Done+"/"+scan.Total:"");
+                preparation.Indeterminate=scan==null||scan.Total==0;
+                preparation.Value=scan!=null&&scan.Total>0?scan.Done*100/scan.Total:0;
+            }else{
+                preparation.Indeterminate=waitingForHost||session.Sender&&session.Stage!=null&&session.PreparationTotal==0;
+                preparation.Caption=prepared?T("Pacote preparado","Pack prepared"):session.Sender?T("Preparando pacote","Preparing pack"):
+                    awaiting?T("Aguardando conferência do anfitrião","Waiting for host verification"):T("Aguardando preparo do anfitrião","Waiting for the host to prepare the pack");
+                preparation.Value=prepared?100:session.PreparationTotal>0?(int)(session.PreparationBytes*100/session.PreparationTotal):0;
+            }
             string message=session.Error??"";
             if(session.Held||session.RecoveryPending)message=T("Arquivo preservado. Clique em Retomar quando quiser continuar.","File preserved. Click Resume when you are ready.");
             else if(session.Completed&&message.Length==0)message=session.Sender?T("Envio concluído","Send complete")
                 :session.ProjectError??(session.ListImported?T("Instalação concluída. Projeto salvo.","Installation complete. Project saved."):T("Instalação concluída","Installation complete"));
             else if(message.Length==0&&session.Phase!=null)message=P2PService.PhaseLabel(session.Phase);
             else if(message.Length==0&&session.Paused)message=T("Pausado por você","Paused by you");
+            else if(message.Length==0&&issue!=null)
+                message=T("Erro ao verificar: ","Verification failed: ")+issue.ModName;
+            else if(message.Length==0&&scanning&&scan!=null&&scan.Item!=null)message=scan.Item;
             else if(message.Length==0&&awaiting){
                 if(session.Sender)message=preview?T("Aguardando a escolha do amigo","Waiting for your friend's choice"):T("Conferindo mods do anfitrião","Checking the host's mods");
-                else message=preview?T("Lista do anfitrião pronta para comparar","Host's list is ready to compare"):T("Aguardando a lista do anfitrião","Waiting for the host's list");
+                else if(session.SyncMode!=0)message=T("Aguardando a verificação do anfitrião","Waiting for the host to finish checking");
+                else if(view.Connected||preview)message=T("Escolha se quer receber só as diferenças ou o pacote completo.","Choose whether to receive only the differences or the full pack.");
+                else message=T("Aguardando conexão com o anfitrião","Waiting to connect to the host");
             }
+            else if(message.Length==0&&!session.Sender&&session.CompareBeforePack&&!prepared)message=T("Escolha enviada. Aguardando preparo do anfitrião.","Choice sent. Waiting for the host to prepare the pack.");
+            else if(message.Length==0&&!session.CompareBeforePack&&!prepared)message=T("Convite antigo. Gere um novo convite para escolher como receber.","Older invitation. Create a new invitation to choose how to receive.");
             else if(message.Length==0&&view.RemotePaused)message=T("Pausado pelo amigo","Paused by friend");
             else if(message.Length==0&&!view.Connected&&view.Recipients.Length==0)message=T("Aguardando conexão","Waiting for connection");
             detail.Text=message;detail.ForeColor=session.Error==null?GeneralStyle.Foreground:GeneralStyle.Danger;
@@ -395,7 +413,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
                 message=installProgress==null||installProgress.File==null?phase:installProgress.File;
                 detail.Text=message;owner.tips.SetToolTip(detail,message);
             }
-            bool showPreparation=!installing&&!awaiting;
+            bool showPreparation=!installing&&(!awaiting||scanning||waitingForHost);
             preparation.Visible=showPreparation;
             bars.Visible=!awaiting;
             layout.RowStyles[1].Height=showPreparation?42:0;
@@ -436,16 +454,19 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
                 (owner.service.RegisterProject==null||session.ProjectError!=null);
             if(owner.service.RegisterProject!=null)import.Text=T("Salvar projeto","Save project");
             bool showReply=!session.Sender&&!session.Completed&&!session.Automatic&&P2PInvite.DeviceValid(owner.service.Engine.Device);
-            bool showCompare=!session.Sender&&preview&&!session.Held&&!session.RecoveryPending&&session.Error==null;
-            compare.Visible=showCompare;
-            retry.Visible=showRetry;discard.Visible=showDiscard;import.Visible=showImport;reply.Visible=showReply;
+            bool showChoices=!session.Sender&&awaiting&&!session.Held&&!session.RecoveryPending&&session.Error==null;
+            update.Visible=full.Visible=showChoices;
+            retry.Visible=showRetry;import.Visible=showImport;reply.Visible=showReply;
             foreach(Control action in actions.Controls)action.Enabled=!owner.busy;
-            bool showDismiss=session.Sender&&session.Completed;
-            dismiss.Visible=showDismiss;
-            dismiss.Enabled=showDismiss&&!owner.busy;
-            int titleHeight=showDismiss?dismiss.MinimumSize.Height:28;
+            update.Enabled=full.Enabled=showChoices&&!owner.busy&&session.SyncMode==0&&(view.Connected||preview);
+            dismiss.Visible=true;
+            dismiss.Enabled=!owner.busy&&(session.Sender||session.Completed||showDiscard);
+            dismiss.AccessibleName=session.Completed?T("Remover transferência concluída","Remove completed transfer")
+                :session.Sender?T("Cancelar envio","Cancel send"):T("Cancelar recebimento","Cancel download");
+            owner.tips.SetToolTip(dismiss,dismiss.AccessibleName);
+            int titleHeight=dismiss.MinimumSize.Height;
             layout.RowStyles[0].Height=titleHeight;
-            int actionsHeight=showCompare||showRetry||showDiscard||showImport||showReply?50:0;
+            int actionsHeight=showChoices||showRetry||showImport||showReply?50:0;
             layout.RowStyles[2].Height=awaiting?0:44*entries.Length;
             layout.RowStyles[3].Height=message.Length==0?0:28;
             layout.RowStyles[4].Height=actionsHeight;
@@ -502,7 +523,7 @@ internal sealed partial class GeneralModWindow {
         try{
             PrepareP2P();
             if(sharingHome==null)await GeneralProjectHome.RecoverSharing(this,p2p);
-            if(!p2p.SnapshotSessions().Any(s=>!s.Completed&&!s.Discarded||Directory.Exists(p2p.Folder(s))))return;
+            if(!p2p.SnapshotSessions().Any(s=>!s.Completed&&(!s.Discarded||s.Sender)||Directory.Exists(p2p.Folder(s))))return;
             await Task.Run(()=>p2p.Start(_=>{}));
             if(!IsDisposed)detail.Text=T("Compartilhamento P2P retomado.","P2P sharing resumed.");
         }

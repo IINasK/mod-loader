@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -81,6 +81,17 @@ internal static class GeneralP2PLifecycleTests {
             Check(checks,File.ReadAllText(Safe.In(right,"mods/forwarded.txt"))=="from friend"&&!incoming.Completed,
                 "A receiver can send a different sharing while awaiting a version choice.");
 
+            var canceled=host.BeginDeferred(source.Item1,new[]{source.Item1.List.Mods.Single().Id},true);
+            host.Pause(canceled);
+            var canceledReceive=second.Accept(host.Invitation(canceled),right,true);
+            Wait(()=>canceled.Recipients.Length==1,"The transfer to be canceled did not connect.");
+            host.CancelSend(canceled);
+            Wait(()=>!host.SnapshotSessions().Contains(canceled)&&!Directory.Exists(host.Folder(canceled)),
+                "Canceling did not detach and clean the selected outgoing transport.");
+            Check(checks,host.Engine.Running&&!sent.Completed&&File.Exists(Safe.In(host.Folder(sent),"pack.zip")),
+                "Canceling an active transfer preserves another sharing on the same connection engine.");
+            second.DiscardIncoming(canceledReceive);
+
             gate.Set();
             Wait(()=>incoming.Phase=="retry"&&incoming.Stage==null,"Keeping the current version did not defer installation.");
             string payload=Safe.In(first.Folder(incoming),"pack.zip");
@@ -148,11 +159,15 @@ internal static class GeneralP2PLifecycleTests {
                 string zip=Safe.In(host.Folder(sent),"pack.zip");
                 Check(checks,P2PInvite.Decode(invitation).Schema==3&&!File.Exists(zip)&&sent.PayloadHash==null,
                     "The sender builds no ZIP until the receiver makes a choice.");
-                var comparison=friend.CompareIncoming(received,localOnly.Item1);
+                var scanned=new List<int>();
+                var comparison=friend.CompareIncoming(received,localOnly.Item1,(done,total,item)=>scanned.Add(done));
+                Check(checks,scanned.SequenceEqual(new[]{0,1,2,3}),"The receiver reports all three physical files and scan completion.");
                 Check(checks,comparison.Different.SequenceEqual(new[]{"diff"})&&
                     comparison.Missing.SequenceEqual(full?new string[0]:new[]{"miss"})&&comparison.Matching==(full?2:1)&&comparison.LocalOnly.SequenceEqual(new[]{"local-only"}),
                     "Real contents identify matching, missing and different mods.");
-                friend.SubmitSyncChoice(comparison,full);
+                if(full)
+                    friend.CompareIncoming(received,report:(done,total,item)=>{throw new IOException("Full pack should not hash local files.");},full:true);
+                friend.ChooseIncoming(received,full).GetAwaiter().GetResult();
                 Wait(()=>received.Phase=="review","The receiver did not reach the version confirmation. "+sent.Error+" "+received.Error);
                 var packed=InstalledSnapshot.Read(zip,sent.PayloadHash,Catalog);
                 Check(checks,packed.List.Mods.Count==3&&packed.Files.Single(file=>file.Path=="mods/same.txt").ReuseLocal==!full,

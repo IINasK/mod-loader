@@ -23,6 +23,13 @@
 - Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
   autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
 
+## Revisão 1.1.35 — comparação P2P, falhas por mod e cancelamento individual
+
+- O envio anterior chegou a 0% porque o Mod Loader 1.1.33 esperava o NightCoop 0.1.2-beta e o jogo já tinha o 0.2.0-beta. Os dez arquivos da base nova passaram na conferência por hash. Evidência privada e sanitizada em T/R135/diagnostico-no-envio.json.
+- Usar convite novo para o seletor no receptor. Atualizar mods compara arquivos por hash antes de montar o ZIP. Pacote completo envia os mods verificados. A preparação avança ao pular uma falha, respeitando dependências.
+- O X encerra ou oculta somente seu cartão. O envio cancela a preparação, descompartilha e limpa apenas seu temporário. O recebimento usa a confirmação existente para preservar a consistência do destino.
+- A conferência de origem dos mods personalizados é somente leitura e pode ocorrer com o jogo aberto. A proteção das operações que escrevem no jogo continua em vigor.
+
 ## Revisão 1.1.29 — conexão por um lado e preparo após aceitação
 
 - Novo convite Automatic autoriza somente prova HMAC vinculada ao segredo/sessão/ID TLS. Fonte não aceita qualquer pending device. Known peer usa prova no pending-folder label. Serviço e UI monitoram1s. Ambos1.1.29+. Nunca publicar convites/segredos/certificados/provas de fixture. Sem servidor novo/dependência nova; Syncthing oficial mantido.

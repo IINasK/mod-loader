@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,16 +8,20 @@ using System.Threading;
 
 internal sealed class P2PSession {
     public string Id, Name, Hash, Peer, Mode, Destination, ReceiptId, Error, Stage;
-    public bool Lifecycle, Held, Discarded, ReceiptClosed, ExportAllPresets, CompareBeforePack;
+    public bool Lifecycle, Held, ReceiptClosed, ExportAllPresets, CompareBeforePack;
+    public volatile bool Discarded;
     public string Phase, TransactionId, ProjectError, ExportPreset;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PInstallProgress InstallProgress;
+    [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PSyncProgress SyncProgress;
+    [System.Web.Script.Serialization.ScriptIgnore] public volatile int SyncMode;
     public P2PRecipient[] Recipients=new P2PRecipient[0];
     [System.Web.Script.Serialization.ScriptIgnore] public bool RecoveryPending;
     public long Size;
     public bool Deferred, Automatic;
     public long PreparationBytes,PreparationTotal;
     public string PayloadHash;
-    public string[] SelectedMods;
+    public string[] SelectedMods, SkippedVerificationMods;
+    [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PVerificationIssue VerificationIssue;
     public bool Sender, Paused, AutoInstall, Completed, ListImported, HistoryDismissed;
     public override string ToString(){return GeneralStyle.T(Sender?"Enviando · ":"Recebendo · ",Sender?"Sending · ":"Receiving · ")+Name;}
 }
@@ -113,16 +117,41 @@ internal sealed partial class P2PService : IDisposable {
     }
     internal P2PSession[] SnapshotSessions(){lock(Sessions)return Sessions.ToArray();}
     void Save(){lock(Sessions){Safe.WriteJson(statePath,Sessions);RefreshSessions();}}
-    internal void DismissCompletedSend(P2PSession session){
+    internal void DismissCompletedTransfer(P2PSession session){
         lock(Sessions){
-            if(!Sessions.Contains(session)||!session.Sender||!session.Completed||session.Discarded||session.HistoryDismissed)return;
+            if(!Sessions.Contains(session)||!session.Completed||session.Discarded||session.HistoryDismissed)return;
             session.HistoryDismissed=true;
             try{Save();}
             catch{session.HistoryDismissed=false;throw;}
         }
     }
+    internal void CancelSend(P2PSession session){
+        lock(session){
+            if(!SnapshotSessions().Contains(session)||!session.Sender||session.Completed||session.Discarded)return;
+            session.Discarded=true;
+            try{Save();}
+            catch{session.Discarded=false;throw;}
+        }
+    }
+    void CleanCanceledSend(P2PSession session){
+        lock(startGate){
+            Engine.RemoveFolder(session.Id);
+            if(session.Stage!=null)return;
+            foreach(var recipient in session.Recipients)CloseReceipt(session,recipient.Device);
+            P2PPack.DeleteSnapshot(Folder(session));
+            ForgetSession(session);
+        }
+    }
     void AddSession(P2PSession session){lock(Sessions){Sessions.Add(session);try{Save();}catch{Sessions.Remove(session);throw;}}}
-    void ForgetSession(P2PSession session){lock(Sessions){Sessions.Remove(session);Save();}}
+    void ForgetSession(P2PSession session){
+        lock(Sessions){
+            int index=Sessions.IndexOf(session);
+            if(index<0)return;
+            Sessions.RemoveAt(index);
+            try{Save();}
+            catch{Sessions.Insert(index,session);throw;}
+        }
+    }
     internal void EnableInstalledReceive(FixedCatalog catalog,string appData,bool fixture=false){installedCatalog=catalog;installedData=appData;installedFixture=fixture;}
     void Pump(){
         if(disposed||Interlocked.Exchange(ref pumping,1)!=0)return;
@@ -182,6 +211,7 @@ internal sealed partial class P2PService : IDisposable {
         lock(s)ProcessInstalledLocked(s);
     }
     void ProcessInstalledLocked(P2PSession s){
+        if(s.Sender&&s.Discarded){CleanCanceledSend(s);return;}
         if(s.Lifecycle&&s.Sender){ProcessOutgoing(s);return;}
         if(!s.Sender&&s.Completed&&s.Stage==null)PublishProject(s);
         if(s.Lifecycle&&(s.Completed||s.Discarded)){if(s.Stage==null)FinishIncoming(s);return;}
@@ -249,6 +279,7 @@ internal sealed partial class P2PService : IDisposable {
         if(!Engine.Running||invite.Device==Engine.Device)throw new IOException("Use o convite do outro computador.");
         var existing=SnapshotSessions().FirstOrDefault(s=>s.Id==invite.Folder);
         if(existing!=null){
+            if(existing.Discarded)throw new IOException("Este recebimento foi descartado. Use um novo convite.");
             if(existing.Hash!=invite.ManifestHash||existing.Sender||existing.Peer!=invite.Device||existing.Deferred!=invite.Deferred||existing.Lifecycle!=(invite.Schema>=2)||existing.CompareBeforePack!=(invite.Schema==3)||existing.Mode!=invite.Mode||(!existing.Deferred&&existing.Size!=invite.Size))throw new IOException("Este convite conflita com outro compartilhamento.");
             if(existing.Automatic!=invite.Automatic){
                 if(existing.Automatic||!invite.Automatic||existing.Completed)throw new IOException("Use o convite atualizado enviado pelo amigo.");
@@ -272,9 +303,12 @@ internal sealed partial class P2PService : IDisposable {
     internal P2PSession Authorize(string code){
         var answer=P2PInvite.Decode(code);if(answer.Kind!="accept")throw new IOException("Cole a resposta enviada por seu amigo.");
         var s=SnapshotSessions().SingleOrDefault(x=>x.Id==answer.Folder&&x.Sender);
-        if(s==null||s.Lifecycle||s.Completed||s.Hash!=answer.ManifestHash||s.Mode!=answer.Mode||s.Deferred!=answer.Deferred||s.Automatic!=answer.Automatic||(!s.Deferred&&s.Size!=answer.Size)||answer.Device==Engine.Device)throw new IOException("A resposta não pertence a um envio ativo.");
-        if(s.Peer!=null&&s.Peer!=answer.Device)throw new IOException("Este convite já está vinculado a outro amigo. Crie outro compartilhamento.");
-        Engine.ConfigurePeer(answer.Device);Engine.ConfigureFolder(s.Id,Folder(s),s.Name,true,answer.Device);if(s.Paused)Engine.Pause(s.Id,true);s.Peer=answer.Device;Save();return s;
+        if(s==null)throw new IOException("A resposta não pertence a um envio ativo.");
+        lock(s){
+            if(s.Lifecycle||s.Completed||s.Discarded||s.Hash!=answer.ManifestHash||s.Mode!=answer.Mode||s.Deferred!=answer.Deferred||s.Automatic!=answer.Automatic||(!s.Deferred&&s.Size!=answer.Size)||answer.Device==Engine.Device)throw new IOException("A resposta não pertence a um envio ativo.");
+            if(s.Peer!=null&&s.Peer!=answer.Device)throw new IOException("Este convite já está vinculado a outro amigo. Crie outro compartilhamento.");
+            Engine.ConfigurePeer(answer.Device);Engine.ConfigureFolder(s.Id,Folder(s),s.Name,true,answer.Device);if(s.Paused)Engine.Pause(s.Id,true);s.Peer=answer.Device;Save();return s;
+        }
     }
     internal P2PManifest AllowFiles(P2PSession s){
         lock(manifestsLock){

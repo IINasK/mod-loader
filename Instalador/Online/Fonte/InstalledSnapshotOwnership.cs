@@ -14,7 +14,6 @@ public sealed partial class FixedInstaller {
         return Directory.Exists(folder)&&Directory.GetFiles(folder,"*.json").Select(ReadReceipt).Any(r=>r.Operation==LocalModPackage.ReceiptOperation&&r.Status=="instalado"&&r.Mods.Contains(id));
     }
     internal List<InstalledSnapshotFile> ExportSnapshotImportedFiles(string id) {
-        Closed();
         string folder=Safe.In(Data,"importados");
         if(!Directory.Exists(folder))throw new IOException("A instalação personalizada não tem recibo nesta pasta.");
         var receipt=Directory.GetFiles(folder,"*.json").Select(ReadReceipt)
