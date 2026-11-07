@@ -11,7 +11,8 @@ using System.Windows.Forms;
 internal static class GeneralStyle {
     internal static bool Dark;
     internal static bool RedTheme;
-    internal static void UseTheme(string theme){Dark=theme=="dark";RedTheme=theme=="light-red";}
+    internal static bool BlackTheme;
+    internal static void UseTheme(string theme){Dark=theme=="dark"||theme=="black";RedTheme=theme=="light-red";BlackTheme=theme=="black";}
     internal static string Language="pt";
     internal static bool AnimationsEnabled=true;
     static readonly PrivateFontCollection fonts=new PrivateFontCollection();
@@ -30,15 +31,15 @@ internal static class GeneralStyle {
         return fonts.Families.Length>0?new Font(fonts.Families[0],size,bold?FontStyle.Bold:FontStyle.Regular):
             new Font("Segoe UI",size,bold?FontStyle.Bold:FontStyle.Regular);
     }
-    internal static Color Background {get{return ColorTranslator.FromHtml(Dark?"#15121d":"#ffffff");}}
-    internal static Color Surface {get{return ColorTranslator.FromHtml(Dark?"#242032":"#ffffff");}}
-    internal static Color Foreground {get{return ColorTranslator.FromHtml(Dark?"#ece8f6":RedTheme?"#2b2326":"#221d33");}}
-    internal static Color Muted {get{return ColorTranslator.FromHtml(Dark?"#b9b1cf":RedTheme?"#756167":"#625b7c");}}
-    internal static Color Accent {get{return ColorTranslator.FromHtml(Dark?"#b8a4ff":RedTheme?"#d92e42":"#5b3fd8");}}
-    internal static Color Primary {get{return ColorTranslator.FromHtml(!Dark&&RedTheme?"#d92e42":"#5b3fd8");}}
-    internal static Color Line {get{return ColorTranslator.FromHtml(Dark?"#827592":RedTheme?"#a5747d":"#897d9d");}}
-    internal static Color SoftLine {get{return ColorTranslator.FromHtml(Dark?"#3a334e":RedTheme?"#f0dde1":"#e9e5f0");}}
-    internal static Color Selection {get{return ColorTranslator.FromHtml(Dark?"#3e335b":RedTheme?"#fde9ec":"#eee9fc");}}
+    internal static Color Background {get{return ColorTranslator.FromHtml(BlackTheme?"#090909":Dark?"#15121d":"#ffffff");}}
+    internal static Color Surface {get{return ColorTranslator.FromHtml(BlackTheme?"#1b1b1b":Dark?"#242032":"#ffffff");}}
+    internal static Color Foreground {get{return ColorTranslator.FromHtml(BlackTheme?"#f2f2f2":Dark?"#ece8f6":RedTheme?"#2b2326":"#221d33");}}
+    internal static Color Muted {get{return ColorTranslator.FromHtml(BlackTheme?"#bcbcbc":Dark?"#b9b1cf":RedTheme?"#756167":"#625b7c");}}
+    internal static Color Accent {get{return ColorTranslator.FromHtml(BlackTheme?"#eeeeee":Dark?"#b8a4ff":RedTheme?"#d92e42":"#5b3fd8");}}
+    internal static Color Primary {get{return ColorTranslator.FromHtml(BlackTheme?"#505050":!Dark&&RedTheme?"#d92e42":"#5b3fd8");}}
+    internal static Color Line {get{return ColorTranslator.FromHtml(BlackTheme?"#858585":Dark?"#827592":RedTheme?"#a5747d":"#897d9d");}}
+    internal static Color SoftLine {get{return ColorTranslator.FromHtml(BlackTheme?"#393939":Dark?"#3a334e":RedTheme?"#f0dde1":"#e9e5f0");}}
+    internal static Color Selection {get{return ColorTranslator.FromHtml(BlackTheme?"#353535":Dark?"#3e335b":RedTheme?"#fde9ec":"#eee9fc");}}
     internal static Color Danger {get{return ColorTranslator.FromHtml(Dark?"#ffadb9":"#b42348");}}
     internal static Color DangerFill {get{return ColorTranslator.FromHtml("#b42348");}}
     internal static GraphicsPath Round(RectangleF box,float radius){

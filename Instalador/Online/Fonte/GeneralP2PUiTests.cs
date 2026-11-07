@@ -10,11 +10,11 @@ internal static class GeneralP2PUiTests {
     internal static int Run(string parent){
         string root=OnlineTests.NestedRoot(parent,"p2p-ui-");Directory.CreateDirectory(root);var checks=new List<string>();
         Action<bool,string> check=(ok,text)=>{if(!ok)throw new IOException(text);checks.Add(text);};
-        bool dark=GeneralStyle.Dark,red=GeneralStyle.RedTheme,animation=GeneralStyle.AnimationsEnabled;string language=GeneralStyle.Language;
+        bool dark=GeneralStyle.Dark,red=GeneralStyle.RedTheme,black=GeneralStyle.BlackTheme,animation=GeneralStyle.AnimationsEnabled;string language=GeneralStyle.Language;
         try{
             var catalog=FixedData.Load();var state=new GeneralModState{List=GeneralModLibrary.Seed(catalog,new ModImportItem[0]),Destination=Path.Combine(root,"game")};string before=Safe.Json.Serialize(state);
             using(var service=new P2PService(Path.Combine(root,"private"),Path.Combine(root,"transport"),true)){
-                foreach(string theme in new[]{"light","light-red","dark"})foreach(string locale in new[]{"pt","en"}){
+                foreach(string theme in new[]{"light","light-red","dark","black"})foreach(string locale in new[]{"pt","en"}){
                     GeneralStyle.UseTheme(theme);GeneralStyle.Language=locale;GeneralStyle.AnimationsEnabled=false;
                     using(var dialog=new GeneralP2PDialog(service,state,state.List.Mods.Select(m=>m.Id),catalog,new DownloadCache(Path.Combine(root,"cache")),false)){
                         dialog.ShowInTaskbar=false;dialog.StartPosition=FormStartPosition.Manual;dialog.Location=new Point(-30000,-30000);dialog.Show();Application.DoEvents();
@@ -28,25 +28,25 @@ internal static class GeneralP2PUiTests {
                         check(destination.Visible&&destination.ReadOnly&&Find<Button>(dialog,"p2p-folder").Enabled,"Colar convite mostra destino local e escolha de pasta antes de conectar: "+theme+locale);
                         using(var image=new Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(root,"layout-"+theme+"-"+locale+".png"),System.Drawing.Imaging.ImageFormat.Png);}
                         Safe.WriteJson(Path.Combine(root,"layout.json"),Children(dialog.Content).Where(c=>!String.IsNullOrEmpty(c.Name)||c is TableLayoutPanel).Select(c=>new{Name=c.Name,Type=c.GetType().Name,Bounds=c.Bounds.ToString(),Parent=c.Parent.ClientRectangle.ToString()}).ToArray());
-                        foreach(Control control in new Control[]{input,output,destination,connect,generate,Find<Button>(dialog,"p2p-folder"),Find<Button>(dialog,"p2p-copy"),Find<Label>(dialog,"p2p-status")})check(Inside(control,dialog.Content),"Controle sem recorte: "+control.Name+theme+locale);
+                        foreach(Control control in new Control[]{input,output,destination,connect,generate,Find<Button>(dialog,"p2p-folder"),Find<Button>(dialog,"p2p-copy"),Find<Label>(dialog,"p2p-status")})check(!control.Visible||Inside(control,dialog.Content),"Controle sem recorte: "+control.Name+theme+locale);
                         check(input.Parent is GeneralSurface&&output.Parent is GeneralSurface&&input.Width>300&&output.Width>300&&!input.Multiline&&!output.Multiline&&input.Parent.Height<=56&&output.Parent.Height<=56,"Campos de links usam superfícies e largura legível: "+theme+locale);
                         var copy=Find<Button>(dialog,"p2p-copy");check(copy.Parent==output.Parent&&copy.Left>=output.Right&&copy.Right<=copy.Parent.ClientSize.Width-16&&copy.Top>=6&&copy.Bottom<=copy.Parent.ClientSize.Height-6,"Copy action shares the send field surface without covering text: "+theme+locale);
                         output.Text=offered.Encode();copy.PerformClick();check(Clipboard.GetText()==output.Text,"Copy preserves the complete single-line invitation: "+theme+locale);
                         var coverage=PackCoverage.Build(Enumerable.Range(0,20).Select(i=>new GeneralModEntry{Id=i.ToString(),Category=i<17?"Main":i<19?"Cars":"FPV"}),m=>Int32.Parse(m.Id)<17,"Uncategorized");
                         using(var bar=new GeneralProgress{Size=new Size(640,44),Value=85,Caption="17 / 20",Segments=coverage})using(var image=new Bitmap(640,44)){bar.BackColor=GeneralStyle.Surface;bar.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(root,"coverage-"+theme+"-"+locale+".png"),System.Drawing.Imaging.ImageFormat.Png);}
-                        input.Clear();var session=new P2PSession{Id=offered.Folder,Name=offered.Name,Hash=offered.ManifestHash,Sender=false,Mode="installed-zip",Size=1024};
+                        input.Clear();var session=new P2PSession{Id=offered.Folder,Name=offered.Name,Hash=offered.ManifestHash,Sender=false,Mode="installed-zip",Size=1024,Peer=offered.Device};
                         typeof(GeneralP2PDialog).GetMethod("SelectSession",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(dialog,new object[]{session});
                         check(pause.Visible&&!pause.Enabled&&destination.Visible,"Pausa existe no recebimento e aguarda motor conectado: "+theme+locale);
                         typeof(GeneralP2PDialog).GetField("remotePaused",BindingFlags.Instance|BindingFlags.NonPublic).SetValue(dialog,true);typeof(GeneralP2PDialog).GetMethod("UpdateActions",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(dialog,null);
-                        check(pause.Text==(locale=="pt"?"Pausado pelo amigo":"Paused by friend")&&!pause.Enabled,"Pausa remota não oferece destravar o amigo: "+theme+locale);
-                        session.Paused=true;typeof(GeneralP2PDialog).GetMethod("UpdateActions",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(dialog,null);check(pause.Text==(locale=="pt"?"Retomar":"Resume"),"Quem pausou recebe ação de retomar sua própria pausa: "+theme+locale);
+                        check(pause.AccessibleName==(locale=="pt"?"Pausado pelo amigo":"Paused by friend")&&!pause.Enabled,"Pausa remota não oferece destravar o amigo: "+theme+locale);
+                        session.Paused=true;typeof(GeneralP2PDialog).GetMethod("UpdateActions",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(dialog,null);check(pause.AccessibleName==(locale=="pt"?"Retomar":"Resume"),"Quem pausou recebe ação de retomar sua própria pausa: "+theme+locale);
                         using(var image=new Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(root,"p2p-"+theme+"-"+locale+".png"),System.Drawing.Imaging.ImageFormat.Png);}dialog.Close();
                     }
                 }
                 check(!service.Engine.Running&&!Directory.Exists(service.Store),"Renderização não inicia rede nem cria pacotes.");check(Safe.Json.Serialize(state)==before&&!Directory.Exists(state.Destination),"Formulário preserva estado e não toca no jogo.");
             }
             Safe.WriteJson(Path.Combine(root,"resultado-p2p-ui.json"),new{Passed=true,Tests=checks,NetworkUsed=false,RealGameTouched=false});return checks.Count;
-        }finally{GeneralStyle.Dark=dark;GeneralStyle.RedTheme=red;GeneralStyle.Language=language;GeneralStyle.AnimationsEnabled=animation;}
+        }finally{GeneralStyle.Dark=dark;GeneralStyle.RedTheme=red;GeneralStyle.BlackTheme=black;GeneralStyle.Language=language;GeneralStyle.AnimationsEnabled=animation;}
     }
     internal static void Preview(string parent){Run(parent);}
     static T Find<T>(Control root,string name)where T:Control{return Children(root).OfType<T>().Single(c=>c.Name==name);}

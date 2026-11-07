@@ -19,7 +19,7 @@ internal sealed partial class P2PService {
         if(chosen.Length==0||chosen.Any(id=>!state.List.Mods.Any(m=>m.Id==id)))throw new IOException("Escolha um preset com mods para compartilhar.");
         byte[] key=new byte[32];using(var random=RandomNumberGenerator.Create())random.GetBytes(key);
         var preset=state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);
-        var session=new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Sender=true,Mode="installed-zip",Deferred=true,Hash=Safe.Hex(key),Name=preset==null?"Pacote instalado":preset.Name,SelectedMods=chosen};
+        var session=new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Sender=true,Mode="installed-zip",Deferred=true,Automatic=true,Hash=Safe.Hex(key),Name=preset==null?"Pacote instalado":preset.Name,SelectedMods=chosen};
         string folder=Folder(session);
         if(!String.IsNullOrEmpty(state.Destination)&&Path.GetFullPath(folder).StartsWith(Path.GetFullPath(state.Destination).TrimEnd('\\')+"\\",StringComparison.OrdinalIgnoreCase))throw new IOException("A transferência deve ficar fora da pasta do jogo.");
         if(Directory.Exists(folder)||File.Exists(folder))throw new IOException("Destino da transferência já existe.");
@@ -31,13 +31,24 @@ internal sealed partial class P2PService {
     internal void PrepareDeferred(P2PSession session,GeneralModState state,FixedCatalog catalog,string appData,bool includeConfigs,Action<string> report){
         if(!Sessions.Contains(session)||!session.Sender||!session.Deferred||session.Completed)throw new IOException("Envio antecipado inválido.");
         string zip=Safe.In(Folder(session),"pack.zip"),part=zip+".part";Safe.NoLinks(zip);Safe.NoLinks(part);
+        DateTime nextCheck=DateTime.MinValue;bool remotePaused=false;
+        Action checkpoint=()=>{
+            while(true){
+                if(disposed)throw new IOException("Preparação interrompida; sessão preservada.");
+                if(DateTime.UtcNow>=nextCheck){var transfer=TransferStatus(session);remotePaused=transfer.RemotePaused;nextCheck=DateTime.UtcNow.AddSeconds(1);}
+                if(!session.Paused&&!remotePaused)return;
+                System.Threading.Thread.Sleep(100);
+            }
+        };
+        session.PreparationBytes=0;session.PreparationTotal=0;
         session.Stage=GeneralStyle.T("Conferindo e preparando o pacote…","Verifying and preparing the pack…");session.Error=null;Save();
         try{
             if(session.PayloadHash==null){
                 if(File.Exists(zip))throw new IOException("Pacote sem registro de conclusão; preservado.");
                 if(File.Exists(part))File.Delete(part);
                 if(report!=null)report(session.Stage);
-                InstalledSnapshot.Create(part,state,session.SelectedMods,catalog,appData,includeConfigs,report,true);
+                InstalledSnapshot.Create(part,state,session.SelectedMods,catalog,appData,includeConfigs,report,true,checkpoint,(done,total)=>{session.PreparationBytes=done;session.PreparationTotal=total;});
+                checkpoint();
                 session.PayloadHash=Safe.Hash(part);session.Size=new FileInfo(part).Length;Save();
             }
             if(!File.Exists(zip)&&File.Exists(part)){

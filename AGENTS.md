@@ -23,6 +23,14 @@
 - Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
   autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
 
+## Revisão 1.1.29 — conexão por um lado e preparo após aceitação
+
+- Novo convite Automatic autoriza somente prova HMAC vinculada ao segredo/sessão/ID TLS. Fonte não aceita qualquer pending device. Known peer usa prova no pending-folder label. Serviço e UI monitoram1s. Ambos1.1.29+. Nunca publicar convites/segredos/certificados/provas de fixture. Sem servidor novo/dependência nova; Syncthing oficial mantido.
+- Abrir menu só cria sessão leve. Depois de TLS/pasta aceitos, a UI prepara em worker; duas barras distintas e pausa/play Lucide com acessibilidade. Pausas de remetente/receptor são independentes, checkpoints entre mods/blocos. Hash individual já em andamento pode terminar antes da pausa. Não prometer preparação retomável por bloco após queda nem expiração automática.
+- Convites deferred antigos sem peer atualizam Automatic e precisam ser reenviados. Receptor atualiza o mesmo registro. Anúncio antigo pode ter label pendente em cache; renovar somente conexão ociosa, preservando outras transferências ativas. Fixture isolada restabelece endpoint loopback após reconexão porque discovery externa está desligada. Não remover proteções de instalação, versão, caminho/hash nem base imutável.
+- Tema black é adicional, neutro RGB, validado em preferências de home/projeto; não converter dark anterior nem alterar preferência do usuário por iniciativa própria. GeneralStyle/GeneralPicker/Lucide oficiais existentes. Altura do diálogo segue linhas visíveis, sem espaço vazio fixo; achado G3 na entrada central autorizada06/11/2026, SKILL central intacta e relato privado fora da publicação.
+- Fonte/catalogo/jogo/RED4ext/saves reais inalterados. Pares novos e conhecidos, migração, pausas, duas UIs/retomada/limpeza e Setup testados em fixtures; resultados sanitizados Conhecimento/Validacoes/1.1.29.json, evidências privadas T/R129. Não alegar teste entre PCs pela Internet/NAT/relay. Main/Release continuam autorizadas; não encerrar app aberto à força.
+
 ## Revisão 1.1.28 — convite antes de preparar o ZIP
 
 - Abrir P2P inicia conexão e preenche convite real antes de Inspect/Create; ícone apenas Clipboard.SetText do campo. Não atrelar teste a Text.Length: texto de progresso não é convite copiável. Falha preserva convite válido e mostra diagnóstico. Projeto vazio só recebe. Não criar URL fictícia.

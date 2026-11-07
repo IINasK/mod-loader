@@ -48,7 +48,7 @@ public static partial class InstalledSnapshot {
         if(variant.CyberpunkVariant!=null)throw new IOException("Variante fixa inválida.");
         return mod;
     }
-    public static InstalledSnapshotManifest Inspect(GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs,bool allowMissing=false) {
+    public static InstalledSnapshotManifest Inspect(GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs,bool allowMissing=false,Action checkpoint=null) {
         if(state==null||state.List==null||ids==null||String.IsNullOrWhiteSpace(state.Destination))throw new IOException("Escolha uma pasta de instalação e um preset.");
         string root=Path.GetFullPath(state.Destination);Safe.NoLinks(root);
         if(!Directory.Exists(root))throw new IOException("Pasta de instalação ausente.");
@@ -71,6 +71,7 @@ public static partial class InstalledSnapshot {
         var receivedEngine=new InstalledSnapshotInstaller(root,appData,catalog);
         var problems=new List<string>();
         foreach(var mod in entries) {
+            if(checkpoint!=null)checkpoint();
             try {
             var variant=mod.Variants.Single(v=>v.Id==Selected(state,mod));
             if(allowMissing&&Uninstalled(state,mod,variant,catalog,root,appData))continue;
@@ -141,9 +142,10 @@ public static partial class InstalledSnapshot {
         Validate(manifest,catalog);
         return manifest;
     }
-    public static InstalledSnapshotManifest Create(string zipPath,GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs,Action<string> report,bool allowMissing=false) {
-        var manifest=Inspect(state,ids,catalog,appData,includeConfigs,allowMissing);string root=Path.GetFullPath(state.Destination);
+    public static InstalledSnapshotManifest Create(string zipPath,GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs,Action<string> report,bool allowMissing=false,Action checkpoint=null,Action<long,long> progress=null) {
+        var manifest=Inspect(state,ids,catalog,appData,includeConfigs,allowMissing,checkpoint);string root=Path.GetFullPath(state.Destination);
         string output=Path.GetFullPath(zipPath);Safe.NoLinks(output);
+        long done=0,expected=manifest.Files.Where(f=>f.Kind=="file").GroupBy(f=>f.Sha256).Select(g=>g.First().Size).Sum();if(progress!=null)progress(0,expected);
         bool created=false;
         try {
             using(var stream=new FileStream(output,FileMode.CreateNew,FileAccess.ReadWrite,FileShare.None)) {
@@ -159,7 +161,7 @@ public static partial class InstalledSnapshot {
                         using(var target=archive.CreateEntry(Entry(file),CompressionLevel.Fastest).Open()) {
                             ValidateCustomData(manifest,file,input);input.Position=0;
                             byte[] buffer=new byte[1024*1024];long total=0;int count;
-                            while((count=input.Read(buffer,0,buffer.Length))>0){total+=count;if(total>file.Size)throw new IOException("Arquivo mudou durante a exportação: "+file.Path);sha.TransformBlock(buffer,0,count,null,0);target.Write(buffer,0,count);}
+                            while((count=input.Read(buffer,0,buffer.Length))>0){if(checkpoint!=null)checkpoint();total+=count;if(total>file.Size)throw new IOException("Arquivo mudou durante a exportação: "+file.Path);sha.TransformBlock(buffer,0,count,null,0);target.Write(buffer,0,count);done+=count;if(progress!=null)progress(done,expected);}
                             sha.TransformFinalBlock(new byte[0],0,0);
                             if(total!=file.Size||Safe.Hex(sha.Hash)!=file.Sha256)throw new IOException("Arquivo mudou durante a exportação: "+file.Path);
                         }

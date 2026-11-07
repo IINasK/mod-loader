@@ -192,7 +192,7 @@ internal sealed class GeneralProjectStore {
     }
 
     static void ValidatePreferences(string theme, string language) {
-        if (theme != "light" && theme != "dark" && theme != "light-red") throw new IOException("Tema de projeto inválido.");
+        if (theme != "light" && theme != "dark" && theme != "light-red" && theme != "black") throw new IOException("Tema de projeto inválido.");
         if (language != "pt" && language != "en") throw new IOException("Idioma de projeto inválido.");
     }
 

@@ -9,7 +9,8 @@ using System.Threading;
 internal sealed class P2PSession {
     public string Id, Name, Hash, Peer, Mode, Destination, ReceiptId, Error, Stage;
     public long Size;
-    public bool Deferred;
+    public bool Deferred, Automatic;
+    public long PreparationBytes,PreparationTotal;
     public string PayloadHash;
     public string[] SelectedMods;
     public bool Sender, Paused, AutoInstall, Completed, ListImported;
@@ -17,7 +18,7 @@ internal sealed class P2PSession {
 }
 internal sealed class P2PTransferStatus {
     internal int Percent;
-    internal bool Connected,RemotePaused;
+    internal bool Connected,RemotePaused,Accepted;
 }
 internal sealed partial class P2PService : IDisposable {
     internal readonly string Root, Store;
@@ -52,6 +53,7 @@ internal sealed partial class P2PService : IDisposable {
     }
     static void Validate(P2PSession s){
         if(s==null||!Regex.IsMatch(s.Id??"","\\Aml-[a-f0-9]{32}\\z")||!P2PPack.HashValid(s.Hash)||String.IsNullOrWhiteSpace(s.Name)||s.Name.Length>300||s.Name.Any(Char.IsControl)||(s.Peer!=null&&!P2PInvite.DeviceValid(s.Peer)))throw new IOException("Registro de compartilhamento inválido.");
+        if(s.Automatic&&!s.Deferred)throw new IOException("Registro automático inválido.");
         if(s.Deferred&&(s.Mode!="installed-zip"||s.Size<0||s.Size>P2PPack.MaxTotal||(s.PayloadHash==null?s.Size!=0:!P2PPack.HashValid(s.PayloadHash)||s.Size==0))||s.SelectedMods!=null&&(s.SelectedMods.Length>1000||s.SelectedMods.Any(id=>!Regex.IsMatch(id??"",@"\A[A-Za-z0-9_-]{1,120}\z"))))throw new IOException("Registro antecipado inválido.");
         if(s.Mode!=null&&s.Mode!="installed-zip"||s.Mode=="installed-zip"&&!s.Deferred&&(s.Size<=0||s.Size>P2PPack.MaxTotal))throw new IOException("Registro de pacote instalado inválido.");
         if(s.ReceiptId!=null&&!Regex.IsMatch(s.ReceiptId,"\\A[a-f0-9]{32}\\z"))throw new IOException("Recibo de pacote inválido.");
@@ -69,10 +71,11 @@ internal sealed partial class P2PService : IDisposable {
             Engine.Start(testExe??SyncthingEngine.Ensure(Root,report));
             if(disposed)throw new ObjectDisposedException("P2PService");
             lock(manifestsLock)allowedManifests.Clear();
-            foreach(var s in Sessions){if(s.Id==excludeFolder||s.Mode=="installed-zip"&&s.Completed&&(s.Sender||!Directory.Exists(Folder(s))))continue;if(s.Peer!=null)Engine.ConfigurePeer(s.Peer);Engine.ConfigureFolder(s.Id,Folder(s),s.Name,s.Sender,s.Peer);if(s.Paused)Engine.Pause(s.Id,true);}
+            foreach(var s in Sessions){if(s.Id==excludeFolder||s.Mode=="installed-zip"&&s.Completed&&(s.Sender||!Directory.Exists(Folder(s))))continue;if(s.Peer!=null)Engine.ConfigurePeer(s.Peer);Engine.ConfigureFolder(s.Id,Folder(s),s.Sender?s.Name:ReceiveLabel(s),s.Sender,s.Peer);if(s.Paused)Engine.Pause(s.Id,true);}
             receivers=Sessions.Where(s=>!s.Sender).ToArray();
             installedSessions=Sessions.Where(s=>s.Mode=="installed-zip").ToArray();
-            if(pump!=null)pump.Dispose();pump=new Timer(_=>Pump(),null,2000,3000);
+            RestoreAcceptanceName();
+            if(pump!=null)pump.Dispose();pump=new Timer(_=>Pump(),null,1000,1000);
         }catch{Engine.Dispose();throw;}
     }
     void Save(){Safe.WriteJson(statePath,Sessions);receivers=Sessions.Where(s=>!s.Sender).ToArray();installedSessions=Sessions.Where(s=>s.Mode=="installed-zip").ToArray();}
@@ -80,6 +83,7 @@ internal sealed partial class P2PService : IDisposable {
     void Pump(){
         if(disposed||Interlocked.Exchange(ref pumping,1)!=0)return;
         try{
+            try{DetectAcceptances();}catch(Exception ex){OnlineDiagnostics.Record("p2p.accept.waiting",null,ex.GetType().Name);}
             foreach(var s in installedSessions){if(disposed)break;if(s.Paused||!s.Completed&&!String.IsNullOrEmpty(s.Error))continue;try{ProcessInstalled(s);}catch(Exception ex){s.Error=ex.Message;s.Stage=null;Save();}}
             foreach(var s in receivers){if(disposed)break;if(s.Paused||s.Mode=="installed-zip")continue;try{if(File.Exists(Safe.In(Folder(s),"pack.json")))AllowFiles(s);}catch(Exception ex){OnlineDiagnostics.Record("p2p.waiting",null,"Aguardando manifesto conferido.",new{ErrorType=ex.GetType().Name});}}
         }
@@ -179,25 +183,32 @@ internal sealed partial class P2PService : IDisposable {
             try{P2PPack.DeleteSnapshot(folder);}catch(Exception){}throw;
         }
     }
-    internal string Invitation(P2PSession session){return new P2PInvite{Kind=session.Sender?"offer":"accept",Device=Engine.Device,Folder=session.Id,ManifestHash=session.Hash,Name=session.Name,Mode=session.Mode,Size=session.Deferred?0:session.Size,Deferred=session.Deferred}.Encode();}
+    internal string Invitation(P2PSession session){return new P2PInvite{Kind=session.Sender?"offer":"accept",Device=Engine.Device,Folder=session.Id,ManifestHash=session.Hash,Name=session.Name,Mode=session.Mode,Size=session.Deferred?0:session.Size,Deferred=session.Deferred,Automatic=session.Automatic}.Encode();}
     internal P2PSession Accept(string code,string destination=null,bool autoInstall=false){
         var invite=P2PInvite.Decode(code);if(invite.Kind!="offer")throw new IOException("Cole o convite de quem está enviando o pacote.");
         if(!Engine.Running||invite.Device==Engine.Device)throw new IOException("Use o convite do outro computador.");
         var existing=Sessions.FirstOrDefault(s=>s.Id==invite.Folder);
-        if(existing!=null){if(existing.Hash!=invite.ManifestHash||existing.Sender||existing.Peer!=invite.Device||existing.Deferred!=invite.Deferred||existing.Mode!=invite.Mode||(!existing.Deferred&&existing.Size!=invite.Size))throw new IOException("Este convite conflita com outro compartilhamento.");return existing;}
+        if(existing!=null){
+            if(existing.Hash!=invite.ManifestHash||existing.Sender||existing.Peer!=invite.Device||existing.Deferred!=invite.Deferred||existing.Mode!=invite.Mode||(!existing.Deferred&&existing.Size!=invite.Size))throw new IOException("Este convite conflita com outro compartilhamento.");
+            if(existing.Automatic!=invite.Automatic){
+                if(existing.Automatic||!invite.Automatic||existing.Completed)throw new IOException("Use o convite atualizado enviado pelo amigo.");
+                existing.Automatic=true;AdvertiseAcceptance(existing);Engine.ConfigureFolder(existing.Id,Folder(existing),ReceiveLabel(existing),false,existing.Peer);if(existing.Paused)Engine.Pause(existing.Id,true);Save();RefreshAcceptance(existing);
+            }
+            return existing;
+        }
         if(Sessions.Count>=100)throw new IOException("Remova compartilhamentos antigos antes de receber outro.");
         if(invite.Mode=="installed-zip"&&autoInstall){if(String.IsNullOrWhiteSpace(destination)||!Directory.Exists(destination))throw new IOException("Escolha a pasta de instalação antes de receber.");Safe.NoLinks(destination);}
-        var session=new P2PSession{Id=invite.Folder,Name=invite.Name,Hash=invite.ManifestHash,Peer=invite.Device,Mode=invite.Mode,Size=invite.Size,Deferred=invite.Deferred,Destination=destination,AutoInstall=autoInstall};
+        var session=new P2PSession{Id=invite.Folder,Name=invite.Name,Hash=invite.ManifestHash,Peer=invite.Device,Mode=invite.Mode,Size=invite.Size,Deferred=invite.Deferred,Automatic=invite.Automatic,Destination=destination,AutoInstall=autoInstall};
         string folder=Folder(session);Directory.CreateDirectory(folder);
         // Receive the pinned manifest first. Other remote files are ignored until its allow-list is validated.
         File.WriteAllText(Safe.In(folder,".stignore"),invite.Mode=="installed-zip"?(invite.Deferred?"!ready.json\n!pack.zip\n*\n":"!pack.zip\n*\n"):"!pack.json\n*\n",new UTF8Encoding(false));
-        Engine.ConfigurePeer(session.Peer);Engine.ConfigureFolder(session.Id,folder,session.Name,false,session.Peer);
+        AdvertiseAcceptance(session);Engine.ConfigurePeer(session.Peer);Engine.ConfigureFolder(session.Id,folder,ReceiveLabel(session),false,session.Peer);
         Sessions.Add(session);try{Save();}catch{Sessions.Remove(session);Engine.RemoveFolder(session.Id);throw;}return session;
     }
     internal P2PSession Authorize(string code){
         var answer=P2PInvite.Decode(code);if(answer.Kind!="accept")throw new IOException("Cole a resposta enviada por seu amigo.");
         var s=Sessions.SingleOrDefault(x=>x.Id==answer.Folder&&x.Sender);
-        if(s==null||s.Completed||s.Hash!=answer.ManifestHash||s.Mode!=answer.Mode||s.Deferred!=answer.Deferred||(!s.Deferred&&s.Size!=answer.Size)||answer.Device==Engine.Device)throw new IOException("A resposta não pertence a um envio ativo.");
+        if(s==null||s.Completed||s.Hash!=answer.ManifestHash||s.Mode!=answer.Mode||s.Deferred!=answer.Deferred||s.Automatic!=answer.Automatic||(!s.Deferred&&s.Size!=answer.Size)||answer.Device==Engine.Device)throw new IOException("A resposta não pertence a um envio ativo.");
         if(s.Peer!=null&&s.Peer!=answer.Device)throw new IOException("Este convite já está vinculado a outro amigo. Crie outro compartilhamento.");
         Engine.ConfigurePeer(answer.Device);Engine.ConfigureFolder(s.Id,Folder(s),s.Name,true,answer.Device);if(s.Paused)Engine.Pause(s.Id,true);s.Peer=answer.Device;Save();return s;
     }
@@ -213,13 +224,14 @@ internal sealed partial class P2PService : IDisposable {
         allowedManifests.Add(s.Id,m);return m;
         }
     }
-    internal void Pause(P2PSession s){lock(s){if(s.Stage!=null||s.Completed)throw new IOException("A transferência terminou ou a instalação já começou; aguarde terminar.");Engine.Pause(s.Id,!s.Paused);s.Paused=!s.Paused;Save();}}
+    internal void Pause(P2PSession s){lock(s){if(s.Stage!=null&&!s.Sender||s.Completed)throw new IOException("A transferência terminou ou a instalação já começou; aguarde terminar.");Engine.Pause(s.Id,!s.Paused);s.Paused=!s.Paused;Save();}}
     internal P2PTransferStatus TransferStatus(P2PSession s){
         Validate(s);var result=new P2PTransferStatus();if(s.Completed){result.Percent=100;return result;}if(s.Peer==null)return result;
         var connections=Engine.Get("system/connections")["connections"] as Dictionary<string,object>;object raw;
         if(connections!=null&&connections.TryGetValue(s.Peer,out raw))result.Connected=Convert.ToBoolean(((Dictionary<string,object>)raw)["connected"]);
         if(!result.Connected||s.Paused)return result;
         var completion=Engine.Get("db/completion?folder="+s.Id+"&device="+s.Peer);
+        result.Accepted=completion.ContainsKey("remoteState")&&(Convert.ToString(completion["remoteState"])=="valid"||Convert.ToString(completion["remoteState"])=="paused");
         result.RemotePaused=completion.ContainsKey("remoteState")&&Convert.ToString(completion["remoteState"])=="paused";
         if(s.Size<=0)return result;
         if(s.Sender)result.Percent=(int)Math.Max(0,Math.Min(99,Convert.ToDouble(completion["completion"])));

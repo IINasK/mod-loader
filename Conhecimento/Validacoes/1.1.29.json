@@ -1,0 +1,83 @@
+{
+  "Version": "1.1.29",
+  "Reports": [
+    {
+      "Report": "resultado-p2p-automatic.json",
+      "Checks": 29,
+      "Passed": true,
+      "Evidence": "T/R129/online-testes-a61cd77c1ac14a1baa7f69044475c1a7/resultado-p2p-automatic.json"
+    },
+    {
+      "Report": "resultado-snapshot-p2p.json",
+      "Checks": 43,
+      "Passed": true,
+      "Evidence": "T/R129/sp-73c7c1/resultado-snapshot-p2p.json"
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Checks": 162,
+      "Passed": true,
+      "Evidence": "T/R129/online-testes-f7bc5d48844e4592a203ccf6756f3fc5/resultado-p2p-ui.json"
+    },
+    {
+      "Report": "resultado-p2p.json",
+      "Checks": 47,
+      "Passed": true,
+      "Evidence": "T/R129/online-testes-2c95df6315da4b55b1b439d2d0893005/resultado-p2p.json"
+    },
+    {
+      "Report": "resultado-version-choice.json",
+      "Checks": 51,
+      "Passed": true,
+      "Evidence": "T/R129/online-testes-70d802f52982438fb2ec734b9f55ed74/resultado-version-choice.json"
+    },
+    {
+      "Report": "resultado-updates.json",
+      "Checks": 30,
+      "Passed": true,
+      "Evidence": "T/R129/online-testes-4b9237fd0f834458b0a93edaaf30c3a2/resultado-updates.json"
+    },
+    {
+      "Report": "resultado-automatic-update.json",
+      "Checks": 25,
+      "Passed": true,
+      "Evidence": "T/R129/online-testes-1774cd7cfd9349e1b5c21dade3745975/resultado-automatic-update.json"
+    },
+    {
+      "Report": "resultado-snapshot.json",
+      "Checks": 45,
+      "Passed": true,
+      "Evidence": "T/R129/online-testes-a797624aec204ec69caf54e9a853e1ca/resultado-snapshot.json"
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 28,
+      "Passed": true,
+      "Evidence": "T/R129/resultado-snapshot-installer.json"
+    },
+    {
+      "Report": "resultado-setup.json",
+      "Checks": 24,
+      "Passed": true,
+      "Evidence": "T/setup-cfe0be832fc84e87ba2764cb4d1a7e2a/resultado-setup.json"
+    }
+  ],
+  "AppSha256": "590f94b935314d6cf2a92958edd3857ba042169a4d3f6f7aba852242fd273195",
+  "SetupSha256": "377374f4fab01d67d389cda8ac89ff4af13a0d7583b00e3cf888dc1ed6278454",
+  "CatalogSha256": "c6a0b3a6170e10c8d707c4d25361d30be7382bccb9a25dd8a50d27c956e2e6a2",
+  "NetworkTests": "Independent official Syncthing peers, loopback only; no manual reply pasted in the new UI flow.",
+  "Compatibility": "Both participants need 1.1.29+ for automatic acceptance. Existing unbound deferred invitations are upgraded; resend the updated code.",
+  "Limitations": [
+    "No two-computer Internet/NAT/relay test was performed.",
+    "Preparation pause is cooperative between inspected mods and copied blocks; an individual hash already being calculated may finish before stopping.",
+    "A pack prepared after connection is retained during interruption for resume; no automatic expiry was introduced.",
+    "No real game, mods, RED4ext or saves changed."
+  ],
+  "ObservedAndFixed": [
+    "Previous flow required a manual reply despite its Connect status. Automatic admission now checks an HMAC proof bound to invitation, session and TLS device.",
+    "Pending-folder proof labels can be cached during a legacy invitation upgrade. Idle acceptance connection is refreshed without disturbing other active transfers.",
+    "The isolated migration fixture needed its loopback endpoint restored after reconnect because external discovery is deliberately disabled.",
+    "Conditional P2P rows initially left empty space under a fixed-height dialog; height now follows visible rows."
+  ],
+  "G3Report": "Reusable dialog-height finding stored in the authorized central inbox; no central skill edits or report publication."
+}
