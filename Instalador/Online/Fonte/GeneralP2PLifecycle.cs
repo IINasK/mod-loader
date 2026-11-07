@@ -331,6 +331,7 @@ internal sealed partial class P2PService {
                     return replace;
                 },id=>{session.TransactionId=id;Save();},checkpoint,value=>session.InstallProgress=value,allowReuse:AllowsLocalReuse(session));
                 var manifest=installer.ReadManifest(session.ReceiptId);
+                ApplyApprovedSyncCleanup(session,manifest);
                 session.ModsOutsidePack=manifest.Project==null?0:manifest.Project.Mods.Count-manifest.List.Mods.Count;
                 session.Completed=true;
                 session.Error=null;

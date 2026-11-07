@@ -48,7 +48,11 @@ public sealed partial class FixedInstaller {
         }
     }
     string DisabledPath(OnlineReceipt r,string relative) {
-        if(r.BackupLayout=="flat-v1")using(var sha=SHA256.Create())return Safe.In(Data,"backups/"+r.Id+"/desativados/"+Safe.Hex(sha.ComputeHash(Encoding.UTF8.GetBytes(relative)))+".bin");
+        if(r.BackupLayout=="flat-v1"||r.BackupLayout=="flat-v2")using(var sha=SHA256.Create()){
+            string hash=Safe.Hex(sha.ComputeHash(Encoding.UTF8.GetBytes(relative)));
+            string name=r.BackupLayout=="flat-v1"?"desativados/"+hash:"d/"+hash.Substring(0,32);
+            return Safe.In(Data,"backups/"+r.Id+"/"+name+".bin");
+        }
         return Safe.In(Data,"backups/"+r.Id+"/desativados/"+relative);
     }
     void EnsureUndoDependencies(OnlineReceipt receipt) {
@@ -68,11 +72,14 @@ public sealed partial class FixedInstaller {
             Closed();string dest=Safe.In(game,f.Path),backup=DisabledPath(r,f.Path);
             // A verified quarantine file is safe to restore after a crash even before Applied was saved.
             if(File.Exists(dest)||Directory.Exists(dest)) {
-                if(File.Exists(dest)&&Safe.Hash(dest)==f.Before)continue;
+                if(MatchesExtraBackup(f,dest))continue;
                 pending++;report("Preservado; destino ocupado: "+f.Path);continue;
             }
-            if(!File.Exists(backup)||Safe.Hash(backup)!=f.Before){pending++;report("Backup ausente ou alterado; preservado: "+f.Path);continue;}
-            Directory.CreateDirectory(Path.GetDirectoryName(dest));Safe.NoLinks(dest);File.Move(backup,dest);report("Restaurado: "+f.Path);
+            if(!MatchesExtraBackup(f,backup)){pending++;report("Backup ausente ou alterado; preservado: "+f.Path);continue;}
+            Directory.CreateDirectory(Path.GetDirectoryName(dest));Safe.NoLinks(dest);
+            if(f.Before==null)Directory.Move(backup,dest);
+            else File.Move(backup,dest);
+            report("Restaurado: "+f.Path);
         }
         r.Status=pending==0?"desfeito":"restauracao_pendente";Save(ledger,r);
         return pending==0?"Desativação desfeita. Arquivos e saves atuais preservados.":"Restauração com conflitos: "+pending+" destino(s) ocupado(s) ou backup(s) diferentes. Arquivos preservados; resolva o conflito e use Desfazer novamente.";

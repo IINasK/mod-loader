@@ -488,3 +488,11 @@ Pedido de Douglas, 28/10/2026: configurar mods com o coop, registrar processos v
 - A varredura limita a quatro trabalhadores, compartilha hashes e leitura de importados dentro da operação e mantém verificações completas. Nenhuma cópia adicional em disco. Medição local da etapa de arquivos fixos: 144 componentes, mesmas situações em todas as rodadas, mediana 5623 ms em série e 1842 ms em paralelo. Não extrapolar para armazenamento remoto, HDD ou duração total da interface.
 - Relato G3 privado registra coluna absoluta sobrando após ocultar ação. Skill central intacta, sem publicar a evidência privada.
 - Diagnóstico da barra de 99%: a tabela antiga excluía a Baixa personalizada reconhecida quando a variante escolhida era Baixa. A tabela agora conta esse caso como instalado, mantendo as outras densidades distintas. A edição Sem DLC exclui Night City Alive por requisito documentado e inclui Advanced Crash Reporter.
+
+## Revisão 1.1.38 — sincronização de mods extras no P2P
+
+- Atualizar mods compara os arquivos do pacote e o inventário real dos diretórios de mods do Cyberpunk nos dois PCs. Arquivos iguais são reutilizados. Arquivos ausentes ou diferentes no preset entram na sincronização e diferenças do anfitrião fora do preset aparecem na revisão.
+- O receptor escolhe, em lista desmarcada por padrão, quais mods que só existem no PC dele serão guardados para restauração. Fechar a revisão cancela a escolha. Manter e sincronizar preserva todos. A retirada dos marcados ocorre depois que a instalação termina, incluindo pastas vazias quando forem exclusivas do receptor. Arquivos da base imutável são protegidos.
+- Auditoria local de leitura confirmou uma pasta vazia red4ext/plugins/vehicle_speed_unlimiter. Ela explica por que esse nome ainda pode aparecer no NightCoop. O crash associado temporalmente ao Spot On Radio não estabelece causalidade.
+- O primeiro teste da sincronização encontrou o limite de caminhos do Windows no backup. O layout novo usa caminhos mais curtos e preserva os backups antigos. O teste de dois serviços Syncthing passou com arquivos divergentes, seleção, exclusão de pastas vazias e restauração.
+- Pacote completo mantém o fluxo de instalação. Limpeza automática indiscriminada não faz parte do protocolo. Para revisar extras, use as duas cópias atualizadas do Mod Loader e um novo convite.

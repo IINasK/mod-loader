@@ -234,9 +234,42 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         status.Text=invite.Kind=="accept"?T("Resposta confirmada. Conectando ao amigo…","Reply confirmed. Connecting to your friend…"):"";
     }
     async void ChooseIncoming(P2PSession session,bool full){
-        try{await service.ChooseIncoming(session,full);}
+        try{await service.ChooseIncoming(session,full,comparison=>{
+            if(IsDisposed||!IsHandleCreated)return null;
+            return (int[])Invoke((Func<int[]>)(()=>ReviewSyncExtras(comparison)));
+        });}
         catch(Exception ex){if(!IsDisposed)Failed(ex);}
         if(!IsDisposed)await Poll();
+    }
+    int[] ReviewSyncExtras(P2PSyncComparison comparison){
+        if(IsDisposed||comparison.Session.Discarded)return null;
+        using(var dialog=new GeneralDialog(T("Revisar sincronização","Review sync")){ClientSize=new Size(720,490)}){
+            var panel=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(24,8,24,24),ColumnCount=1,RowCount=4};
+            panel.RowStyles.Add(new RowStyle(SizeType.Absolute,60));
+            panel.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            panel.RowStyles.Add(new RowStyle(SizeType.Absolute,comparison.HostOutsideDifferences.Length>0?66:0));
+            panel.RowStyles.Add(new RowStyle(SizeType.Absolute,56));
+            var intro=Heading(String.Format(T("Há {0} mod(s) extra(s) neste PC. Marque os que deseja guardar em backup e retirar do jogo.\n{1} faltando e {2} diferentes serão tratados pelo pacote.",
+                "There are {0} extra mod(s) on this PC. Check the ones you want to back up and remove from the game.\nThe pack covers {1} missing and {2} different mods."),
+                comparison.Extras.Length,comparison.Missing.Length,comparison.Different.Length));
+            panel.Controls.Add(intro,0,0);
+            var choices=new CheckedListBox{Name="SyncExtraMods",Dock=DockStyle.Fill,CheckOnClick=true,BorderStyle=BorderStyle.None,IntegralHeight=false};
+            choices.Items.AddRange(comparison.Extras.Cast<object>().ToArray());
+            panel.Controls.Add(new GeneralScrollView(choices),0,1);
+            var outside=Heading(String.Format(T("{0} arquivo(s) do anfitrião fora do preset estão diferentes ou ausentes neste PC. Inclua os mods correspondentes no projeto do anfitrião para enviá-los.",
+                "{0} host file(s) outside the preset differ or are missing on this PC. Add their mods to the host project to send them."),comparison.HostOutsideDifferences.Length));
+            panel.Controls.Add(outside,0,2);
+            tips.SetToolTip(outside,String.Join("\r\n",comparison.HostOutsideDifferences.Take(24)));
+            var commands=GeneralTableDialogLayout.Commands();
+            var keep=GeneralStyle.Button(T("Manter e sincronizar","Keep and sync"),()=>dialog.Complete(DialogResult.No));
+            var remove=GeneralStyle.Button(T("Remover marcados","Remove checked"),()=>dialog.Complete(DialogResult.Yes),true);
+            remove.Enabled=false;
+            choices.ItemCheck+=(s,e)=>remove.Enabled=choices.CheckedItems.Count+(e.NewValue==CheckState.Checked?1:-1)>0;
+            commands.Controls.Add(remove);commands.Controls.Add(keep);panel.Controls.Add(commands,0,3);
+            dialog.Content.Controls.Add(panel);GeneralStyle.Apply(dialog,GeneralStyle.Dark);
+            var answer=dialog.ShowDialog(this);
+            return answer==DialogResult.Yes?choices.CheckedIndices.Cast<int>().ToArray():answer==DialogResult.No?new int[0]:null;
+        }
     }
     void Retry(P2PSession session){Run(async()=>{
         if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));
@@ -392,11 +425,13 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
                     awaiting?T("Aguardando conferência do anfitrião","Waiting for host verification"):T("Aguardando preparo do anfitrião","Waiting for the host to prepare the pack");
                 preparation.Value=prepared?100:session.PreparationTotal>0?(int)(session.PreparationBytes*100/session.PreparationTotal):0;
             }
-            bool ready=!session.Sender&&session.Completed&&session.ListImported&&session.ProjectError==null&&session.ModsOutsidePack==0;
+            bool syncDifferences=session.SyncLocalExtrasKept>0||session.SyncHostFilesDifferent>0;
+            bool ready=!session.Sender&&session.Completed&&session.ListImported&&session.ProjectError==null&&session.ModsOutsidePack==0&&!syncDifferences;
             string message=session.Error??"";
             if(session.Held||session.RecoveryPending)message=T("Arquivo preservado. Clique em Retomar quando quiser continuar.","File preserved. Click Resume when you are ready.");
             else if(session.Completed&&message.Length==0)message=session.Sender?T("Envio concluído","Send complete")
                 :session.ProjectError??(ready?T("Tudo pronto para jogar","Ready to play")
+                    :session.ListImported&&syncDifferences?T("Projeto salvo. Ainda há diferenças fora do pacote.","Project saved. Differences remain outside the pack.")
                     :session.ListImported&&session.ModsOutsidePack>0?T("Projeto salvo. Mods fora do pacote: ","Project saved. Mods outside the pack: ")+session.ModsOutsidePack
                     :session.ListImported?T("Instalação concluída. Projeto salvo.","Installation complete. Project saved."):T("Instalação concluída","Installation complete"));
             else if(message.Length==0&&session.Phase!=null)message=P2PService.PhaseLabel(session.Phase);

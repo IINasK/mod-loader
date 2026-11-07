@@ -12,6 +12,8 @@ internal sealed class P2PSession {
     public volatile bool Discarded;
     public string Phase, TransactionId, ProjectError, ExportPreset;
     public int? ModsOutsidePack;
+    public List<OwnedChange> SyncCleanup;
+    public int SyncLocalExtrasKept, SyncHostFilesDifferent;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PInstallProgress InstallProgress;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PSyncProgress SyncProgress;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile int SyncMode;
@@ -83,6 +85,9 @@ internal sealed partial class P2PService : IDisposable {
         if(s.TransactionId!=null&&!Regex.IsMatch(s.TransactionId,@"\A[a-f0-9]{32}\z"))
             throw new IOException("Transação inválida.");
         if(s.CompareBeforePack&&(!s.Lifecycle||!s.Automatic||s.Recipients.Length>1))throw new IOException("Registro de comparação inválido.");
+        if(s.SyncCleanup!=null&&(s.Sender||!s.CompareBeforePack||s.SyncCleanup.Count>2000||
+            s.SyncCleanup.Any(file=>file==null||!FixedInstaller.SyncInventoryEntry(file.Path,file.Before))))
+            throw new IOException("A seleção de remoção P2P é inválida.");
         if(s.Automatic&&!s.Deferred)throw new IOException("Registro automático inválido.");
         if(s.Deferred&&(s.Mode!="installed-zip"||s.Size<0||s.Size>P2PPack.MaxTotal||(s.PayloadHash==null?s.Size!=0:!P2PPack.HashValid(s.PayloadHash)||s.Size==0))||s.SelectedMods!=null&&(s.SelectedMods.Length>1000||s.SelectedMods.Any(id=>!Regex.IsMatch(id??"",@"\A[A-Za-z0-9_-]{1,120}\z"))))throw new IOException("Registro antecipado inválido.");
         if(s.Mode!=null&&s.Mode!="installed-zip"||s.Mode=="installed-zip"&&!s.Deferred&&(s.Size<=0||s.Size>P2PPack.MaxTotal))throw new IOException("Registro de pacote instalado inválido.");

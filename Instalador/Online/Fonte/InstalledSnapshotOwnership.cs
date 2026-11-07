@@ -4,10 +4,12 @@ using System.IO;
 using System.Linq;
 
 public sealed partial class FixedInstaller {
-    internal FixedInstaller(FixedCatalog sourceCatalog,string installedRoot) {
+    internal FixedInstaller(FixedCatalog sourceCatalog,string installedRoot,bool isFixture=false) {
         game=Path.GetFullPath(installedRoot).TrimEnd('\\');Safe.NoLinks(game);
         if(game.Length<=3||game.StartsWith(@"\\"))throw new IOException("Escolha uma pasta local do jogo.");
-        catalog=UserFileApprovals.ResolveCatalog(sourceCatalog,game);cache=null;saves=null;fixture=false;
+        if(isFixture&&(!File.Exists(Path.Combine(game,".fixture-only"))||!System.Text.RegularExpressions.Regex.IsMatch(game,@"(?i)[\\/]online-testes-[a-f0-9]{32}[\\/]")))
+            throw new IOException("Exceção de teste permitida apenas dentro de uma fixture isolada.");
+        catalog=UserFileApprovals.ResolveCatalog(sourceCatalog,game);cache=null;saves=null;fixture=isFixture;
     }
     internal bool HasSnapshotImportedRecord(string id){
         string folder=Safe.In(Data,"importados");

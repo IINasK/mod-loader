@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -15,6 +15,8 @@ internal sealed class P2PSyncComparison {
     internal P2PSession Session;
     internal string PreviewHash, Destination;
     internal string[] Required, Missing, Different, LocalOnly;
+    internal P2PSyncExtra[] Extras=new P2PSyncExtra[0];
+    internal string[] HostOutsideDifferences=new string[0];
     internal int Matching, Unavailable;
 }
 
@@ -76,6 +78,11 @@ internal sealed partial class P2PService {
         InstalledSnapshot.Validate(preview,installedCatalog);
         if(preview.Project==null||preview.Files.Any(file=>file.Kind!="file"||file.ReuseLocal))
             throw new IOException("A lista de comparação do anfitrião é inválida.");
+        var inventory=preview.SyncGameInventory;
+        if(inventory!=null&&(preview.Game!="cyberpunk2077"||inventory.Count>InstalledSnapshot.MaxFiles||
+            inventory.Keys.Distinct(StringComparer.OrdinalIgnoreCase).Count()!=inventory.Count||
+            inventory.Any(item=>!FixedInstaller.SyncInventoryEntry(item.Key,item.Value))))
+            throw new IOException("O inventário do anfitrião contém arquivos inválidos.");
         return preview;
     }
 
@@ -97,6 +104,12 @@ internal sealed partial class P2PService {
                         if(disposed||session.Completed||session.Discarded)throw new OperationCanceledException();
                     },skipProblem:(id,name,error)=>ReviewSnapshotProblem(session,id,name,error),
                       inspectProgress:(done,total,item)=>session.SyncProgress=new P2PSyncProgress{Done=done,Total=total,Item=item});
+                    if(preview.Game=="cyberpunk2077"){
+                        session.SyncProgress=new P2PSyncProgress{Item="Arquivos do jogo fora do pacote"};
+                        preview.SyncGameInventory=new FixedInstaller(installedCatalog,source.Destination,installedFixture).ReadSyncInventory(preview.Files.Select(file=>file.Path),()=>{
+                            if(disposed||session.Discarded)throw new OperationCanceledException();
+                        });
+                    }
                     if(disposed||session.Completed||session.Discarded)return;
                     WriteSyncMessage(session,device,PreviewPath(session),PreviewName,preview);
                     ScanSyncFolder(session.Id);
@@ -121,6 +134,7 @@ internal sealed partial class P2PService {
             foreach(var file in previewManifest.Files){
                 file.ReuseLocal=file.Owners.All(owner=>!required.Contains(owner.Split('/')[0]));
             }
+            previewManifest.SyncGameInventory=null;
             delta=previewManifest;
         }
         return true;
@@ -179,10 +193,35 @@ internal sealed partial class P2PService {
                 if(variant!=null&&!InstalledSnapshot.Uninstalled(local,mod,variant,installedCatalog,destination,installedData))localOnly.Add(mod.Name);
             }
         }
+        var extras=new P2PSyncExtra[0];
+        var outside=new List<string>();
+        if(cyberpunk&&preview.SyncGameInventory!=null){
+            Action checkpoint=()=>{if(disposed||session.Discarded)throw new OperationCanceledException();};
+            if(report!=null)report(0,0,"Mods fora do pacote");
+            extras=new FixedInstaller(installedCatalog,destination,installedFixture).PlanSyncExtras(preview,checkpoint);
+            foreach(var item in preview.SyncGameInventory){
+                checkpoint();
+                string path=Safe.In(destination,item.Key);
+                if(item.Value==null?!Directory.Exists(path):!File.Exists(path)||Safe.Hash(path)!=item.Value)outside.Add(item.Key);
+            }
+        }
         return new P2PSyncComparison{
             Session=session,PreviewHash=hash,Destination=destination,Required=required.ToArray(),Missing=absentNames.ToArray(),Different=differentNames.ToArray(),
+            Extras=extras,HostOutsideDifferences=outside.ToArray(),
             LocalOnly=localOnly.ToArray(),Matching=preview.List.Mods.Count-required.Count,Unavailable=preview.Project.Mods.Count-preview.List.Mods.Count
         };
+    }
+
+    void ApplyApprovedSyncCleanup(P2PSession session,InstalledSnapshotManifest installed) {
+        if(session.SyncCleanup==null||session.SyncCleanup.Count==0)return;
+        string hash,ignored;
+        var preview=ReadSyncPreview(session,Engine.Device,out hash);
+        var choice=Safe.Json.Deserialize<SyncChoice>(ReadSyncMessage(session,Engine.Device,ChoicePath(session,Engine.Device),ChoiceName,out ignored));
+        if(choice==null||choice.Full||choice.PreviewHash!=hash||installed.Game!="cyberpunk2077")
+            throw new IOException("Refaça a comparação antes de remover mods extras.");
+        new FixedInstaller(installedCatalog,session.Destination,installedFixture)
+            .ApplySyncCleanup(session.SyncCleanup,preview,installed.Files.Select(file=>file.Path),message=>session.Stage=message);
+        session.SyncCleanup=null;
     }
 
     bool AllowsLocalReuse(P2PSession session){
@@ -192,7 +231,7 @@ internal sealed partial class P2PService {
         return choice!=null&&!choice.Full;
     }
 
-    internal async Task ChooseIncoming(P2PSession session,bool full) {
+    internal async Task ChooseIncoming(P2PSession session,bool full,Func<P2PSyncComparison,int[]> reviewExtras=null) {
         lock(session){
             if(session.SyncMode!=0||session.Sender||session.Completed||session.Discarded||!session.CompareBeforePack||HasSyncChoice(session))return;
             session.SyncMode=full?2:1;
@@ -206,7 +245,12 @@ internal sealed partial class P2PService {
                 if(disposed||session.Discarded)return;
                 var comparison=CompareIncoming(session,report:(done,total,item)=>
                     session.SyncProgress=new P2PSyncProgress{Done=done,Total=total,Item=item},full:full);
-                if(!disposed&&!session.Discarded)SubmitSyncChoice(comparison,full);
+                int[] selected=new int[0];
+                if(!full&&reviewExtras!=null&&(comparison.Extras.Length>0||comparison.HostOutsideDifferences.Length>0)){
+                    selected=reviewExtras(comparison);
+                    if(selected==null)return;
+                }
+                if(!disposed&&!session.Discarded)SubmitSyncChoice(comparison,full,selected);
             }).ConfigureAwait(false);
         }catch(Exception ex){
             if(!disposed&&!session.Discarded){
@@ -216,7 +260,7 @@ internal sealed partial class P2PService {
         }finally{session.SyncProgress=null;session.SyncMode=0;}
     }
 
-    internal void SubmitSyncChoice(P2PSyncComparison comparison,bool full) {
+    internal void SubmitSyncChoice(P2PSyncComparison comparison,bool full,int[] selected=null) {
         var session=comparison.Session;
         lock(session){
             if(!SnapshotSessions().Contains(session)||session.Sender||session.Completed||session.Discarded||HasSyncChoice(session))
@@ -224,6 +268,14 @@ internal sealed partial class P2PService {
             string hash;
             ReadSyncPreview(session,Engine.Device,out hash);
             if(hash!=comparison.PreviewHash||!String.Equals(session.Destination,comparison.Destination,StringComparison.OrdinalIgnoreCase))throw new IOException("A lista do anfitrião mudou. Confira os mods novamente.");
+            selected=selected??new int[0];
+            if((full&&selected.Length!=0)||selected.Distinct().Count()!=selected.Length||selected.Any(index=>index<0||index>=comparison.Extras.Length))
+                throw new IOException("A seleção de mods extras é inválida.");
+            var cleanup=selected.SelectMany(index=>comparison.Extras[index].Files).ToList();
+            session.SyncCleanup=cleanup.Count==0?null:cleanup;
+            session.SyncLocalExtrasKept=comparison.Extras.Length-selected.Length;
+            session.SyncHostFilesDifferent=comparison.HostOutsideDifferences.Length;
+            Save();
             var choice=new SyncChoice{PreviewHash=hash,Full=full,Required=full?new string[0]:comparison.Required};
             WriteSyncMessage(session,Engine.Device,ChoicePath(session,Engine.Device),ChoiceName,choice);
             ScanSyncFolder(ReceiptFolderId(session,Engine.Device));

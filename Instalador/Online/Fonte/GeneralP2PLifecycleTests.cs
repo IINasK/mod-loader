@@ -135,6 +135,7 @@ internal static class GeneralP2PLifecycleTests {
         var checks=new List<string>();
         try{
             Sync(root,helper,checks);
+            CyberpunkSync(root,helper,checks);
             Safe.WriteJson(Path.Combine(root,"resultado-p2p-sync.json"),new{Passed=true,Tests=checks});
         }catch(Exception ex){
             Safe.WriteJson(Path.Combine(root,"resultado-p2p-sync.json"),new{Passed=false,Tests=checks,Error=ex.ToString()});
@@ -194,6 +195,72 @@ internal static class GeneralP2PLifecycleTests {
         }
     }
 
+    static void CyberpunkSync(string root,string helper,List<string> checks){
+        FixedAsset unused;
+        var catalog=OnlineTests.MakeCatalog(root,out unused);
+        string source=OnlineTests.Fixture(root,"game-host"),target=OnlineTests.Fixture(root,"game-friend");
+        string data=Safe.In(root,"cp-data");
+        var mods=GeneralModLibrary.Seed(catalog,new ModImportItem[0]);
+        var state=new GeneralModState{Destination=source,List=mods};
+        foreach(var file in catalog.Packages.SelectMany(mod=>mod.Files)){
+            WriteSyncFile(source,file.Path,"test "+file.Path);
+            WriteSyncFile(target,file.Path,"test "+file.Path);
+        }
+        string stale=catalog.Packages[1].Files[0].Path;
+        WriteSyncFile(target,stale,"old version");
+        const string outside="r6/scripts/Outside/one.reds",remove="archive/pc/mod/remove.archive",
+            sidecar="archive/pc/mod/remove.archive.xl",keep="r6/tweaks/keep.yaml",baseFile="red4ext/plugins/NightCoop/preference.ini";
+        WriteSyncFile(source,outside,"host-only version");
+        WriteSyncFile(target,outside,"local version");
+        const string empty="red4ext/plugins/stale-folder",sharedEmpty="red4ext/plugins/shared-empty",bundle="red4ext/plugins/stale-plugin";
+        foreach(string path in new[]{remove,sidecar,keep,baseFile,bundle+"/mod.dll"})WriteSyncFile(target,path,path);
+        Directory.CreateDirectory(Safe.In(target,empty));
+        Directory.CreateDirectory(Safe.In(source,sharedEmpty));
+        Directory.CreateDirectory(Safe.In(target,sharedEmpty));
+        using(var host=Service(root,"cp-host",Safe.In(root,"cp-source"),helper,catalog:catalog))
+        using(var friend=Service(root,"cp-friend",data,helper,catalog:catalog)){
+            host.SetPreparationState(state);
+            friend.ChooseVersion=_=>true;
+            var sent=host.BeginDeferred(state,new[]{"Extra"},true,compareBeforePack:true);
+            var received=friend.Accept(host.Invitation(sent),target,true);
+            ConnectTo(friend,host);
+            Wait(()=>friend.HasSyncPreview(received),"Cyberpunk inventory did not reach the receiver. "+sent.Error);
+            bool shown=false;
+            friend.ChooseIncoming(received,false,review=>{
+                shown=true;
+                Check(checks,review.Different.Contains("Mod de teste")&&review.HostOutsideDifferences.SequenceEqual(new[]{outside}),
+                    "Comparison identifies an older package file and an actual host file outside the preset.");
+                Check(checks,review.Extras.Length==4&&review.Extras.Single(extra=>extra.Name=="remove").Files.Length==2&&
+                    review.Extras.Single(extra=>extra.Name=="stale-folder").Files.Single().Before==null,
+                    "Archive sidecars are grouped. Receiver-only empty folders are listed and host files and protected base stay out.");
+                return null;
+            }).GetAwaiter().GetResult();
+            Check(checks,shown&&!friend.HasSyncChoice(received)&&File.Exists(Safe.In(target,remove))&&sent.PayloadHash==null,
+                "Closing the review makes no changes and sends no choice.");
+            friend.ChooseIncoming(received,false,review=>Enumerable.Range(0,review.Extras.Length)
+                .Where(index=>review.Extras[index].Name!="keep").ToArray()).GetAwaiter().GetResult();
+            Wait(()=> {
+                if(received.Error!=null||sent.Error!=null)throw new IOException("Cyberpunk sync: "+received.Error+" "+sent.Error);
+                return received.Completed&&sent.Completed;
+            },"Selected Cyberpunk sync did not finish.");
+            Check(checks,!Directory.Exists(Safe.In(target,empty))&&!Directory.Exists(Safe.In(target,bundle))&&Directory.Exists(Safe.In(target,sharedEmpty)),
+                "Selected empty folders and shells from selected mods disappear while shared folders remain.");
+            Check(checks,!File.Exists(Safe.In(target,remove))&&!File.Exists(Safe.In(target,sidecar))&&File.Exists(Safe.In(target,keep))&&File.Exists(Safe.In(target,baseFile))&&
+                File.ReadAllText(Safe.In(target,outside))=="local version"&&File.ReadAllText(Safe.In(target,stale))=="test "+stale,
+                "Only checked extras are moved. Existing host files and unchecked mods stay while the approved version is updated.");
+            Check(checks,received.SyncLocalExtrasKept==1&&received.SyncHostFilesDifferent==1,"Known differences remain visible after installation.");
+            new FixedInstaller(catalog,target,true).Undo(_=>{});
+            Check(checks,File.Exists(Safe.In(target,remove))&&File.Exists(Safe.In(target,sidecar))&&
+                Directory.Exists(Safe.In(target,empty))&&File.Exists(Safe.In(target,bundle+"/mod.dll")),"The removal journal restores files and empty folders.");
+        }
+    }
+
+    static void WriteSyncFile(string root,string path,string content){
+        string target=Safe.In(root,path);
+        Directory.CreateDirectory(Path.GetDirectoryName(target));
+        File.WriteAllText(target,content);
+    }
+
     static void Rollback(string root,List<string> checks){
         var source=Source(root,"rollback","rollback.txt","incoming");
         string target=Target(root,"rollback-target"),data=Path.Combine(root,"rollback-data"),zip=Path.Combine(root,"rollback-snapshot.zip");
@@ -238,9 +305,9 @@ internal static class GeneralP2PLifecycleTests {
         return path;
     }
 
-    static P2PService Service(string root,string name,string data,string helper,bool start=true){
+    static P2PService Service(string root,string name,string data,string helper,bool start=true,FixedCatalog catalog=null){
         var service=new P2PService(Path.Combine(root,name),Path.Combine(root,name+"-files"),true,true);
-        service.EnableInstalledReceive(Catalog,data,true);
+        service.EnableInstalledReceive(catalog??Catalog,data,true);
         if(start)service.Start(_=>{},helper);
         return service;
     }

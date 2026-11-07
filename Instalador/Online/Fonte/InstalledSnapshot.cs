@@ -12,6 +12,7 @@ public sealed class InstalledSnapshotManifest {
     public string Name,Game,GameFileVersion;
     public GeneralModList List=new GeneralModList();
     public GeneralModList Project;
+    public Dictionary<string,string> SyncGameInventory;
     public List<InstalledSnapshotFile> Files=new List<InstalledSnapshotFile>();
 }
 public sealed class InstalledSnapshotFile {
