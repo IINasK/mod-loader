@@ -20,7 +20,7 @@ internal sealed partial class GeneralModWindow {
         var real=FixedData.Load();
         var realSeed=GeneralModLibrary.Seed(real,new ModImportItem[0]);
         var nca=realSeed.Mods.Single(m=>m.Id==NightCityDensity.ModId);
-        check(realSeed.Mods.Count==141&&nca.DefaultVariant=="low"&&nca.Variants.Count==3,"Catálogo preservado com três densidades e Baixa principal.");
+        check(realSeed.Mods.Count==153&&nca.DefaultVariant=="low"&&nca.Variants.Count==3,"Catálogo preservado com três densidades e Baixa principal.");
         string local=TestZip(root,"custom.zip","CETExample/init.lua","return {}");
         var imported=NewEntry("Nome original",local);
         imported.Name="Personalizado renomeado";imported.Category="Minha categoria";

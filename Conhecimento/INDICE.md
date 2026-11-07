@@ -1,13 +1,27 @@
 # Conhecimento dos mods
 
-Indice interno de138componentes ativos do instalador. Revisao de06/11/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
+Índice interno de componentes do instalador. Revisão de 07/11/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
 
 ## Perfis Phantom Liberty
 
-- Com Phantom Liberty:138registros,135visiveis; três componentes continuam retidos.
-- Sem Phantom Liberty:126registros elegiveis,123visiveis. Ver a classificação atual emmods.json. Night City FPV foi retirado de todos os pacotes em1.1.3.
+- Com Phantom Liberty, 156 registros e 153 visíveis. Três componentes continuam retidos.
+- Sem Phantom Liberty, 144 registros elegíveis e 141 visíveis. Ver a classificação atual emmods.json. Night City FPV foi retirado de todos os pacotes em1.1.3.
 - A base NightCoop nao exige DLC segundo aFAQoficial; o anfitriao pode reiniciar sem a expansao pelo fluxo oferecido pelo proprio mod. Nao apagar arquivos de expansao nem converter saves automaticamente.
 - Esta separacao e documental/estatica. Nao foi executado um jogo semDLC para validar aparencia, gameplay ou rede. Confirmacoescoop anteriores do usuario continuam atribuidas a ele.
+
+## Virtual Atelier · tênis, relógios e NetWatch
+
+| Mod | Loja | Situação |
+| --- | --- | --- |
+| [Adidas 4DFWD Pulse Shoes](Mods/mod-30321.md) | [V49 Footwear Atelier](Mods/mod-27357.md) | Incluído |
+| [Nike Air Mag · Back to the Future](Mods/mod-30910.md) | [V49 Footwear Atelier](Mods/mod-27357.md) | Incluído |
+| [Nike Air Jordan Shoes](Mods/mod-30769.md) | [V49 Footwear Atelier](Mods/mod-27357.md) | Incluído |
+| [Nike Air Jordan 4 Shoes](Mods/mod-29643.md) | [V49 Footwear Atelier](Mods/mod-27357.md) | Incluído |
+| [Nike Air Max Shoes](Mods/mod-30120.md) | [V49 Footwear Atelier](Mods/mod-27357.md) | Incluído |
+| [Nike Jordan 1 × Off-White Euro](Mods/mod-27597.md) | [Catherwood’s Virtual Atelier Shop](Mods/mod-27599.md) | Incluído |
+| [Maneo Retro Wrist Watch (FemV)](Mods/mod-22565.md) | [Yusei’s Virtual Atelier](Mods/mod-16645.md) | Incluído |
+| [NetWatch Cyberware and Accessories](Mods/mod-37005.md) | [MRTH Atelier · NetWatch Collection](Mods/mod-37000.md) | Incluído |
+| [OneSlowZZ · MMM Watchya Saaay](Mods/mod-8594.md) | [OneSlowZZ Virtual Store](Mods/mod-8572.md) | Pendente |
 
 ## Consulta
 

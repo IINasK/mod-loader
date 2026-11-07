@@ -10,7 +10,7 @@ internal static class OnlineRemovedPackageTests {
         string root=Path.Combine(parent,"retirada-pacote-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
         var checks=new List<string>();Action<bool,string> check=(ok,message)=>{if(!ok)throw new IOException(message);checks.Add(message);};
         var catalog=FixedData.Load();
-        check(catalog.Packages.Count==144&&!catalog.Packages.Any(mod=>mod.Id==RetiredPackEntries.DroneId),"Receita retirada; demais144componentes permanecem.");
+        check(catalog.Packages.Count==156&&!catalog.Packages.Any(mod=>mod.Id==RetiredPackEntries.DroneId),"Receita retirada; demais156 componentes permanecem.");
         check(!catalog.Packages.Any(mod=>mod.Id=="mod-12572")&&catalog.Packages.Single(mod=>mod.Id=="mod-34403").Dependencies.SequenceEqual(new[]{"CET"}),"Stockings collection retired and reporter uses the existing CET without replacing the base.");
         check(!catalog.Packages.Any(m=>m.Id==RetiredPackEntries.RadioId)&&!catalog.Packages.SelectMany(m=>m.Dependencies).Contains(RetiredPackEntries.RadioId),"Spot On Radio retirado sem dependencias pendentes.");
         var radioList=new GeneralModList{Mods=new List<GeneralModEntry>{Entry(RetiredPackEntries.RadioId,"https://www.nexusmods.com/cyberpunk2077/mods/34305"),Entry("mapped-radio","https://www.nexusmods.com/cyberpunk2077/mods/34305",RetiredPackEntries.RadioId),Entry("custom-radio","https://www.nexusmods.com/cyberpunk2077/mods/34305")}};

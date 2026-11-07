@@ -1,17 +1,17 @@
 {
   "Schema": 1,
-  "CheckedOn": "2026-11-06",
+  "CheckedOn": "2026-11-07",
   "CatalogId": "cp25-fixed-20261028",
-  "BaselineCatalogSha256": "c6a0b3a6170e10c8d707c4d25361d30be7382bccb9a25dd8a50d27c956e2e6a2",
-  "Count": 144,
+  "BaselineCatalogSha256": "ad2d3b823c0cf872b481a2b18d0d9abca52403f57b0ce87d552cc65781ea2a32",
+  "Count": 156,
   "Profiles": {
     "WithPL": {
-      "Total": 144,
-      "Visible": 141
+      "Total": 156,
+      "Visible": 153
     },
     "WithoutPL": {
-      "Total": 132,
-      "Visible": 129
+      "Total": 144,
+      "Visible": 141
     },
     "Required": [
       "19-ThirdPerson",
@@ -20790,6 +20790,886 @@
         ],
         "Notes": "Sem exigência explícita de expansão; runtime sem DLC não testado."
       }
+    },
+    {
+      "Id": "mod-30321",
+      "Name": "Adidas 4DFWD Pulse Shoes",
+      "FixedVersion": "1.0",
+      "GameVersion": "2.5",
+      "Category": "Roupas para ambas",
+      "Function": "Tênis Adidas 4DFWD Pulse com dez cores. O ZIP usa variantes dinâmicas do ArchiveXL.",
+      "HowToUse": [
+        "Abra Atelier no computador do apartamento e entre na loja V49 Footwear Atelier. A loja é necessária para comprar os itens pelo Atelier."
+      ],
+      "Dependencies": [
+        "NightCoop",
+        "ArchiveXL",
+        "TweakXL",
+        "CET",
+        "redscript",
+        "mod-6945",
+        "mod-27357"
+      ],
+      "GenderAndBody": "V feminina e V masculina com corpo padrão. Pés ou corpos personalizados podem exigir outro ajuste. Nenhum refit de corpo foi confirmado.",
+      "KnownConflictsAndLimits": [
+        "Ambas as Vs com corpo padrão. Pés personalizados podem alterar o encaixe."
+      ],
+      "PhantomLiberty": {
+        "Status": "not-required",
+        "Required": false,
+        "Evidence": "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado.",
+        "Sources": [
+          "https://www.nexusmods.com/cyberpunk2077/mods/30321",
+          "https://www.nexusmods.com/cyberpunk2077/mods/30321?tab=files&file_id=147861",
+          "https://www.nexusmods.com/cyberpunk2077/mods/27357"
+        ],
+        "RuntimeWithoutDLCValidated": false,
+        "WithoutDLCProfileEligible": true
+      },
+      "Blocked": false,
+      "CoopEvidence": "Não testado em coop nesta auditoria.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Adidas 4dfwd Pulse Shoes-30321-1-0-1780838447.zip",
+          "ModId": 30321,
+          "FileId": 147861,
+          "Size": 96044221,
+          "Sha256": "a25f6d073aab891f15790d0e751c0f9512627e7af9957e9ba33da2c4d25a94bc",
+          "OfficialUrl": "https://www.nexusmods.com/cyberpunk2077/mods/30321?tab=files&file_id=147861"
+        }
+      ],
+      "Files": [
+        {
+          "RelativeInstallPath": "archive/pc/mod/bs_adidas_4dfwd_pulse_shoes.archive",
+          "Size": 98123776,
+          "Sha256": "e336c3130187d61226b1ca0f9361a54baf4d5c9488e0b85f31cf7d54ec5226dd"
+        },
+        {
+          "RelativeInstallPath": "archive/pc/mod/bs_adidas_4dfwd_pulse_shoes_dynamic_variants.archive.xl",
+          "Size": 265,
+          "Sha256": "32e3309dfec5219c6676d6679d30d6e46392df539bd4dce54a1998352038e6bb"
+        },
+        {
+          "RelativeInstallPath": "r6/tweaks/tutorial_my_custom_shirt_dynamic_variants/bs_adidas_4dfwd_pulse_shoes_dynamic_variants.yaml",
+          "Size": 1165,
+          "Sha256": "525ccfbe7d0c61996f44d8a5ce02a704e8e500dbe3c736c831f11c2747d3aa09"
+        }
+      ],
+      "Sources": [
+        "https://www.nexusmods.com/cyberpunk2077/mods/30321",
+        "https://www.nexusmods.com/cyberpunk2077/mods/30321?tab=files&file_id=147861",
+        "https://www.nexusmods.com/cyberpunk2077/mods/27357"
+      ],
+      "CheckedOn": "2026-11-07",
+      "EvidenceGroup": "Virtual Atelier",
+      "Limitations": [
+        "O script oficial da loja registra os 10 códigos de item definidos no pacote.",
+        "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado."
+      ]
+    },
+    {
+      "Id": "mod-30910",
+      "Name": "Nike Air Mag · Back to the Future",
+      "FixedVersion": "1.2",
+      "GameVersion": "2.5",
+      "Category": "Roupas para ambas",
+      "Function": "Tênis de De Volta para o Futuro com cinco estilos, incluindo quatro alternativas ao original.",
+      "HowToUse": [
+        "Abra Atelier no computador do apartamento e entre na loja V49 Footwear Atelier. A loja é necessária para comprar os itens pelo Atelier."
+      ],
+      "Dependencies": [
+        "NightCoop",
+        "ArchiveXL",
+        "TweakXL",
+        "CET",
+        "redscript",
+        "mod-6945",
+        "mod-27357"
+      ],
+      "GenderAndBody": "V feminina e V masculina com corpo padrão. Pés ou corpos personalizados podem exigir outro ajuste. Nenhum refit de corpo foi confirmado.",
+      "KnownConflictsAndLimits": [
+        "Ambas as Vs com corpo padrão. Pés personalizados podem alterar o encaixe."
+      ],
+      "PhantomLiberty": {
+        "Status": "not-required",
+        "Required": false,
+        "Evidence": "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado.",
+        "Sources": [
+          "https://www.nexusmods.com/cyberpunk2077/mods/30910",
+          "https://www.nexusmods.com/cyberpunk2077/mods/30910?tab=files&file_id=150420",
+          "https://www.nexusmods.com/cyberpunk2077/mods/27357"
+        ],
+        "RuntimeWithoutDLCValidated": false,
+        "WithoutDLCProfileEligible": true
+      },
+      "Blocked": false,
+      "CoopEvidence": "Não testado em coop nesta auditoria.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Nike Air Mag 30910 1.2 2026-06-30T11-14Z 9ka2ky4zn.zip",
+          "ModId": 30910,
+          "FileId": 150420,
+          "Size": 22410978,
+          "Sha256": "31336bca96d101985bc5d3f3054e1b735faa997d5e66341e06ec4f9caf057626",
+          "OfficialUrl": "https://www.nexusmods.com/cyberpunk2077/mods/30910?tab=files&file_id=150420"
+        }
+      ],
+      "Files": [
+        {
+          "RelativeInstallPath": "archive/pc/mod/bs_nike_air_mag.archive",
+          "Size": 22757376,
+          "Sha256": "990a3af7b6842b28ee4bb53980b38f705f47000ed5edbc62e5f7e0915d16ccb8"
+        },
+        {
+          "RelativeInstallPath": "archive/pc/mod/bs_nike_air_mag.archive.xl",
+          "Size": 241,
+          "Sha256": "0fea220157004d8d2b11e1d4e93650f472178d7031ceb932e1c51b001529b8f7"
+        },
+        {
+          "RelativeInstallPath": "r6/tweaks/tutorial_my_custom_shirt_dynamic_variants/bs_nike_air_mag.yaml",
+          "Size": 1273,
+          "Sha256": "0fdab7f9f02aff4b51bb6e20a317885c4ef8c270c6d097b64c117c37519ea857"
+        }
+      ],
+      "Sources": [
+        "https://www.nexusmods.com/cyberpunk2077/mods/30910",
+        "https://www.nexusmods.com/cyberpunk2077/mods/30910?tab=files&file_id=150420",
+        "https://www.nexusmods.com/cyberpunk2077/mods/27357"
+      ],
+      "CheckedOn": "2026-11-07",
+      "EvidenceGroup": "Virtual Atelier",
+      "Limitations": [
+        "O script oficial da loja registra os 5 códigos de item definidos no pacote.",
+        "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado."
+      ]
+    },
+    {
+      "Id": "mod-30769",
+      "Name": "Nike Air Jordan Shoes",
+      "FixedVersion": "1.0",
+      "GameVersion": "2.5",
+      "Category": "Roupas para ambas",
+      "Function": "Tênis Air Jordan com dez combinações de cores, incluindo Chicago e University Blue.",
+      "HowToUse": [
+        "Abra Atelier no computador do apartamento e entre na loja V49 Footwear Atelier. A loja é necessária para comprar os itens pelo Atelier."
+      ],
+      "Dependencies": [
+        "NightCoop",
+        "ArchiveXL",
+        "TweakXL",
+        "CET",
+        "redscript",
+        "mod-6945",
+        "mod-27357"
+      ],
+      "GenderAndBody": "V feminina e V masculina com corpo padrão. Pés ou corpos personalizados podem exigir outro ajuste. Nenhum refit de corpo foi confirmado.",
+      "KnownConflictsAndLimits": [
+        "Ambas as Vs com corpo padrão. Pés personalizados podem alterar o encaixe."
+      ],
+      "PhantomLiberty": {
+        "Status": "not-required",
+        "Required": false,
+        "Evidence": "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado.",
+        "Sources": [
+          "https://www.nexusmods.com/cyberpunk2077/mods/30769",
+          "https://www.nexusmods.com/cyberpunk2077/mods/30769?tab=files&file_id=149559",
+          "https://www.nexusmods.com/cyberpunk2077/mods/27357"
+        ],
+        "RuntimeWithoutDLCValidated": false,
+        "WithoutDLCProfileEligible": true
+      },
+      "Blocked": false,
+      "CoopEvidence": "Não testado em coop nesta auditoria.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Bs Nike Air Jordan 30769 1.0 2026-06-23T14-07Z G5yE5CJCV.zip",
+          "ModId": 30769,
+          "FileId": 149559,
+          "Size": 52517268,
+          "Sha256": "8014d85a7172be38efdb02b223e4fa31800592d50c73562f7d30506b9f42ff0d",
+          "OfficialUrl": "https://www.nexusmods.com/cyberpunk2077/mods/30769?tab=files&file_id=149559"
+        }
+      ],
+      "Files": [
+        {
+          "RelativeInstallPath": "archive/pc/mod/bs_nike_air_jordan.archive",
+          "Size": 53272576,
+          "Sha256": "d5c2f28233fc726b079059de51b9ef6d65e002f004a4ac6cb81d2bc8692fd8e4"
+        },
+        {
+          "RelativeInstallPath": "archive/pc/mod/bs_nike_air_jordan.archive.xl",
+          "Size": 247,
+          "Sha256": "c7a8097d457bc4d764ed6deefaa02fa40ffa0d3b3ab82df7115dfdd8e7d372af"
+        },
+        {
+          "RelativeInstallPath": "r6/tweaks/tutorial_my_custom_shirt_dynamic_variants/bs_nike_air_jordan.yaml",
+          "Size": 1686,
+          "Sha256": "11bd8bb8a795d949bc065737326e0bc54bff9aa0cd631d06add558b9d9f1cb36"
+        }
+      ],
+      "Sources": [
+        "https://www.nexusmods.com/cyberpunk2077/mods/30769",
+        "https://www.nexusmods.com/cyberpunk2077/mods/30769?tab=files&file_id=149559",
+        "https://www.nexusmods.com/cyberpunk2077/mods/27357"
+      ],
+      "CheckedOn": "2026-11-07",
+      "EvidenceGroup": "Virtual Atelier",
+      "Limitations": [
+        "O script oficial da loja registra os 10 códigos de item definidos no pacote.",
+        "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado."
+      ]
+    },
+    {
+      "Id": "mod-29643",
+      "Name": "Nike Air Jordan 4 Shoes",
+      "FixedVersion": "1.2",
+      "GameVersion": "2.5",
+      "Category": "Roupas para ambas",
+      "Function": "Tênis Air Jordan 4. O TweakXL escolhe a aparência pelo gênero de V.",
+      "HowToUse": [
+        "Abra Atelier no computador do apartamento e entre na loja V49 Footwear Atelier. A loja é necessária para comprar os itens pelo Atelier."
+      ],
+      "Dependencies": [
+        "NightCoop",
+        "ArchiveXL",
+        "TweakXL",
+        "CET",
+        "redscript",
+        "mod-6945",
+        "mod-27357"
+      ],
+      "GenderAndBody": "V feminina e V masculina com corpo padrão. Pés ou corpos personalizados podem exigir outro ajuste. Nenhum refit de corpo foi confirmado.",
+      "KnownConflictsAndLimits": [
+        "Ambas as Vs com corpo padrão. Pés personalizados podem alterar o encaixe."
+      ],
+      "PhantomLiberty": {
+        "Status": "not-required",
+        "Required": false,
+        "Evidence": "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado.",
+        "Sources": [
+          "https://www.nexusmods.com/cyberpunk2077/mods/29643",
+          "https://www.nexusmods.com/cyberpunk2077/mods/29643?tab=files&file_id=147855",
+          "https://www.nexusmods.com/cyberpunk2077/mods/27357"
+        ],
+        "RuntimeWithoutDLCValidated": false,
+        "WithoutDLCProfileEligible": true
+      },
+      "Blocked": false,
+      "CoopEvidence": "Não testado em coop nesta auditoria.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Nike Air Jordan 4 Shoes-29643-1-2-1780832660.zip",
+          "ModId": 29643,
+          "FileId": 147855,
+          "Size": 23948744,
+          "Sha256": "0f929d213673288784c54f3d9fa5a32a30033fce749617927e43ef86949a1042",
+          "OfficialUrl": "https://www.nexusmods.com/cyberpunk2077/mods/29643?tab=files&file_id=147855"
+        }
+      ],
+      "Files": [
+        {
+          "RelativeInstallPath": "r6/tweaks/nike_air_jordan_4.yaml",
+          "Size": 9088,
+          "Sha256": "41b4cb53f13f3079253d748924e7ef69529aaf8c1bc7c3dba1d1dfe16143fb98"
+        },
+        {
+          "RelativeInstallPath": "archive/pc/mod/nike_air_jordan_4.archive.xl",
+          "Size": 203,
+          "Sha256": "342ccea08c37537cd402f50ca2c471ad53621fe56c86f3621aa041cb3472da09"
+        },
+        {
+          "RelativeInstallPath": "archive/pc/mod/nike_air_jordan_4_shoes.archive",
+          "Size": 24530944,
+          "Sha256": "00714e538aad723bf227a6896873a2cf71133c7e9e63fe4b1605c37ae8d5c693"
+        }
+      ],
+      "Sources": [
+        "https://www.nexusmods.com/cyberpunk2077/mods/29643",
+        "https://www.nexusmods.com/cyberpunk2077/mods/29643?tab=files&file_id=147855",
+        "https://www.nexusmods.com/cyberpunk2077/mods/27357"
+      ],
+      "CheckedOn": "2026-11-07",
+      "EvidenceGroup": "Virtual Atelier",
+      "Limitations": [
+        "O script oficial da loja registra os 17 códigos de item definidos no pacote.",
+        "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado."
+      ]
+    },
+    {
+      "Id": "mod-30120",
+      "Name": "Nike Air Max Shoes",
+      "FixedVersion": "1.1",
+      "GameVersion": "2.5",
+      "Category": "Roupas para ambas",
+      "Function": "Tênis Air Max. O TweakXL escolhe a aparência pelo gênero de V.",
+      "HowToUse": [
+        "Abra Atelier no computador do apartamento e entre na loja V49 Footwear Atelier. A loja é necessária para comprar os itens pelo Atelier."
+      ],
+      "Dependencies": [
+        "NightCoop",
+        "ArchiveXL",
+        "TweakXL",
+        "CET",
+        "redscript",
+        "mod-6945",
+        "mod-27357"
+      ],
+      "GenderAndBody": "V feminina e V masculina com corpo padrão. Pés ou corpos personalizados podem exigir outro ajuste. Nenhum refit de corpo foi confirmado.",
+      "KnownConflictsAndLimits": [
+        "Ambas as Vs com corpo padrão. Pés personalizados podem alterar o encaixe."
+      ],
+      "PhantomLiberty": {
+        "Status": "not-required",
+        "Required": false,
+        "Evidence": "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado.",
+        "Sources": [
+          "https://www.nexusmods.com/cyberpunk2077/mods/30120",
+          "https://www.nexusmods.com/cyberpunk2077/mods/30120?tab=files&file_id=147850",
+          "https://www.nexusmods.com/cyberpunk2077/mods/27357"
+        ],
+        "RuntimeWithoutDLCValidated": false,
+        "WithoutDLCProfileEligible": true
+      },
+      "Blocked": false,
+      "CoopEvidence": "Não testado em coop nesta auditoria.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Nike Air Max Shoes-30120-1-1-1780832398.zip",
+          "ModId": 30120,
+          "FileId": 147850,
+          "Size": 33550987,
+          "Sha256": "759c616cee21f6bd4c3d4981c3810710893b01d41e035788f7307bdd1748e574",
+          "OfficialUrl": "https://www.nexusmods.com/cyberpunk2077/mods/30120?tab=files&file_id=147850"
+        }
+      ],
+      "Files": [
+        {
+          "RelativeInstallPath": "r6/tweaks/nike_air_max.yaml",
+          "Size": 6165,
+          "Sha256": "a77528da77d06a805f4aeae7791704cdabd6050984283b5d44b83cc1f43655a2"
+        },
+        {
+          "RelativeInstallPath": "archive/pc/mod/nike_airmax.archive",
+          "Size": 33845248,
+          "Sha256": "05f5bd7fc4760bcef88d5ec2c219ad71efe2f96acf1e0b414de45d09e05159d9"
+        },
+        {
+          "RelativeInstallPath": "archive/pc/mod/nike_air_max.archive.xl",
+          "Size": 193,
+          "Sha256": "d40c4b68754446cf72d7ed3bdacbc5c6382c7e87489e67de7b5b2f9a9f3751f0"
+        }
+      ],
+      "Sources": [
+        "https://www.nexusmods.com/cyberpunk2077/mods/30120",
+        "https://www.nexusmods.com/cyberpunk2077/mods/30120?tab=files&file_id=147850",
+        "https://www.nexusmods.com/cyberpunk2077/mods/27357"
+      ],
+      "CheckedOn": "2026-11-07",
+      "EvidenceGroup": "Virtual Atelier",
+      "Limitations": [
+        "O script oficial da loja registra os 11 códigos de item definidos no pacote.",
+        "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado."
+      ]
+    },
+    {
+      "Id": "mod-27597",
+      "Name": "Nike Jordan 1 × Off-White Euro",
+      "FixedVersion": "1.12.0",
+      "GameVersion": "2.5",
+      "Category": "Roupas para ambas",
+      "Function": "Tênis Jordan 1 Off-White Euro com suporte para ambas as Vs no mesmo arquivo. O autor relata clipping leve na sola.",
+      "HowToUse": [
+        "Abra Atelier no computador do apartamento e entre na loja Catherwood’s Virtual Atelier Shop. A loja é necessária para comprar os itens pelo Atelier."
+      ],
+      "Dependencies": [
+        "NightCoop",
+        "ArchiveXL",
+        "TweakXL",
+        "CET",
+        "redscript",
+        "mod-6945",
+        "mod-27599"
+      ],
+      "GenderAndBody": "V feminina e V masculina com corpo padrão. Pés ou corpos personalizados podem exigir outro ajuste. Nenhum refit de corpo foi confirmado.",
+      "KnownConflictsAndLimits": [
+        "Ambas as Vs no mesmo ZIP. O autor relata clipping leve na sola."
+      ],
+      "PhantomLiberty": {
+        "Status": "not-required",
+        "Required": false,
+        "Evidence": "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado.",
+        "Sources": [
+          "https://www.nexusmods.com/cyberpunk2077/mods/27597",
+          "https://www.nexusmods.com/cyberpunk2077/mods/27597?tab=files&file_id=138495",
+          "https://www.nexusmods.com/cyberpunk2077/mods/27599"
+        ],
+        "RuntimeWithoutDLCValidated": false,
+        "WithoutDLCProfileEligible": true
+      },
+      "Blocked": false,
+      "CoopEvidence": "Não testado em coop nesta auditoria.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Nike x Off-White - Jordan 1 Euro-27597-1-12-0-1772669638.zip",
+          "ModId": 27597,
+          "FileId": 138495,
+          "Size": 22617223,
+          "Sha256": "1cf764a69ef1ab39489cb7220a12f3d9a83c05b6d2dce2b910f8adb5e2c06a37",
+          "OfficialUrl": "https://www.nexusmods.com/cyberpunk2077/mods/27597?tab=files&file_id=138495"
+        }
+      ],
+      "Files": [
+        {
+          "RelativeInstallPath": "r6/tweaks/drc_nike_airjordan_euro.yaml",
+          "Size": 530,
+          "Sha256": "93c437f7d8f91969c8d82189e980a1543b3925305cd91971b2a11839bf468266"
+        },
+        {
+          "RelativeInstallPath": "archive/pc/mod/DrCatherwood_Nike_AirJordan_Euro.archive",
+          "Size": 23121920,
+          "Sha256": "6907ba57234055a85256da365caa1d0b645799f13d687cc19fc8787820d75f57"
+        },
+        {
+          "RelativeInstallPath": "archive/pc/mod/drc_nike_airjordan_euro.archive.xl",
+          "Size": 197,
+          "Sha256": "63b523793bc1afe4250bac60ee5a3ff271be5feea4d7d51eaba19c8b6302fa6a"
+        }
+      ],
+      "Sources": [
+        "https://www.nexusmods.com/cyberpunk2077/mods/27597",
+        "https://www.nexusmods.com/cyberpunk2077/mods/27597?tab=files&file_id=138495",
+        "https://www.nexusmods.com/cyberpunk2077/mods/27599"
+      ],
+      "CheckedOn": "2026-11-07",
+      "EvidenceGroup": "Virtual Atelier",
+      "Limitations": [
+        "O script oficial da loja registra os 1 códigos de item definidos no pacote.",
+        "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado."
+      ]
+    },
+    {
+      "Id": "mod-22565",
+      "Name": "Maneo Retro Wrist Watch (FemV)",
+      "FixedVersion": "1.0",
+      "GameVersion": "2.5",
+      "Category": "Roupas femininas",
+      "Function": "Relógio de pulso esquerdo com quatro apresentações. O autor orienta instalar uma versão por vez. FemV e MascV compartilham os registros e não devem ser sobrepostas.",
+      "HowToUse": [
+        "Abra Atelier no computador do apartamento e entre na loja Yusei’s Virtual Atelier. A loja é necessária para comprar os itens pelo Atelier."
+      ],
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "CET",
+        "mod-6945",
+        "mod-16645"
+      ],
+      "GenderAndBody": "Downloads separados para V feminina e masculina com corpo padrão. Os dois ZIPs compartilham caminhos e registros. O catálogo fixa FemV para evitar sobreposição. Use o ZIP MascV somente depois de retirar o FemV.",
+      "KnownConflictsAndLimits": [
+        "Somente FemV. O ZIP MascV usa os mesmos caminhos e deve ser usado sozinho."
+      ],
+      "PhantomLiberty": {
+        "Status": "not-required",
+        "Required": false,
+        "Evidence": "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado.",
+        "Sources": [
+          "https://www.nexusmods.com/cyberpunk2077/mods/22565",
+          "https://www.nexusmods.com/cyberpunk2077/mods/22565?tab=files&file_id=113026",
+          "https://www.nexusmods.com/cyberpunk2077/mods/16645"
+        ],
+        "RuntimeWithoutDLCValidated": false,
+        "WithoutDLCProfileEligible": true
+      },
+      "Blocked": false,
+      "CoopEvidence": "Não testado em coop nesta auditoria.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Maneo Wrist Watch FemV-22565-1-0-1751754152.zip",
+          "ModId": 22565,
+          "FileId": 113026,
+          "Size": 21271586,
+          "Sha256": "6d7e05461621495e8238a55d5f44c91c499fabb2c00f56afe259ec1d68634ffe",
+          "OfficialUrl": "https://www.nexusmods.com/cyberpunk2077/mods/22565?tab=files&file_id=113026"
+        }
+      ],
+      "Files": [
+        {
+          "RelativeInstallPath": "archive/pc/mod/maneo_retro_wrist_watch.archive",
+          "Size": 22179840,
+          "Sha256": "d94fb16cfd6ff5b99d5ac96bbda888ed195700ea888dd76bc9a10003b2e9bf34"
+        },
+        {
+          "RelativeInstallPath": "archive/pc/mod/maneo_retro_wrist_watch.xl",
+          "Size": 245,
+          "Sha256": "936b02be139f80dc5ccd45591a71789cdf10d142ec473e2f31273aa24723a286"
+        },
+        {
+          "RelativeInstallPath": "r6/tweaks/maneo_retro_wrist_watch.yaml",
+          "Size": 2224,
+          "Sha256": "017119585d78fa4190360b37f15f7fb1cc5794b8cbca8909904d1348cd202e74"
+        }
+      ],
+      "Sources": [
+        "https://www.nexusmods.com/cyberpunk2077/mods/22565",
+        "https://www.nexusmods.com/cyberpunk2077/mods/22565?tab=files&file_id=113026",
+        "https://www.nexusmods.com/cyberpunk2077/mods/16645"
+      ],
+      "CheckedOn": "2026-11-07",
+      "EvidenceGroup": "Virtual Atelier",
+      "Limitations": [
+        "O script oficial da loja registra os 4 códigos de item definidos no pacote.",
+        "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado."
+      ]
+    },
+    {
+      "Id": "mod-37005",
+      "Name": "NetWatch Cyberware and Accessories",
+      "FixedVersion": "1.0",
+      "GameVersion": "2.5",
+      "Category": "Roupas para ambas",
+      "Function": "Conjunto de 67 itens NetWatch para cabeça, rosto e roupa. Inclui viseiras, implantes cosméticos, cartões e distintivos sem substituir itens originais.",
+      "HowToUse": [
+        "Abra Atelier no computador do apartamento e entre na loja MRTH Atelier · NetWatch Collection. A loja é necessária para comprar os itens pelo Atelier."
+      ],
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "mod-6945",
+        "mod-37000"
+      ],
+      "GenderAndBody": "Peças de cabeça para ambas as Vs e independentes do corpo segundo o autor. Cartões e distintivos ajustados para corpos padrão e Angel. Outros corpos usam o ajuste padrão, com chance de flutuar ou atravessar roupas. Viseiras podem atravessar cabelos volumosos.",
+      "KnownConflictsAndLimits": [
+        "Cartões e distintivos ajustados para corpos padrão e Angel. Outros corpos ou cabelos volumosos podem causar clipping."
+      ],
+      "PhantomLiberty": {
+        "Status": "not-required",
+        "Required": false,
+        "Evidence": "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado.",
+        "Sources": [
+          "https://www.nexusmods.com/cyberpunk2077/mods/37005",
+          "https://www.nexusmods.com/cyberpunk2077/mods/37005?tab=files&file_id=172620",
+          "https://www.nexusmods.com/cyberpunk2077/mods/37000"
+        ],
+        "RuntimeWithoutDLCValidated": false,
+        "WithoutDLCProfileEligible": true
+      },
+      "Blocked": false,
+      "CoopEvidence": "Não testado em coop nesta auditoria.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "MRTH NetWatch Cyberware V1.0 37005 1 2026-11-02T14-49Z HncQn2YLt.zip",
+          "ModId": 37005,
+          "FileId": 172620,
+          "Size": 13326464,
+          "Sha256": "e297aad3c2942e1eef95101cc83b0cd8794f68a0d18235e9cb79efd3616d7240",
+          "OfficialUrl": "https://www.nexusmods.com/cyberpunk2077/mods/37005?tab=files&file_id=172620"
+        }
+      ],
+      "Files": [
+        {
+          "RelativeInstallPath": "archive/pc/mod/netwatch_cyberware.archive.xl",
+          "Size": 345,
+          "Sha256": "1873194392c15ceb1962d6519f3082f9773302cf55fd02a09132431380289106"
+        },
+        {
+          "RelativeInstallPath": "archive/pc/mod/netwatch_cyberware.archive",
+          "Size": 13467648,
+          "Sha256": "2494b877c8dae6329f881d3d8c6af0cdd31ac52f3eff30d667bb9ac153dca63a"
+        },
+        {
+          "RelativeInstallPath": "r6/tweaks/netwatch_cyberware.yaml",
+          "Size": 32033,
+          "Sha256": "f4e30a709b75fa7ed39aad8888c793d06d350e0edde5ae40a49960b62a7f16a8"
+        }
+      ],
+      "Sources": [
+        "https://www.nexusmods.com/cyberpunk2077/mods/37005",
+        "https://www.nexusmods.com/cyberpunk2077/mods/37005?tab=files&file_id=172620",
+        "https://www.nexusmods.com/cyberpunk2077/mods/37000"
+      ],
+      "CheckedOn": "2026-11-07",
+      "EvidenceGroup": "Virtual Atelier",
+      "Limitations": [
+        "O script oficial da loja registra os 67 códigos de item definidos no pacote.",
+        "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado."
+      ]
+    },
+    {
+      "Id": "mod-27357",
+      "Name": "V49 Footwear Atelier",
+      "FixedVersion": "4.0.4",
+      "GameVersion": "2.5",
+      "Category": "Lojas",
+      "Function": "Loja dos cinco tênis BunnySays auditados.",
+      "HowToUse": [
+        "Abra Atelier no computador do apartamento após instalar as peças correspondentes."
+      ],
+      "Dependencies": [
+        "mod-2987",
+        "ArchiveXL",
+        "TweakXL",
+        "Codeware",
+        "mod-6945",
+        "NightCoop",
+        "redscript"
+      ],
+      "GenderAndBody": "O ajuste ao corpo é definido pelo pacote de cada peça.",
+      "KnownConflictsAndLimits": [
+        "Abra Atelier no computador do apartamento."
+      ],
+      "PhantomLiberty": {
+        "Status": "not-required",
+        "Required": false,
+        "Evidence": "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado.",
+        "Sources": [
+          "https://www.nexusmods.com/cyberpunk2077/mods/27357",
+          "https://www.nexusmods.com/cyberpunk2077/mods/27357?tab=files&file_id=165126"
+        ],
+        "RuntimeWithoutDLCValidated": false,
+        "WithoutDLCProfileEligible": true
+      },
+      "Blocked": false,
+      "CoopEvidence": "Não testado em coop nesta auditoria.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "v49_footwear_atelier 27357 4.0.4 2026-10-10T08-47Z YfTif71IZ.zip",
+          "ModId": 27357,
+          "FileId": 165126,
+          "Size": 54562,
+          "Sha256": "ee135496ecc900841a6d0aaaa50df19ae88f669f8b82fccf327faa5478016b5a",
+          "OfficialUrl": "https://www.nexusmods.com/cyberpunk2077/mods/27357?tab=files&file_id=165126"
+        }
+      ],
+      "Files": [
+        {
+          "RelativeInstallPath": "archive/pc/mod/vault_49_virtual_atelier.archive",
+          "Size": 57344,
+          "Sha256": "1348a577c9cc974a1e09b831e0f7e5c9e0fe7064f8d702e30b759e55b1d2284d"
+        },
+        {
+          "RelativeInstallPath": "r6/scripts/v49_footwear_atelier/V49FOOTWEARATELIER-atelier-store.reds",
+          "Size": 14568,
+          "Sha256": "c465e4c479eed192194ac80c46610eba91ca361f888cdf5cdd88ac913c9bc7ab"
+        }
+      ],
+      "Sources": [
+        "https://www.nexusmods.com/cyberpunk2077/mods/27357",
+        "https://www.nexusmods.com/cyberpunk2077/mods/27357?tab=files&file_id=165126"
+      ],
+      "CheckedOn": "2026-11-07",
+      "EvidenceGroup": "Virtual Atelier",
+      "Limitations": [
+        "O arquivo oficial contém o script de registro e o archive de recursos da loja.",
+        "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado."
+      ]
+    },
+    {
+      "Id": "mod-27599",
+      "Name": "Catherwood’s Virtual Atelier Shop",
+      "FixedVersion": "1.0.2",
+      "GameVersion": "2.5",
+      "Category": "Lojas",
+      "Function": "Loja do Jordan 1 Off-White Euro e de outros itens do autor.",
+      "HowToUse": [
+        "Abra Atelier no computador do apartamento após instalar as peças correspondentes."
+      ],
+      "Dependencies": [
+        "mod-2987",
+        "ArchiveXL",
+        "TweakXL",
+        "Codeware",
+        "mod-6945",
+        "NightCoop",
+        "redscript",
+        "CET"
+      ],
+      "GenderAndBody": "O ajuste ao corpo é definido pelo pacote de cada peça.",
+      "KnownConflictsAndLimits": [
+        "Abra Atelier no computador do apartamento."
+      ],
+      "PhantomLiberty": {
+        "Status": "not-required",
+        "Required": false,
+        "Evidence": "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado.",
+        "Sources": [
+          "https://www.nexusmods.com/cyberpunk2077/mods/27599",
+          "https://www.nexusmods.com/cyberpunk2077/mods/27599?tab=files&file_id=138550"
+        ],
+        "RuntimeWithoutDLCValidated": false,
+        "WithoutDLCProfileEligible": true
+      },
+      "Blocked": false,
+      "CoopEvidence": "Não testado em coop nesta auditoria.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Catherwood's - Virtual Atelier Shop-27599-1-0-2-1772679408.zip",
+          "ModId": 27599,
+          "FileId": 138550,
+          "Size": 20710,
+          "Sha256": "7c2563925b6365c023d71de61aea215c456627c7805d53f6f24169cbd9fbda2f",
+          "OfficialUrl": "https://www.nexusmods.com/cyberpunk2077/mods/27599?tab=files&file_id=138550"
+        }
+      ],
+      "Files": [
+        {
+          "RelativeInstallPath": "archive/pc/mod/DrCatherwoodAtelier.archive",
+          "Size": 24576,
+          "Sha256": "927037878c9cde7c20971a2b631b720dbc8bd163a4ab5f9c1d0be890581bc062"
+        },
+        {
+          "RelativeInstallPath": "r6/scripts/drcatherwood/drcatherwoodatelier-atelier-store.reds",
+          "Size": 399,
+          "Sha256": "c0043096bdfa5febffcfe7c769b73849a60f97c547055e869e2cb93d6e528ab4"
+        }
+      ],
+      "Sources": [
+        "https://www.nexusmods.com/cyberpunk2077/mods/27599",
+        "https://www.nexusmods.com/cyberpunk2077/mods/27599?tab=files&file_id=138550"
+      ],
+      "CheckedOn": "2026-11-07",
+      "EvidenceGroup": "Virtual Atelier",
+      "Limitations": [
+        "O arquivo oficial contém o script de registro e o archive de recursos da loja.",
+        "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado."
+      ]
+    },
+    {
+      "Id": "mod-16645",
+      "Name": "Yusei’s Virtual Atelier",
+      "FixedVersion": "2.67",
+      "GameVersion": "2.5",
+      "Category": "Lojas",
+      "Function": "Loja de acessórios do autor, incluindo o relógio Maneo.",
+      "HowToUse": [
+        "Abra Atelier no computador do apartamento após instalar as peças correspondentes."
+      ],
+      "Dependencies": [
+        "mod-2987"
+      ],
+      "GenderAndBody": "O ajuste ao corpo é definido pelo pacote de cada peça.",
+      "KnownConflictsAndLimits": [
+        "Abra Atelier no computador do apartamento."
+      ],
+      "PhantomLiberty": {
+        "Status": "not-required",
+        "Required": false,
+        "Evidence": "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado.",
+        "Sources": [
+          "https://www.nexusmods.com/cyberpunk2077/mods/16645",
+          "https://www.nexusmods.com/cyberpunk2077/mods/16645?tab=files&file_id=174224"
+        ],
+        "RuntimeWithoutDLCValidated": false,
+        "WithoutDLCProfileEligible": true
+      },
+      "Blocked": false,
+      "CoopEvidence": "Não testado em coop nesta auditoria.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Yusei's Virtual Atelier 16645 2.67 2026-11-06T02-01Z OCk3C5Ai5.7z",
+          "ModId": 16645,
+          "FileId": 174224,
+          "Size": 59124,
+          "Sha256": "abcaf29a0e97ac11a13a26b4549cfb0bb5ca659f71b2295698440c1048de4422",
+          "OfficialUrl": "https://www.nexusmods.com/cyberpunk2077/mods/16645?tab=files&file_id=174224"
+        }
+      ],
+      "Files": [
+        {
+          "RelativeInstallPath": "archive/pc/mod/yusei_virtual atelier.archive",
+          "Size": 61440,
+          "Sha256": "005743574185e17e68517a35a5bdb3814bbf2c9b33056a9fe2035ff64012c73d"
+        },
+        {
+          "RelativeInstallPath": "r6/scripts/yuseiyamotosstore-atelier-store.reds",
+          "Size": 41680,
+          "Sha256": "e0b4ca3f870be297e20c4f8c2f8f86d9e695726836c554ff9448627a8676a695"
+        }
+      ],
+      "Sources": [
+        "https://www.nexusmods.com/cyberpunk2077/mods/16645",
+        "https://www.nexusmods.com/cyberpunk2077/mods/16645?tab=files&file_id=174224"
+      ],
+      "CheckedOn": "2026-11-07",
+      "EvidenceGroup": "Virtual Atelier",
+      "Limitations": [
+        "O arquivo oficial contém o script de registro e o archive de recursos da loja.",
+        "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado."
+      ]
+    },
+    {
+      "Id": "mod-37000",
+      "Name": "MRTH Atelier · NetWatch Collection",
+      "FixedVersion": "1.0",
+      "GameVersion": "2.5",
+      "Category": "Lojas",
+      "Function": "Loja NetWatch. O script filtra os itens disponíveis antes de registrar a loja.",
+      "HowToUse": [
+        "Abra Atelier no computador do apartamento após instalar as peças correspondentes."
+      ],
+      "Dependencies": [
+        "mod-2987"
+      ],
+      "GenderAndBody": "O ajuste ao corpo é definido pelo pacote de cada peça.",
+      "KnownConflictsAndLimits": [
+        "Abra Atelier no computador do apartamento."
+      ],
+      "PhantomLiberty": {
+        "Status": "not-required",
+        "Required": false,
+        "Evidence": "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado.",
+        "Sources": [
+          "https://www.nexusmods.com/cyberpunk2077/mods/37000",
+          "https://www.nexusmods.com/cyberpunk2077/mods/37000?tab=files&file_id=172602"
+        ],
+        "RuntimeWithoutDLCValidated": false,
+        "WithoutDLCProfileEligible": true
+      },
+      "Blocked": false,
+      "CoopEvidence": "Não testado em coop nesta auditoria.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "MRTH Atelier NetWatch Collection Store V1.0 37000 1 2026-11-02T14-25Z ymA1m8Rny.zip",
+          "ModId": 37000,
+          "FileId": 172602,
+          "Size": 74203,
+          "Sha256": "9be2958b97514230613ba67d63c45109eba80e8b73ce46778eb9b6d0e00b5ac6",
+          "OfficialUrl": "https://www.nexusmods.com/cyberpunk2077/mods/37000?tab=files&file_id=172602"
+        }
+      ],
+      "Files": [
+        {
+          "RelativeInstallPath": "archive/pc/mod/mrth_netwatch_store.archive",
+          "Size": 77824,
+          "Sha256": "a38dae32807ab0d7d226514ddc8619998ae2e93ba2d586b250d5430dac9a40e3"
+        },
+        {
+          "RelativeInstallPath": "r6/scripts/MRTH_NetWatch_Store/MRTH_NetWatch-atelier-store.reds",
+          "Size": 3805,
+          "Sha256": "00fbde3d526349dccbfe7bab5558b97b0f4e352472fee49417d0400c707dd985"
+        }
+      ],
+      "Sources": [
+        "https://www.nexusmods.com/cyberpunk2077/mods/37000",
+        "https://www.nexusmods.com/cyberpunk2077/mods/37000?tab=files&file_id=172602"
+      ],
+      "CheckedOn": "2026-11-07",
+      "EvidenceGroup": "Virtual Atelier",
+      "Limitations": [
+        "O arquivo oficial contém o script de registro e o archive de recursos da loja.",
+        "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado."
+      ]
     }
   ],
   "ArchiveReader": {

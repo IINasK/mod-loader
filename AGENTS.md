@@ -503,3 +503,10 @@ Pedido de Douglas, 28/10/2026: configurar mods com o coop, registrar processos v
 - O auxiliar e seus subprocessos são iniciados num Job Object do Windows ligado ao Mod Loader. O fechamento normal solicita shutdown. Em fechamento abrupto, o Windows encerra a árvore do auxiliar. O perfil, a identidade TLS, as sessões e os arquivos de transferência continuam nas pastas existentes.
 - Na inicialização, o erro de bloqueio recente recebe mensagem específica. Um registro anterior não contamina o diagnóstico atual. A tela limpa o texto de inicialização se o auxiliar falhar e informa quando o convite colado já concluiu um recebimento.
 - Teste local validou a retomada do mesmo perfil e identidade após encerramento abrupto de uma fixture, além de fechamento normal. O motivo exato no PC remoto ainda depende do log daquele computador.
+
+## Revisão 1.1.40 — lojas e acessórios Virtual Atelier
+
+- O catálogo inclui seis tênis, Maneo FemV e NetWatch, com quatro lojas como dependências. Os scripts das lojas registram os 125 códigos dos oito pacotes. As fichas por mod ficam em Conhecimento/Mods e o índice relaciona cada item à sua loja.
+- O Maneo MascV usa os mesmos caminhos da versão FemV. O catálogo fixa somente FemV. A ficha informa a alternativa MascV e a regra de instalar uma edição por vez.
+- O OneSlowZZ 8594 e sua loja 8572 ficaram fora do catálogo. A loja foi conferida e o download do arquivo principal dos relógios ficou incompleto.
+- Os 12 pacotes e 32 arquivos passaram pela preparação isolada do instalador com hashes conferidos. Compatibilidade de DLC e corpo é documental e estática. Jogo real, terceira pessoa e coop não foram testados.
