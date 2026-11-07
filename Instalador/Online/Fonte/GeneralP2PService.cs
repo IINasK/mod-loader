@@ -8,7 +8,7 @@ using System.Threading;
 
 internal sealed class P2PSession {
     public string Id, Name, Hash, Peer, Mode, Destination, ReceiptId, Error, Stage;
-    public bool Lifecycle, Held, Discarded, ReceiptClosed, ExportAllPresets;
+    public bool Lifecycle, Held, Discarded, ReceiptClosed, ExportAllPresets, CompareBeforePack;
     public string Phase, TransactionId, ProjectError, ExportPreset;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PInstallProgress InstallProgress;
     public P2PRecipient[] Recipients=new P2PRecipient[0];
@@ -77,6 +77,7 @@ internal sealed partial class P2PService : IDisposable {
         if(s.ExportPreset!=null&&!Regex.IsMatch(s.ExportPreset,@"\A[A-Za-z0-9_-]{1,120}\z"))throw new IOException("Preset de compartilhamento inválido.");
         if(s.TransactionId!=null&&!Regex.IsMatch(s.TransactionId,@"\A[a-f0-9]{32}\z"))
             throw new IOException("Transação inválida.");
+        if(s.CompareBeforePack&&(!s.Lifecycle||!s.Automatic||s.Recipients.Length>1))throw new IOException("Registro de comparação inválido.");
         if(s.Automatic&&!s.Deferred)throw new IOException("Registro automático inválido.");
         if(s.Deferred&&(s.Mode!="installed-zip"||s.Size<0||s.Size>P2PPack.MaxTotal||(s.PayloadHash==null?s.Size!=0:!P2PPack.HashValid(s.PayloadHash)||s.Size==0))||s.SelectedMods!=null&&(s.SelectedMods.Length>1000||s.SelectedMods.Any(id=>!Regex.IsMatch(id??"",@"\A[A-Za-z0-9_-]{1,120}\z"))))throw new IOException("Registro antecipado inválido.");
         if(s.Mode!=null&&s.Mode!="installed-zip"||s.Mode=="installed-zip"&&!s.Deferred&&(s.Size<=0||s.Size>P2PPack.MaxTotal))throw new IOException("Registro de pacote instalado inválido.");
@@ -168,7 +169,7 @@ internal sealed partial class P2PService : IDisposable {
         if(s.Mode!="installed-zip"||s.Sender||s.Completed)throw new IOException("Selecione um pacote recebido ainda não instalado.");
         if(s.Stage!=null)throw new IOException("A instalação já começou. Aguarde terminar.");
         if(s.Discarded)throw new IOException("Este recebimento foi descartado. Use um novo convite.");
-        if(s.TransactionId!=null&&!String.Equals(s.Destination,destination,StringComparison.OrdinalIgnoreCase))
+        if((s.TransactionId!=null||s.CompareBeforePack&&HasSyncChoice(s))&&!String.Equals(s.Destination,destination,StringComparison.OrdinalIgnoreCase))
             throw new IOException("Retome a instalação na pasta original.");
         if(!Directory.Exists(destination))throw new IOException("Escolha uma pasta de instalação existente.");Safe.NoLinks(destination);
         s.Destination=Path.GetFullPath(destination);
@@ -209,6 +210,7 @@ internal sealed partial class P2PService : IDisposable {
             Engine.RemoveFolder(s.Id);s.Completed=true;Save();CleanupTransport(s);return;
         }
         if(!s.AutoInstall||installedCatalog==null||installedData==null||s.Stage!=null)return;
+        if(s.CompareBeforePack&&!HasSyncChoice(s))return;
         if(s.Deferred&&!ResolveDeferred(s))return;
         string zip=Safe.In(Folder(s),"pack.zip");
         if(!File.Exists(zip)||new FileInfo(zip).Length!=s.Size)return;
@@ -241,13 +243,13 @@ internal sealed partial class P2PService : IDisposable {
             try{P2PPack.DeleteSnapshot(folder);}catch(Exception){}throw;
         }
     }
-    internal string Invitation(P2PSession session){return new P2PInvite{Schema=session.Lifecycle?2:1,Kind=session.Sender?"offer":"accept",Device=Engine.Device,Folder=session.Id,ManifestHash=session.Hash,Name=session.Name,Mode=session.Mode,Size=session.Deferred?0:session.Size,Deferred=session.Deferred,Automatic=session.Automatic}.Encode();}
+    internal string Invitation(P2PSession session){return new P2PInvite{Schema=session.CompareBeforePack?3:session.Lifecycle?2:1,Kind=session.Sender?"offer":"accept",Device=Engine.Device,Folder=session.Id,ManifestHash=session.Hash,Name=session.Name,Mode=session.Mode,Size=session.Deferred?0:session.Size,Deferred=session.Deferred,Automatic=session.Automatic}.Encode();}
     internal P2PSession Accept(string code,string destination=null,bool autoInstall=false){
         var invite=P2PInvite.Decode(code);if(invite.Kind!="offer")throw new IOException("Cole o convite de quem está enviando o pacote.");
         if(!Engine.Running||invite.Device==Engine.Device)throw new IOException("Use o convite do outro computador.");
         var existing=SnapshotSessions().FirstOrDefault(s=>s.Id==invite.Folder);
         if(existing!=null){
-            if(existing.Hash!=invite.ManifestHash||existing.Sender||existing.Peer!=invite.Device||existing.Deferred!=invite.Deferred||existing.Lifecycle!=(invite.Schema==2)||existing.Mode!=invite.Mode||(!existing.Deferred&&existing.Size!=invite.Size))throw new IOException("Este convite conflita com outro compartilhamento.");
+            if(existing.Hash!=invite.ManifestHash||existing.Sender||existing.Peer!=invite.Device||existing.Deferred!=invite.Deferred||existing.Lifecycle!=(invite.Schema>=2)||existing.CompareBeforePack!=(invite.Schema==3)||existing.Mode!=invite.Mode||(!existing.Deferred&&existing.Size!=invite.Size))throw new IOException("Este convite conflita com outro compartilhamento.");
             if(existing.Automatic!=invite.Automatic){
                 if(existing.Automatic||!invite.Automatic||existing.Completed)throw new IOException("Use o convite atualizado enviado pelo amigo.");
                 existing.Automatic=true;AdvertiseAcceptance(existing);Engine.ConfigureFolder(existing.Id,Folder(existing),ReceiveLabel(existing),false,existing.Peer);if(existing.Paused)Engine.Pause(existing.Id,true);Save();RefreshAcceptance(existing);
@@ -256,10 +258,10 @@ internal sealed partial class P2PService : IDisposable {
         }
         if(Sessions.Count>=100)throw new IOException("Remova compartilhamentos antigos antes de receber outro.");
         if(invite.Mode=="installed-zip"&&autoInstall){if(String.IsNullOrWhiteSpace(destination)||!Directory.Exists(destination))throw new IOException("Escolha a pasta de instalação antes de receber.");Safe.NoLinks(destination);}
-        var session=new P2PSession{Id=invite.Folder,Name=invite.Name,Hash=invite.ManifestHash,Peer=invite.Device,Mode=invite.Mode,Size=invite.Size,Deferred=invite.Deferred,Automatic=invite.Automatic,Lifecycle=invite.Schema==2,Destination=destination,AutoInstall=autoInstall};
+        var session=new P2PSession{Id=invite.Folder,Name=invite.Name,Hash=invite.ManifestHash,Peer=invite.Device,Mode=invite.Mode,Size=invite.Size,Deferred=invite.Deferred,Automatic=invite.Automatic,Lifecycle=invite.Schema>=2,CompareBeforePack=invite.Schema==3,Destination=destination,AutoInstall=autoInstall};
         string folder=Folder(session);Directory.CreateDirectory(folder);
         // Receive the pinned manifest first. Other remote files are ignored until its allow-list is validated.
-        File.WriteAllText(Safe.In(folder,".stignore"),invite.Mode=="installed-zip"?(invite.Deferred?"!ready.json\n!pack.zip\n*\n":"!pack.zip\n*\n"):"!pack.json\n*\n",new UTF8Encoding(false));
+        File.WriteAllText(Safe.In(folder,".stignore"),invite.Mode=="installed-zip"?(invite.Deferred?DeferredIgnores(session):"!pack.zip\n*\n"):"!pack.json\n*\n",new UTF8Encoding(false));
         AdvertiseAcceptance(session);Engine.ConfigurePeer(session.Peer);Engine.ConfigureFolder(session.Id,folder,ReceiveLabel(session),false,session.Peer);
         try{
             if(session.Lifecycle)ConfigureReceipt(session,session.Peer,false);

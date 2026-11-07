@@ -114,7 +114,7 @@ internal sealed partial class GeneralModWindow {
         bool cyberpunk=reads==null?IsCyberpunk(root):reads.Cyberpunk;
         Func<string,string> hash=reads==null?null:(Func<string,string>)reads.Hash;
         string snapshot;
-        if(exists&&state.SnapshotReceipts.TryGetValue(work.Key,out snapshot)){
+        if(exists&&work.Variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts.TryGetValue(work.Key,out snapshot)){
             string found=Snapshot(root).Status(snapshot,work.Key);
             if(found!=GeneralModInstaller.Missing||work.Variant.CyberpunkId==null)return found;
         }
@@ -131,7 +131,7 @@ internal sealed partial class GeneralModWindow {
                 return "Não instalado";
             }
             var scan=FixedData.Scan(recipe,root,true,hash,reads==null);
-            return scan.IsCorrect?"Instalado":scan.Original>0?"Versão diferente":scan.State;
+            return scan.IsCorrect?"Instalado":scan.State=="Atualização disponível"?scan.State:scan.Original>0?"Versão diferente":scan.State;
         }
         if(exists){
             List<string> results;
@@ -246,7 +246,7 @@ internal sealed partial class GeneralModWindow {
             RowStatus(work,"Verificando",null,work.Entry.Name+T(": verificando arquivos…",": checking files…"));
             OnlineDiagnostics.Record("general.install.begin",work.Entry.Id,"Iniciando item da fila.",new{Variant=work.Variant.Id});
             string snapshot;
-            if(state.SnapshotReceipts.TryGetValue(work.Key,out snapshot)&&Snapshot(root).Status(snapshot,work.Key)==GeneralModInstaller.Installed){RowStatus(work,"Instalado",100);return;}
+            if(work.Variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts.TryGetValue(work.Key,out snapshot)&&Snapshot(root).Status(snapshot,work.Key)==GeneralModInstaller.Installed){RowStatus(work,"Instalado",100);return;}
             if(work.Variant.Sources.Any(GeneralModDownload.IsInstalledSource))throw new IOException(T("Este mod veio de um pacote instalado. Para reparar, receba um novo pacote do remetente.","This mod came from an installed pack. Receive a new pack from the sender to repair it."));
             if(work.Variant.CyberpunkId!=null)await InstallKnown(work,root);
             else await InstallGeneral(work,root);
@@ -289,7 +289,7 @@ internal sealed partial class GeneralModWindow {
                 if(scan.IsCorrect)continue;
                 if(scan.Original>0||scan.IsConflict){
                     var file=mod.Files.FirstOrDefault(f=>!f.UserData&&File.Exists(Safe.In(root,f.Path))&&Safe.Hash(Safe.In(root,f.Path))!=f.Sha256);
-                    var difference=new ModVersionDifference{Name=mod.Name,Current=file==null?scan.State:ModVersionDifference.FileVersion(Safe.In(root,file.Path)),Incoming=mod.Version,CanReplace=!scan.IsConflict,Detail=scan.IsConflict?T("Há conteúdo não reconhecido ou incompatível. Resolva o conflito antes de substituir; a base protegida permanece intacta.","Unrecognized or incompatible content was found. Resolve the conflict before replacing; the protected base remains intact."):T("Versão anterior reconhecida. A troca usa o backup e a conferência de arquivos do instalador.","Recognized previous version. Replacement uses the installer's backup and file verification.")};
+                    var difference=new ModVersionDifference{Name=mod.Name,Current=scan.State=="Atualização disponível"?"0.1.2-beta":file==null?scan.State:ModVersionDifference.FileVersion(Safe.In(root,file.Path)),Incoming=mod.Version,CanReplace=!scan.IsConflict,Detail=scan.IsConflict?T("Há conteúdo não reconhecido ou incompatível. Resolva o conflito antes de substituir; a base protegida permanece intacta.","Unrecognized or incompatible content was found. Resolve the conflict before replacing; the protected base remains intact."):T("Versão anterior reconhecida. A troca usa o backup e a conferência de arquivos do instalador.","Recognized previous version. Replacement uses the installer's backup and file verification.")};
                     difference.Require(ChooseVersion);
                 }
             }
@@ -299,6 +299,7 @@ internal sealed partial class GeneralModWindow {
             CheckSkip(work);
             if(await Task.Run(()=>cache.Contains(asset)))continue;
             if(asset.ModId==0){
+                if(asset.Url==NightCoopRelease.Url&&await Task.Run(()=>ImportExistingNightCoop(asset)))continue;
                 if(testMode)throw new IOException("Download de rede bloqueado no teste.");
                 RowStatus(work,"Baixando",null,"Baixando "+asset.Name+"…");
                 using(var control=new DownloadControl()){
@@ -329,6 +330,18 @@ internal sealed partial class GeneralModWindow {
                 UserFileApprovals.Approve(catalog,root,request);
             }
         }
+    }
+    bool ImportExistingNightCoop(FixedAsset asset){
+        if(String.IsNullOrEmpty(state.DownloadFolder)||!Directory.Exists(state.DownloadFolder))return false;
+        Safe.NoLinks(state.DownloadFolder);
+        string pattern=Path.GetFileNameWithoutExtension(asset.Name)+"*.zip";
+        foreach(string path in Directory.EnumerateFiles(state.DownloadFolder,pattern,SearchOption.TopDirectoryOnly)){
+            Safe.NoLinks(path);
+            if(new FileInfo(path).Length!=asset.Size||Safe.Hash(path)!=asset.Sha256)continue;
+            cache.Import(path,asset);
+            return true;
+        }
+        return false;
     }
     async Task AwaitKnown(Work work,FixedAsset asset,string root){
         using(var watch=new GeneralModDownload(state.DownloadFolder,asset)){

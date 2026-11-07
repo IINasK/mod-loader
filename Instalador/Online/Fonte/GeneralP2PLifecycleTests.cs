@@ -107,6 +107,67 @@ internal static class GeneralP2PLifecycleTests {
         }
     }
 
+    internal static void RunSync(string parent,string helper){
+        string root=OnlineTests.NestedRoot(parent,"sync-");
+        Directory.CreateDirectory(root);
+        var checks=new List<string>();
+        try{
+            Sync(root,helper,checks);
+            Safe.WriteJson(Path.Combine(root,"resultado-p2p-sync.json"),new{Passed=true,Tests=checks});
+        }catch(Exception ex){
+            Safe.WriteJson(Path.Combine(root,"resultado-p2p-sync.json"),new{Passed=false,Tests=checks,Error=ex.ToString()});
+            throw;
+        }
+    }
+
+    static void Sync(string root,string helper,List<string> checks){
+        var source=Source(root,"sync-host","same.txt","shared contents");
+        source.Item1.List.Mods.AddRange(Source(root,"diff","different.txt","host version",source.Item1.Destination,source.Item2).Item1.List.Mods);
+        source.Item1.List.Mods.AddRange(Source(root,"miss","missing.txt","missing payload",source.Item1.Destination,source.Item2).Item1.List.Mods);
+        var ids=source.Item1.List.Mods.Select(mod=>mod.Id).ToArray();
+        string target=Target(root,"sync-receiver");
+        string same=Safe.In(target,"mods/same.txt"),different=Safe.In(target,"mods/different.txt");
+        File.WriteAllText(same,"shared contents");
+        File.WriteAllText(different,"local version");
+        var localOnly=Source(root,"local-only","local-only.txt","keep local",target,Path.Combine(root,"sync-data"));
+        var stamp=new DateTime(2020,1,1,0,0,0,DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(same,stamp);
+        using(var host=Service(root,"sync-host-p2p",source.Item2,helper))
+        using(var friend=Service(root,"sync-friend-p2p",Path.Combine(root,"sync-data"),helper))
+        using(var install=new ManualResetEventSlim()){
+            host.SetPreparationState(source.Item1);
+            friend.ChooseVersion=_=>install.Wait(40000);
+            foreach(bool full in new[]{false,true}){
+                install.Reset();
+                File.WriteAllText(different,"local version");
+                var sent=host.BeginDeferred(source.Item1,ids,true,compareBeforePack:true);
+                var invitation=host.Invitation(sent);
+                var received=friend.Accept(invitation,target,true);
+                ConnectTo(friend,host);
+                Wait(()=>friend.HasSyncPreview(received),"The signed comparison preview did not reach the receiver. "+sent.Error);
+                string zip=Safe.In(host.Folder(sent),"pack.zip");
+                Check(checks,P2PInvite.Decode(invitation).Schema==3&&!File.Exists(zip)&&sent.PayloadHash==null,
+                    "The sender builds no ZIP until the receiver makes a choice.");
+                var comparison=friend.CompareIncoming(received,localOnly.Item1);
+                Check(checks,comparison.Different.SequenceEqual(new[]{"diff"})&&
+                    comparison.Missing.SequenceEqual(full?new string[0]:new[]{"miss"})&&comparison.Matching==(full?2:1)&&comparison.LocalOnly.SequenceEqual(new[]{"local-only"}),
+                    "Real contents identify matching, missing and different mods.");
+                friend.SubmitSyncChoice(comparison,full);
+                Wait(()=>received.Phase=="review","The receiver did not reach the version confirmation. "+sent.Error+" "+received.Error);
+                var packed=InstalledSnapshot.Read(zip,sent.PayloadHash,Catalog);
+                Check(checks,packed.List.Mods.Count==3&&packed.Files.Single(file=>file.Path=="mods/same.txt").ReuseLocal==!full,
+                    full?"The full option sends the complete pack.":"The delta keeps all records and reuses the matching file.");
+                using(var archive=ZipFile.OpenRead(zip))
+                    Check(checks,archive.Entries.Count==(full?4:3),"ZIP contains exactly the requested binary payloads.");
+                install.Set();
+                Wait(()=>received.Completed&&sent.Completed,"The comparison transfer did not complete. "+sent.Error+" "+received.Error);
+                Check(checks,File.ReadAllText(different)=="host version"&&File.Exists(Safe.In(target,"mods/missing.txt"))&&File.GetLastWriteTimeUtc(same)==stamp&&File.ReadAllText(Safe.In(target,"mods/local-only.txt"))=="keep local",
+                    "The receiver installs changes and preserves the existing identical file.");
+                Check(checks,friend.InstalledManifest(received).List.Mods.Count==3,"The installed receipt retains the complete mod list.");
+            }
+        }
+    }
+
     static void Rollback(string root,List<string> checks){
         var source=Source(root,"rollback","rollback.txt","incoming");
         string target=Target(root,"rollback-target"),data=Path.Combine(root,"rollback-data"),zip=Path.Combine(root,"rollback-snapshot.zip");

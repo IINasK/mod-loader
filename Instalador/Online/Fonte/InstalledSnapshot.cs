@@ -17,6 +17,7 @@ public sealed class InstalledSnapshotManifest {
 public sealed class InstalledSnapshotFile {
     public string Path,Sha256,Kind,Section,Content;
     public long Size;
+    public bool ReuseLocal;
     public List<string> Owners=new List<string>();
 }
 public static partial class InstalledSnapshot {
@@ -84,7 +85,7 @@ public static partial class InstalledSnapshot {
             var originalSources=variant.Sources.ToList();
             List<InstalledSnapshotFile> files=new List<InstalledSnapshotFile>();
             string snapshotId;
-            if(state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(work,out snapshotId))files=receivedEngine.ReadInstalledFiles(snapshotId,work);
+            if(variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(work,out snapshotId))files=receivedEngine.ReadInstalledFiles(snapshotId,work);
             else if(variant.CyberpunkId!=null) {
                 if(!cyberpunk)throw new IOException(mod.Name+": o destino não é Cyberpunk 2077.");
                 var recipe=FixedRecipe(catalog,variant);
@@ -122,6 +123,7 @@ public static partial class InstalledSnapshot {
             list.Mods.Add(mod);
             foreach(var file in files) {
                 if(!includeConfigs&&file.Kind!="file")continue;
+                file.ReuseLocal=false;
                 file.Owners=new List<string>{work};
                 var same=manifest.Files.FirstOrDefault(f=>String.Equals(f.Path,file.Path,StringComparison.OrdinalIgnoreCase)&&f.Section==file.Section);
                 if(same==null)manifest.Files.Add(file);
@@ -143,9 +145,15 @@ public static partial class InstalledSnapshot {
         return manifest;
     }
     public static InstalledSnapshotManifest Create(string zipPath,GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs,Action<string> report,bool allowMissing=false,Action checkpoint=null,Action<long,long> progress=null) {
-        var manifest=Inspect(state,ids,catalog,appData,includeConfigs,allowMissing,checkpoint);string root=Path.GetFullPath(state.Destination);
+        var manifest=Inspect(state,ids,catalog,appData,includeConfigs,allowMissing,checkpoint);
+        Write(zipPath,state.Destination,manifest,report,checkpoint,progress);
+        return manifest;
+    }
+    internal static void Write(string zipPath,string root,InstalledSnapshotManifest manifest,Action<string> report,Action checkpoint,Action<long,long> progress){
+        root=Path.GetFullPath(root);
         string output=Path.GetFullPath(zipPath);Safe.NoLinks(output);
-        long done=0,expected=manifest.Files.Where(f=>f.Kind=="file").GroupBy(f=>f.Sha256).Select(g=>g.First().Size).Sum();if(progress!=null)progress(0,expected);
+        var payload=manifest.Files.Where(f=>f.Kind=="file"&&!f.ReuseLocal).GroupBy(f=>f.Sha256).Select(g=>g.First()).ToList();
+        long done=0,expected=payload.Sum(file=>file.Size);if(progress!=null)progress(0,expected);
         bool created=false;
         try {
             using(var stream=new FileStream(output,FileMode.CreateNew,FileAccess.ReadWrite,FileShare.None)) {
@@ -153,7 +161,7 @@ public static partial class InstalledSnapshot {
                 using(var archive=new ZipArchive(stream,ZipArchiveMode.Create,true)) {
                     var metadata=archive.CreateEntry("manifest.json",CompressionLevel.Optimal);
                     using(var target=metadata.Open()){byte[] bytes=Utf8.GetBytes(Safe.Json.Serialize(manifest));target.Write(bytes,0,bytes.Length);}
-                    foreach(var file in manifest.Files.Where(f=>f.Kind=="file").GroupBy(f=>f.Sha256).Select(g=>g.First())) {
+                    foreach(var file in payload) {
                         if(report!=null)report("Preparando "+file.Path);
                         string source=Safe.In(root,file.Path);
                         using(var input=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read))
@@ -169,7 +177,6 @@ public static partial class InstalledSnapshot {
                 }
                 stream.Flush(true);
             }
-            return manifest;
         }catch {if(created){Safe.NoLinks(output);File.Delete(output);}throw;}
     }
     static InstalledSnapshotFile Config(string path,string kind,string section,string content){byte[] bytes=Utf8.GetBytes(content);return new InstalledSnapshotFile{Path=path,Kind=kind,Section=section,Content=content,Size=bytes.Length,Sha256=Hash(bytes)};}
@@ -208,6 +215,7 @@ public static partial class InstalledSnapshot {
                     }else if(!SafeGenericPath(file.Path)||(manifest.Game=="cyberpunk2077"&&(!LocalModPackage.Allowed(file.Path)||reserved.Contains(file.Path))))throw new IOException("Destino personalizado não autorizado: "+file.Path);
                 }
             }else {
+                if(file.ReuseLocal)throw new IOException("Configuração local não pode ser referenciada pelo pacote.");
                 InstalledSnapshotConfig.Validate(file);configs+=file.Size;if(configs>1048576)throw new IOException("Configurações grandes demais.");
                 foreach(string owner in file.Owners) {
                     FixedMod recipe;
@@ -239,18 +247,18 @@ public static partial class InstalledSnapshot {
                 InstalledSnapshotManifest manifest;
                 using(var input=metadata.Open())manifest=Safe.Json.Deserialize<InstalledSnapshotManifest>(Utf8.GetString(ReadBytes(input,8000000)));
                 Validate(manifest,catalog);
-                var expected=manifest.Files.Where(f=>f.Kind=="file").GroupBy(f=>f.Sha256).Select(g=>g.First()).ToList();
+                var expected=manifest.Files.Where(f=>f.Kind=="file"&&!f.ReuseLocal).GroupBy(f=>f.Sha256).Select(g=>g.First()).ToList();
                 if(entries.Count!=expected.Count+1)throw new IOException("Arquivos não declarados no pacote.");
                 foreach(var file in expected) {
                     ZipArchiveEntry entry;if(!entries.TryGetValue(Entry(file),out entry)||entry.Length!=file.Size)throw new IOException("Arquivo ausente ou tamanho divergente: "+file.Path);
                     using(var input=entry.Open())if(HashStream(input,file.Size)!=file.Sha256)throw new IOException("Arquivo transferido divergente: "+file.Path);
                 }
-                foreach(var file in manifest.Files.Where(f=>f.Kind=="file"))using(var input=entries[Entry(file)].Open())ValidateCustomData(manifest,file,input);
+                foreach(var file in manifest.Files.Where(f=>f.Kind=="file"&&!f.ReuseLocal))using(var input=entries[Entry(file)].Open())ValidateCustomData(manifest,file,input);
                 return manifest;
             }
         }
     }
-    static void ValidateCustomData(InstalledSnapshotManifest manifest,InstalledSnapshotFile file,Stream input) {
+    internal static void ValidateCustomData(InstalledSnapshotManifest manifest,InstalledSnapshotFile file,Stream input) {
         bool custom=file.Owners.Any(owner=>manifest.List.Mods.Any(m=>m.Variants.Any(v=>Owner(m,v)==owner&&v.CyberpunkId==null)));
         if(!custom)return;
         string extension=System.IO.Path.GetExtension(file.Path).ToLowerInvariant();

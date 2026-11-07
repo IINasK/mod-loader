@@ -7,22 +7,22 @@
     {
       "Id": "NightCoop",
       "Name": "NightCoop + RED4ext 1.31.0",
-      "Version": "0.1.2-beta",
+      "Version": "0.2.0-beta",
       "Profile": "Kit inicial",
       "GameVersion": "2.5",
       "RequiresPL": false,
       "RequiresRedmod": false,
       "Immutable": true,
       "Dependencies": [],
-      "Warning": "Base fixa com RED4ext 1.31.0.",
+      "Warning": "NightCoop 0.2.0-beta (protocolo 164) com RED4ext 1.31.0.",
       "Assets": [
         {
           "Id": "a0",
-          "Name": "NightCoop-0.1.2-beta-2.5.zip",
-          "Sha256": "5418bc90a68c650344126a9532bec933d18c3e70cb9a97c515bb8695533c1621",
-          "Size": 8895082,
+          "Name": "NightCoop-0.2.0-beta-2.5.zip",
+          "Sha256": "ca070aa296519fb4147dadf14a625a538df59d6a20d289fa3e335ae3da3cace5",
+          "Size": 10117378,
           "Format": "zip",
-          "Url": "https://nightcoop.net/dl/0.1.2-beta/NightCoop-0.1.2-beta-2.5.zip",
+          "Url": "https://nightcoop.net/dl/0.2.0-beta/NightCoop-0.2.0-beta-2.5.zip",
           "ModId": 0,
           "FileId": 0
         }
@@ -60,14 +60,49 @@
           "Asset": "a0",
           "Entry": "red4ext/plugins/NightCoop/NightCoop.dll",
           "Path": "red4ext/plugins/NightCoop/NightCoop.dll",
-          "Sha256": "65960e5926108e8de9dfd46476a10752f1ad7b8891152c81fd30af21dfa21a6f",
-          "Size": 19016192
+          "Sha256": "447ee81cb5200de2b372372a5c68dd36275c7b172eeee009f56e5d5d606c55f7",
+          "Size": 21416448
+        },
+        {
+          "Asset": "a0",
+          "Entry": "red4ext/plugins/NightCoop/redscript/NightCoopSdk.reds",
+          "Path": "red4ext/plugins/NightCoop/redscript/NightCoopSdk.reds",
+          "Sha256": "1b843fd44b672abe50bfb348a450b72114e981f196595bf980cd5481db1a56fc",
+          "Size": 11603
+        },
+        {
+          "Asset": "a0",
+          "Entry": "red4ext/plugins/NightCoop/redscript/NightCoopSdkNative.reds",
+          "Path": "red4ext/plugins/NightCoop/redscript/NightCoopSdkNative.reds",
+          "Sha256": "9564627a12330121de2b58d0bec8e4ac4716fdfe291b958ec0a7417c91469443",
+          "Size": 23150
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/NightCoopFlight/NightCoopFlight.reds",
+          "Path": "r6/scripts/NightCoopFlight/NightCoopFlight.reds",
+          "Sha256": "d6c58bcf842d888420e721f1959a6736057b773e1256648a8f01df3907a6fed9",
+          "Size": 31438
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/NightCoopFlight/LICENSE.txt",
+          "Path": "r6/scripts/NightCoopFlight/LICENSE.txt",
+          "Sha256": "42568c0d4e7ec1d6d8f20aedf090577c38c500c9fd4dd55b826add546ed8f4ee",
+          "Size": 1087
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/NightCoopFlight/THIRD_PARTY.md",
+          "Path": "r6/scripts/NightCoopFlight/THIRD_PARTY.md",
+          "Sha256": "31c18a4d7b65dfdd6c3ad7ccea6959771b4ceab570bffc9da364423d668bfa27",
+          "Size": 1495
         }
       ],
       "BlockedReason": "",
       "ThirdPerson": "Confirmado em coop",
-      "ThirdPersonNotes": "Uso do pacote em coop confirmado por Douglas em 29/10/2026.",
-      "ThirdPersonSource": "https://nightcoop.net/dl/0.1.2-beta/NightCoop-0.1.2-beta-2.5.zip",
+      "ThirdPersonNotes": "Notas oficiais da 0.2.0-beta descrevem melhorias de sincronização e compatibilidade com Let There Be Flight. A verificação local confere os arquivos oficiais.",
+      "ThirdPersonSource": "https://nightcoop.net/download.html",
       "PhantomLibertyStatus": "not-required",
       "PhantomLibertyNotes": "FAQ oficial responde que Phantom Liberty não é obrigatório e descreve reinício do anfitrião sem o DLC, sem apagar arquivos.",
       "PhantomLibertySource": "https://nightcoop.net/index.html\nhttps://nightcoop.net/download.html\nhttps://nightcoop.net/docs.html"

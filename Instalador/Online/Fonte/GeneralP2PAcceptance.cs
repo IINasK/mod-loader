@@ -38,7 +38,7 @@ internal sealed partial class P2PService {
         lock(s)lock(startGate){if(!s.Sender||!s.Deferred||s.Automatic||s.Completed||s.Peer!=null)return false;s.Automatic=true;Save();return true;}
     }
     void DetectAcceptances(){
-        var waiting=installedSessions.Where(s=>s.Sender&&s.Automatic&&!s.Completed&&(s.Lifecycle?s.Recipients.Length<3:s.Peer==null)).ToArray();if(waiting.Length==0)return;
+        var waiting=installedSessions.Where(s=>s.Sender&&s.Automatic&&!s.Completed&&(s.Lifecycle?s.Recipients.Length<(s.CompareBeforePack?1:3):s.Peer==null)).ToArray();if(waiting.Length==0)return;
         var devices=Engine.Get("cluster/pending/devices");var folders=Engine.Get("cluster/pending/folders");
         foreach(var s in waiting){
             var candidates=new Dictionary<string,string>(StringComparer.Ordinal);
@@ -54,7 +54,7 @@ internal sealed partial class P2PService {
                 lock(s)lock(startGate){
                     if(s.Completed)break;
                     if(s.Lifecycle){
-                        if(s.Recipients.Length==3||s.Recipients.Any(p=>p.Device==peer.Key))continue;
+                        if(s.Recipients.Length>=(s.CompareBeforePack?1:3)||s.Recipients.Any(p=>p.Device==peer.Key))continue;
                         AddRecipient(s,peer.Key);
                         continue;
                     }

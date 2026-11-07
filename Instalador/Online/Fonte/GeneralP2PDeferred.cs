@@ -12,23 +12,24 @@ internal sealed partial class P2PService {
         public string Hash,Tag;
         public long Size;
     }
-    internal P2PSession BeginDeferred(GeneralModState state,System.Collections.Generic.IEnumerable<string> ids,bool lifecycle=false,string exportPreset=null,bool exportAllPresets=false){
+    internal P2PSession BeginDeferred(GeneralModState state,System.Collections.Generic.IEnumerable<string> ids,bool lifecycle=false,string exportPreset=null,bool exportAllPresets=false,bool compareBeforePack=false){
+        if(compareBeforePack&&!lifecycle)throw new ArgumentException("A comparação requer o protocolo atual.");
         lock(startGate){
         if(!Engine.Running||Sessions.Count>=100)throw new IOException("Inicie a conexão ou remova compartilhamentos antigos.");
         string[] chosen=ids.Distinct(StringComparer.Ordinal).ToArray();
         if(chosen.Length==0||chosen.Any(id=>!state.List.Mods.Any(m=>m.Id==id)))throw new IOException("Escolha um preset com mods para compartilhar.");
         byte[] key=new byte[32];using(var random=RandomNumberGenerator.Create())random.GetBytes(key);
         var preset=exportAllPresets?null:state.List.Presets.FirstOrDefault(p=>p.Id==(exportPreset??state.SelectedPreset));
-        var session=new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Sender=true,Mode="installed-zip",Deferred=true,Automatic=true,Lifecycle=lifecycle,Destination=state.Destination,Hash=Safe.Hex(key),Name=preset==null?"Pacote instalado":preset.Name,SelectedMods=chosen,ExportPreset=exportPreset,ExportAllPresets=exportAllPresets};
+        var session=new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Sender=true,Mode="installed-zip",Deferred=true,Automatic=true,Lifecycle=lifecycle,CompareBeforePack=compareBeforePack,Destination=state.Destination,Hash=Safe.Hex(key),Name=preset==null?"Pacote instalado":preset.Name,SelectedMods=chosen,ExportPreset=exportPreset,ExportAllPresets=exportAllPresets};
         string folder=Folder(session);
         if(!String.IsNullOrEmpty(state.Destination)&&Path.GetFullPath(folder).StartsWith(Path.GetFullPath(state.Destination).TrimEnd('\\')+"\\",StringComparison.OrdinalIgnoreCase))throw new IOException("A transferência deve ficar fora da pasta do jogo.");
         if(Directory.Exists(folder)||File.Exists(folder))throw new IOException("Destino da transferência já existe.");
         Directory.CreateDirectory(folder);
-        try{File.WriteAllText(Safe.In(folder,".stignore"),"!ready.json\n!pack.zip\n*\n",new UTF8Encoding(false));Engine.ConfigureFolder(session.Id,folder,session.Name,true);AddSession(session);return session;}
+        try{File.WriteAllText(Safe.In(folder,".stignore"),DeferredIgnores(session),new UTF8Encoding(false));Engine.ConfigureFolder(session.Id,folder,session.Name,true);AddSession(session);return session;}
         catch{Sessions.Remove(session);try{Engine.RemoveFolder(session.Id);}catch(Exception){}try{P2PPack.DeleteSnapshot(folder);}catch(Exception){}throw;}
         }
     }
-    internal void PrepareDeferred(P2PSession session,GeneralModState state,FixedCatalog catalog,string appData,bool includeConfigs,Action<string> report){
+    internal void PrepareDeferred(P2PSession session,GeneralModState state,FixedCatalog catalog,string appData,bool includeConfigs,Action<string> report,InstalledSnapshotManifest delta=null){
         if(!SnapshotSessions().Contains(session)||!session.Sender||!session.Deferred||session.Completed)throw new IOException("Envio antecipado inválido.");
         string zip=Safe.In(Folder(session),"pack.zip"),part=zip+".part";Safe.NoLinks(zip);Safe.NoLinks(part);
         DateTime nextCheck=DateTime.MinValue;bool remotePaused=false;
@@ -54,7 +55,9 @@ internal sealed partial class P2PService {
                 if(File.Exists(zip))throw new IOException("Pacote sem registro de conclusão; preservado.");
                 if(File.Exists(part))File.Delete(part);
                 if(report!=null)report(session.Stage);
-                InstalledSnapshot.Create(part,ExportState(state,session.ExportPreset,session.SelectedMods,session.ExportAllPresets),session.SelectedMods,catalog,appData,includeConfigs,report,true,checkpoint,(done,total)=>{session.PreparationBytes=done;session.PreparationTotal=total;});
+                Action<long,long> progress=(done,total)=>{session.PreparationBytes=done;session.PreparationTotal=total;};
+                if(delta==null)InstalledSnapshot.Create(part,ExportState(state,session.ExportPreset,session.SelectedMods,session.ExportAllPresets),session.SelectedMods,catalog,appData,includeConfigs,report,true,checkpoint,progress);
+                else InstalledSnapshot.Write(part,state.Destination,delta,report,checkpoint,progress);
                 checkpoint();
                 string hash=Safe.Hash(part);
                 lock(Sessions){session.PayloadHash=hash;session.Size=new FileInfo(part).Length;Save();}

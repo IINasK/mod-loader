@@ -79,6 +79,7 @@ $extensions += Join-Path $PSScriptRoot 'GeneralPopupStabilityTests.cs'
 $extensions += @('GeneralProjectDeletion.cs','GeneralProjectDeleteDialog.cs','GeneralProjectDeletionTests.cs','GeneralProjectsPanel.cs','GeneralProjectStorage.cs','GeneralNexusInfo.cs','GeneralProjectHubTests.cs','GeneralProjectHub.cs','GeneralAppPaths.cs','GeneralAppPathsTests.cs','GeneralStorageTests.cs','DownloadSourceIndex.cs','InstalledModpack.cs','GeneralNoCopyTests.cs','GeneralProjectCloneTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += @('ModVersionChoice.cs','ModVersionChoiceTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += @('GeneralAutomaticUpdate.cs','GeneralAutomaticUpdateTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
+$extensions += @('GeneralP2PSync.cs','NightCoopRelease.cs','NightCoopReleaseTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += '/reference:System.Xml.dll'
 $extensions += '/win32icon:'+(Join-Path $PSScriptRoot 'Assets\ModLoader.ico')
 $extensions += '/resource:'+(Join-Path $PSScriptRoot 'Assets\ModLoader.svg')+',ModLoader.Logo.svg'

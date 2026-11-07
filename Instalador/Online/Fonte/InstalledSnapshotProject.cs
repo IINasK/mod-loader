@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 
 public static partial class InstalledSnapshot {
-    static bool Uninstalled(GeneralModState state,GeneralModEntry mod,GeneralModVariant variant,FixedCatalog catalog,string root,string appData){
+    internal static bool Uninstalled(GeneralModState state,GeneralModEntry mod,GeneralModVariant variant,FixedCatalog catalog,string root,string appData){
         string work=Owner(mod,variant);
         if(state.SnapshotReceipts.ContainsKey(work))return false;
         if(variant.CyberpunkId!=null){

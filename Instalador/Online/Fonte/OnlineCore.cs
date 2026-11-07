@@ -81,7 +81,11 @@ public static class FixedData {
         NightCityDensity.Validate(c);
         Expand(c,c.Packages.Select(x=>x.Id));
         string[] basePaths={"bin/x64/winmm.dll","red4ext/RED4ext.dll","red4ext/LICENSE.txt","red4ext/THIRD_PARTY_LICENSES.txt","red4ext/plugins/NightCoop/NightCoop.dll"};
-        if(immutable.Count!=5 || !basePaths.All(immutable.Contains) || c.Packages.Any(x=>x.Immutable&&x.Id!="NightCoop")) throw new IOException("A base imutável precisa dos cinco arquivos originais.");
+        var nightCoop=c.Packages.SingleOrDefault(m=>m.Id=="NightCoop");
+        if(nightCoop!=null&&nightCoop.Version==NightCoopRelease.Version)
+            basePaths=basePaths.Concat(NightCoopRelease.AddedPaths).ToArray();
+        if(!immutable.SetEquals(basePaths)||c.Packages.Any(x=>x.Immutable&&x.Id!="NightCoop"))
+            throw new IOException("A base imutável diverge dos arquivos esperados para esta versão.");
     }
     public static bool HashValid(string h) { return Regex.IsMatch(h??"","^[a-f0-9]{64}$"); }
     public static void RequireInstallable(IEnumerable<FixedMod> mods) {
@@ -105,9 +109,10 @@ public static class FixedData {
             foreach(var f in mod.Files.Where(f=>!f.UserData)) {
                 string p=Safe.In(game,f.Path);
                 if(!File.Exists(p)) { if(Directory.Exists(p)) s.Different++; else s.Missing++;if(logFiles)OnlineDiagnostics.Record("scan.file",mod.Id,"Arquivo não encontrado.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,Present=false}); }
-                else {var info=new FileInfo(p);string hash=(info.Length==f.Size||VehicleCompatibility.HasUpgrade(f)||f.CanonicalSha256!=null||(f.Patch!=null&&info.Length==f.Patch.SourceSize))?(readHash==null?Safe.Hash(p):readHash(p)):null;bool correct=FpvCustomization.MatchesFile(f,info.Length,hash)&&!FpvCustomization.IsOriginal(f,info.Length,hash);bool original=FpvCustomization.IsOriginal(f,info.Length,hash);if(correct)s.Correct++;else if(original)s.Original++;else s.Different++;if(logFiles||!correct)OnlineDiagnostics.Record("scan.file",mod.Id,correct?"Arquivo conferido.":original?"Versão anterior reconhecida; correção disponível.":"Arquivo divergente.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,ActualSize=info.Length,ActualSha256=hash,WrittenUtc=info.LastWriteTimeUtc.ToString("o"),Present=true,Correct=correct,OfficialOriginal=original});}
+                else {var info=new FileInfo(p);string hash=(info.Length==f.Size||VehicleCompatibility.HasUpgrade(f)||NightCoopRelease.IsUpgradeTarget(f)||f.CanonicalSha256!=null||(f.Patch!=null&&info.Length==f.Patch.SourceSize))?(readHash==null?Safe.Hash(p):readHash(p)):null;bool correct=FpvCustomization.MatchesFile(f,info.Length,hash)&&!FpvCustomization.IsOriginal(f,info.Length,hash);bool original=FpvCustomization.IsOriginal(f,info.Length,hash);if(correct)s.Correct++;else if(original)s.Original++;else s.Different++;if(logFiles||!correct)OnlineDiagnostics.Record("scan.file",mod.Id,correct?"Arquivo conferido.":original?"Versão anterior reconhecida; correção disponível.":"Arquivo divergente.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,ActualSize=info.Length,ActualSha256=hash,WrittenUtc=info.LastWriteTimeUtc.ToString("o"),Present=true,Correct=correct,OfficialOriginal=original});}
             }
-            s.State=s.Different>0?"Diferente/alterado":s.Missing==0?(s.Original>0?"Setup NASK disponível":"Instalado correto"):s.Correct+s.Original==0?"Não instalado":"Parcial";
+            bool migrateNightCoop=mod.Id=="NightCoop"&&s.Original>0;
+            s.State=migrateNightCoop&&s.Different==0?"Atualização disponível":s.Different>0?"Diferente/alterado":s.Missing==0?(s.Original>0?"Setup NASK disponível":"Instalado correto"):s.Correct+s.Original==0?"Não instalado":"Parcial";
             s.Detail=s.Correct+" corretos; "+s.Original+" originais oficiais; "+s.Missing+" ausentes; "+s.Different+" diferentes";
             if(mod.Files.Any(f=>f.UserData))s.Detail+="; arquivos de perfil preservados, fora da verificação de versão";
         }catch(IOException){s.State="Não verificável";s.Detail="Não foi possível ler o caminho com segurança.";}

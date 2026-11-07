@@ -45,11 +45,12 @@ public sealed partial class InstalledSnapshotInstaller {
         records = Safe.In(this.appData, "Snapshots/" + Fingerprint(this.destination.ToUpperInvariant()));
     }
 
-    public string Install(string zipPath, string expectedHash, Action<string> report, int failAfter = -1, Func<ModVersionDifference,bool> chooseVersion = null, Action<string> transaction = null, Action checkpoint = null, Action<P2PInstallProgress> progress = null) {
+    public string Install(string zipPath, string expectedHash, Action<string> report, int failAfter = -1, Func<ModVersionDifference,bool> chooseVersion = null, Action<string> transaction = null, Action checkpoint = null, Action<P2PInstallProgress> progress = null, bool allowReuse = false) {
         // The archive is leased throughout verification and copying; no archive is kept in the receipt store.
         zipPath = Path.GetFullPath(zipPath); Safe.NoLinks(zipPath);
         using (var source = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
             var manifest = InstalledSnapshot.Read(zipPath, expectedHash, catalog);
+            if(!allowReuse&&manifest.Files.Any(file=>file.ReuseLocal))throw new IOException("O recebimento não autorizou reutilizar arquivos locais.");
             using (var hash = SHA256.Create()) if (Safe.Hex(hash.ComputeHash(source)) != expectedHash)
                 throw new IOException("O pacote foi alterado antes da instalação.");
             source.Position = 0;
@@ -90,7 +91,13 @@ public sealed partial class InstalledSnapshotInstaller {
                             beforeHashes.Add(group.Key, before);
                             string prepared = Safe.In(stage, Fingerprint(group.Key));
                             var files = group.ToList();
-                            if (files[0].Kind == "file") {
+                            var local = files[0].ReuseLocal;
+                            if (local) {
+                                var file=files[0];
+                                if (before!=file.Sha256 || new FileInfo(target).Length!=file.Size)
+                                    throw new IOException(GeneralStyle.T("Arquivo local mudou após a comparação. Peça um novo convite: ","A local file changed after comparison. Ask for a new invitation: ")+file.Path);
+                                using (var input=File.OpenRead(target)) InstalledSnapshot.ValidateCustomData(manifest,file,input);
+                            } else if (files[0].Kind == "file") {
                                 var file = files[0];
                                 ZipArchiveEntry entry = zip.GetEntry("files/" + file.Sha256);
                                 if (entry == null || entry.Length != file.Size) throw new IOException("Arquivo ausente no pacote: " + file.Path);
@@ -105,9 +112,9 @@ public sealed partial class InstalledSnapshotInstaller {
                                 foreach (var file in files) content = InstalledSnapshotConfig.Apply(file, content);
                                 File.WriteAllBytes(prepared, content);
                             }
-                            string after = Safe.Hash(prepared);
+                            string after = local ? before : Safe.Hash(prepared);
                             if (before != null && before != after) Backup(target, Safe.In(stage, Fingerprint(group.Key) + ".rollback"), before);
-                            var change = new Change { Path = group.Key, Before = before, Expected=before, After = after, Size = new FileInfo(prepared).Length, Owned = before == null };
+                            var change = new Change { Path = group.Key, Before = before, Expected=before, After = after, Size = local ? files[0].Size : new FileInfo(prepared).Length, Owned = before == null };
                             var previous = others.SelectMany(r => r.Files.Select(f => new { Receipt = r, File = f }))
                                 .FirstOrDefault(x => x.File.Path.Equals(group.Key, StringComparison.OrdinalIgnoreCase)
                                     && !x.File.Reverted && x.File.Applied && x.File.After == before && x.File.Owned);
@@ -167,11 +174,11 @@ public sealed partial class InstalledSnapshotInstaller {
         var paths=new HashSet<string>(manifest.Files.Where(f=>f.Kind=="file").Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
         var obsolete=receipts.Where(r=>r.Status=="installed").SelectMany(r=>r.Manifest.Files.Where(f=>f.Kind=="file"&&f.Owners.Any(o=>r.ActiveOwners.Contains(o)&&ids.Contains(o.Split('/')[0]))&&!paths.Contains(f.Path))).Where(f=>File.Exists(Safe.In(destination,f.Path))||Directory.Exists(Safe.In(destination,f.Path))).Select(f=>f.Path).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if(obsolete.Count>0)new ModVersionDifference{Name=manifest.Name,Current=GeneralStyle.T("Outra versão registrada","Another recorded version"),Incoming=manifest.Name,CanReplace=false,Detail=GeneralStyle.T("A versão anterior contém arquivos que não fazem parte do novo pacote. Remova a versão anterior pelo gerenciador para evitar misturar versões. Nada foi apagado.","The previous version contains files absent from the new pack. Remove the previous version through the manager to avoid mixing versions. Nothing was deleted.")+"\r\n"+String.Join("\r\n",obsolete.Take(6))}.Require(choose);
-        var changed=manifest.Files.Where(f=>f.Kind=="file").GroupBy(f=>f.Path,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()).Where(f=>File.Exists(Safe.In(destination,f.Path))&&HashOrNull(Safe.In(destination,f.Path))!=f.Sha256).ToList();
+        var changed=manifest.Files.Where(f=>f.Kind=="file"&&!f.ReuseLocal).GroupBy(f=>f.Path,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()).Where(f=>File.Exists(Safe.In(destination,f.Path))&&HashOrNull(Safe.In(destination,f.Path))!=f.Sha256).ToList();
         var expected=changed.ToDictionary(f=>f.Path,f=>HashOrNull(Safe.In(destination,f.Path)),StringComparer.OrdinalIgnoreCase);
         foreach(var group in changed.GroupBy(f=>String.Join(", ",manifest.List.Mods.Where(m=>f.Owners.Any(owner=>owner.StartsWith(m.Id+"/",StringComparison.Ordinal))).Select(m=>m.Name)))){
             var files=group.ToList();var known=catalog.Packages.FirstOrDefault(m=>m.Files.Any(f=>files.Any(p=>p.Path.Equals(f.Path,StringComparison.OrdinalIgnoreCase))));
-            new ModVersionDifference{Name=group.Key,Current=String.Join("; ",files.Select(f=>ModVersionDifference.FileVersion(Safe.In(destination,f.Path))).Distinct()),Incoming=known==null?GeneralStyle.T("Conteúdo do pacote recebido","Received pack content"):known.Version,CanReplace=!files.Any(f=>IsImmutable(f.Path)),Detail=String.Join("\r\n",files.Take(6).Select(f=>f.Path))+"\r\n"+GeneralStyle.T("O pacote inteiro aguarda sua escolha. A troca guarda os arquivos anteriores para reversão. A base protegida não pode ser substituída.","The entire pack waits for your choice. Replacement backs up the previous files. The protected base cannot be replaced.")}.Require(choose);
+            new ModVersionDifference{Name=group.Key,Current=String.Join("; ",files.Select(f=>ModVersionDifference.FileVersion(Safe.In(destination,f.Path))).Distinct()),Incoming=known==null?GeneralStyle.T("Conteúdo do pacote recebido","Received pack content"):known.Version,CanReplace=!files.Any(f=>IsImmutable(f.Path)&&!NightCoopRelease.AllowsUpgrade(f,expected[f.Path],catalog)),Detail=String.Join("\r\n",files.Take(6).Select(f=>f.Path))+"\r\n"+GeneralStyle.T("O pacote aguarda sua escolha. A troca guarda os arquivos anteriores para reversão. A base protegida só aceita atualizações oficiais reconhecidas.","The pack waits for your choice. Replacement backs up previous files. The protected base only accepts recognized official updates.")}.Require(choose);
         }
         return expected;
     }
@@ -328,6 +335,7 @@ public sealed partial class InstalledSnapshotInstaller {
         long staged = 0, copies = 0, backups = 0;
         foreach (var group in manifest.Files.GroupBy(f => f.Path, StringComparer.OrdinalIgnoreCase)) {
             var file = group.First();
+            if(file.ReuseLocal)continue;
             string path = Safe.In(destination, file.Path);
             if (file.Kind == "file") {
                 staged = checked(staged + file.Size);
@@ -432,7 +440,7 @@ public sealed partial class InstalledSnapshotInstaller {
         if (receipt == null || receipt.Id != id || !String.Equals(receipt.Root, destination, StringComparison.OrdinalIgnoreCase)
             || receipt.Files == null || receipt.Files.Count > 20000 || receipt.ActiveOwners == null
             || !new[] { "preparing", "installing", "installed", "rolledback", "rollback-preserved" }.Contains(receipt.Status)) throw new IOException("Recibo de snapshot inválido.");
-        InstalledSnapshot.Validate(receipt.Manifest, catalog);
+        InstalledSnapshot.Validate(receipt.Manifest,NightCoopRelease.CatalogForReceipt(catalog,receipt.Manifest));
         var keys = new HashSet<string>(WorkKeys(receipt.Manifest), StringComparer.Ordinal);
         if (receipt.ActiveOwners.Count > keys.Count || receipt.ActiveOwners.Distinct().Count() != receipt.ActiveOwners.Count || receipt.ActiveOwners.Any(k => !keys.Contains(k))) throw new IOException("Proprietários inválidos no recibo.");
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

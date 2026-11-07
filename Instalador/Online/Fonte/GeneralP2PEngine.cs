@@ -29,7 +29,7 @@ internal sealed class P2PInvite {
         if(Automatic&&!Deferred)throw new IOException("Aceitação automática requer convite antecipado.");
         if(Deferred&&(Mode!="installed-zip"||Size!=0))throw new IOException("Convite antecipado inválido.");
         if(Mode=="installed-zip"&&!Deferred&&(Size<=0||Size>P2PPack.MaxTotal))throw new IOException("Tamanho de pacote instalado inválido.");
-        if((Schema!=1&&(Schema!=2||!Automatic))||(Kind!="offer"&&Kind!="accept")||!DeviceValid(Device)||Folder==null||!Regex.IsMatch(Folder,"\\Aml-[a-f0-9]{32}\\z")||!P2PPack.HashValid(ManifestHash)||String.IsNullOrWhiteSpace(Name)||Name.Length>300||Name.Any(Char.IsControl))throw new IOException("Convite P2P inválido.");
+        if((Schema!=1&&((Schema!=2&&Schema!=3)||!Automatic))||(Kind!="offer"&&Kind!="accept")||!DeviceValid(Device)||Folder==null||!Regex.IsMatch(Folder,"\\Aml-[a-f0-9]{32}\\z")||!P2PPack.HashValid(ManifestHash)||String.IsNullOrWhiteSpace(Name)||Name.Length>300||Name.Any(Char.IsControl))throw new IOException("Convite P2P inválido.");
     }
     internal static bool DeviceValid(string device){return device!=null&&Regex.IsMatch(device,"\\A[A-Z2-7]{7}(?:-[A-Z2-7]{7}){7}\\z");}
 }

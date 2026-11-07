@@ -53,7 +53,7 @@ internal sealed partial class P2PService {
         string folder = NoticeDirectory(session, recipient);
         Directory.CreateDirectory(folder);
         string ignore=Safe.In(folder,".stignore");
-        const string rules="!status.json\n*\n";
+        string rules=session.CompareBeforePack?"!status.json\n!sync-choice.json\n*\n":"!status.json\n*\n";
         Safe.NoLinks(ignore);
         if(!File.Exists(ignore))File.WriteAllText(ignore,rules);
         else if(new FileInfo(ignore).Length>128||File.ReadAllText(ignore)!=rules)
@@ -165,9 +165,11 @@ internal sealed partial class P2PService {
             Save();
             return;
         }
+        InstalledSnapshotManifest delta=null;
+        if(session.CompareBeforePack&&session.PayloadHash==null&&!TryPrepareSync(session,state,out delta))return;
         session.Stage="Preparando pacote…";
         Task.Run(()=>{
-            try{PrepareDeferred(session,state,installedCatalog,installedData,true,null);}
+            try{PrepareDeferred(session,state,installedCatalog,installedData,true,null,delta);}
             catch(Exception ex){if(!disposed){session.Error=ex.Message;session.Stage=null;Save();}}
         });
     }
@@ -285,7 +287,7 @@ internal sealed partial class P2PService {
                     checkpoint();
                     if(replace)SetPhase(session,"installing");
                     return replace;
-                },id=>{session.TransactionId=id;Save();},checkpoint,value=>session.InstallProgress=value);
+                },id=>{session.TransactionId=id;Save();},checkpoint,value=>session.InstallProgress=value,allowReuse:AllowsLocalReuse(session));
                 session.Completed=true;
                 session.Error=null;
                 SetPhase(session,"installed");
