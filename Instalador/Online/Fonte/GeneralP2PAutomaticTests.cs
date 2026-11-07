@@ -35,11 +35,14 @@ internal static class GeneralP2PAutomaticTests {
                     await Wait(()=>copy.Enabled,"No automatic invitation appeared.");sent=sender.Sessions.Single();string offer=output.Text;copy.PerformClick();
                     check(Clipboard.GetText()==offer&&sent.Automatic,"Opening fills a copy-only automatic invitation.");
                     await Task.Delay(1300);check(sent.PayloadHash==null&&!Directory.GetFiles(sender.Folder(sent),"*.zip*").Any(),"Leaving the dialog open without a friend creates no ZIP or partial ZIP.");
-                    check(dialog.Content.Controls.Find("p2p-progress",true).Length==0,"No download loading bar is shown before acceptance.");Capture(dialog,Path.Combine(root,"waiting-black.png"));
+                    check(dialog.Content.Controls.Find("p2p-progress",true).All(control=>!control.Visible),"No download loading bar is visible before acceptance.");Capture(dialog,Path.Combine(root,"waiting-black.png"));
                     dialog.Hide();
                     accepted=receiver.Accept(offer,target,true);receiver.Engine.ConfigurePeer(sender.Engine.Device,"tcp://127.0.0.1:"+sender.Engine.ListenPort);
                     await Wait(()=>sent.Recipients.Length!=0,"Host did not detect acceptance without a reply code.");check(sent.Recipients.Single().Device==receiver.Engine.Device,"Host pins the proven recipient automatically without manual Authorize or reply paste.");
-                    await Wait(()=>sent.PayloadHash!=null||sent.Error!=null,"Preparation did not start after the recipient connected.");check(sent.PayloadHash!=null&&sent.Error==null,"Background service starts preparation even with its dialog hidden.");
+                    await Wait(()=>receiver.HasSyncPreview(accepted)||sent.Error!=null,"Host did not publish the comparison.");
+                    check(sent.Error==null&&sent.PayloadHash==null,"The host waits for the receiver's choice before building the pack.");
+                    await receiver.ChooseIncoming(accepted,true);
+                    await Wait(()=>sent.PayloadHash!=null||sent.Error!=null,"Preparation did not start after the recipient chose a full pack.");check(sent.PayloadHash!=null&&sent.Error==null,"Background service starts preparation even with its dialog hidden.");
                     using(var reopened=new GeneralP2PDialog(sender,state,catalog,false)){
                         reopened.Show(host);
                         await Wait(()=>reopened.Content.Controls.Find("p2p-card",true).Length==1,"The transfer was not reconstructed on reopening.");
@@ -49,11 +52,23 @@ internal static class GeneralP2PAutomaticTests {
                     dialog.Show();Capture(dialog,Path.Combine(root,"connected-black.png"));
                     await Wait(()=>accepted.Completed||accepted.Error!=null,"Automatic receive did not complete.");check(accepted.Completed&&accepted.Error==null&&File.ReadAllText(Path.Combine(target,"mods/test.txt"))=="automatic acceptance","Receiver installs verified files automatically after one-sided acceptance.");
                     await Wait(()=>sent.Completed&&!Directory.Exists(sender.Folder(sent))&&!Directory.Exists(receiver.Folder(accepted)),"Automatic transfer temporary cleanup did not finish.");check(true,"Both sides remove temporary transfer files after confirmation.");
-                }catch(Exception ex){failure=ex;}dialog.Dispose();host.Close();};Application.Run(host);
+                }catch(Exception ex){failure=ex;}if(!dialog.IsDisposed)dialog.Dispose();if(!host.IsDisposed)host.Close();};Application.Run(host);
             }
             if(failure!=null)throw failure;
             // The same trusted device still needs a fresh invitation proof for the next pack.
             sender.SetPreparationState(null);
+            var fallback=sender.BeginDeferred(state,new[]{"fixture"},true,compareBeforePack:true);
+            var fallbackReceive=receiver.Accept(sender.Invitation(fallback),target,true);
+            var reply=P2PInvite.Decode(receiver.Invitation(fallbackReceive));
+            string valid=reply.Encode();
+            reply.ManifestHash=new string('d',64);
+            bool rejected=false;
+            try{sender.Authorize(reply.Encode());}catch(IOException){rejected=true;}
+            check(rejected&&fallback.Recipients.Length==0,"Manual fallback requires the correct invitation secret.");
+            sender.Authorize(valid);sender.Authorize(valid);
+            check(fallback.Recipients.Length==1&&fallback.Recipients[0].Device==receiver.Engine.Device,"Copy reply authorizes only this recipient and is idempotent.");
+            sender.CancelSend(fallback);
+            receiver.DiscardIncoming(fallbackReceive);
             var second=sender.BeginDeferred(state,new[]{"fixture"});second.Automatic=false;string previous=sender.Invitation(second);var incoming=receiver.Accept(previous,target,true);
             check(sender.UpgradeInvitation(second)&&sender.Invitation(second)!=previous,"Unbound legacy invitations upgrade to automatic acceptance and display an updated code.");
             var upgraded=receiver.Accept(sender.Invitation(second),target,true);check(Object.ReferenceEquals(upgraded,incoming)&&incoming.Automatic,"Receiver upgrades its existing pending session when the updated invitation is pasted, without duplicate files.");

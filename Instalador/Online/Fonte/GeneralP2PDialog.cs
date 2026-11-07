@@ -174,7 +174,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         int order=0;
         foreach(var session in sessions){
             if(session.Discarded||session.HistoryDismissed||session.Mode!="installed-zip")continue;
-            if(session.Sender&&session.Peer==null&&session.Recipients.Length==0)continue;
+            if(session.Sender&&session.Peer==null&&session.Recipients.Length==0&&session!=offer)continue;
             if(session.Completed&&!cards.ContainsKey(session)&&(session.Sender?session!=latestSent:session.ListImported))continue;
             TransferCard card;
             if(!cards.TryGetValue(session,out card)){
@@ -229,7 +229,9 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));
             await Task.Run(()=>service.Authorize(code));
         }
-        input.Clear();status.Text="";
+        input.Clear();
+        status.ForeColor=GeneralStyle.Foreground;
+        status.Text=invite.Kind=="accept"?T("Resposta confirmada. Conectando ao amigo…","Reply confirmed. Connecting to your friend…"):"";
     }
     async void ChooseIncoming(P2PSession session,bool full){
         try{await service.ChooseIncoming(session,full);}
@@ -295,10 +297,10 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
                 (s.Peer!=null||s.Recipients.Length!=0)).ToArray();
             var views=await Task.Run(()=>{
                 var result=new Dictionary<P2PSession,P2PTransferStatus>();
-                if(!service.Engine.Running)return result;
+                if(!service.Engine.Running){foreach(var session in sessions)result.Add(session,new P2PTransferStatus{Unavailable=true});return result;}
                 foreach(var session in sessions){
                     try{result.Add(session,service.TransferStatus(session));}
-                    catch(System.Net.WebException){}
+                    catch(System.Net.WebException){result.Add(session,new P2PTransferStatus{Unavailable=true});}
                 }
                 return result;
             });
@@ -325,6 +327,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         readonly FlowLayoutPanel actions=new FlowLayoutPanel{Dock=DockStyle.Fill,Margin=Padding.Empty,WrapContents=false};
         readonly Button pause,retry,import,reply,dismiss,update,full;
         P2PTransferStatus last;
+        DateTime? waitingSince;
         internal int Order,Height;
 
         internal TransferCard(GeneralP2PDialog owner,P2PSession session){
@@ -350,7 +353,12 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             owner.IconButton(pause,"pause",T("Pausar","Pause"));pause.Name="p2p-pause";bars.Controls.Add(pause,1,0);
             retry=GeneralStyle.Button(T("Retomar","Resume"),()=>owner.Retry(session));retry.Name="p2p-retry";
             import=GeneralStyle.Button(T("Importar lista","Import list"),()=>owner.Import(session));import.Name="p2p-import-list";
-            reply=GeneralStyle.Button(T("Copiar resposta","Copy reply"),()=>owner.Copy(owner.service.Invitation(session)));
+            reply=GeneralStyle.Button(T("Copiar resposta","Copy reply"),()=>{
+                owner.Copy(owner.service.Invitation(session));
+                owner.status.ForeColor=GeneralStyle.Foreground;
+                owner.status.Text=T("Envie a resposta ao anfitrião. Ele deve colar em Link recebido do amigo e clicar em Conectar.","Send the reply to the host. They paste it in Link received from your friend and click Connect.");
+                owner.UpdateActions();
+            });reply.Name="p2p-reply";
             update=GeneralStyle.Button(T("Atualizar mods","Update mods"),()=>owner.ChooseIncoming(session,false),true);
             update.Name="p2p-update";
             full=GeneralStyle.Button(T("Pacote completo","Full pack"),()=>owner.ChooseIncoming(session,true));
@@ -363,6 +371,12 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             bool prepared=session.PayloadHash!=null||session.Completed||!session.Deferred;
             bool awaiting=session.CompareBeforePack&&!session.Completed&&session.PayloadHash==null&&!owner.service.HasSyncChoice(session);
             bool preview=awaiting&&owner.service.HasSyncPreview(session);
+            bool pendingGuest=session.Sender&&session.Peer==null&&session.Recipients.Length==0;
+            bool waitingConnection=!session.Completed&&!session.Paused&&!view.RemotePaused&&session.Phase==null&&!preview&&
+                (pendingGuest||!view.Connected||!view.Accepted);
+            if(waitingConnection&&!waitingSince.HasValue)waitingSince=DateTime.UtcNow;
+            if(!waitingConnection)waitingSince=null;
+            bool delayed=waitingSince.HasValue&&(DateTime.UtcNow-waitingSince.Value).TotalSeconds>=30;
             var scan=session.SyncProgress;
             var issue=session.VerificationIssue;
             bool scanning=scan!=null||session.Sender&&awaiting&&!preview&&session.Stage!=null;
@@ -388,17 +402,29 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             else if(message.Length==0&&issue!=null)
                 message=T("Erro ao verificar: ","Verification failed: ")+issue.ModName;
             else if(message.Length==0&&scanning&&scan!=null&&scan.Item!=null)message=scan.Item;
+            else if(message.Length==0&&waitingConnection){
+                if(view.Unavailable)message=T("Sem resposta do serviço P2P local. Reabra o Mod Loader se persistir.","Local P2P service unavailable. Reopen Mod Loader if this persists.");
+                else if(pendingGuest)message=delayed
+                    ?T("Nenhum aceite recebido. Peça ao amigo para copiar a resposta e cole-a acima.","No reply received. Ask your friend to copy their reply and paste it above.")
+                    :T("Convite pronto. Aguardando seu amigo aceitar.","Invitation ready. Waiting for your friend to accept.");
+                else if(!session.Sender&&view.Connected)message=T("Conectado. Aguardando o anfitrião autorizar o convite.","Connected. Waiting for the host to authorize the invitation.");
+                else if(delayed)message=session.Sender
+                    ?T("Conexão ainda indisponível. Confira se o amigo está com o Mod Loader aberto.","Connection still unavailable. Check that your friend has Mod Loader open.")
+                    :T("Conexão ainda indisponível. Copie a resposta e envie ao anfitrião.","Connection still unavailable. Copy the reply and send it to the host.");
+                else message=session.Sender?T("Convite aceito. Conectando ao amigo…","Invitation accepted. Connecting to your friend…")
+                    :T("Conectando ao anfitrião…","Connecting to the host…");
+            }
             else if(message.Length==0&&awaiting){
                 if(session.Sender)message=preview?T("Aguardando a escolha do amigo","Waiting for your friend's choice"):T("Conferindo mods do anfitrião","Checking the host's mods");
                 else if(session.SyncMode!=0)message=T("Aguardando a verificação do anfitrião","Waiting for the host to finish checking");
-                else if(view.Connected||preview)message=T("Escolha se quer receber só as diferenças ou o pacote completo.","Choose whether to receive only the differences or the full pack.");
+                else if(view.Accepted||preview)message=T("Conectado. Escolha as diferenças ou o pacote completo.","Connected. Choose differences or the full pack.");
                 else message=T("Aguardando conexão com o anfitrião","Waiting to connect to the host");
             }
             else if(message.Length==0&&!session.Sender&&session.CompareBeforePack&&!prepared)message=T("Escolha enviada. Aguardando preparo do anfitrião.","Choice sent. Waiting for the host to prepare the pack.");
             else if(message.Length==0&&!session.CompareBeforePack&&!prepared)message=T("Convite antigo. Gere um novo convite para escolher como receber.","Older invitation. Create a new invitation to choose how to receive.");
             else if(message.Length==0&&view.RemotePaused)message=T("Pausado pelo amigo","Paused by friend");
             else if(message.Length==0&&!view.Connected&&view.Recipients.Length==0)message=T("Aguardando conexão","Waiting for connection");
-            detail.Text=message;detail.ForeColor=session.Error==null?GeneralStyle.Foreground:GeneralStyle.Danger;
+            detail.Text=message;detail.ForeColor=session.Error==null&&!view.Unavailable?GeneralStyle.Foreground:GeneralStyle.Danger;
             owner.tips.SetToolTip(detail,message);
             var installing=!session.Sender&&session.Stage!=null&&session.Phase=="installing";
             var installProgress=session.InstallProgress;
@@ -453,12 +479,12 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             bool showImport=!session.Sender&&session.Completed&&!session.ListImported&&session.ReceiptId!=null&&
                 (owner.service.RegisterProject==null||session.ProjectError!=null);
             if(owner.service.RegisterProject!=null)import.Text=T("Salvar projeto","Save project");
-            bool showReply=!session.Sender&&!session.Completed&&!session.Automatic&&P2PInvite.DeviceValid(owner.service.Engine.Device);
+            bool showReply=!session.Sender&&!session.Completed&&session.Phase==null&&(!session.Automatic||waitingConnection)&&P2PInvite.DeviceValid(owner.service.Engine.Device);
             bool showChoices=!session.Sender&&awaiting&&!session.Held&&!session.RecoveryPending&&session.Error==null;
             update.Visible=full.Visible=showChoices;
             retry.Visible=showRetry;import.Visible=showImport;reply.Visible=showReply;
             foreach(Control action in actions.Controls)action.Enabled=!owner.busy;
-            update.Enabled=full.Enabled=showChoices&&!owner.busy&&session.SyncMode==0&&(view.Connected||preview);
+            update.Enabled=full.Enabled=showChoices&&!owner.busy&&session.SyncMode==0&&(view.Accepted||preview);
             dismiss.Visible=true;
             dismiss.Enabled=!owner.busy&&(session.Sender||session.Completed||showDiscard);
             dismiss.AccessibleName=session.Completed?T("Remover transferência concluída","Remove completed transfer")

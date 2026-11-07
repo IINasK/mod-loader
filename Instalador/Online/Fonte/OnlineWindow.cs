@@ -681,7 +681,11 @@ public sealed class DownloadBarCell:DataGridViewTextBoxCell {
 }
 
 static class OnlineProgram {
-    [STAThread]static int Main(string[] args){try{System.Net.ServicePointManager.SecurityProtocol=System.Net.SecurityProtocolType.Tls12;
+    [STAThread]static int Main(string[] args){try{
+#if VELOPACK
+        Velopack.VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
+#endif
+        System.Net.ServicePointManager.SecurityProtocol=System.Net.SecurityProtocolType.Tls12;
         if(args.Length==2&&args[0]=="--self-test"){OnlineTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-p2p"){GeneralP2PTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-snapshot"){InstalledSnapshotTests.Run(args[1]);InstalledSnapshotInstallerTests.Run(args[1]);return 0;}
@@ -719,7 +723,11 @@ static class OnlineProgram {
         }
         if(args.Length!=0)throw new IOException("Argumento não reconhecido. A instalação exige confirmação na interface.");
         OnlineDiagnostics.Start(paths.Logs);string exeHash=null;try{if(OnlineDiagnostics.Enabled)exeHash=Safe.Hash(Application.ExecutablePath);}catch(Exception){}OnlineDiagnostics.Record("app.start",null,"Aplicativo iniciado com diagnóstico ativo.",new{AppVersion=GeneralUpdateChecker.CurrentVersion,Executable=Path.GetFileName(Application.ExecutablePath),ExecutableSha256=exeHash,Catalog=c.Id,CatalogSha256=OnlineIdentity.CatalogHash});
+#if VELOPACK
+        GeneralVelopackUpdate.CheckAtStartup();
+#else
         if(GeneralAutomaticUpdate.TryStart(Application.ExecutablePath,paths)){OnlineDiagnostics.Stop();return 0;}
+#endif
         Application.Run(new GeneralProjectHome(c,cache,paths.Data));OnlineDiagnostics.Stop();return 0;
     }catch(Exception ex){if(args.Length>0){File.WriteAllText(Path.Combine(Path.GetTempPath(),"CyberpunkCoopOnline-erro.txt"),ex.ToString());return 1;}MessageBox.Show(ex.Message,"Não foi possível abrir o programa",MessageBoxButtons.OK,MessageBoxIcon.Error);return 1;}}
 }

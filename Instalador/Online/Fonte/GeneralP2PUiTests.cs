@@ -123,7 +123,10 @@ internal static class GeneralP2PUiTests {
                                     "An interrupted canceled send cannot resume on reopen.");
                         }
                         incoming.Completed=false;incoming.Phase=null;incoming.PayloadHash=null;incoming.Size=0;incoming.Lifecycle=true;incoming.CompareBeforePack=true;
-                        views[incoming].Connected=true;
+                        views[incoming].Connected=false;views[incoming].Accepted=false;views[incoming].RemotePaused=false;
+                        update();
+                        check(!Find<Button>(cards[1],"p2p-update").Enabled&&Find<Label>(cards[1],"p2p-transfer-status").Text.Contains(locale=="pt"?"Conectando":"Connecting"),"Pending connection has an explicit status.");
+                        views[incoming].Connected=true;views[incoming].Accepted=true;
                         update();
                         var updateMods=Find<Button>(cards[1],"p2p-update");
                         var fullPack=Find<Button>(cards[1],"p2p-full");

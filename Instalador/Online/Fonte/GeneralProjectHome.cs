@@ -16,7 +16,7 @@ internal sealed class GeneralProjectHome : Form {
     ListBox saved;
     LinkLabel update;
     Label storageSize;
-    GeneralUpdateRelease available;
+    GeneralUpdateRelease available=null;
     int buildVersion,hoverSaved=-1;
     internal bool DeletingProject {get;private set;}
     readonly ToolTip savedTips=new ToolTip{UseAnimation=false,UseFading=false};
@@ -31,7 +31,9 @@ internal sealed class GeneralProjectHome : Form {
         };FormClosing+=(s,e)=>{if(DeletingProject)e.Cancel=true;};
         Shown+=(s,e)=>RefreshStorageSize();
         if(!fixture)Shown+=async(s,e)=>await RestoreSharing();
+#if !VELOPACK
         if(!fixture)Shown+=async(s,e)=>{available=await GeneralUpdateChecker.Session.CheckOnce();if(!IsDisposed)UpdateNotice();};
+#endif
     }
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
     internal void Build(){

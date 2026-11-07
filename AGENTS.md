@@ -23,6 +23,12 @@
 - Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
   autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
 
+## Revisão 1.1.36 — Velopack e estado de conexão P2P
+
+- Velopack 1.2.161 para .NET Framework 4.7.2 e feed estável em GitHub Releases. ID de instalação separado de Config, cache e projetos. Velopack substitui a pasta atual mantendo o atalho. O Setup público usa nome fixo. Migração única do Inno pelo desinstalador existente, que preserva dados.
+- O anfitrião vê o convite pendente. O receptor diferencia conexão, autorização e serviço indisponível, com orientação após a espera. A resposta manual reutiliza o segredo do convite, valida sessão/esquema/limite e mantém a identidade TLS do Syncthing. Sem divulgar convites ou dados de rede nos relatos.
+- A execução da atualização respeita outra instância aberta. Manter a verificação antes de abrir projeto e o aplicativo disponível se a consulta de rede falhar.
+
 ## Revisão 1.1.35 — comparação P2P, falhas por mod e cancelamento individual
 
 - O envio anterior chegou a 0% porque o Mod Loader 1.1.33 esperava o NightCoop 0.1.2-beta e o jogo já tinha o 0.2.0-beta. Os dez arquivos da base nova passaram na conferência por hash. Evidência privada e sanitizada em T/R135/diagnostico-no-envio.json.

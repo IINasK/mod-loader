@@ -85,7 +85,12 @@ internal sealed partial class GeneralModWindow : Form {
         };
         Disposed+=(s,e)=>menus.Dispose();
         Shown+=(s,e)=>RefreshStorageSize();
-        if(fixture==null)Shown+=async(s,e)=>{CheckUpdatesOnStartup();await Scan();if(!IsDisposed)await ResumeP2P();};
+        if(fixture==null)Shown+=async(s,e)=>{
+#if !VELOPACK
+            CheckUpdatesOnStartup();
+#endif
+            await Scan();if(!IsDisposed)await ResumeP2P();
+        };
     }
     void BuildInterface(){
         GeneralStyle.UseTheme(state.Theme);GeneralStyle.Language=state.Language??"pt";

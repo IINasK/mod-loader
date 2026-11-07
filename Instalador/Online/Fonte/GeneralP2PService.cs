@@ -27,7 +27,7 @@ internal sealed class P2PSession {
 }
 internal sealed class P2PTransferStatus {
     internal int Percent;
-    internal bool Connected,RemotePaused,Accepted;
+    internal bool Connected,RemotePaused,Accepted,Unavailable;
     internal P2PRecipientProgress[] Recipients=new P2PRecipientProgress[0];
 }
 internal sealed partial class P2PService : IDisposable {
@@ -305,7 +305,13 @@ internal sealed partial class P2PService : IDisposable {
         var s=SnapshotSessions().SingleOrDefault(x=>x.Id==answer.Folder&&x.Sender);
         if(s==null)throw new IOException("A resposta não pertence a um envio ativo.");
         lock(s){
-            if(s.Lifecycle||s.Completed||s.Discarded||s.Hash!=answer.ManifestHash||s.Mode!=answer.Mode||s.Deferred!=answer.Deferred||s.Automatic!=answer.Automatic||(!s.Deferred&&s.Size!=answer.Size)||answer.Device==Engine.Device)throw new IOException("A resposta não pertence a um envio ativo.");
+            if(answer.Schema!=(s.CompareBeforePack?3:s.Lifecycle?2:1)||s.Completed||s.Discarded||s.Hash!=answer.ManifestHash||s.Mode!=answer.Mode||s.Deferred!=answer.Deferred||s.Automatic!=answer.Automatic||(!s.Deferred&&s.Size!=answer.Size)||answer.Device==Engine.Device)throw new IOException("A resposta não pertence a um envio ativo.");
+            if(s.Lifecycle){
+                if(s.Recipients.Any(peer=>peer.Device==answer.Device))return s;
+                if(s.Recipients.Length>=(s.CompareBeforePack?1:3))throw new IOException("Este convite já atingiu o limite de destinatários. Crie outro compartilhamento.");
+                lock(startGate)AddRecipient(s,answer.Device);
+                return s;
+            }
             if(s.Peer!=null&&s.Peer!=answer.Device)throw new IOException("Este convite já está vinculado a outro amigo. Crie outro compartilhamento.");
             Engine.ConfigurePeer(answer.Device);Engine.ConfigureFolder(s.Id,Folder(s),s.Name,true,answer.Device);if(s.Paused)Engine.Pause(s.Id,true);s.Peer=answer.Device;Save();return s;
         }

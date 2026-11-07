@@ -52,6 +52,14 @@ RAR e 7z agora são lidos pelo 7-Zip oficial 26.05, incorporado ao executável, 
 
 O catálogo atual tem 95 componentes: 93 linhas visíveis com Phantom Liberty e 84 sem a expansão; BMW/Yamaha continuam retidos. O botão Pular e continuar da 1.0.30 e o aceite/remoção rastreável de diferenças da 1.0.29 continuam disponíveis. O perfil FPV atual é NASK; Nask667 abaixo pertence ao histórico da 1.0.24. Consulte Conhecimento/Configuracoes/fpv-nativo-1.0.28.md para os valores finais aprovados.
 
+## Instalar e atualizar
+
+Baixe o [instalador atual](https://github.com/IINasK/mod-loader/releases/latest/download/Mod-Loader-Setup.exe) e abra **Mod Loader** no menu Iniciar. A partir da 1.1.36, o aplicativo consulta as atualizações estáveis no GitHub a cada abertura. Com outra instância aberta, a aplicação da atualização espera outra abertura.
+
+Para migrar do instalador Inno, feche o Mod Loader, desinstale a versão antiga em Aplicativos instalados do Windows e execute o novo Setup. Os projetos e as preferências usam pastas separadas da instalação.
+
+Para empacotar a edição atual, use o SDK .NET 8 e o vpk 1.2.161. Restaure as dependências de "Instalador/Setup/Velopack.Dependencies.csproj" com "dotnet restore --packages" e passe essa pasta em "-NuGetPackages" para "Instalador/Setup/compilar-velopack.ps1". Aponte "-Vpk" para o executável do vpk. Para gerar deltas, use "vpk download github" no diretório Release de saída antes de empacotar. Publique "Mod-Loader-Setup.exe", "releases.win.json" e os ".nupkg" apontados pelo feed na mesma Release.
+
 ## Compilar
 
 A logo original está em `Instalador/Online/Fonte/Assets/ModLoader.svg`. `preparar-logo.ps1` gera o ícone do Windows diretamente desse vetor, sem ferramentas ou downloads adicionais. O mesmo SVG é desenhado no cabeçalho do aplicativo.
