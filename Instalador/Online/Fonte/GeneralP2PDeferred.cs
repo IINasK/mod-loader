@@ -12,30 +12,37 @@ internal sealed partial class P2PService {
         public string Hash,Tag;
         public long Size;
     }
-    internal P2PSession BeginDeferred(GeneralModState state,System.Collections.Generic.IEnumerable<string> ids){
+    internal P2PSession BeginDeferred(GeneralModState state,System.Collections.Generic.IEnumerable<string> ids,bool lifecycle=false){
         lock(startGate){
         if(!Engine.Running||Sessions.Count>=100)throw new IOException("Inicie a conexão ou remova compartilhamentos antigos.");
         string[] chosen=ids.Distinct(StringComparer.Ordinal).ToArray();
         if(chosen.Length==0||chosen.Any(id=>!state.List.Mods.Any(m=>m.Id==id)))throw new IOException("Escolha um preset com mods para compartilhar.");
         byte[] key=new byte[32];using(var random=RandomNumberGenerator.Create())random.GetBytes(key);
         var preset=state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);
-        var session=new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Sender=true,Mode="installed-zip",Deferred=true,Automatic=true,Hash=Safe.Hex(key),Name=preset==null?"Pacote instalado":preset.Name,SelectedMods=chosen};
+        var session=new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Sender=true,Mode="installed-zip",Deferred=true,Automatic=true,Lifecycle=lifecycle,Destination=state.Destination,Hash=Safe.Hex(key),Name=preset==null?"Pacote instalado":preset.Name,SelectedMods=chosen};
         string folder=Folder(session);
         if(!String.IsNullOrEmpty(state.Destination)&&Path.GetFullPath(folder).StartsWith(Path.GetFullPath(state.Destination).TrimEnd('\\')+"\\",StringComparison.OrdinalIgnoreCase))throw new IOException("A transferência deve ficar fora da pasta do jogo.");
         if(Directory.Exists(folder)||File.Exists(folder))throw new IOException("Destino da transferência já existe.");
         Directory.CreateDirectory(folder);
-        try{File.WriteAllText(Safe.In(folder,".stignore"),"!ready.json\n!pack.zip\n*\n",new UTF8Encoding(false));Engine.ConfigureFolder(session.Id,folder,session.Name,true);Sessions.Add(session);Save();return session;}
+        try{File.WriteAllText(Safe.In(folder,".stignore"),"!ready.json\n!pack.zip\n*\n",new UTF8Encoding(false));Engine.ConfigureFolder(session.Id,folder,session.Name,true);AddSession(session);return session;}
         catch{Sessions.Remove(session);try{Engine.RemoveFolder(session.Id);}catch(Exception){}try{P2PPack.DeleteSnapshot(folder);}catch(Exception){}throw;}
         }
     }
     internal void PrepareDeferred(P2PSession session,GeneralModState state,FixedCatalog catalog,string appData,bool includeConfigs,Action<string> report){
-        if(!Sessions.Contains(session)||!session.Sender||!session.Deferred||session.Completed)throw new IOException("Envio antecipado inválido.");
+        if(!SnapshotSessions().Contains(session)||!session.Sender||!session.Deferred||session.Completed)throw new IOException("Envio antecipado inválido.");
         string zip=Safe.In(Folder(session),"pack.zip"),part=zip+".part";Safe.NoLinks(zip);Safe.NoLinks(part);
         DateTime nextCheck=DateTime.MinValue;bool remotePaused=false;
         Action checkpoint=()=>{
             while(true){
                 if(disposed)throw new IOException("Preparação interrompida; sessão preservada.");
-                if(DateTime.UtcNow>=nextCheck){var transfer=TransferStatus(session);remotePaused=transfer.RemotePaused;nextCheck=DateTime.UtcNow.AddSeconds(1);}
+                if(DateTime.UtcNow>=nextCheck){
+                    nextCheck=DateTime.UtcNow.AddSeconds(1);
+                    try{
+                        remotePaused=session.Lifecycle
+                            ?!session.Recipients.Any(p=>!Terminal(p.Phase)&&RecipientReady(session,p.Device))
+                            :TransferStatus(session).RemotePaused;
+                    }catch(System.Net.WebException){remotePaused=true;}
+                }
                 if(!session.Paused&&!remotePaused)return;
                 System.Threading.Thread.Sleep(100);
             }
@@ -49,7 +56,8 @@ internal sealed partial class P2PService {
                 if(report!=null)report(session.Stage);
                 InstalledSnapshot.Create(part,state,session.SelectedMods,catalog,appData,includeConfigs,report,true,checkpoint,(done,total)=>{session.PreparationBytes=done;session.PreparationTotal=total;});
                 checkpoint();
-                session.PayloadHash=Safe.Hash(part);session.Size=new FileInfo(part).Length;Save();
+                string hash=Safe.Hash(part);
+                lock(Sessions){session.PayloadHash=hash;session.Size=new FileInfo(part).Length;Save();}
             }
             if(!File.Exists(zip)&&File.Exists(part)){
                 if(new FileInfo(part).Length!=session.Size||Safe.Hash(part)!=session.PayloadHash)throw new IOException("Preparação interrompida divergente; preservada.");
@@ -58,7 +66,8 @@ internal sealed partial class P2PService {
             if(!File.Exists(zip)||new FileInfo(zip).Length!=session.Size||Safe.Hash(zip)!=session.PayloadHash)throw new IOException("O pacote preparado foi alterado ou removido. Preserve os registros.");
             var ready=new ReadyPack{Hash=session.PayloadHash,Size=session.Size};ready.Tag=ReadyTag(session.Hash,session.Id,ready.Hash,ready.Size);
             Safe.WriteJson(Safe.In(Folder(session),"ready.json"),ready);
-            session.Stage=null;session.Error=null;Save();lock(startGate)Engine.Request("POST","db/scan?folder="+session.Id,null);
+            lock(startGate)Engine.Request("POST","db/scan?folder="+session.Id,null);
+            session.Error=null;session.Stage=null;Save();
         }catch(Exception ex){session.Stage=null;session.Error=ex.Message;Save();throw;}
     }
     internal static string ReadyTag(string key,string id,string hash,long size){
@@ -77,7 +86,7 @@ internal sealed partial class P2PService {
     bool ResolveDeferred(P2PSession session){
         var ready=ReadReady(Safe.In(Folder(session),"ready.json"),session.Hash,session.Id);if(ready==null)return false;
         if(session.PayloadHash!=null&&(session.PayloadHash!=ready.Hash||session.Size!=ready.Size))throw new IOException("O remetente mudou o pacote depois da autorização; preservado.");
-        if(session.PayloadHash==null){session.PayloadHash=ready.Hash;session.Size=ready.Size;Save();}return true;
+        if(session.PayloadHash==null){lock(Sessions){session.PayloadHash=ready.Hash;session.Size=ready.Size;Save();}}return true;
     }
     internal bool DeferredPrepared(P2PSession session){return session.PayloadHash!=null&&File.Exists(Safe.In(Folder(session),"pack.zip"))&&File.Exists(Safe.In(Folder(session),"ready.json"));}
 }

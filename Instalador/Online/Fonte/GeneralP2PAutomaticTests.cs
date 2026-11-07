@@ -37,9 +37,15 @@ internal static class GeneralP2PAutomaticTests {
                     check(Clipboard.GetText()==offer&&sent.Automatic,"Opening fills a copy-only automatic invitation.");
                     await Task.Delay(1300);check(sent.PayloadHash==null&&!Directory.GetFiles(sender.Folder(sent),"*.zip*").Any(),"Leaving the dialog open without a friend creates no ZIP or partial ZIP.");
                     var bar=(GeneralProgress)dialog.Content.Controls.Find("p2p-progress",true).Single();check(!bar.Visible,"No download loading bar is shown before acceptance.");Capture(dialog,Path.Combine(root,"waiting-black.png"));
+                    dialog.Hide();
                     accepted=receiver.Accept(offer,target,true);receiver.Engine.ConfigurePeer(sender.Engine.Device,"tcp://127.0.0.1:"+sender.Engine.ListenPort);
-                    await Wait(()=>sent.Peer!=null,"Host did not detect acceptance without a reply code.");check(sent.Peer==receiver.Engine.Device,"Host pins the proven recipient automatically without manual Authorize or reply paste.");
-                    await Wait(()=>sent.PayloadHash!=null||sent.Error!=null,"Preparation did not start after the recipient connected.");check(sent.PayloadHash!=null&&sent.Error==null,"Host dialog starts preparation automatically after authenticated connection.");Capture(dialog,Path.Combine(root,"connected-black.png"));
+                    await Wait(()=>sent.Recipients.Length!=0,"Host did not detect acceptance without a reply code.");check(sent.Recipients.Single().Device==receiver.Engine.Device,"Host pins the proven recipient automatically without manual Authorize or reply paste.");
+                    await Wait(()=>sent.PayloadHash!=null||sent.Error!=null,"Preparation did not start after the recipient connected.");check(sent.PayloadHash!=null&&sent.Error==null,"Background service starts preparation even with its dialog hidden.");
+                    using(var reopened=new GeneralP2PDialog(sender,state,new[]{"fixture"},catalog,new DownloadCache(Path.Combine(root,"cache")),false)){
+                        var selected=(GeneralPicker)reopened.Content.Controls.Find("p2p-transfers",true).Single();
+                        check(selected.SelectedIndex==0&&sender.ActiveSelection==sent.Id,"A new sharing dialog selects the same ongoing transfer.");
+                    }
+                    dialog.Show();Capture(dialog,Path.Combine(root,"connected-black.png"));
                     await Wait(()=>accepted.Completed||accepted.Error!=null,"Automatic receive did not complete.");check(accepted.Completed&&accepted.Error==null&&File.ReadAllText(Path.Combine(target,"mods/test.txt"))=="automatic acceptance","Receiver installs verified files automatically after one-sided acceptance.");
                     await Wait(()=>sent.Completed&&!Directory.Exists(sender.Folder(sent))&&!Directory.Exists(receiver.Folder(accepted)),"Automatic transfer temporary cleanup did not finish.");check(true,"Both sides remove temporary transfer files after confirmation.");
                 }catch(Exception ex){failure=ex;}while((bool)typeof(GeneralP2PDialog).GetField("preparing",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(dialog))await Task.Delay(30);dialog.Dispose();host.Close();};Application.Run(host);

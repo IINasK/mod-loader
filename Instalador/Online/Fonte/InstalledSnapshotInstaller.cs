@@ -45,7 +45,7 @@ public sealed partial class InstalledSnapshotInstaller {
         records = Safe.In(this.appData, "Snapshots/" + Fingerprint(this.destination.ToUpperInvariant()));
     }
 
-    public string Install(string zipPath, string expectedHash, Action<string> report, int failAfter = -1, Func<ModVersionDifference,bool> chooseVersion = null) {
+    public string Install(string zipPath, string expectedHash, Action<string> report, int failAfter = -1, Func<ModVersionDifference,bool> chooseVersion = null, Action<string> transaction = null, Action checkpoint = null) {
         // The archive is leased throughout verification and copying; no archive is kept in the receipt store.
         zipPath = Path.GetFullPath(zipPath); Safe.NoLinks(zipPath);
         using (var source = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
@@ -59,7 +59,8 @@ public sealed partial class InstalledSnapshotInstaller {
                 var pending=receipts.Where(r=>r.Status=="preparing"||r.Status=="installing").ToList();
                 if(pending.Count!=0){
                     if(pending.Count!=1||!pending[0].Recoverable||Safe.Json.Serialize(pending[0].Manifest)!=Safe.Json.Serialize(manifest))throw new IOException("Há outra instalação interrompida nesta pasta. Preserve os recibos e restaure a operação antes de continuar.");
-                    return Resume(pending[0],report);
+                    if(transaction!=null)transaction(pending[0].Id);
+                    return Resume(pending[0],report,checkpoint);
                 }
                 var complete=receipts.FirstOrDefault(r=>r.Status=="installed"&&r.ActiveOwners.Count==WorkKeys(manifest).Count()&&Safe.Json.Serialize(r.Manifest)==Safe.Json.Serialize(manifest)&&r.Files.All(Matches));
                 if(complete!=null){CleanStage(Safe.In(destination,".mod-loader-snapshot-"+complete.Id));return complete.Id;}
@@ -74,10 +75,13 @@ public sealed partial class InstalledSnapshotInstaller {
                 var directories = new List<string>();
                 var beforeHashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 var writtenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                bool keepStage=false;
+                if(transaction!=null)transaction(receipt.Id);
                 Directory.CreateDirectory(stage);
                 try {
                     using (var zip = new ZipArchive(source, ZipArchiveMode.Read, true)) {
                         foreach (var group in manifest.Files.GroupBy(f => f.Path, StringComparer.OrdinalIgnoreCase)) {
+                            if(checkpoint!=null)checkpoint();
                             string target = Safe.In(destination, group.Key);
                             if (Directory.Exists(target)) throw Conflict(group.Key);
                             string before = HashOrNull(target);
@@ -122,6 +126,7 @@ public sealed partial class InstalledSnapshotInstaller {
                     try {
                         receipt.Status = "installing"; Save(receipt);
                         foreach (var change in receipt.Files) {
+                            if(checkpoint!=null)checkpoint();
                             Closed(manifest.Game);
                             string target = Safe.In(destination, change.Path);
                             string prepared = Safe.In(stage, Fingerprint(change.Path));
@@ -139,12 +144,15 @@ public sealed partial class InstalledSnapshotInstaller {
                         }
                         receipt.Status = "installed"; Save(receipt);
                         return receipt.Id;
+                    } catch(OperationCanceledException) {
+                        keepStage=true;
+                        throw;
                     } catch {
                         Rollback(receipt, beforeHashes, writtenPaths, stage);
                         foreach (string directory in directories.AsEnumerable().Reverse()) TryCleanup(() => DeleteEmpty(directory));
                         throw;
                     }
-                } finally { CleanStage(stage); }
+                } finally { if(!keepStage)CleanStage(stage); }
             }
         }
     }
@@ -187,7 +195,7 @@ public sealed partial class InstalledSnapshotInstaller {
         }
         return exported;
     }
-    string Resume(Receipt receipt,Action<string> report){
+    string Resume(Receipt receipt,Action<string> report,Action checkpoint){
         if(receipt.Files.Count!=receipt.Manifest.Files.Select(f=>f.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count())throw new IOException("Preparação interrompida incompleta. Preserve o pacote e o recibo.");
         string stage=Safe.In(destination,".mod-loader-snapshot-"+receipt.Id);Safe.NoLinks(stage);
         foreach(var file in receipt.Files){
@@ -198,11 +206,42 @@ public sealed partial class InstalledSnapshotInstaller {
         }
         receipt.Status="installing";Save(receipt);
         foreach(var file in receipt.Files){
+            if(checkpoint!=null)checkpoint();
             Closed(receipt.Manifest.Game);string target=Safe.In(destination,file.Path);
             if(HashOrNull(target)!=file.After){CreateParents(file.Path,new List<string>());ReplaceChecked(Safe.In(stage,Fingerprint(file.Path)),target,file.After,file.Expected,Safe.In(stage,"replace-"+Fingerprint(file.Path)));}
             file.Applied=true;Save(receipt);Report(report,"Retomado: "+file.Path);
         }
         receipt.Status="installed";Save(receipt);CleanStage(stage);return receipt.Id;
+    }
+
+    internal string DiscardInterrupted(string transaction,string zip,string expectedHash) {
+        Receipt receipt;
+        if(transaction!=null){
+            receipt=Read(transaction);
+            if(receipt==null){
+                CleanStage(Safe.In(destination,".mod-loader-snapshot-"+transaction));
+                return null;
+            }
+        }else{
+            if(expectedHash==null||!File.Exists(zip))return null;
+            var pending=AllReceipts().Where(r=>r.Recoverable&&(r.Status=="preparing"||r.Status=="installing")).ToArray();
+            if(pending.Length==0)return null;
+            var manifest=InstalledSnapshot.Read(zip,expectedHash,catalog);
+            receipt=pending.SingleOrDefault(r=>Safe.Json.Serialize(r.Manifest)==Safe.Json.Serialize(manifest));
+            if(receipt==null)return null;
+        }
+        if(receipt.Status=="installed")return receipt.Id;
+        if(receipt.Status!="preparing"&&receipt.Status!="installing")return null;
+        using(AcquireLock(receipt.Manifest.Game)){
+            Closed(receipt.Manifest.Game);
+            string stage=Safe.In(destination,".mod-loader-snapshot-"+receipt.Id);
+            var before=receipt.Files.ToDictionary(f=>f.Path,f=>f.Expected,StringComparer.OrdinalIgnoreCase);
+            var written=new HashSet<string>(receipt.Files.Where(f=>f.Expected!=f.After&&
+                (f.Applied||HashOrNull(Safe.In(destination,f.Path))==f.After)).Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
+            Rollback(receipt,before,written,stage);
+            CleanStage(stage);
+        }
+        return null;
     }
 
     internal InstalledSnapshotManifest ReadManifest(string receiptId) {

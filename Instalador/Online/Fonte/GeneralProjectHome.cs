@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -10,6 +11,8 @@ internal sealed class GeneralProjectHome : Form {
     readonly DownloadCache cache;
     readonly GeneralProjectStore store;
     readonly bool fixture;
+    readonly Dictionary<string,P2PService> sharing=new Dictionary<string,P2PService>(StringComparer.OrdinalIgnoreCase);
+    GeneralModWindow sharingWindow;
     ListBox saved;
     LinkLabel update;
     Label storageSize;
@@ -22,8 +25,12 @@ internal sealed class GeneralProjectHome : Form {
     internal GeneralProjectHome(FixedCatalog catalog,DownloadCache cache,string root,bool fixture=false){
         this.catalog=catalog;this.cache=cache;this.fixture=fixture;store=new GeneralProjectStore(root);OpenRequested=OpenProject;
         Text="Mod Loader "+GeneralUpdateChecker.CurrentVersion;Icon=ModLoaderBrand.AppIcon;ClientSize=new Size(1020,740);MinimumSize=new Size(900,680);
-        StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;Build();Disposed+=(s,e)=>savedTips.Dispose();FormClosing+=(s,e)=>{if(DeletingProject)e.Cancel=true;};
+        StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;Build();Disposed+=(s,e)=>{
+            savedTips.Dispose();
+            foreach(var service in sharing.Values)try{service.Dispose();}catch(Exception){}
+        };FormClosing+=(s,e)=>{if(DeletingProject)e.Cancel=true;};
         Shown+=(s,e)=>RefreshStorageSize();
+        if(!fixture)Shown+=async(s,e)=>await RestoreSharing();
         if(!fixture)Shown+=async(s,e)=>{available=await GeneralUpdateChecker.Session.CheckOnce();if(!IsDisposed)UpdateNotice();};
     }
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
@@ -118,7 +125,9 @@ internal sealed class GeneralProjectHome : Form {
             try{
                 var restored=store.Load(project);
                 using(var window=new GeneralModWindow(catalog,cache,store.DataPath(project),fixture?restored:null)){
-                    window.AttachProject(store,project);window.Shown+=(s,e)=>{window.Refresh();Hide();};window.ShowDialog();action=window.ProjectAction;
+                    window.AttachProject(store,project);
+                    if(!fixture){sharingWindow=window;window.AttachSharingHome(this);}
+                    window.Shown+=(s,e)=>{window.Refresh();Hide();};window.ShowDialog();action=window.ProjectAction;
                 }
                 if(action=="new"||action=="import"||action=="import-project"){ShowHome();project=action=="new"?CreateProject(false):ImportProject();}
                 else project=action=="ready"?CreateProject(true):action!=null&&action.StartsWith("project/",StringComparison.Ordinal)?store.Read().Projects.FirstOrDefault(item=>item.Id==action.Substring(8)):null;
@@ -126,6 +135,70 @@ internal sealed class GeneralProjectHome : Form {
         }
         ShowHome();
     }
+    internal void DetachSharingWindow(GeneralModWindow window){
+        if(sharingWindow==window)sharingWindow=null;
+    }
+
+    internal P2PService SharingService(string projectData){
+        P2PService service;
+        if(sharing.TryGetValue(projectData,out service))return service;
+        service=new P2PService(Path.Combine(projectData,"P2P"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"Mod Loader","Pacotes P2P"),offerRecovery:true);
+        service.EnableInstalledReceive(catalog,projectData);
+        service.ChooseVersion=difference=>{
+            if(IsDisposed||!IsHandleCreated)return false;
+            return (bool)Invoke((Func<bool>)(()=>{
+                var window=sharingWindow;
+                var owner=window!=null&&!window.IsDisposed?window.SharingPromptOwner:this;
+                return GeneralVersionChoiceDialog.Ask(owner,difference);
+            }));
+        };
+        sharing.Add(projectData,service);
+        return service;
+    }
+
+    async Task RestoreSharing(){
+        foreach(var project in store.Read().Projects){
+            if(IsDisposed)return;
+            string projectData=store.DataPath(project);
+            if(!File.Exists(Path.Combine(projectData,"P2P","sessions.json")))continue;
+            try{
+                var service=SharingService(projectData);
+                if(!service.SnapshotSessions().Any(s=>!s.Completed&&!s.Discarded||Directory.Exists(service.Folder(s))||s.Lifecycle&&(s.Sender?s.Recipients.Any(peer=>!peer.ReceiptClosed):!s.ReceiptClosed)))continue;
+                service.SetPreparationState(store.Load(project));
+                await RecoverSharing(this,service);
+                if(!IsDisposed)await Task.Run(()=>service.Start(_=>{}));
+            }catch(Exception ex){
+                if(!IsDisposed)GeneralDialog.Message(this,ex.Message,T("Retomada P2P","P2P recovery"),MessageBoxButtons.OK,MessageBoxIcon.Warning);
+            }
+        }
+    }
+
+    internal static async Task RecoverSharing(Control owner,P2PService service){
+        foreach(var session in service.SnapshotSessions().Where(s=>s.RecoveryPending)){
+            if(owner.IsDisposed)return;
+            using(var dialog=new GeneralDialog(T("Recebimento interrompido","Interrupted download"))){
+                dialog.ClientSize=new Size(650,284);
+                var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(24,12,24,20)};
+                layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+                layout.RowStyles.Add(new RowStyle(SizeType.Absolute,52));
+                var message=new Label{Dock=DockStyle.Fill,Text=session.Name+"\r\n\r\n"+T(
+                    "O download ou a instalação foi interrompido. Preserve o arquivo para retomar pelo mesmo compartilhamento ou descarte o recebimento e reverta as alterações registradas.",
+                    "The download or installation was interrupted. Keep the file to resume the same transfer, or discard it and roll back recorded changes.")};
+                var actions=GeneralTableDialogLayout.Commands();
+                var keep=GeneralStyle.Button(T("Preservar para depois","Keep for later"),()=>dialog.Complete(DialogResult.No),true);
+                var discard=GeneralStyle.Button(T("Descartar recebimento","Discard download"),()=>dialog.Complete(DialogResult.Yes));
+                actions.Controls.Add(keep);actions.Controls.Add(discard);
+                layout.Controls.Add(message,0,0);layout.Controls.Add(actions,0,1);dialog.Content.Controls.Add(layout);
+                dialog.AcceptButton=keep;dialog.CancelButton=keep;GeneralStyle.Apply(dialog,GeneralStyle.Dark);
+                if(dialog.ShowDialog(owner)==DialogResult.Yes){
+                    try{await Task.Run(()=>service.DiscardIncoming(session));}
+                    catch(Exception ex){if(!owner.IsDisposed)GeneralDialog.Message(owner,ex.Message,T("Recebimento preservado","Download preserved"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+                }else await Task.Run(()=>service.PreserveInterrupted(session));
+            }
+        }
+    }
+
     void ShowHome(){if(IsDisposed)return;Build();Show();Activate();}
     void Options(){
         var preferences=store.Read();using(var dialog=new GeneralOptionsDialog(preferences.Theme,preferences.Language,preferences.DownloadFolder,()=>cache.ClearDownloads())){
@@ -148,9 +221,9 @@ internal sealed partial class GeneralModWindow {
         UpdateTableTitle();
     }
     bool BuiltInProject {get{return project!=null&&!String.IsNullOrEmpty(project.TemplateId);}}
-    void BackToProjects(){if(working||scanning||p2p!=null&&p2p.Installing)return;Close();}
+    void BackToProjects(){if(working||scanning)return;Close();}
     void ProjectCommand(string action){
-        if(working||scanning||p2p!=null&&p2p.Installing)return;
+        if(working||scanning)return;
         if(BuiltInProject&&(action=="export"||action=="import"||action=="delete-project"))return;
         if(action=="clone"){
             if(projectStore==null||project==null||!ConfirmPresetNavigation())return;

@@ -64,8 +64,9 @@ internal static class ModVersionChoiceTests {
             service.EnableInstalledReceive(catalog,Path.Combine(root,"p2p-receipts"));int choices=0;service.ChooseVersion=d=>{choices++;return false;};
             var session=new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Name="Conflict pack",Hash=Safe.Hash(pack),Size=new FileInfo(pack).Length,Mode="installed-zip",Destination=target,AutoInstall=true};
             string folder=service.Folder(session);Directory.CreateDirectory(folder);File.Copy(pack,Path.Combine(folder,"pack.zip"));
-            reject(()=>{try{typeof(P2PService).GetMethod("ProcessInstalledLocked",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).Invoke(service,new object[]{session});}catch(System.Reflection.TargetInvocationException ex){throw ex.InnerException;}},"P2P receive dispatch forwards version choice before installation.");
-            check(choices==1&&!session.Completed&&File.Exists(Path.Combine(folder,"pack.zip"))&&File.ReadAllText(file)=="changed-during-choice","Keeping current in P2P preserves payload for retry and never marks the pack installed.");
+            typeof(P2PService).GetMethod("ProcessInstalledLocked",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).Invoke(service,new object[]{session});
+            check(System.Threading.SpinWait.SpinUntil(()=>session.Stage==null,10000)&&choices==1&&session.Phase=="retry"&&!String.IsNullOrEmpty(session.Error),"P2P receive worker forwards the version choice and records the deferred installation.");
+            check(!session.Completed&&File.Exists(Path.Combine(folder,"pack.zip"))&&File.ReadAllText(file)=="changed-during-choice","Keeping current in P2P preserves payload for retry and never marks the pack installed.");
         }
         string binary=GeneralAutomaticUpdateTests.MakeExe(root,"version.dll","1.2.3","Fixture");check(ModVersionDifference.FileVersion(binary)=="1.2.3.0","Readable binary version is displayed without executing the file.");
         var blocked=new ModVersionDifference{Name="Protected",CanReplace=false,Detail="protected"};reject(()=>blocked.Require(d=>true),"Explicit choice cannot bypass protected replacement guard.");

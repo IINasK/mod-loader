@@ -72,7 +72,6 @@ internal sealed partial class GeneralModWindow : Form {
         Text="Mod Loader "+GeneralUpdateChecker.CurrentVersion;Icon=ModLoaderBrand.AppIcon;ClientSize=new Size(1240,820);MinimumSize=new Size(1000,680);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
         BuildInterface();
         FormClosing+=(s,e)=>{
-            if(p2p!=null&&p2p.Installing){e.Cancel=true;detail.Text=T("Aguarde a instalação do pacote recebido terminar antes de fechar.","Wait for the received pack installation to finish before closing.");return;}
             if(working){RequestSkip();normal.Clear();priority.Clear();e.Cancel=true;detail.Text=T("Aguarde a operação atual terminar antes de fechar.","Wait for the current operation to finish before closing.");}
             else if(scanning){RequestSkip();e.Cancel=true;}
             else if(!ConfirmPresetNavigation())e.Cancel=true;

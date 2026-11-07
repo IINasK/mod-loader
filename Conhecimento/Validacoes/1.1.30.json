@@ -1,0 +1,111 @@
+{
+  "Version": "1.1.30",
+  "Reports": [
+    {
+      "Report": "resultado-updates.json",
+      "Checks": 30,
+      "Passed": true,
+      "Evidence": "T/130/online-testes-0c19b35f75034531b0118d14079c5764/resultado-updates.json"
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Checks": 162,
+      "Passed": true,
+      "Evidence": "T/130/online-testes-247f61f2b53a44c989cf314fb71e2394/resultado-p2p-ui.json"
+    },
+    {
+      "Report": "resultado-p2p-deferred.json",
+      "Checks": 17,
+      "Passed": true,
+      "Evidence": "T/130/online-testes-3fc31f09eab040eda84c77d226ba90b0/resultado-p2p-deferred.json"
+    },
+    {
+      "Report": "resultado-automatic-update.json",
+      "Checks": 25,
+      "Passed": true,
+      "Evidence": "T/130/online-testes-520e633d7276439f8c102a448e5b706e/resultado-automatic-update.json"
+    },
+    {
+      "Report": "resultado-p2p-network.json",
+      "Checks": 31,
+      "Passed": true,
+      "Evidence": "T/130/online-testes-97c19d83db954b89b9d05bcc39ce67af/resultado-p2p-network.json"
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 28,
+      "Passed": true,
+      "Evidence": "T/130/online-testes-9cb14c330e254db8ad962e9e9e1a50f3/resultado-snapshot-installer.json"
+    },
+    {
+      "Report": "resultado-version-choice.json",
+      "Checks": 51,
+      "Passed": true,
+      "Evidence": "T/130/online-testes-9cb14c330e254db8ad962e9e9e1a50f3/resultado-version-choice.json"
+    },
+    {
+      "Report": "resultado-p2p.json",
+      "Checks": 47,
+      "Passed": true,
+      "Evidence": "T/130/online-testes-b9bd044af2e840f9a8fa4a6b02639531/resultado-p2p.json"
+    },
+    {
+      "Report": "resultado-p2p-lifecycle.json",
+      "Checks": 12,
+      "Passed": true,
+      "Evidence": "T/130/online-testes-c3b22d3237814a7a8104daf98db7d8e4/resultado-p2p-lifecycle.json"
+    },
+    {
+      "Report": "resultado-p2p-automatic.json",
+      "Checks": 30,
+      "Passed": true,
+      "Evidence": "T/130/online-testes-efb70ff634154f6286735797db647502/resultado-p2p-automatic.json"
+    },
+    {
+      "Report": "resultado-snapshot-density.json",
+      "Checks": 1,
+      "Passed": true,
+      "Evidence": "T/130/online-testes-f21d8ef6cb4f4559a353d8c7b4fb1520/on-2f90f940/resultado-snapshot-density.json"
+    },
+    {
+      "Report": "resultado-snapshot.json",
+      "Checks": 45,
+      "Passed": true,
+      "Evidence": "T/130/online-testes-f21d8ef6cb4f4559a353d8c7b4fb1520/resultado-snapshot.json"
+    },
+    {
+      "Report": "resultado-p2p-dialog-network.json",
+      "Checks": 6,
+      "Passed": true,
+      "Evidence": "T/130/pd-d6090c/resultado-p2p-dialog-network.json"
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 28,
+      "Passed": true,
+      "Evidence": "T/130/resultado-snapshot-installer.json"
+    },
+    {
+      "Report": "resultado-snapshot-p2p.json",
+      "Checks": 43,
+      "Passed": true,
+      "Evidence": "T/130/sp-1dc4d0/resultado-snapshot-p2p.json"
+    },
+    {
+      "Report": "resultado-setup.json",
+      "Checks": 24,
+      "Passed": true,
+      "Evidence": "T/setup-0117bfa4273c4fc58c582c96ded90e95/resultado-setup.json"
+    }
+  ],
+  "AppSha256": "14d944b2d6ef2387191608dd7ea160baa04cd4d3d91b1abcf354e8279e62d150",
+  "SetupSha256": "a699237c6bf7ad116e01275a641dfc655868f8062f5d0fecf754925305d4f8a3",
+  "CatalogSha256": "c6a0b3a6170e10c8d707c4d25361d30be7382bccb9a25dd8a50d27c956e2e6a2",
+  "NetworkTests": "Separate official Syncthing peers on loopback. The same ZIP was sent to three peers while one recipient sent another pack.",
+  "Recovery": "The installation version choice remains visible to the sender at 100% download. The original invite and ZIP survive restart. Keeping and retrying, and rolling back an interrupted write, are covered.",
+  "Compatibility": "Use 1.1.30 on all peers and a new invitation for installation receipts and up to three recipients. Earlier complete local downloads can still be retried from their retained sessions.",
+  "Limitations": [
+    "No Internet, relay, or two-computer test for this version.",
+    "The test suite used synthetic mods and destinations. No real game files or saves changed."
+  ]
+}

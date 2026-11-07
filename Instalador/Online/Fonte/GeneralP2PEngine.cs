@@ -29,7 +29,7 @@ internal sealed class P2PInvite {
         if(Automatic&&!Deferred)throw new IOException("Aceitação automática requer convite antecipado.");
         if(Deferred&&(Mode!="installed-zip"||Size!=0))throw new IOException("Convite antecipado inválido.");
         if(Mode=="installed-zip"&&!Deferred&&(Size<=0||Size>P2PPack.MaxTotal))throw new IOException("Tamanho de pacote instalado inválido.");
-        if(Schema!=1||(Kind!="offer"&&Kind!="accept")||!DeviceValid(Device)||Folder==null||!Regex.IsMatch(Folder,"\\Aml-[a-f0-9]{32}\\z")||!P2PPack.HashValid(ManifestHash)||String.IsNullOrWhiteSpace(Name)||Name.Length>300||Name.Any(Char.IsControl))throw new IOException("Convite P2P inválido.");
+        if((Schema!=1&&(Schema!=2||!Automatic))||(Kind!="offer"&&Kind!="accept")||!DeviceValid(Device)||Folder==null||!Regex.IsMatch(Folder,"\\Aml-[a-f0-9]{32}\\z")||!P2PPack.HashValid(ManifestHash)||String.IsNullOrWhiteSpace(Name)||Name.Length>300||Name.Any(Char.IsControl))throw new IOException("Convite P2P inválido.");
     }
     internal static bool DeviceValid(string device){return device!=null&&Regex.IsMatch(device,"\\A[A-Z2-7]{7}(?:-[A-Z2-7]{7}){7}\\z");}
 }
@@ -121,12 +121,15 @@ internal sealed class SyncthingEngine : IDisposable {
         device["addresses"]=new[]{endpoint??"dynamic"};Request("PUT","config/devices/"+id,device);
     }
     internal void ConfigureFolder(string id,string path,string name,bool sender,string peer=null){
+        ConfigureSharedFolder(id,path,name,sender,peer==null?new string[0]:new[]{peer},false);
+    }
+    internal void ConfigureSharedFolder(string id,string path,string name,bool sender,IEnumerable<string> peers,bool paused){
         if(!Regex.IsMatch(id??"","\\Aml-[a-f0-9]{32}\\z"))throw new IOException("Identificador de pacote inválido.");
         Safe.NoLinks(path);Directory.CreateDirectory(path);
         var folder=Get("config/defaults/folder");folder["id"]=id;folder["label"]=name;folder["path"]=Path.GetFullPath(path);
-        folder["type"]=sender?"sendonly":"receiveonly";folder["paused"]=false;folder["fsWatcherEnabled"]=true;folder["rescanIntervalS"]=60;
+        folder["type"]=sender?"sendonly":"receiveonly";folder["paused"]=paused;folder["fsWatcherEnabled"]=true;folder["rescanIntervalS"]=60;
         // PUT merges folder defaults. Clear the peer secret explicitly; let Syncthing add itself.
-        folder["devices"]=peer==null?new object[0]:new object[]{new{deviceID=peer,encryptionPassword=""}};
+        folder["devices"]=peers.Select(peer=>new{deviceID=peer,encryptionPassword=""}).ToArray();
         Request("PUT","config/folders/"+id,folder);
     }
     internal void Pause(string id,bool value){try{Request("PATCH","config/folders/"+id,new{paused=value});}catch(WebException ex){var response=ex.Response as HttpWebResponse;if(response==null||response.StatusCode!=HttpStatusCode.NotFound)throw;response.Dispose();}}

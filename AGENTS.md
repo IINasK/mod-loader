@@ -451,3 +451,10 @@ Pedido de Douglas, 28/10/2026: configurar mods com o coop, registrar processos v
 - Fechamento1.1.12:1022checks/23relatórios em D:\T112verified aprovados; EXE7437312bytes/SHA D5730703E1C8F59A2D7FEF2F24397C4AC4875549EAA7D10DE8352FA8A87175BF. Catálogo idêntico. Commitmain e Release devem corresponder a esse binário; não incluir relato privado no Git.
 
 - Publicação concluída: v1.1.28, código60b50bb, Setup SHA345c0cc36ece0da7465ae43a85dd994c60c9896d8c320a55ccc8d32882f8d0e3. Download público conferido pelo transporte de produção; checker detecta atualização a partir de1.1.27. Instância real aberta foi preservada: instalação local1.1.28 não executada nesta etapa, atualizar na próxima abertura. Prova sanitizada Validacoes/publicacao-1.1.28.json.
+
+## Revisão 1.1.30 — 07/11/2026
+
+- O envio P2P tem estados separados de transferência e instalação por destinatário. Convites novos aceitam até três destinatários e compartilham o mesmo ZIP. O remetente só libera o pacote após todos confirmarem instalação ou descarte.
+- O serviço P2P pertence à sessão do aplicativo e mantém envios e recebimentos ativos fora da janela de compartilhamento. Na abertura, o receptor escolhe preservar ou descartar o recebimento interrompido. Preservar mantém o arquivo para Retomar. Descartar reverte somente as alterações registradas da instalação interrompida.
+- Todos os participantes precisam da 1.1.30 e de um novo convite para o fluxo completo. Recebimentos antigos com ZIP local íntegro podem retomar a instalação pelo registro existente.
+- Testes locais com três destinatários e envio simultâneo, escolha de versão, reabertura, descarte e instalação Windows em fixture. Evidência em Conhecimento/Validacoes/1.1.30.json. A validação por Internet entre computadores permanece para o próximo teste do usuário.
