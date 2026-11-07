@@ -1,0 +1,20 @@
+{
+  "Version": "1.1.31",
+  "SourceCommit": "92f54d4",
+  "Release": "https://github.com/IINasK/mod-loader/releases/tag/v1.1.31",
+  "PublicDownloadVerified": true,
+  "SetupSha256": "a94ecd7a32bacd5994e1d45aa00e2b4417d459972d64903ffd6e5d7f0a1851c7",
+  "PreviousVersionDetectedByProductionChecker": "1.1.30",
+  "LocalUpdate": {
+    "Passed": true,
+    "PreviousVersion": "1.1.30.0",
+    "InstalledVersion": "1.1.31.0",
+    "AppSha256": "5a17321758217a083161b8206dfcfa2862b5a7bc6134075cb93fcf0233ad8fa8",
+    "SettingsChecked": 5,
+    "SettingsUnchanged": 5,
+    "SetupExit": 0,
+    "ForcedClose": false,
+    "AppLaunched": false
+  },
+  "RemoteTwoComputerTestPerformed": false
+}
