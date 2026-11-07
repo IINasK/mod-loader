@@ -22,7 +22,7 @@ internal sealed partial class P2PService {
         lock(startGate)Engine.Request("PATCH","config/devices/"+Engine.Device,new{name=ReceiveLabel(s)});
     }
     void RefreshAcceptance(P2PSession s){
-        if(SnapshotSessions().Any(other=>other!=s&&other.Peer==s.Peer&&!other.Completed&&!other.Paused))return;
+        if(SnapshotSessions().Any(other=>other!=s&&other.Peer==s.Peer&&!other.Completed&&!other.Discarded&&!other.Held&&!other.Paused))return;
         lock(startGate){
             var device=Engine.Get("config/devices/"+s.Peer);if(device.ContainsKey("paused")&&Convert.ToBoolean(device["paused"]))return;
             // Re-advertise the upgraded proof; the peer's pending-folder cache may still hold the previous label.

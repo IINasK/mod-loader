@@ -284,6 +284,9 @@ internal sealed partial class P2PService : IDisposable {
             if(existing.Automatic!=invite.Automatic){
                 if(existing.Automatic||!invite.Automatic||existing.Completed)throw new IOException("Use o convite atualizado enviado pelo amigo.");
                 existing.Automatic=true;AdvertiseAcceptance(existing);Engine.ConfigureFolder(existing.Id,Folder(existing),ReceiveLabel(existing),false,existing.Peer);if(existing.Paused)Engine.Pause(existing.Id,true);Save();RefreshAcceptance(existing);
+            }else if(existing.Automatic&&!existing.Completed&&!existing.Held&&!existing.Paused&&existing.PayloadHash==null){
+                AdvertiseAcceptance(existing);
+                RefreshAcceptance(existing);
             }
             return existing;
         }
