@@ -496,3 +496,10 @@ Pedido de Douglas, 28/10/2026: configurar mods com o coop, registrar processos v
 - Auditoria local de leitura confirmou uma pasta vazia red4ext/plugins/vehicle_speed_unlimiter. Ela explica por que esse nome ainda pode aparecer no NightCoop. O crash associado temporalmente ao Spot On Radio não estabelece causalidade.
 - O primeiro teste da sincronização encontrou o limite de caminhos do Windows no backup. O layout novo usa caminhos mais curtos e preserva os backups antigos. O teste de dois serviços Syncthing passou com arquivos divergentes, seleção, exclusão de pastas vazias e restauração.
 - Pacote completo mantém o fluxo de instalação. Limpeza automática indiscriminada não faz parte do protocolo. Para revisar extras, use as duas cópias atualizadas do Mod Loader e um novo convite.
+
+## Revisão 1.1.39 — retomada do auxiliar P2P
+
+- Reprodução isolada com o Syncthing 2.1.7 fixado. Dois auxiliares usando o mesmo perfil geram saída 1 e Failed to acquire lock. O aviso antigo era genérico para qualquer saída.
+- O auxiliar e seus subprocessos são iniciados num Job Object do Windows ligado ao Mod Loader. O fechamento normal solicita shutdown. Em fechamento abrupto, o Windows encerra a árvore do auxiliar. O perfil, a identidade TLS, as sessões e os arquivos de transferência continuam nas pastas existentes.
+- Na inicialização, o erro de bloqueio recente recebe mensagem específica. Um registro anterior não contamina o diagnóstico atual. A tela limpa o texto de inicialização se o auxiliar falhar e informa quando o convite colado já concluiu um recebimento.
+- Teste local validou a retomada do mesmo perfil e identidade após encerramento abrupto de uma fixture, além de fechamento normal. O motivo exato no PC remoto ainda depende do log daquele computador.

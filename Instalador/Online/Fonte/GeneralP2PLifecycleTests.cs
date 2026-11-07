@@ -26,6 +26,54 @@ internal static class GeneralP2PLifecycleTests {
         }
     }
 
+    internal static void RunEngine(string parent,string helper){
+        string root=OnlineTests.NestedRoot(parent,"engine-");
+        Directory.CreateDirectory(root);
+        string ready=Safe.In(root,".fixture-engine");
+        File.WriteAllText(ready,"");
+        string home=Safe.In(root,"syncthing");
+        var checks=new List<string>();
+        string identity;
+        var launch=new ProcessStartInfo(typeof(GeneralP2PLifecycleTests).Assembly.Location,
+            "--self-test-p2p-engine-owner \""+root+"\" \""+helper+"\""){UseShellExecute=false,CreateNoWindow=true};
+        using(var owner=Process.Start(launch)){
+            try{
+                Wait(()=>owner.HasExited||new FileInfo(ready).Length>0,"Fixture owner did not start the helper.");
+                if(owner.HasExited)throw new IOException("Fixture owner exited before starting the helper.");
+                identity=File.ReadAllText(ready);
+                Check(checks,P2PInvite.DeviceValid(identity),"The fixture launched the verified Syncthing helper.");
+            }finally{if(!owner.HasExited)owner.Kill();owner.WaitForExit();}
+        }
+        using(var reopened=new SyncthingEngine(home,true)){
+            reopened.Start(helper);
+            Check(checks,reopened.Running&&reopened.Device==identity,
+                "An abruptly closed Mod Loader releases Syncthing and reopens with the same identity.");
+        }
+        using(var reopened=new SyncthingEngine(home,true)){
+            reopened.Start(helper);
+            Check(checks,reopened.Device==identity,"Normal close also releases the helper.");
+        }
+        string log=Safe.In(root,"startup.log");
+        GeneralStyle.Language="en";
+        File.WriteAllText(log,"Failed to acquire lock: is another Syncthing instance already running?");
+        Check(checks,SyncthingEngine.StartupFailure(log,0,1).Message.Contains("previous helper"),
+            "A fresh lock error identifies the previous helper.");
+        Check(checks,!SyncthingEngine.StartupFailure(log,new FileInfo(log).Length,1).Message.Contains("previous helper"),
+            "An older lock error does not hide a different current startup failure.");
+        Safe.WriteJson(Safe.In(root,"resultado-p2p-engine.json"),new{Passed=true,Tests=checks});
+    }
+
+    internal static void RunEngineOwner(string root,string helper){
+        string ready=Safe.In(root,".fixture-engine");
+        if(!File.Exists(ready)||!System.Text.RegularExpressions.Regex.IsMatch(root,@"(?i)[\\/]online-testes-[a-f0-9]{32}(?:[\\/]|$)"))
+            throw new IOException("O teste exige uma pasta de simulação isolada.");
+        using(var engine=new SyncthingEngine(Safe.In(root,"syncthing"),true)){
+            engine.Start(helper);
+            File.WriteAllText(ready,engine.Device);
+            Thread.Sleep(60000);
+        }
+    }
+
     static void Network(string root,string helper,List<string> checks){
         var source=Source(root,"host","shared.txt","from host");
         string left=Target(root,"left"),right=Target(root,"right"),leftData=Path.Combine(root,"left-data");

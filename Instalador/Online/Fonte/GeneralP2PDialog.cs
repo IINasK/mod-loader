@@ -200,7 +200,8 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         string preset=ExportPreset;
         if(selected.Length==0){offer=null;output.Clear();return;}
         output.Text=T("Iniciando conexão…","Starting connection…");
-        if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));
+        try{if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));}
+        catch{output.Clear();throw;}
         var sessions=service.SnapshotSessions();
         offer=sessions.LastOrDefault(s=>s.Sender&&s.Deferred&&s.CompareBeforePack&&!s.Completed&&!s.Discarded&&s.Recipients.Length==0&&s.ExportPreset==preset&&(preset!=null||s.ExportAllPresets||state.SelectedPreset==null)&&
             s.SelectedMods!=null&&s.SelectedMods.SequenceEqual(selected)&&(s.Lifecycle||s.Peer==null));
@@ -221,10 +222,18 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             string prompt=invite.Schema==3?T("Comparar os mods do pacote ","Compare mods from the pack "):T("Receber e instalar o pacote ","Receive and install pack ");
             if(GeneralDialog.Message(this,prompt+invite.Name+T(" em:\n"," into:\n")+target+T("\n\nMantenha o jogo fechado. Configurações anteriores terão backup.","\n\nKeep the game closed. Previous settings will be backed up."),T("Conectar ao anfitrião","Connect to the host"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
             if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));
-            await Task.Run(()=>{
-                var session=service.Accept(code,target,true);
-                if(!session.Completed&&(session.Held||session.Error!=null||!session.AutoInstall))service.RetryInstalled(session,target);
+            var session=await Task.Run(()=>{
+                var accepted=service.Accept(code,target,true);
+                if(!accepted.Completed&&(accepted.Held||accepted.Error!=null||!accepted.AutoInstall))service.RetryInstalled(accepted,target);
+                return accepted;
             });
+            if(session.Completed){
+                input.Clear();
+                status.ForeColor=GeneralStyle.Foreground;
+                status.Text=T("Este convite já foi concluído. Peça um novo convite para sincronizar novamente.",
+                    "This invitation was already completed. Ask for a new invitation to sync again.");
+                return;
+            }
         }else{
             if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));
             await Task.Run(()=>service.Authorize(code));

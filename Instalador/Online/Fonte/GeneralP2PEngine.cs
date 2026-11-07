@@ -43,6 +43,7 @@ internal sealed class SyncthingEngine : IDisposable {
     readonly bool localOnly;
     string address,key;
     Process process;
+    P2PProcessJob processJob;
     FileStream lease;
     internal string Device {get;private set;}
     internal string Executable {get;private set;}
@@ -76,7 +77,14 @@ internal sealed class SyncthingEngine : IDisposable {
     ProcessStartInfo Launch(string exe,string args){return new ProcessStartInfo(exe,args){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden,WorkingDirectory=Path.GetDirectoryName(exe)};}
     internal void Start(string exe){
         if(Running)return;Dispose();Safe.NoLinks(exe);if(Safe.Hash(exe)!=ExeHash)throw new IOException("Versão do Syncthing não reconhecida.");Executable=Path.GetFullPath(exe);
-        Directory.CreateDirectory(home);lease=new FileStream(Safe.In(home,"engine.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None);
+        Directory.CreateDirectory(home);
+        try{lease=new FileStream(Safe.In(home,"engine.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None);}
+        catch(IOException ex){
+            int code=ex.HResult&0xffff;
+            if(code!=32&&code!=33)throw;
+            throw new IOException(GeneralStyle.T("O compartilhamento deste projeto já está aberto em outra janela do Mod Loader.",
+                "Sharing for this project is already open in another Mod Loader window."),ex);
+        }
         try{
             string config=Safe.In(home,"config.xml");
             if(!File.Exists(config))using(var generation=Process.Start(Launch(exe,"generate --home \""+home+"\" --no-port-probing"))){
@@ -98,14 +106,47 @@ internal sealed class SyncthingEngine : IDisposable {
             xml.Save(config);address="http://127.0.0.1:"+guiPort;key=Guid.NewGuid().ToString("N")+Guid.NewGuid().ToString("N");
             var start=Launch(exe,"serve --home \""+home+"\" --no-browser --no-restart --no-upgrade --log-max-size 1048576 --log-max-old-files 2 --log-level WARN");
             start.EnvironmentVariables["STGUIADDRESS"]=address;start.EnvironmentVariables["STGUIAPIKEY"]=key;
-            process=Process.Start(start);var timer=Stopwatch.StartNew();
+            string log=Safe.In(home,"syncthing.log");
+            long previousLogLength=File.Exists(log)?new FileInfo(log).Length:0;
+            processJob=new P2PProcessJob();
+            process=processJob.Start(start);
+            var timer=Stopwatch.StartNew();
             while(timer.ElapsedMilliseconds<25000){
-                if(process.HasExited)throw new IOException("O auxiliar P2P não iniciou. Verifique se outra instância está usando o compartilhamento.");
-                try{Device=Convert.ToString(Get("system/status")["myID"]);if(P2PInvite.DeviceValid(Device))return;}catch(WebException){}
+                if(process.HasExited)throw StartupFailure(log,previousLogLength,process.ExitCode);
+                try{
+                    var status=Get("system/status");
+                    object id;
+                    if(status!=null&&status.TryGetValue("myID",out id)){
+                        Device=Convert.ToString(id);
+                        if(P2PInvite.DeviceValid(Device))return;
+                    }
+                }catch(WebException){}
                 Thread.Sleep(150);
             }
             throw new IOException("Tempo esgotado ao conectar o auxiliar P2P.");
         }catch{Dispose();throw;}
+    }
+    internal static IOException StartupFailure(string log,long previousLength,int exitCode){
+        bool busy=false;
+        try{
+            Safe.NoLinks(log);
+            using(var input=new FileStream(log,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete)){
+                long start=input.Length<previousLength?0:previousLength;
+                input.Position=Math.Max(start,input.Length-8192);
+                using(var reader=new StreamReader(input)){
+                    var tail=new char[8192];
+                    int count=reader.ReadBlock(tail,0,tail.Length);
+                    busy=new string(tail,0,count).IndexOf("Failed to acquire lock: is another Syncthing instance already running?",StringComparison.Ordinal)>=0;
+                }
+            }
+        }catch(IOException){}
+        catch(UnauthorizedAccessException){}
+        OnlineDiagnostics.Record("p2p.helper.start.failed",null,"O auxiliar P2P encerrou durante a inicialização.",new{ExitCode=exitCode,ProfileInUse=busy});
+        return new IOException(busy?
+            GeneralStyle.T("O auxiliar anterior ainda está usando este projeto. Feche as outras janelas do Mod Loader. Se já fechou todas, reinicie o Windows uma vez.",
+                "The previous helper is still using this project. Close the other Mod Loader windows. If they are all closed, restart Windows once."):
+            GeneralStyle.T("O auxiliar P2P encerrou ao iniciar. Feche e reabra o compartilhamento. Se persistir, confira o registro syncthing.log. Código ",
+                "The P2P helper exited during startup. Reopen sharing. If it persists, check syncthing.log. Code ")+exitCode+".");
     }
     internal Dictionary<string,object> Get(string route){return Request("GET",route,null) as Dictionary<string,object>;}
     internal object Request(string method,string route,object body){
@@ -135,7 +176,15 @@ internal sealed class SyncthingEngine : IDisposable {
     internal void Pause(string id,bool value){try{Request("PATCH","config/folders/"+id,new{paused=value});}catch(WebException ex){var response=ex.Response as HttpWebResponse;if(response==null||response.StatusCode!=HttpStatusCode.NotFound)throw;response.Dispose();}}
     internal void RemoveFolder(string id){try{Request("DELETE","config/folders/"+id,null);}catch(WebException ex){var response=ex.Response as HttpWebResponse;if(response==null||response.StatusCode!=HttpStatusCode.NotFound)throw;response.Dispose();}}
     public void Dispose(){
-        if(process!=null){try{try{Request("POST","system/shutdown",null);}catch(Exception){}if(!process.HasExited&&!process.WaitForExit(4000))process.Kill();}finally{process.Dispose();process=null;}}
-        if(lease!=null){lease.Dispose();lease=null;}
+        try{
+            if(process!=null&&!process.HasExited){
+                try{Request("POST","system/shutdown",null);}catch(Exception){}
+                process.WaitForExit(4000);
+            }
+        }finally{
+            if(processJob!=null){processJob.Dispose();processJob=null;}
+            if(process!=null){process.WaitForExit(4000);process.Dispose();process=null;}
+            if(lease!=null){lease.Dispose();lease=null;}
+        }
     }
 }
