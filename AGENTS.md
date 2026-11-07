@@ -23,6 +23,12 @@
 - Nao apagar ou mover residuos existentes sem autorizacao. Esta regra nao
   autoriza alterar jogo, saves, dados pessoais ou a skill G3 central.
 
+## Revisão 1.1.37 — progresso do receptor e conclusão P2P
+
+- O cartão de envio aparece após o aceite. O convite disponível continua no campo de compartilhamento.
+- O recibo P2P assina a etapa e os contadores enviados pelo receptor enquanto o instalador trabalha. Receptores anteriores continuam informando as fases; sem contadores, o anfitrião vê progresso indeterminado. Caminhos de arquivos locais não são transmitidos.
+- O receptor vê Tudo pronto para jogar quando o projeto está salvo e todos os mods da lista foram incluídos. Se o pacote ficou incompleto, a indicação informa quantos mods ficaram fora.
+
 ## Revisão 1.1.36 — Velopack e estado de conexão P2P
 
 - Velopack 1.2.161 para .NET Framework 4.7.2 e feed estável em GitHub Releases. ID de instalação separado de Config, cache e projetos. Velopack substitui a pasta atual mantendo o atalho. O Setup público usa nome fixo. Migração única do Inno pelo desinstalador existente, que preserva dados.

@@ -35,7 +35,7 @@ internal static class GeneralP2PAutomaticTests {
                     await Wait(()=>copy.Enabled,"No automatic invitation appeared.");sent=sender.Sessions.Single();string offer=output.Text;copy.PerformClick();
                     check(Clipboard.GetText()==offer&&sent.Automatic,"Opening fills a copy-only automatic invitation.");
                     await Task.Delay(1300);check(sent.PayloadHash==null&&!Directory.GetFiles(sender.Folder(sent),"*.zip*").Any(),"Leaving the dialog open without a friend creates no ZIP or partial ZIP.");
-                    check(dialog.Content.Controls.Find("p2p-progress",true).All(control=>!control.Visible),"No download loading bar is visible before acceptance.");Capture(dialog,Path.Combine(root,"waiting-black.png"));
+                    check(dialog.Content.Controls.Find("p2p-card",true).Length==0,"An unaccepted invitation does not create a transfer card.");Capture(dialog,Path.Combine(root,"waiting-black.png"));
                     dialog.Hide();
                     accepted=receiver.Accept(offer,target,true);receiver.Engine.ConfigurePeer(sender.Engine.Device,"tcp://127.0.0.1:"+sender.Engine.ListenPort);
                     await Wait(()=>sent.Recipients.Length!=0,"Host did not detect acceptance without a reply code.");check(sent.Recipients.Single().Device==receiver.Engine.Device,"Host pins the proven recipient automatically without manual Authorize or reply paste.");

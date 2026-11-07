@@ -65,6 +65,16 @@ internal static class GeneralP2PUiTests {
                         incoming.Completed=true;incoming.Stage=null;incoming.Phase="installed";
                         update();
                         check(!pause.Visible&&active.Left==prep.Left&&active.Width==prep.Width&&active.Value==100,"Conclusão realinha a barra com o preparo: "+theme+locale);
+                        incoming.ListImported=true;incoming.ModsOutsidePack=2;
+                        update();
+                        var status=Find<Label>(cards[1],"p2p-transfer-status");
+                        check(status.Text.Contains(locale=="pt"?"Mods fora do pacote":"Mods outside the pack")&&status.Text.EndsWith("2"),
+                            "An incomplete pack identifies the missing count: "+theme+locale);
+                        incoming.ModsOutsidePack=0;
+                        update();
+                        check(status.Text==(locale=="pt"?"Tudo pronto para jogar":"Ready to play"),"Verified install and saved project show readiness: "+theme+locale);
+                        incoming.ListImported=false;incoming.ModsOutsidePack=null;
+                        update();
                         var viewport=Find<GeneralScrollView>(dialog,"p2p-cards");
                         Rectangle field=Position(output.Parent,dialog.Content);
                         Rectangle received=Position(input.Parent,dialog.Content);

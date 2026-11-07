@@ -11,6 +11,7 @@ internal sealed class P2PSession {
     public bool Lifecycle, Held, ReceiptClosed, ExportAllPresets, CompareBeforePack;
     public volatile bool Discarded;
     public string Phase, TransactionId, ProjectError, ExportPreset;
+    public int? ModsOutsidePack;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PInstallProgress InstallProgress;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PSyncProgress SyncProgress;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile int SyncMode;
@@ -215,8 +216,8 @@ internal sealed partial class P2PService : IDisposable {
         if(s.Lifecycle&&s.Sender){ProcessOutgoing(s);return;}
         if(!s.Sender&&s.Completed&&s.Stage==null)PublishProject(s);
         if(s.Lifecycle&&(s.Completed||s.Discarded)){if(s.Stage==null)FinishIncoming(s);return;}
-        if(!s.Sender&&s.Stage!=null)return;
         if(s.Lifecycle&&!s.Sender&&s.Phase!=null)PublishNotice(s);
+        if(!s.Sender&&s.Stage!=null)return;
         if(s.Paused||s.Held||s.RecoveryPending||s.Discarded||!s.Completed&&s.Error!=null)return;
         if(s.Completed){
             if(!Directory.Exists(Folder(s)))return;

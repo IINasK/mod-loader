@@ -174,7 +174,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         int order=0;
         foreach(var session in sessions){
             if(session.Discarded||session.HistoryDismissed||session.Mode!="installed-zip")continue;
-            if(session.Sender&&session.Peer==null&&session.Recipients.Length==0&&session!=offer)continue;
+            if(session.Sender&&session.Peer==null&&session.Recipients.Length==0)continue;
             if(session.Completed&&!cards.ContainsKey(session)&&(session.Sender?session!=latestSent:session.ListImported))continue;
             TransferCard card;
             if(!cards.TryGetValue(session,out card)){
@@ -371,9 +371,8 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             bool prepared=session.PayloadHash!=null||session.Completed||!session.Deferred;
             bool awaiting=session.CompareBeforePack&&!session.Completed&&session.PayloadHash==null&&!owner.service.HasSyncChoice(session);
             bool preview=awaiting&&owner.service.HasSyncPreview(session);
-            bool pendingGuest=session.Sender&&session.Peer==null&&session.Recipients.Length==0;
             bool waitingConnection=!session.Completed&&!session.Paused&&!view.RemotePaused&&session.Phase==null&&!preview&&
-                (pendingGuest||!view.Connected||!view.Accepted);
+                (!view.Connected||!view.Accepted);
             if(waitingConnection&&!waitingSince.HasValue)waitingSince=DateTime.UtcNow;
             if(!waitingConnection)waitingSince=null;
             bool delayed=waitingSince.HasValue&&(DateTime.UtcNow-waitingSince.Value).TotalSeconds>=30;
@@ -393,10 +392,13 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
                     awaiting?T("Aguardando conferência do anfitrião","Waiting for host verification"):T("Aguardando preparo do anfitrião","Waiting for the host to prepare the pack");
                 preparation.Value=prepared?100:session.PreparationTotal>0?(int)(session.PreparationBytes*100/session.PreparationTotal):0;
             }
+            bool ready=!session.Sender&&session.Completed&&session.ListImported&&session.ProjectError==null&&session.ModsOutsidePack==0;
             string message=session.Error??"";
             if(session.Held||session.RecoveryPending)message=T("Arquivo preservado. Clique em Retomar quando quiser continuar.","File preserved. Click Resume when you are ready.");
             else if(session.Completed&&message.Length==0)message=session.Sender?T("Envio concluído","Send complete")
-                :session.ProjectError??(session.ListImported?T("Instalação concluída. Projeto salvo.","Installation complete. Project saved."):T("Instalação concluída","Installation complete"));
+                :session.ProjectError??(ready?T("Tudo pronto para jogar","Ready to play")
+                    :session.ListImported&&session.ModsOutsidePack>0?T("Projeto salvo. Mods fora do pacote: ","Project saved. Mods outside the pack: ")+session.ModsOutsidePack
+                    :session.ListImported?T("Instalação concluída. Projeto salvo.","Installation complete. Project saved."):T("Instalação concluída","Installation complete"));
             else if(message.Length==0&&session.Phase!=null)message=P2PService.PhaseLabel(session.Phase);
             else if(message.Length==0&&session.Paused)message=T("Pausado por você","Paused by you");
             else if(message.Length==0&&issue!=null)
@@ -404,9 +406,6 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             else if(message.Length==0&&scanning&&scan!=null&&scan.Item!=null)message=scan.Item;
             else if(message.Length==0&&waitingConnection){
                 if(view.Unavailable)message=T("Sem resposta do serviço P2P local. Reabra o Mod Loader se persistir.","Local P2P service unavailable. Reopen Mod Loader if this persists.");
-                else if(pendingGuest)message=delayed
-                    ?T("Nenhum aceite recebido. Peça ao amigo para copiar a resposta e cole-a acima.","No reply received. Ask your friend to copy their reply and paste it above.")
-                    :T("Convite pronto. Aguardando seu amigo aceitar.","Invitation ready. Waiting for your friend to accept.");
                 else if(!session.Sender&&view.Connected)message=T("Conectado. Aguardando o anfitrião autorizar o convite.","Connected. Waiting for the host to authorize the invitation.");
                 else if(delayed)message=session.Sender
                     ?T("Conexão ainda indisponível. Confira se o amigo está com o Mod Loader aberto.","Connection still unavailable. Check that your friend has Mod Loader open.")
@@ -424,19 +423,21 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             else if(message.Length==0&&!session.CompareBeforePack&&!prepared)message=T("Convite antigo. Gere um novo convite para escolher como receber.","Older invitation. Create a new invitation to choose how to receive.");
             else if(message.Length==0&&view.RemotePaused)message=T("Pausado pelo amigo","Paused by friend");
             else if(message.Length==0&&!view.Connected&&view.Recipients.Length==0)message=T("Aguardando conexão","Waiting for connection");
-            detail.Text=message;detail.ForeColor=session.Error==null&&!view.Unavailable?GeneralStyle.Foreground:GeneralStyle.Danger;
+            detail.Text=message;
+            detail.ForeColor=session.Error!=null||session.ProjectError!=null||view.Unavailable?GeneralStyle.Danger
+                :ready?(GeneralStyle.Dark?Color.PaleGreen:Color.DarkGreen):GeneralStyle.Foreground;
             owner.tips.SetToolTip(detail,message);
             var installing=!session.Sender&&session.Stage!=null&&session.Phase=="installing";
             var installProgress=session.InstallProgress;
             var entries=view.Recipients;
             if(installing){
-                string phase=installProgress!=null&&installProgress.Writing?T("Instalando arquivos","Installing files"):T("Verificando pacote","Verifying pack");
+                string phase=P2PService.InstallCaption(installProgress);
                 int count=installProgress==null?0:installProgress.Total;
                 entries=new[]{new P2PRecipientProgress{
-                    Caption=phase+(count>0?" · "+installProgress.Done+"/"+count:""),
-                    Percent=count>0?installProgress.Done*100/count:0,Finished=true
+                    Caption=phase,
+                    Percent=count>0?installProgress.Done*100/count:0,Finished=true,Indeterminate=count==0
                 }};
-                message=installProgress==null||installProgress.File==null?phase:installProgress.File;
+                message=installProgress==null||installProgress.File==null?"":installProgress.File;
                 detail.Text=message;owner.tips.SetToolTip(detail,message);
             }
             bool showPreparation=!installing&&(!awaiting||scanning||waitingForHost);
@@ -470,7 +471,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
                 bar.Visible=i<entries.Length;bars.RowStyles[i].Height=i<entries.Length?44:0;
                 if(i>=entries.Length)continue;
                 bars.SetColumnSpan(bar,canPause&&i==pauseRow?1:2);
-                bar.Indeterminate=installing&&(installProgress==null||installProgress.Total==0);
+                bar.Indeterminate=entries[i].Indeterminate;
                 bar.Caption=entries[i].Caption;bar.Value=entries[i].Percent;
             }
             bars.ResumeLayout(true);

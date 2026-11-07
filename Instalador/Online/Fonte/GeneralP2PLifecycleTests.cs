@@ -74,6 +74,17 @@ internal static class GeneralP2PLifecycleTests {
             Check(checks,File.ReadAllText(Safe.In(left,"mods/shared.txt"))=="original",
                 "A version review leaves the existing file intact.");
 
+            incoming.Phase="installing";
+            Wait(()=>host.TransferStatus(sent).Recipients.Any(line=>line.Indeterminate&&line.Caption.Contains(P2PService.PhaseLabel("installing"))),
+                "An older receiver without progress must show an indeterminate installation.");
+            incoming.InstallProgress=new P2PInstallProgress(false,2,5,"mods/shared.txt");
+            Wait(()=>host.TransferStatus(sent).Recipients.Any(line=>line.Percent==40&&line.Caption.Contains("2/5")&&!line.Indeterminate),
+                "The host did not receive verification progress while the receiver was busy.");
+            incoming.InstallProgress=new P2PInstallProgress(true,3,5,"mods/shared.txt");
+            Wait(()=>host.TransferStatus(sent).Recipients.Any(line=>line.Percent==60&&line.Caption.Contains("3/5")&&!line.Caption.Contains("mods/shared.txt")),
+                "The host did not receive installation progress without the receiver's file path.");
+            incoming.Phase="review";
+            Check(checks,host.TransferStatus(sent).Percent==100&&!sent.Completed,"Remote installation progress does not change delivery completion.");
             var forwarded=first.BeginDeferred(relay.Item1,new[]{relay.Item1.List.Mods.Single().Id},true);
             var forwardedReceive=second.Accept(first.Invitation(forwarded),right,true);
             ConnectTo(second,first);

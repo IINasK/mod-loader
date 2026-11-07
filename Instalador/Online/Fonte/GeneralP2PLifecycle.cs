@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -9,6 +10,7 @@ using System.Threading.Tasks;
 internal sealed class P2PRecipient {
     public string Device, Phase;
     public bool ReceiptClosed;
+    [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PInstallProgress InstallProgress;
 }
 
 public sealed class P2PInstallProgress {
@@ -23,12 +25,14 @@ public sealed class P2PInstallProgress {
 internal sealed class P2PRecipientProgress {
     internal string Caption;
     internal int Percent;
-    internal bool Finished;
+    internal bool Finished,Indeterminate;
 }
 
 internal sealed partial class P2PService {
     sealed class InstallNotice {
-        public string Phase, Hash, Tag;
+        public string Phase, Hash, Tag, ProgressTag;
+        public bool Writing;
+        public int Done, Total;
     }
 
     static readonly string[] NoticePhases = { "review", "installing", "retry", "installed", "discarded" };
@@ -102,12 +106,31 @@ internal sealed partial class P2PService {
         return ReadyTag(session.Hash,session.Id+"\ninstall-status\n"+recipient+"\n"+phase,hash,0);
     }
 
+    string InstallProgressTag(P2PSession session,string recipient,InstallNotice notice) {
+        string context=session.Id+"\ninstall-progress\n"+recipient+"\n"+(notice.Writing?"write":"verify")+"\n"+notice.Done.ToString(CultureInfo.InvariantCulture);
+        return ReadyTag(session.Hash,context,notice.Hash,notice.Total);
+    }
+
+    static bool SameNoticeTag(string expected,string tag) {
+        if(!P2PPack.HashValid(tag))return false;
+        int different=0;
+        for(int i=0;i<expected.Length;i++)different|=expected[i]^tag[i];
+        return different==0;
+    }
+
     void PublishNotice(P2PSession session) {
         if(!session.Lifecycle||session.ReceiptClosed||disposed||!Engine.Running)return;
         string directory=NoticeDirectory(session,Engine.Device);
         string path=Safe.In(directory,"status.json");
         string hash=session.PayloadHash??EmptyHash;
         var notice=new InstallNotice{Phase=session.Phase,Hash=hash,Tag=NoticeTag(session,Engine.Device,session.Phase,hash)};
+        var progress=session.InstallProgress;
+        if(session.Phase=="installing"&&progress!=null&&progress.Total>0){
+            notice.Writing=progress.Writing;
+            notice.Done=progress.Done;
+            notice.Total=progress.Total;
+            notice.ProgressTag=InstallProgressTag(session,Engine.Device,notice);
+        }
         string json=Safe.Json.Serialize(notice);
         if(File.Exists(path)&&new FileInfo(path).Length<=2048&&File.ReadAllText(path)==json)return;
         Safe.WriteJson(path,notice);
@@ -122,10 +145,7 @@ internal sealed partial class P2PService {
         catch(ArgumentException){return null;}
         if(notice==null||!NoticePhases.Contains(notice.Phase)||!P2PPack.HashValid(notice.Hash)||!P2PPack.HashValid(notice.Tag))return null;
         if(notice.Hash!=session.PayloadHash&&(notice.Phase!="discarded"||notice.Hash!=EmptyHash))return null;
-        string expected=NoticeTag(session,recipient.Device,notice.Phase,notice.Hash);
-        int different=0;
-        for(int i=0;i<expected.Length;i++)different|=expected[i]^notice.Tag[i];
-        return different==0?notice:null;
+        return SameNoticeTag(NoticeTag(session,recipient.Device,notice.Phase,notice.Hash),notice.Tag)?notice:null;
     }
 
     void ProcessOutgoing(P2PSession session) {
@@ -142,9 +162,14 @@ internal sealed partial class P2PService {
         foreach(var recipient in session.Recipients){
             if(Terminal(recipient.Phase))continue;
             var notice=ReadNotice(session,recipient);
-            if(notice==null||recipient.Phase==notice.Phase)continue;
-            recipient.Phase=notice.Phase;
-            Save();
+            if(notice==null)continue;
+            recipient.InstallProgress=notice.Phase=="installing"&&notice.Total>0&&notice.Total<=InstalledSnapshot.MaxFiles&&
+                notice.Done>=0&&notice.Done<=notice.Total&&SameNoticeTag(InstallProgressTag(session,recipient.Device,notice),notice.ProgressTag)
+                ?new P2PInstallProgress(notice.Writing,notice.Done,notice.Total,null):null;
+            if(recipient.Phase!=notice.Phase){
+                recipient.Phase=notice.Phase;
+                Save();
+            }
         }
         if(session.Recipients.Length!=0&&session.Recipients.All(peer=>Terminal(peer.Phase))){
             // The receipt is durable before the shared ZIP is removed.
@@ -220,11 +245,25 @@ internal sealed partial class P2PService {
                 : percent==100?GeneralStyle.T("Aguardando instalação","Waiting for installation")
                 : paused?GeneralStyle.T("Pausado","Paused")
                 : GeneralStyle.T("Enviando","Sending");
-            lines.Add(new P2PRecipientProgress{Caption=label+" · "+detail,Percent=percent,Finished=percent==100});
+            if(recipient.Phase=="installing"){
+                var progress=recipient.InstallProgress;
+                lines.Add(new P2PRecipientProgress{
+                    Caption=label+" · "+(progress==null?detail:InstallCaption(progress)),
+                    Percent=progress==null?0:progress.Done*100/progress.Total,
+                    Finished=true,Indeterminate=progress==null
+                });
+            }else lines.Add(new P2PRecipientProgress{Caption=label+" · "+detail,Percent=percent,Finished=percent==100});
         }
         result.Recipients=lines.ToArray();
         result.Percent=measured==0?0:total/measured;
         return result;
+    }
+
+    internal static string InstallCaption(P2PInstallProgress progress) {
+        string phase=progress!=null&&progress.Writing
+            ?GeneralStyle.T("Instalando arquivos","Installing files")
+            :GeneralStyle.T("Verificando pacote","Verifying pack");
+        return progress!=null&&progress.Total>0?phase+" · "+progress.Done+"/"+progress.Total:phase;
     }
 
     internal static string PhaseLabel(string phase) {
@@ -264,11 +303,13 @@ internal sealed partial class P2PService {
     }
 
     void SetPhase(P2PSession session,string phase) {
-        session.Phase=phase;Save();
-        try{PublishNotice(session);}
-        catch(System.Net.WebException){/* The next pass advertises the durable state. */}
-        catch(IOException){/* The receipt may still be indexed by the transport. */}
-        catch(UnauthorizedAccessException){/* The next pass retries publication. */}
+        lock(session){
+            session.Phase=phase;Save();
+            try{PublishNotice(session);}
+            catch(System.Net.WebException){/* The next pass advertises the durable state. */}
+            catch(IOException){/* The receipt may still be indexed by the transport. */}
+            catch(UnauthorizedAccessException){/* The next pass retries publication. */}
+        }
     }
 
     void StartInstall(P2PSession session,string zip) {
@@ -289,6 +330,8 @@ internal sealed partial class P2PService {
                     if(replace)SetPhase(session,"installing");
                     return replace;
                 },id=>{session.TransactionId=id;Save();},checkpoint,value=>session.InstallProgress=value,allowReuse:AllowsLocalReuse(session));
+                var manifest=installer.ReadManifest(session.ReceiptId);
+                session.ModsOutsidePack=manifest.Project==null?0:manifest.Project.Mods.Count-manifest.List.Mods.Count;
                 session.Completed=true;
                 session.Error=null;
                 SetPhase(session,"installed");
