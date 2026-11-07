@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -123,7 +123,7 @@ public sealed partial class FixedInstaller {
         return InstallTransaction(new List<FixedMod>{recipe},report,-1,true);
     }
 
-    internal HashSet<string> InstalledImports() {
+    internal HashSet<string> InstalledImports(Func<string,string> readHash=null) {
         var result=new HashSet<string>(StringComparer.Ordinal);
         string folder=Safe.In(Data,"importados");
         Safe.NoLinks(folder);
@@ -131,7 +131,7 @@ public sealed partial class FixedInstaller {
         foreach(string path in Directory.GetFiles(folder,"*.json")) {
             var receipt=ReadReceipt(path);
             if(receipt.Operation!=LocalModPackage.ReceiptOperation || receipt.Status!="instalado" || receipt.Files.Count==0)continue;
-            if(receipt.Files.All(f=>f.Applied && File.Exists(Safe.In(game,f.Path)) && Safe.Hash(Safe.In(game,f.Path))==f.After))
+            if(receipt.Files.All(f=>f.Applied && File.Exists(Safe.In(game,f.Path)) && (readHash==null?Safe.Hash(Safe.In(game,f.Path)):readHash(Safe.In(game,f.Path)))==f.After))
                 result.Add(receipt.Mods[0]);
         }
         return result;

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,6 +9,21 @@ using System.Threading.Tasks;
 internal sealed class P2PRecipient {
     public string Device, Phase;
     public bool ReceiptClosed;
+}
+
+public sealed class P2PInstallProgress {
+    public readonly bool Writing;
+    public readonly int Done, Total;
+    public readonly string File;
+    internal P2PInstallProgress(bool writing,int done,int total,string file){
+        Writing=writing;Done=done;Total=total;File=file;
+    }
+}
+
+internal sealed class P2PRecipientProgress {
+    internal string Caption;
+    internal int Percent;
+    internal bool Finished;
 }
 
 internal sealed partial class P2PService {
@@ -22,7 +37,7 @@ internal sealed partial class P2PService {
     int installing;
 
     internal void SetPreparationState(GeneralModState state) {
-        preparationState = Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(state));
+        preparationState = state==null?null:Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(state));
     }
 
     string ReceiptFolderId(P2PSession session, string recipient) {
@@ -138,9 +153,13 @@ internal sealed partial class P2PService {
             CleanupTransport(session);
             return;
         }
+        StartDeferredPreparation(session,()=>session.Recipients.Any(peer=>!Terminal(peer.Phase)&&RecipientReady(session,peer.Device)));
+    }
+
+    void StartDeferredPreparation(P2PSession session,Func<bool> ready){
         if(session.Paused||session.Stage!=null||session.Error!=null||DeferredPrepared(session))return;
         var state=preparationState;
-        if(state==null||!session.Recipients.Any(peer=>!Terminal(peer.Phase)&&RecipientReady(session,peer.Device)))return;
+        if(state==null||installedCatalog==null||installedData==null||!ready())return;
         if(!String.Equals(session.Destination,state.Destination,StringComparison.OrdinalIgnoreCase)){
             session.Error="A pasta de origem do pacote mudou. Abra o projeto com a pasta original e tente novamente.";
             Save();
@@ -160,16 +179,19 @@ internal sealed partial class P2PService {
 
     P2PTransferStatus OutgoingStatus(P2PSession session) {
         var result=new P2PTransferStatus();
-        var lines=new List<string>();
+        var lines=new List<P2PRecipientProgress>();
         int index=0,total=0,measured=0;
         foreach(var recipient in session.Recipients){
             index++;
             string label=GeneralStyle.T("Amigo ","Friend ")+index;
-            if(recipient.Phase=="discarded"){lines.Add(label+" · "+PhaseLabel(recipient.Phase));continue;}
+            if(recipient.Phase=="discarded"){
+                lines.Add(new P2PRecipientProgress{Caption=label+" · "+PhaseLabel(recipient.Phase),Finished=true});
+                continue;
+            }
             measured++;
             if(Terminal(recipient.Phase)){
                 total+=100;
-                lines.Add(label+" · "+PhaseLabel(recipient.Phase));
+                lines.Add(new P2PRecipientProgress{Caption=label+" · "+PhaseLabel(recipient.Phase),Percent=100,Finished=true});
                 continue;
             }
             int percent=0;
@@ -191,9 +213,11 @@ internal sealed partial class P2PService {
                 percent=Math.Max(percent,(int)Math.Min(99,partial*100.0/session.Size));
             }
             total+=percent;
-            lines.Add(label+" · "+(recipient.Phase==null
-                ? (percent==100?GeneralStyle.T("Download concluído. Aguardando instalação.","Download complete. Waiting for installation."):percent+"%"+(paused?GeneralStyle.T(" · Pausado"," · Paused"):""))
-                : PhaseLabel(recipient.Phase)));
+            string detail=recipient.Phase!=null?PhaseLabel(recipient.Phase)
+                : percent==100?GeneralStyle.T("Aguardando instalação","Waiting for installation")
+                : paused?GeneralStyle.T("Pausado","Paused")
+                : GeneralStyle.T("Enviando","Sending");
+            lines.Add(new P2PRecipientProgress{Caption=label+" · "+detail,Percent=percent,Finished=percent==100});
         }
         result.Recipients=lines.ToArray();
         result.Percent=measured==0?0:total/measured;
@@ -251,6 +275,7 @@ internal sealed partial class P2PService {
             try{
                 Action checkpoint=()=>{if(disposed)throw new OperationCanceledException();};
                 checkpoint();
+                session.InstallProgress=null;
                 SetPhase(session,"installing");
                 var installer=new InstalledSnapshotInstaller(session.Destination,installedData,installedCatalog,installedFixture);
                 session.ReceiptId=installer.Install(zip,session.Deferred?session.PayloadHash:session.Hash,message=>session.Stage=message,-1,difference=>{
@@ -260,7 +285,7 @@ internal sealed partial class P2PService {
                     checkpoint();
                     if(replace)SetPhase(session,"installing");
                     return replace;
-                },id=>{session.TransactionId=id;Save();},checkpoint);
+                },id=>{session.TransactionId=id;Save();},checkpoint,value=>session.InstallProgress=value);
                 session.Completed=true;
                 session.Error=null;
                 SetPhase(session,"installed");
@@ -274,6 +299,21 @@ internal sealed partial class P2PService {
                 }
             }finally{session.Stage=null;Interlocked.Exchange(ref installing,0);}
         });
+    }
+
+    internal void PublishProject(P2PSession session,bool retry=false){
+        lock(session){
+            if(RegisterProject==null||!session.Completed||session.Sender||session.ListImported||session.ReceiptId==null||
+                session.ProjectError!=null&&!retry)return;
+            try{
+                RegisterProject(session);
+                session.ListImported=true;
+                session.ProjectError=null;
+            }catch(Exception ex){
+                session.ProjectError=GeneralStyle.T("Mods instalados. Não foi possível salvar o projeto: ","Mods installed. Could not save the project: ")+ex.Message;
+            }
+            Save();
+        }
     }
 
     internal void PreserveInterrupted(P2PSession session) {

@@ -4,6 +4,13 @@ using System.IO;
 using System.Linq;
 
 internal sealed partial class GeneralModWindow {
+    internal static bool DensityCountsAsInstalled(FixedCatalog catalog,GeneralModState state,string data){
+        using(var form=new GeneralModWindow(catalog,new DownloadCache(Path.Combine(data,"cache")),data,state)){
+            string status=form.Status(form.MakeWork(state.List.Mods.Single()),state.Destination);
+            return GeneralStatusPresentation.Kind(status)=="installed";
+        }
+    }
+
     internal static void RunProgressTests(string parent) {
         string root=OnlineTests.NestedRoot(parent,"online-testes-progress-");
         Directory.CreateDirectory(root);

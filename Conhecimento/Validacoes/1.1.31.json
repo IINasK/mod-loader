@@ -1,0 +1,269 @@
+{
+  "Version": "1.1.31",
+  "Reports": [
+    {
+      "Report": "resultado-automatic-update.json",
+      "Checks": 25,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/au-574ed2bf/resultado-automatic-update.json"
+    },
+    {
+      "Report": "resultado-brand.json",
+      "Checks": 45,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/br-0428a0d4/resultado-brand.json"
+    },
+    {
+      "Report": "resultado-project-clone.json",
+      "Checks": 21,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/c/resultado-project-clone.json"
+    },
+    {
+      "Report": "resultado-category-delete.json",
+      "Checks": 16,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/ca-a3d03d4f/resultado-category-delete.json"
+    },
+    {
+      "Report": "resultado-project-deletion.json",
+      "Checks": 45,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/d/resultado-project-deletion.json"
+    },
+    {
+      "Report": "resultado-floating.json",
+      "Checks": 30,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/fl-0f8aa596/resultado-floating.json"
+    },
+    {
+      "Report": "resultado-project-home.json",
+      "Checks": 119,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/h/resultado-project-home.json"
+    },
+    {
+      "Report": "resultado-historico.json",
+      "Checks": 1,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/hi-f7762b6a/resultado-historico.json"
+    },
+    {
+      "Report": "resultado-project-hub.json",
+      "Checks": 59,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/j/resultado-project-hub.json"
+    },
+    {
+      "Report": "resultado-menu-host.json",
+      "Checks": 73,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/me-2498b35a/resultado-menu-host.json"
+    },
+    {
+      "Report": "resultado-no-copy.json",
+      "Checks": 28,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/n/resultado-no-copy.json"
+    },
+    {
+      "Report": "resultado-progresso-geral.json",
+      "Checks": 38,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/on-c8afb418/resultado-progresso-geral.json"
+    },
+    {
+      "Report": "resultado-status-presentation.json",
+      "Checks": 47,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/online-testes-status-455fa311bfc2449596076393bb8f3cd9/resultado-status-presentation.json"
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Checks": 186,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/p2-7d4ff1f6/resultado-p2p-ui.json"
+    },
+    {
+      "Report": "resultado-p2p.json",
+      "Checks": 47,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/p2-ad58b330/resultado-p2p.json"
+    },
+    {
+      "Report": "resultado-app-paths.json",
+      "Checks": 7,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/pa-32d7e152/resultado-app-paths.json"
+    },
+    {
+      "Report": "resultado-popup-stability.json",
+      "Checks": 80,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/po-ec60bee1/resultado-popup-stability.json"
+    },
+    {
+      "Report": "resultado-preset-draft.json",
+      "Checks": 43,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/pr-6713dbd6/resultado-preset-draft.json"
+    },
+    {
+      "Report": "resultado-preset-clean.json",
+      "Checks": 26,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/pr-6fd7ad4f/resultado-preset-clean.json"
+    },
+    {
+      "Report": "resultado-project-store.json",
+      "Checks": 55,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/pr-cd9a6448/resultado-project-store.json"
+    },
+    {
+      "Report": "resultado-redesign.json",
+      "Checks": 27,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/re-83fddd67/resultado-redesign.json"
+    },
+    {
+      "Report": "resultado-loader-geral.json",
+      "Checks": 14,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/resultado-loader-geral.json"
+    },
+    {
+      "Report": "resultado-pintura-botoes.json",
+      "Checks": 36,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/resultado-pintura-botoes.json"
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 28,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/resultado-snapshot-installer.json"
+    },
+    {
+      "Report": "resultado-storage-by-mod.json",
+      "Checks": 31,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/s/resultado-storage-by-mod.json"
+    },
+    {
+      "Report": "resultado-project-search.json",
+      "Checks": 34,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/se-858319d4/resultado-project-search.json"
+    },
+    {
+      "Report": "resultado-snapshot-density.json",
+      "Checks": 1,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/ss-7f0f77f1/on-52a024c9/resultado-snapshot-density.json"
+    },
+    {
+      "Report": "resultado-snapshot.json",
+      "Checks": 45,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/ss-7f0f77f1/resultado-snapshot.json"
+    },
+    {
+      "Report": "resultado-table-dialogs.json",
+      "Checks": 81,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/ta-04e028e9/resultado-table-dialogs.json"
+    },
+    {
+      "Report": "resultado-ui-v2.json",
+      "Checks": 30,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/ui-401a3829/resultado-ui-v2.json"
+    },
+    {
+      "Report": "resultado-updates.json",
+      "Checks": 30,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/up-54f7b8c7/resultado-updates.json"
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 28,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/ve-970a868f/resultado-snapshot-installer.json"
+    },
+    {
+      "Report": "resultado-version-choice.json",
+      "Checks": 51,
+      "Passed": true,
+      "Evidence": "T/G31/online-testes-ba484d92a4a44b02ad72908e6b65535e/ve-970a868f/resultado-version-choice.json"
+    },
+    {
+      "Report": "resultado-snapshot-p2p.json",
+      "Checks": 43,
+      "Passed": true,
+      "Evidence": "T/J31/sp-f59bb0/resultado-snapshot-p2p.json"
+    },
+    {
+      "Report": "resultado-p2p-lifecycle.json",
+      "Checks": 15,
+      "Passed": true,
+      "Evidence": "T/N31/online-testes-6ce847a18c9a447f865d1ca3fe204798/resultado-p2p-lifecycle.json"
+    },
+    {
+      "Report": "resultado-snapshot-density.json",
+      "Checks": 1,
+      "Passed": true,
+      "Evidence": "T/S31/online-testes-92029391c0514baab2bd676b06d0fdf3/on-93614161/resultado-snapshot-density.json"
+    },
+    {
+      "Report": "resultado-snapshot.json",
+      "Checks": 45,
+      "Passed": true,
+      "Evidence": "T/S31/online-testes-92029391c0514baab2bd676b06d0fdf3/resultado-snapshot.json"
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 28,
+      "Passed": true,
+      "Evidence": "T/S31/resultado-snapshot-installer.json"
+    },
+    {
+      "Report": "resultado-setup.json",
+      "Checks": 24,
+      "Passed": true,
+      "Evidence": "T/setup-deacb66d03f0485a9fec3bd6c19adff3/resultado-setup.json"
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Checks": 186,
+      "Passed": true,
+      "Evidence": "T/U31/online-testes-15f958a6bbac4b6cb8d1e19301934552/resultado-p2p-ui.json"
+    }
+  ],
+  "AppSha256": "5a17321758217a083161b8206dfcfa2862b5a7bc6134075cb93fcf0233ad8fa8",
+  "SetupSha256": "a94ecd7a32bacd5994e1d45aa00e2b4417d459972d64903ffd6e5d7f0a1851c7",
+  "CatalogSha256": "c6a0b3a6170e10c8d707c4d25361d30be7382bccb9a25dd8a50d27c956e2e6a2",
+  "NetworkTests": "Official Syncthing peers on loopback. Multiple transfers, exact preset, resume, receipts and new-project registration passed. No two-computer Internet test.",
+  "LocalScan": {
+    "FixedComponents": 144,
+    "SerialMedianMs": 5623,
+    "ParallelMedianMs": 1842,
+    "Rounds": 3,
+    "AllStatesMatched": true,
+    "DiskCacheAdded": false,
+    "ReadOnly": true,
+    "MeasuresFixedFileChecksOnly": true
+  },
+  "ReportedMissing": {
+    "OldInvitationsChecked": 2,
+    "CrashReporterSelected": false,
+    "LocalCrashReporterFilesVerified": 26,
+    "LocalNightCityAliveFilesVerified": 24,
+    "NightCityAliveProfile": "legacy-low",
+    "NightCityAliveRequiresPhantomLiberty": true
+  },
+  "ProjectRegistration": "A stable transfer ID prevents duplicate registration. The project recognizes the installed files through a copy of the receipt. Reversal data remains in the receiving source project.",
+  "RealGameChanged": false
+}

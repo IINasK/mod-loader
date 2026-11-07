@@ -103,6 +103,32 @@ internal sealed class GeneralProjectStore {
         }
     }
 
+    internal GeneralProject CreateReceived(P2PSession session,string sourceData,FixedCatalog catalog){
+        lock(gate){
+            var index=Read();
+            var id=session.Id.Substring(3);
+            var existing=index.Projects.FirstOrDefault(item=>item.Id==id);
+            if(existing!=null)return existing;
+            if(index.Projects.Count>=200)throw new IOException("Use no máximo 200 projetos nesta biblioteca.");
+            var source=new InstalledSnapshotInstaller(session.Destination,sourceData,catalog);
+            var manifest=source.ReadManifest(session.ReceiptId);
+            var list=manifest.Project??manifest.List;
+            var name=manifest.Name.Trim();
+            name=ProjectName(name.Substring(0,Math.Min(120,name.Length)).TrimEnd());
+            var project=new GeneralProject{Id=id,Name=name};
+            string data=DataPath(project);
+            var state=new GeneralModState{
+                List=list,Theme=index.Theme,Language=index.Language,Destination=session.Destination,
+                DownloadFolder=index.DownloadFolder,SelectedPreset=list.Presets.Count==0?null:list.Presets[0].Id
+            };
+            foreach(var mod in manifest.List.Mods)state.SnapshotReceipts[mod.Id+"/"+mod.DefaultVariant]=session.ReceiptId;
+            source.CopyReceivedRecognition(session.ReceiptId,data);
+            new GeneralModLibrary(Path.Combine(data,"lista.json")).Save(state);
+            index.Projects.Add(project);Write(index);
+            return project;
+        }
+    }
+
     internal GeneralProject Duplicate(GeneralProject source,string name,FixedCatalog catalog){
         lock(gate){
             name=ProjectName(name);var original=Load(source);var index=Read();

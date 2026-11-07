@@ -152,9 +152,9 @@ public sealed class GeneralModLibrary {
                 } }
             });
         }
-        list.Presets.Add(new GeneralModPreset { Id = "all", Name = "Todos", ModIds = list.Mods.Select(mod => mod.Id).ToList() });
+        list.Presets.Add(new GeneralModPreset { Id = "all", Name = "Com DLC Phantom Liberty", ModIds = list.Mods.Select(mod => mod.Id).ToList() });
         list.Presets.Add(new GeneralModPreset {
-            Id = "no-pl", Name = "Sem Phantom Liberty",
+            Id = "no-pl", Name = "Sem DLC Phantom Liberty",
             ModIds = catalog.Packages.Where(mod => String.IsNullOrWhiteSpace(mod.BlockedReason) &&
                 FixedData.Expand(catalog, new[] { mod.Id }).All(dependency => !GameEdition.NeedsPL(dependency) && String.IsNullOrWhiteSpace(dependency.BlockedReason)))
                 .Select(mod => mod.Id).ToList()

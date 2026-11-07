@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -16,6 +16,7 @@ internal static class GeneralStatusPresentation {
         switch ((raw ?? "").Trim().ToLowerInvariant()) {
             case "instalado":
             case "instalado correto":
+            case "instalado: baixa personalizada":
                 return "installed";
             case "falhou":
             case "incompatível":
@@ -45,7 +46,7 @@ internal static class GeneralStatusPresentation {
 internal static class GeneralStatusPresentationTests {
     internal static int Run(string parent) {
         var cases = new Dictionary<string, string[]> {
-            { "installed", new[] { "Instalado", "Instalado correto", " INSTALADO " } },
+            { "installed", new[] { "Instalado", "Instalado correto", " INSTALADO ", "Instalado: Baixa personalizada" } },
             { "error", new[] { "Falhou", "Incompatível", "Não verificável", "Diferente/alterado", "Arquivos alterados", "Arquivo não encontrado", "Parcial", "Instalação parcial", "Parcial/pulado" } },
             { "active", new[] { "Na fila", "Verificando", "Baixando", "Instalando", "Conferindo download", "Aguardando download", "Aguardando arquivo" } },
             { "pending", new[] { "", "Não instalado", "Não iniciado", "Não conferido", "A baixar", "Pronto para instalar", "Pulado", "Verificação pulada", "Setup NASK disponível", "Instalado: Média", "Instalado: Baixa", "Instalado: Alta", "Requer Phantom Liberty", "Requer Cyberpunk 2077", "Installed", "Instalado parcialmente", "Estado futuro" } }

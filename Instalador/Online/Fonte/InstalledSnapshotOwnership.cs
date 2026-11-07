@@ -56,6 +56,13 @@ public sealed partial class GeneralModInstaller {
 }
 
 public sealed partial class InstalledSnapshotInstaller {
+    internal void CopyReceivedRecognition(string id,string targetData){
+        var receipt=Read(id);
+        if(receipt==null||receipt.Status!="installed")throw new IOException("Recibo de snapshot instalado ausente.");
+        receipt.Recoverable=false;
+        foreach(var file in receipt.Files){file.Owned=false;file.Before=null;}
+        new InstalledSnapshotInstaller(destination,targetData,catalog).Save(receipt);
+    }
     internal void DuplicateRecognition(string targetData){
         var target=new InstalledSnapshotInstaller(destination,targetData,catalog);
         foreach(var receipt in AllReceipts(true).Where(item=>item.Status=="installed")){

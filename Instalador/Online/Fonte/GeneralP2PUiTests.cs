@@ -16,13 +16,13 @@ internal static class GeneralP2PUiTests {
             using(var service=new P2PService(Path.Combine(root,"private"),Path.Combine(root,"transport"),true)){
                 foreach(string theme in new[]{"light","light-red","dark","black"})foreach(string locale in new[]{"pt","en"}){
                     GeneralStyle.UseTheme(theme);GeneralStyle.Language=locale;GeneralStyle.AnimationsEnabled=false;
-                    using(var dialog=new GeneralP2PDialog(service,state,state.List.Mods.Select(m=>m.Id),catalog,new DownloadCache(Path.Combine(root,"cache")),false)){
+                    using(var dialog=new GeneralP2PDialog(service,state,catalog,false)){
                         dialog.ShowInTaskbar=false;dialog.StartPosition=FormStartPosition.Manual;dialog.Location=new Point(-30000,-30000);dialog.Show();Application.DoEvents();
-                        var input=Find<TextBox>(dialog,"p2p-input");var output=Find<TextBox>(dialog,"p2p-output");var destination=Find<TextBox>(dialog,"p2p-destination");var connect=Find<Button>(dialog,"p2p-connect");var pause=Find<Button>(dialog,"p2p-pause");
+                        var input=Find<TextBox>(dialog,"p2p-input");var output=Find<TextBox>(dialog,"p2p-output");var destination=Find<TextBox>(dialog,"p2p-destination");var connect=Find<Button>(dialog,"p2p-connect");
                         check(output.ReadOnly&&!input.ReadOnly&&input.MaxLength==12000,"Link de envio protegido e link recebido editável/limitado: "+theme+locale);
                         check(!Find<Button>(dialog,"p2p-copy").Enabled,"Empty invitation is not copyable: "+theme+locale);
                         var generate=Find<Button>(dialog,"modpack-generate");check(generate.Enabled&&!service.Engine.Running,"Offline modpack generation is available without a running P2P engine: "+theme+locale);
-                        check(connect.Enabled&&!pause.Visible&&!destination.Visible,"Estado inicial oferece Conectar sem lista de sessões ou pausa vazia: "+theme+locale);
+                        check(!connect.Enabled&&dialog.Content.Controls.Find("p2p-pause",true).Length==0&&!destination.Visible,"Estado inicial oferece Conectar sem lista de sessões ou pausa vazia: "+theme+locale);
                         check(!Children(dialog.Content).OfType<ListBox>().Any()&&!Children(dialog.Content).OfType<CheckBox>().Any(),"Sem lista, seleção de configuração ou ações legadas: "+theme+locale);
                         var offered=new P2PInvite{Device=String.Join("-",Enumerable.Repeat("AAAAAAA",8)),Folder="ml-"+new string('a',32),ManifestHash=new string('b',64),Kind="offer",Name="Pacote do amigo",Mode="installed-zip",Size=1024};input.Text=offered.Encode();output.Text=offered.Encode();Application.DoEvents();
                         check(destination.Visible&&destination.ReadOnly&&Find<Button>(dialog,"p2p-folder").Enabled,"Colar convite mostra destino local e escolha de pasta antes de conectar: "+theme+locale);
@@ -34,12 +34,38 @@ internal static class GeneralP2PUiTests {
                         output.Text=offered.Encode();copy.PerformClick();check(Clipboard.GetText()==output.Text,"Copy preserves the complete single-line invitation: "+theme+locale);
                         var coverage=PackCoverage.Build(Enumerable.Range(0,20).Select(i=>new GeneralModEntry{Id=i.ToString(),Category=i<17?"Main":i<19?"Cars":"FPV"}),m=>Int32.Parse(m.Id)<17,"Uncategorized");
                         using(var bar=new GeneralProgress{Size=new Size(640,44),Value=85,Caption="17 / 20",Segments=coverage})using(var image=new Bitmap(640,44)){bar.BackColor=GeneralStyle.Surface;bar.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(root,"coverage-"+theme+"-"+locale+".png"),System.Drawing.Imaging.ImageFormat.Png);}
-                        input.Clear();var session=new P2PSession{Id=offered.Folder,Name=offered.Name,Hash=offered.ManifestHash,Sender=false,Mode="installed-zip",Size=1024,Peer=offered.Device};
-                        typeof(GeneralP2PDialog).GetMethod("SelectSession",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(dialog,new object[]{session});
-                        check(pause.Visible&&!pause.Enabled&&destination.Visible,"Pausa existe no recebimento e aguarda motor conectado: "+theme+locale);
-                        typeof(GeneralP2PDialog).GetField("remotePaused",BindingFlags.Instance|BindingFlags.NonPublic).SetValue(dialog,true);typeof(GeneralP2PDialog).GetMethod("UpdateActions",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(dialog,null);
+                        input.Clear();
+                        var incoming=new P2PSession{Id=offered.Folder,Name=offered.Name,Hash=offered.ManifestHash,Mode="installed-zip",Size=1024,Peer=offered.Device,Automatic=true,Deferred=true,PayloadHash=offered.ManifestHash};
+                        var outgoing=new P2PSession{Id="ml-"+new string('c',32),Name="Project export",Hash=offered.ManifestHash,Sender=true,Lifecycle=true,Mode="installed-zip",Size=1024,
+                            Recipients=new[]{new P2PRecipient{Device=offered.Device}}};
+                        var views=new Dictionary<P2PSession,P2PTransferStatus>{
+                            {incoming,new P2PTransferStatus{Percent=40,RemotePaused=true}},
+                            {outgoing,new P2PTransferStatus{Recipients=new[]{
+                                new P2PRecipientProgress{Caption="Friend 1",Percent=100,Finished=true},
+                                new P2PRecipientProgress{Caption="Friend 2",Percent=55}}}}
+                        };
+                        service.Sessions.Add(outgoing);service.Sessions.Add(incoming);
+                        var refresh=typeof(GeneralP2PDialog).GetMethod("RefreshCards",BindingFlags.Instance|BindingFlags.NonPublic);
+                        Action update=()=>{refresh.Invoke(dialog,new object[]{views});dialog.PerformLayout();Application.DoEvents();};
+                        update();
+                        var cards=Children(dialog.Content).Where(control=>control.Name=="p2p-card").ToArray();
+                        check(cards.Length==2&&cards[0] is GeneralSurface&&cards[1] is GeneralSurface,"Envio e recebimento aparecem juntos em molduras separadas: "+theme+locale);
+                        var outgoingBars=Children(cards[0]).OfType<GeneralProgress>().Where(bar=>bar.Name=="p2p-progress").ToArray();
+                        check(outgoingBars.Length==2&&outgoingBars[0].Value==100&&outgoingBars[1].Value==55,"Cada destinatário tem uma barra própria: "+theme+locale);
+                        var pause=Find<Button>(cards[1],"p2p-pause");
                         check(pause.AccessibleName==(locale=="pt"?"Pausado pelo amigo":"Paused by friend")&&!pause.Enabled,"Pausa remota não oferece destravar o amigo: "+theme+locale);
-                        session.Paused=true;typeof(GeneralP2PDialog).GetMethod("UpdateActions",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(dialog,null);check(pause.AccessibleName==(locale=="pt"?"Retomar":"Resume"),"Quem pausou recebe ação de retomar sua própria pausa: "+theme+locale);
+                        incoming.Paused=true;update();
+                        check(pause.AccessibleName==(locale=="pt"?"Retomar":"Resume"),"Quem pausou pode retomar sua própria pausa: "+theme+locale);
+                        incoming.Paused=false;incoming.Stage="install";incoming.Phase="installing";
+                        incoming.InstallProgress=new P2PInstallProgress(true,2,5,"mods/example");
+                        update();
+                        var prep=Find<GeneralProgress>(cards[1],"p2p-preparation");
+                        var active=Find<GeneralProgress>(cards[1],"p2p-progress");
+                        check(!prep.Visible&&!pause.Visible&&active.Value==40&&Find<Label>(cards[1],"p2p-transfer-status").Text=="mods/example","Instalação troca as barras pela etapa, progresso e arquivo: "+theme+locale);
+                        incoming.Completed=true;incoming.Stage=null;incoming.Phase="installed";
+                        update();
+                        check(!pause.Visible&&active.Left==prep.Left&&active.Width==prep.Width&&active.Value==100,"Conclusão realinha a barra com o preparo: "+theme+locale);
+                        service.Sessions.Clear();
                         using(var image=new Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(root,"p2p-"+theme+"-"+locale+".png"),System.Drawing.Imaging.ImageFormat.Png);}dialog.Close();
                     }
                 }

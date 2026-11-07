@@ -46,11 +46,11 @@ internal sealed partial class GeneralModWindow {
                 check(((GeneralButton)remove).Primary&&((GeneralButton)remove).Destructive&&remove.Height==install.Height&&remove.Font.Size==install.Font.Size&&remove.Font.Bold==install.Font.Bold,"Desinstalar segue altura, preenchimento e tipografia de Baixar/Instalar: "+theme);
                 var windowBounds=form.Bounds;int rows=form.grid.RowCount,height=form.grid.Height;string selectedPreset=form.state.SelectedPreset;var markedBefore=form.marked.ToArray();
                 form.expandList.PerformClick();form.PerformLayout();await Task.Delay(25);
-                check(form.listExpanded&&form.Bounds==windowBounds&&form.grid.Height>height+150&&form.tableName.Visible&&form.expandList.Visible,"Expandir aumenta só a lista dentro da janela: "+theme);
-                check(!form.destination.Visible&&form.preset.Visible&&form.presetSettings.Visible&&!form.optionsButton.Visible&&!remove.Visible&&!install.Visible&&!form.currentProgress.Visible,"Modo lista oculta controles externos e mantém ações do título: "+theme);
+                check(form.listExpanded&&form.Bounds==windowBounds&&form.grid.Height>height+100&&form.tableName.Visible&&form.expandList.Visible,"Expandir aumenta só a lista dentro da janela: "+theme);
+                check(form.preset.Visible&&form.presetSettings.Visible&&!form.optionsButton.Visible&&!remove.Visible&&!install.Visible&&!form.currentProgress.Visible,"Modo lista oculta controles externos e mantém ações do título: "+theme);
                 check(form.grid.RowCount==rows&&form.state.SelectedPreset==selectedPreset&&form.marked.SetEquals(markedBefore)&&((GeneralButton)form.expandList).IconKind=="minimize","Expandir preserva itens, preset e seleção e oferece restaurar: "+theme);
                 CaptureUi(form,Path.Combine(root,"lista-expandida-"+theme+".png"));form.expandList.PerformClick();form.PerformLayout();
-                check(!form.listExpanded&&form.grid.Height==height&&form.destination.Visible&&form.preset.Visible&&remove.Visible&&install.Visible&&form.Bounds==windowBounds,"Restaurar recupera layout e controles sem maximizar o aplicativo: "+theme);
+                check(!form.listExpanded&&form.grid.Height==height&&form.preset.Visible&&remove.Visible&&install.Visible&&form.Bounds==windowBounds,"Restaurar recupera layout e controles sem maximizar o aplicativo: "+theme);
                 form.optionsButton.PerformClick();var actions=form.menus.Current as GeneralActionsMenu;check(actions!=null&&actions.Visible,"Hamburger abre menu vertical: "+theme);CaptureUi(form,Path.Combine(root,"editor-"+theme+".png"));
                 form.optionsButton.PerformClick();Application.DoEvents();check(form.menus.Current==null,"Segundo clique no hamburger fecha o menu: "+theme);
             }

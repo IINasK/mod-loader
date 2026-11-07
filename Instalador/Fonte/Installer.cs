@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -25,7 +25,8 @@ public sealed class Receipt {
     public List<Change> Files = new List<Change>();
 }
 public static class Safe {
-    public static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = 16000000 };
+    [ThreadStatic] static JavaScriptSerializer json;
+    public static JavaScriptSerializer Json {get{return json??(json=new JavaScriptSerializer{MaxJsonLength=16000000});}}
     public static string Hash(string file) { using (var s=File.OpenRead(file)) using (var h=SHA256.Create()) return Hex(h.ComputeHash(s)); }
     public static string Hex(byte[] bytes) { return BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant(); }
     public static string In(string root, string relative) {

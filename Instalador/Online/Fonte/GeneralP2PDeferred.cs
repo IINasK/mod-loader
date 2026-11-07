@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -12,14 +12,14 @@ internal sealed partial class P2PService {
         public string Hash,Tag;
         public long Size;
     }
-    internal P2PSession BeginDeferred(GeneralModState state,System.Collections.Generic.IEnumerable<string> ids,bool lifecycle=false){
+    internal P2PSession BeginDeferred(GeneralModState state,System.Collections.Generic.IEnumerable<string> ids,bool lifecycle=false,string exportPreset=null,bool exportAllPresets=false){
         lock(startGate){
         if(!Engine.Running||Sessions.Count>=100)throw new IOException("Inicie a conexão ou remova compartilhamentos antigos.");
         string[] chosen=ids.Distinct(StringComparer.Ordinal).ToArray();
         if(chosen.Length==0||chosen.Any(id=>!state.List.Mods.Any(m=>m.Id==id)))throw new IOException("Escolha um preset com mods para compartilhar.");
         byte[] key=new byte[32];using(var random=RandomNumberGenerator.Create())random.GetBytes(key);
-        var preset=state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);
-        var session=new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Sender=true,Mode="installed-zip",Deferred=true,Automatic=true,Lifecycle=lifecycle,Destination=state.Destination,Hash=Safe.Hex(key),Name=preset==null?"Pacote instalado":preset.Name,SelectedMods=chosen};
+        var preset=exportAllPresets?null:state.List.Presets.FirstOrDefault(p=>p.Id==(exportPreset??state.SelectedPreset));
+        var session=new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Sender=true,Mode="installed-zip",Deferred=true,Automatic=true,Lifecycle=lifecycle,Destination=state.Destination,Hash=Safe.Hex(key),Name=preset==null?"Pacote instalado":preset.Name,SelectedMods=chosen,ExportPreset=exportPreset,ExportAllPresets=exportAllPresets};
         string folder=Folder(session);
         if(!String.IsNullOrEmpty(state.Destination)&&Path.GetFullPath(folder).StartsWith(Path.GetFullPath(state.Destination).TrimEnd('\\')+"\\",StringComparison.OrdinalIgnoreCase))throw new IOException("A transferência deve ficar fora da pasta do jogo.");
         if(Directory.Exists(folder)||File.Exists(folder))throw new IOException("Destino da transferência já existe.");
@@ -54,7 +54,7 @@ internal sealed partial class P2PService {
                 if(File.Exists(zip))throw new IOException("Pacote sem registro de conclusão; preservado.");
                 if(File.Exists(part))File.Delete(part);
                 if(report!=null)report(session.Stage);
-                InstalledSnapshot.Create(part,state,session.SelectedMods,catalog,appData,includeConfigs,report,true,checkpoint,(done,total)=>{session.PreparationBytes=done;session.PreparationTotal=total;});
+                InstalledSnapshot.Create(part,ExportState(state,session.ExportPreset,session.SelectedMods,session.ExportAllPresets),session.SelectedMods,catalog,appData,includeConfigs,report,true,checkpoint,(done,total)=>{session.PreparationBytes=done;session.PreparationTotal=total;});
                 checkpoint();
                 string hash=Safe.Hash(part);
                 lock(Sessions){session.PayloadHash=hash;session.Size=new FileInfo(part).Length;Save();}
@@ -69,6 +69,19 @@ internal sealed partial class P2PService {
             lock(startGate)Engine.Request("POST","db/scan?folder="+session.Id,null);
             session.Error=null;session.Stage=null;Save();
         }catch(Exception ex){session.Stage=null;session.Error=ex.Message;Save();throw;}
+    }
+    internal static GeneralModState ExportState(GeneralModState state,string presetId,string[] ids,bool exportAllPresets=false){
+        if(presetId==null&&!exportAllPresets)return state;
+        var copy=Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(state));
+        if(exportAllPresets){copy.SelectedPreset=null;return copy;}
+        var preset=copy.List.Presets.SingleOrDefault(item=>item.Id==presetId);
+        if(preset==null)throw new IOException("O preset escolhido para este envio não existe mais.");
+        var chosen=new System.Collections.Generic.HashSet<string>(ids,StringComparer.Ordinal);
+        copy.SelectedPreset=presetId;
+        copy.List.Mods.RemoveAll(item=>!chosen.Contains(item.Id));
+        preset.ModIds=copy.List.Mods.Select(item=>item.Id).ToList();
+        copy.List.Presets=new System.Collections.Generic.List<GeneralModPreset>{preset};
+        return copy;
     }
     internal static string ReadyTag(string key,string id,string hash,long size){
         if(!P2PPack.HashValid(key)||!P2PPack.HashValid(hash))throw new IOException("Assinatura de preparação inválida.");

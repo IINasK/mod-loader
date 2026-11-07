@@ -29,7 +29,7 @@ internal sealed partial class GeneralModWindow {
                 foreach(string key in state.SnapshotReceipts.Keys.Where(key=>list.Mods.Any(mod=>key.StartsWith(mod.Id+"/",StringComparison.Ordinal))).ToArray())state.SnapshotReceipts.Remove(key);
             }
             if(snapshotReceipt!=null)foreach(var mod in new InstalledSnapshotInstaller(newDestination??state.Destination,data,catalog,testMode).ReadManifest(snapshotReceipt).List.Mods)state.SnapshotReceipts[mod.Id+"/"+mod.DefaultVariant]=snapshotReceipt;
-            if(newDestination!=null){state.Destination=newDestination;destination.Text=newDestination;}
+            if(newDestination!=null)state.Destination=newDestination;
             Persist();RebuildPresets();await Scan();return true;
         }catch(Exception ex){ShowError(ex);return false;}
     }
@@ -84,30 +84,19 @@ internal sealed partial class GeneralModWindow {
             }
         }catch(Exception ex){ShowError(ex);}
     }
-    async void ChooseFolder(bool downloads){
-        if(working||scanning)return;
-        try{
-            using(var dialog=new FolderBrowserDialog{Description=downloads?T("Escolha onde o navegador salva os downloads.","Choose the folder where your browser saves downloads."):T("Escolha a pasta em que os mods serão instalados.","Choose the folder where mods will be installed."),SelectedPath=(downloads?state.DownloadFolder:state.Destination)??""}){
-                if(dialog.ShowDialog(this)!=DialogResult.OK)return;
-                if(downloads)state.DownloadFolder=new OnlineDownloadWatch(dialog.SelectedPath).Folder;
-                else{Safe.NoLinks(dialog.SelectedPath);state.Destination=dialog.SelectedPath;destination.Text=state.Destination;}
-                Persist();
-                if(!downloads){statuses.Clear();progress.Clear();DrawRows();await Scan();}
-                else detail.Text=T("Downloads monitorados: ","Watching downloads in: ")+state.DownloadFolder;
-            }
-        }catch(Exception ex){ShowError(ex);}
-    }
     void OpenDownloads(){
         if(!Directory.Exists(state.DownloadFolder))throw new IOException(T("A pasta de downloads não está disponível. Escolha outra em Opções.","The download folder is unavailable. Choose another one in Options."));
         Safe.NoLinks(state.DownloadFolder);Process.Start(new ProcessStartInfo(state.DownloadFolder){UseShellExecute=true});
     }
-    void ShowOptions(){
+    async void ShowOptions(){
         if(working||scanning)return;
-        using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder,()=>cache.ClearDownloads())){
+        using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder,()=>cache.ClearDownloads(),state.Destination??"")){
             dialog.AnchorTo(optionsButton);
             if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+            bool moved=!String.Equals(state.Destination??"",dialog.Destination,StringComparison.OrdinalIgnoreCase);
+            if(moved){state.Destination=dialog.Destination;statuses.Clear();statusDetails.Clear();progress.Clear();}
             state.Theme=dialog.ThemeValue;state.Language=dialog.LanguageValue;state.DownloadFolder=dialog.DownloadFolder;
-            Persist();if(projectStore!=null)projectStore.SavePreferences(state.Theme,state.Language,state.DownloadFolder);BuildInterface();
+            Persist();if(projectStore!=null)projectStore.SavePreferences(state.Theme,state.Language,state.DownloadFolder);BuildInterface();if(moved)await Scan();
         }
     }
 }

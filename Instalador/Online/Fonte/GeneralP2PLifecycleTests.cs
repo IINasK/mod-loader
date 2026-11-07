@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -32,16 +32,25 @@ internal static class GeneralP2PLifecycleTests {
         var relay=Source(root,"friend","forwarded.txt","from friend",left,leftData);
         string thirdTarget=Target(root,"third");
         File.WriteAllText(Safe.In(left,"mods/shared.txt"),"original");
+        source.Item1.List.Presets.Add(new GeneralModPreset{Id="no-pl",Name="Sem DLC Phantom Liberty",ModIds=source.Item1.List.Mods.Select(m=>m.Id).ToList()});
+        source.Item1.List.Presets.Add(new GeneralModPreset{Id="all",Name="Com DLC Phantom Liberty",ModIds=source.Item1.List.Mods.Select(m=>m.Id).ToList()});
+        source.Item1.SelectedPreset="no-pl";
+        var all=P2PService.ExportState(source.Item1,null,source.Item1.List.Mods.Select(item=>item.Id).ToArray(),true);
+        Check(checks,all.SelectedPreset==null&&all.List.Presets.Count==2&&source.Item1.SelectedPreset=="no-pl",
+            "Exporting all presets keeps both and clears the single-preset label without editing the source.");
         var gate=new ManualResetEventSlim();
         var host=Service(root,"host-peer",source.Item2,helper);
         var first=Service(root,"first-peer",leftData,helper);
         var second=Service(root,"second-peer",Path.Combine(root,"right-data"),helper);
-        var third=Service(root,"third-peer",Path.Combine(root,"third-data"),helper);
+        string thirdData=Path.Combine(root,"third-data");
+        var third=Service(root,"third-peer",thirdData,helper);
+        var library=new GeneralProjectStore(Path.Combine(root,"lib"));
+        third.RegisterProject=session=>library.CreateReceived(session,thirdData,Catalog);
         try{
             first.ChooseVersion=_=>{gate.Wait(40000);return false;};
             host.SetPreparationState(source.Item1);
             first.SetPreparationState(relay.Item1);
-            var sent=host.BeginDeferred(source.Item1,new[]{source.Item1.List.Mods.Single().Id},true);
+            var sent=host.BeginDeferred(source.Item1,new[]{source.Item1.List.Mods.Single().Id},true,"no-pl");
             string invitation=host.Invitation(sent);
             Check(checks,P2PInvite.Decode(invitation).Schema==2&&!File.Exists(Safe.In(host.Folder(sent),"pack.zip")),
                 "The new invitation creates no payload before a recipient connects.");
@@ -51,9 +60,16 @@ internal static class GeneralP2PLifecycleTests {
             ConnectTo(first,host);ConnectTo(second,host);ConnectTo(third,host);
             Wait(()=>sent.Recipients.Length==3,"Three friends did not join the same invitation.");
             Wait(()=>sent.Recipients.Any(p=>p.Phase=="review")&&incomingSecond.Completed&&incomingThird.Completed,"The version review did not arrive while the other receiver completed.");
+            Wait(()=>incomingThird.ListImported,"Installed transfer did not register its new project.");
+            var project=library.Read().Projects.Single();
+            var projectState=library.Load(project);
+            Check(checks,project.Name=="Sem DLC Phantom Liberty"&&projectState.Destination==thirdTarget&&projectState.List.Presets.Single().Id=="no-pl"&&projectState.SnapshotReceipts.Count==1,
+                "The chosen preset and installation receipt automatically create a separate project.");
+            Check(checks,library.CreateReceived(incomingThird,thirdData,Catalog).Id==project.Id&&library.Read().Projects.Count==1,
+                "Retrying registration does not duplicate the received project.");
             Check(checks,!sent.Completed&&File.Exists(Safe.In(host.Folder(sent),"pack.zip")),
                 "The host retains its one ZIP while one recipient is choosing a version.");
-            Check(checks,host.TransferStatus(sent).Percent==100&&host.TransferStatus(sent).Recipients.Any(line=>line.Contains(P2PService.PhaseLabel("review"))),
+            Check(checks,host.TransferStatus(sent).Percent==100&&host.TransferStatus(sent).Recipients.Any(line=>line.Caption.Contains(P2PService.PhaseLabel("review"))),
                 "The sender can show 100% downloaded while installation is awaiting the version choice.");
             Check(checks,File.ReadAllText(Safe.In(left,"mods/shared.txt"))=="original",
                 "A version review leaves the existing file intact.");

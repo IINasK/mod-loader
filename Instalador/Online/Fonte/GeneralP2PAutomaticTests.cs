@@ -5,7 +5,6 @@ using System.Drawing;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -29,29 +28,32 @@ internal static class GeneralP2PAutomaticTests {
         using(var sender=new P2PService(Path.Combine(root,"sender"),Path.Combine(root,"send-files"),true))using(var receiver=new P2PService(Path.Combine(root,"receiver"),Path.Combine(root,"receive-files"),true)){
             sender.EnableInstalledReceive(catalog,data,true);receiver.EnableInstalledReceive(catalog,receivedData,true);sender.Start(_=>{},helper);receiver.Start(_=>{},helper);
             Exception failure=null;P2PSession sent=null,accepted=null;
-            using(var host=new Form{ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)})using(var dialog=new GeneralP2PDialog(sender,state,new[]{"fixture"},catalog,new DownloadCache(Path.Combine(root,"cache")))){
+            using(var host=new Form{ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)})using(var dialog=new GeneralP2PDialog(sender,state,catalog)){
                 dialog.ShowInTaskbar=false;dialog.StartPosition=FormStartPosition.Manual;dialog.Location=new Point(-30000,-30000);
                 host.Shown+=async(s,e)=>{try{
                     dialog.Show(host);var output=(TextBox)dialog.Content.Controls.Find("p2p-output",true).Single();var copy=(Button)dialog.Content.Controls.Find("p2p-copy",true).Single();
                     await Wait(()=>copy.Enabled,"No automatic invitation appeared.");sent=sender.Sessions.Single();string offer=output.Text;copy.PerformClick();
                     check(Clipboard.GetText()==offer&&sent.Automatic,"Opening fills a copy-only automatic invitation.");
                     await Task.Delay(1300);check(sent.PayloadHash==null&&!Directory.GetFiles(sender.Folder(sent),"*.zip*").Any(),"Leaving the dialog open without a friend creates no ZIP or partial ZIP.");
-                    var bar=(GeneralProgress)dialog.Content.Controls.Find("p2p-progress",true).Single();check(!bar.Visible,"No download loading bar is shown before acceptance.");Capture(dialog,Path.Combine(root,"waiting-black.png"));
+                    check(dialog.Content.Controls.Find("p2p-progress",true).Length==0,"No download loading bar is shown before acceptance.");Capture(dialog,Path.Combine(root,"waiting-black.png"));
                     dialog.Hide();
                     accepted=receiver.Accept(offer,target,true);receiver.Engine.ConfigurePeer(sender.Engine.Device,"tcp://127.0.0.1:"+sender.Engine.ListenPort);
                     await Wait(()=>sent.Recipients.Length!=0,"Host did not detect acceptance without a reply code.");check(sent.Recipients.Single().Device==receiver.Engine.Device,"Host pins the proven recipient automatically without manual Authorize or reply paste.");
                     await Wait(()=>sent.PayloadHash!=null||sent.Error!=null,"Preparation did not start after the recipient connected.");check(sent.PayloadHash!=null&&sent.Error==null,"Background service starts preparation even with its dialog hidden.");
-                    using(var reopened=new GeneralP2PDialog(sender,state,new[]{"fixture"},catalog,new DownloadCache(Path.Combine(root,"cache")),false)){
-                        var selected=(GeneralPicker)reopened.Content.Controls.Find("p2p-transfers",true).Single();
-                        check(selected.SelectedIndex==0&&sender.ActiveSelection==sent.Id,"A new sharing dialog selects the same ongoing transfer.");
+                    using(var reopened=new GeneralP2PDialog(sender,state,catalog,false)){
+                        reopened.Show(host);
+                        await Wait(()=>reopened.Content.Controls.Find("p2p-card",true).Length==1,"The transfer was not reconstructed on reopening.");
+                        check(reopened.Content.Controls.Find("p2p-transfers",true).Length==0,"Reopening shows the ongoing transfer as a card without a session selector.");
+                        reopened.Close();
                     }
                     dialog.Show();Capture(dialog,Path.Combine(root,"connected-black.png"));
                     await Wait(()=>accepted.Completed||accepted.Error!=null,"Automatic receive did not complete.");check(accepted.Completed&&accepted.Error==null&&File.ReadAllText(Path.Combine(target,"mods/test.txt"))=="automatic acceptance","Receiver installs verified files automatically after one-sided acceptance.");
                     await Wait(()=>sent.Completed&&!Directory.Exists(sender.Folder(sent))&&!Directory.Exists(receiver.Folder(accepted)),"Automatic transfer temporary cleanup did not finish.");check(true,"Both sides remove temporary transfer files after confirmation.");
-                }catch(Exception ex){failure=ex;}while((bool)typeof(GeneralP2PDialog).GetField("preparing",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(dialog))await Task.Delay(30);dialog.Dispose();host.Close();};Application.Run(host);
+                }catch(Exception ex){failure=ex;}dialog.Dispose();host.Close();};Application.Run(host);
             }
             if(failure!=null)throw failure;
             // The same trusted device still needs a fresh invitation proof for the next pack.
+            sender.SetPreparationState(null);
             var second=sender.BeginDeferred(state,new[]{"fixture"});second.Automatic=false;string previous=sender.Invitation(second);var incoming=receiver.Accept(previous,target,true);
             check(sender.UpgradeInvitation(second)&&sender.Invitation(second)!=previous,"Unbound legacy invitations upgrade to automatic acceptance and display an updated code.");
             var upgraded=receiver.Accept(sender.Invitation(second),target,true);check(Object.ReferenceEquals(upgraded,incoming)&&incoming.Automatic,"Receiver upgrades its existing pending session when the updated invitation is pasted, without duplicate files.");

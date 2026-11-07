@@ -126,6 +126,7 @@ internal static class InstalledSnapshotTests {
         Write(densityGame,"r6/tweaks/FixtureDensity/medium.yml","medium");
         Write(densityGame,NightCityDensity.LegacyPath,"# Perfil local de densidade baixa: preservar os demais encontros.\r\nAIGeneralSettings.ReactionSystem.aggressiveCiviliansLimit: 1\r\n");
         var legacyState=new GeneralModState{Destination=densityGame,List=GeneralModLibrary.Seed(legacyCatalog,new ModImportItem[0])};
+        check(GeneralModWindow.DensityCountsAsInstalled(legacyCatalog,legacyState,densityData),"O contador do projeto inclui a Baixa personalizada reconhecida com o preset Baixa.");
         var legacyManifest=InstalledSnapshot.Create(Path.Combine(root,"legacy.zip"),legacyState,new[]{density.Id},legacyCatalog,densityData,false,s=>{},true);
         var legacyRead=InstalledSnapshot.Read(Path.Combine(root,"legacy.zip"),Safe.Hash(Path.Combine(root,"legacy.zip")),legacyCatalog);
         check(legacyRead.List.Mods.Single().DefaultVariant=="legacy-low"&&legacyRead.Project.Mods.Single().DefaultVariant=="legacy-low","Perfil antigo conhecido exporta e valida com a identidade exata, sem converter a densidade.");

@@ -143,8 +143,13 @@ internal sealed class GeneralProjectHome : Form {
         P2PService service;
         if(sharing.TryGetValue(projectData,out service))return service;
         service=new P2PService(Path.Combine(projectData,"P2P"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"Mod Loader","Pacotes P2P"),offerRecovery:true);
+            P2PService.TransferStore,offerRecovery:true);
         service.EnableInstalledReceive(catalog,projectData);
+        service.RegisterProject=session=>{
+            store.CreateReceived(session,projectData,catalog);
+            if(IsHandleCreated&&!IsDisposed)try{BeginInvoke((Action)(()=>{if(!IsDisposed&&Visible)Build();}));}
+            catch(InvalidOperationException){}
+        };
         service.ChooseVersion=difference=>{
             if(IsDisposed||!IsHandleCreated)return false;
             return (bool)Invoke((Func<bool>)(()=>{
@@ -164,9 +169,13 @@ internal sealed class GeneralProjectHome : Form {
             if(!File.Exists(Path.Combine(projectData,"P2P","sessions.json")))continue;
             try{
                 var service=SharingService(projectData);
-                if(!service.SnapshotSessions().Any(s=>!s.Completed&&!s.Discarded||Directory.Exists(service.Folder(s))||s.Lifecycle&&(s.Sender?s.Recipients.Any(peer=>!peer.ReceiptClosed):!s.ReceiptClosed)))continue;
+                if(!service.SnapshotSessions().Any(s=>!s.Completed&&!s.Discarded||Directory.Exists(service.Folder(s))||s.Lifecycle&&(s.Sender?s.Recipients.Any(peer=>!peer.ReceiptClosed):!s.ReceiptClosed)||!s.Sender&&s.Completed&&!s.ListImported))continue;
                 service.SetPreparationState(store.Load(project));
                 await RecoverSharing(this,service);
+                await Task.Run(()=>{
+                    foreach(var session in service.SnapshotSessions().Where(s=>!s.Sender&&s.Completed&&!s.ListImported))
+                        service.PublishProject(session,true);
+                });
                 if(!IsDisposed)await Task.Run(()=>service.Start(_=>{}));
             }catch(Exception ex){
                 if(!IsDisposed)GeneralDialog.Message(this,ex.Message,T("Retomada P2P","P2P recovery"),MessageBoxButtons.OK,MessageBoxIcon.Warning);
@@ -216,7 +225,23 @@ internal sealed partial class GeneralModWindow {
     internal string ProjectAction {get;private set;}
     internal void AttachProject(GeneralProjectStore store,GeneralProject project){
         projectStore=store;this.project=project;var preferences=store.Read();
-        if(state.Theme!=preferences.Theme||state.Language!=preferences.Language){state.Theme=preferences.Theme;state.Language=preferences.Language;Persist();BuildInterface();}
+        bool refreshed=false;
+        if(BuiltInProject){
+            var added=seed.Mods.Where(item=>!state.List.Mods.Any(current=>current.Id==item.Id)).ToArray();
+            if(added.Length!=0){
+                state.List.Mods.AddRange(added);
+                foreach(var category in seed.Categories)
+                    if(!state.List.Categories.Contains(category))state.List.Categories.Add(category);
+                foreach(var reference in seed.Presets){
+                    var saved=state.List.Presets.FirstOrDefault(p=>p.Id==reference.Id);
+                    if(saved!=null)saved.ModIds.AddRange(added.Where(item=>reference.ModIds.Contains(item.Id)).Select(item=>item.Id));
+                }
+                refreshed=true;
+            }
+        }
+        if(refreshed||state.Theme!=preferences.Theme||state.Language!=preferences.Language){
+            state.Theme=preferences.Theme;state.Language=preferences.Language;Persist();BuildInterface();
+        }
         Text="Mod Loader "+GeneralUpdateChecker.CurrentVersion+" — "+project.Name;
         UpdateTableTitle();
     }

@@ -8,8 +8,9 @@ using System.Threading;
 
 internal sealed class P2PSession {
     public string Id, Name, Hash, Peer, Mode, Destination, ReceiptId, Error, Stage;
-    public bool Lifecycle, Held, Discarded, ReceiptClosed;
-    public string Phase, TransactionId;
+    public bool Lifecycle, Held, Discarded, ReceiptClosed, ExportAllPresets;
+    public string Phase, TransactionId, ProjectError, ExportPreset;
+    [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PInstallProgress InstallProgress;
     public P2PRecipient[] Recipients=new P2PRecipient[0];
     [System.Web.Script.Serialization.ScriptIgnore] public bool RecoveryPending;
     public long Size;
@@ -23,10 +24,11 @@ internal sealed class P2PSession {
 internal sealed class P2PTransferStatus {
     internal int Percent;
     internal bool Connected,RemotePaused,Accepted;
-    internal string[] Recipients=new string[0];
+    internal P2PRecipientProgress[] Recipients=new P2PRecipientProgress[0];
 }
 internal sealed partial class P2PService : IDisposable {
     internal readonly string Root, Store;
+    internal static string TransferStore {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"Mod Loader","Pacotes P2P");}}
     internal readonly SyncthingEngine Engine;
     internal readonly List<P2PSession> Sessions;
     readonly string statePath;
@@ -40,9 +42,9 @@ internal sealed partial class P2PService : IDisposable {
     string installedData;
     bool installedFixture;
     internal event Action<P2PSession> SnapshotInstalled;
+    internal Action<P2PSession> RegisterProject;
     internal Func<ModVersionDifference,bool> ChooseVersion;
     internal string ApplicationData {get{return installedData;}}
-    internal string ActiveSelection;
     internal bool Installing {get{return installedSessions.Any(s=>s.Stage!=null&&!s.Completed&&String.IsNullOrEmpty(s.Error));}}
     readonly object manifestsLock=new object();
     readonly Dictionary<string,P2PManifest> allowedManifests=new Dictionary<string,P2PManifest>();
@@ -72,6 +74,7 @@ internal sealed partial class P2PService : IDisposable {
         if(s==null||!Regex.IsMatch(s.Id??"","\\Aml-[a-f0-9]{32}\\z")||!P2PPack.HashValid(s.Hash)||String.IsNullOrWhiteSpace(s.Name)||s.Name.Length>300||s.Name.Any(Char.IsControl)||(s.Peer!=null&&!P2PInvite.DeviceValid(s.Peer)))throw new IOException("Registro de compartilhamento inválido.");
         if(s.Recipients==null||s.Recipients.Length>3||s.Recipients.Any(p=>p==null||!P2PInvite.DeviceValid(p.Device))||s.Recipients.Select(p=>p.Device).Distinct().Count()!=s.Recipients.Length)
             throw new IOException("Destinatários inválidos.");
+        if(s.ExportPreset!=null&&!Regex.IsMatch(s.ExportPreset,@"\A[A-Za-z0-9_-]{1,120}\z"))throw new IOException("Preset de compartilhamento inválido.");
         if(s.TransactionId!=null&&!Regex.IsMatch(s.TransactionId,@"\A[a-f0-9]{32}\z"))
             throw new IOException("Transação inválida.");
         if(s.Automatic&&!s.Deferred)throw new IOException("Registro automático inválido.");
@@ -171,6 +174,7 @@ internal sealed partial class P2PService : IDisposable {
     }
     void ProcessInstalledLocked(P2PSession s){
         if(s.Lifecycle&&s.Sender){ProcessOutgoing(s);return;}
+        if(!s.Sender&&s.Completed&&s.Stage==null)PublishProject(s);
         if(s.Lifecycle&&(s.Completed||s.Discarded)){if(s.Stage==null)FinishIncoming(s);return;}
         if(!s.Sender&&s.Stage!=null)return;
         if(s.Lifecycle&&!s.Sender&&s.Phase!=null)PublishNotice(s);
@@ -186,7 +190,10 @@ internal sealed partial class P2PService : IDisposable {
             CleanupTransport(s);s.Error=null;Save();return;
         }
         if(s.Sender){
-            if(s.Deferred&&(s.PayloadHash==null||!File.Exists(Safe.In(Folder(s),"ready.json"))))return;
+            if(s.Deferred&&!DeferredPrepared(s)){
+                if(s.Peer!=null)StartDeferredPreparation(s,()=>RecipientReady(s,s.Peer));
+                return;
+            }
             if(s.Peer==null)return;
             var completion=Engine.Get("db/completion?folder="+s.Id+"&device="+s.Peer);
             if(!completion.ContainsKey("remoteState")||Convert.ToString(completion["remoteState"])!="valid"||!completion.ContainsKey("globalBytes")||Convert.ToInt64(completion["globalBytes"])<s.Size||Convert.ToDouble(completion["completion"])<100||Convert.ToInt64(completion["needBytes"])!=0)return;

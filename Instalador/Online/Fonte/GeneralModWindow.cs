@@ -20,7 +20,6 @@ internal sealed partial class GeneralModWindow : Form {
     readonly Dictionary<string,string> statusDetails=new Dictionary<string,string>();
     readonly Dictionary<string,int> progress=new Dictionary<string,int>();
     readonly List<Control> idle=new List<Control>();
-    TextBox destination;
     GeneralPicker preset;
     DataGridView grid;
     Label detail,counts;
@@ -47,7 +46,15 @@ internal sealed partial class GeneralModWindow : Form {
         library=new GeneralModLibrary(Path.Combine(data,"lista.json"));
         seed=GeneralModLibrary.Seed(catalog,new ModImportItem[0]);state=fixture;
         if(state==null){try{state=library.Load();}catch(Exception ex){startupIssue=ex.Message;}}
-        if(state!=null)GeneralModLibrary.RestoreKnownMappings(state.List,seed);
+        if(state!=null){
+            GeneralModLibrary.RestoreKnownMappings(state.List,seed);
+            if(state.List.Mods.Any(m=>m.Id=="NightCoop")){
+                foreach(var item in state.List.Presets){
+                    if(item.Id=="all"&&item.Name=="Todos")item.Name="Com DLC Phantom Liberty";
+                    if(item.Id=="no-pl"&&item.Name=="Sem Phantom Liberty")item.Name="Sem DLC Phantom Liberty";
+                }
+            }
+        }
         if(state==null){
             var pending=new List<ModImportItem>();
             try{pending=new ModImporter(catalog,cache,Path.Combine(Path.GetDirectoryName(cache.Root),"importados-pendentes.json")).ReadPending().Where(x=>!ModImporter.ExcludedFromVanillaProfile(x)).ToList();}
@@ -103,11 +110,6 @@ internal sealed partial class GeneralModWindow : Form {
         projectsButton=Command(T("Projetos","Projects"),ToggleProjectsPanel,true);projectsButton.Name="ProjectsButton";((GeneralButton)projectsButton).IconKind="folder";projectsButton.Margin=new Padding(0,0,8,0);heading.Controls.Add(projectsButton,1,0);
         homeButton=IconButton("home",T("Voltar ao menu principal","Back to main menu"),BackToProjects,true);homeButton.Name="BackHome";((GeneralButton)homeButton).Bare=true;homeButton.Margin=Padding.Empty;heading.Controls.Add(homeButton,2,0);
         heading.Controls.Add(optionsButton,3,0);layout.Controls.Add(heading,0,0);
-        var path=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=new Padding(0,0,0,14)};
-        path.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));path.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        var pathSurface=new GeneralSurface{Dock=DockStyle.Fill,Height=44,MinimumSize=new Size(100,44),MaximumSize=new Size(0,44),Padding=new Padding(16,11,16,0),Margin=new Padding(0,0,12,0)};
-        destination=new TextBox{ReadOnly=true,BorderStyle=BorderStyle.None,Dock=DockStyle.Fill,Text=state.Destination??"",Font=GeneralStyle.Font(11),AccessibleName=T("Pasta de instalação","Installation folder")};
-        pathSurface.Controls.Add(destination);path.Controls.Add(pathSurface,0,0);path.Controls.Add(Command(T("Escolher pasta","Choose folder"),()=>ChooseFolder(false),true),1,0);layout.Controls.Add(path,0,1);
         preset=Picker(44);preset.MinimumSize=new Size(44,44);preset.Width=44;preset.Margin=Padding.Empty;preset.IconOnly=true;preset.AccessibleName=T("Escolher preset","Choose preset");tips.SetToolTip(preset,preset.AccessibleName);
         presetSettings=IconButton("save",T("Salvar preset","Save preset"),SaveCurrentPreset,true);((GeneralButton)presetSettings).Bare=true;presetSettings.Name="SavePreset";presetSettings.Margin=Padding.Empty;
         discardPreset=IconButton("close",T("Descartar alterações do preset","Discard preset changes"),DiscardPresetDraft,true);((GeneralButton)discardPreset).Bare=true;discardPreset.Name="DiscardPreset";discardPreset.Margin=Padding.Empty;
@@ -117,6 +119,19 @@ internal sealed partial class GeneralModWindow : Form {
         counts=new Label{AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=Padding.Empty};summary.Controls.Add(counts);
         storageSize=new Label{Name="ProjectStorage",AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(16,0,0,0)};summary.Controls.Add(storageSize);
         tips.SetToolTip(storageSize,T("Soma dos arquivos de mods identificados, downloads referenciados e dados locais do projeto. O mesmo caminho não é contado duas vezes. Cache contém registros e dados de apoio, sem novas cópias dos mods. Downloads originais entram somente no total.","Sum of identified mod files, referenced downloads and local project data. The same path is counted once. Cache contains records and support data, without new mod copies. Original downloads count only toward total."));
+        var temporary=new LinkLabel{Text=T("Temporários P2P","P2P temporary files"),AutoSize=true,
+            LinkColor=GeneralStyle.Accent,ActiveLinkColor=GeneralStyle.Foreground,Margin=new Padding(16,0,0,0),Font=GeneralStyle.Font(10.5f)};
+        temporary.LinkClicked+=(s,e)=>Guard(()=>{
+            string folder=P2PService.TransferStore;
+            if(p2p!=null){
+                var paths=p2p.SnapshotSessions().Where(session=>!session.Sender&&!session.Discarded).Select(p2p.Folder).Where(Directory.Exists).ToArray();
+                if(paths.Length==1)folder=paths[0];
+            }
+            Safe.NoLinks(folder);
+            if(!Directory.Exists(folder)){detail.Text=T("Nenhum arquivo temporário P2P disponível.","No P2P temporary files available.");return;}
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(folder){UseShellExecute=true});
+        });
+        summary.Controls.Add(temporary);
         AddUpdateNotice(summary);
         var tableHeading=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=7,Height=52,Margin=Padding.Empty,Padding=new Padding(14,4,0,4),BackColor=GeneralStyle.Surface};
         tableHeading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));for(int i=1;i<7;i++)tableHeading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
@@ -172,20 +187,28 @@ internal sealed partial class GeneralModWindow : Form {
         menu.Opening+=(s,e)=>{bool available=!working&&!scanning&&IsCyberpunk(state.Destination);undo.Visible=available;clean.Visible=available;var focused=FocusedEntry();string status;failureDetails.Visible=focused!=null&&statuses.TryGetValue(Key(focused,Selected(focused)),out status)&&GeneralStatusPresentation.Kind(status)=="error";copyFailures.Visible=statuses.Values.Any(value=>GeneralStatusPresentation.Kind(value)=="error");e.Cancel=focused==null;};
         grid.CellMouseDown+=(s,e)=>{if(e.Button==MouseButtons.Right&&e.RowIndex>=0&&grid.Rows[e.RowIndex].Tag is string)grid.CurrentCell=grid.Rows[e.RowIndex].Cells[1];};grid.ContextMenuStrip=menu;grid.Disposed+=(s,e)=>menu.Dispose();
         layout.Controls.Add(new GeneralScrollView(grid),0,5);
+        grid.Scroll+=(s,e)=>{
+            if(e.ScrollOrientation!=ScrollOrientation.VerticalScroll||e.NewValue==e.OldValue)return;
+            tableTools.Visible=e.NewValue==0||e.NewValue<e.OldValue;
+            layout.RowStyles[4].SizeType=tableTools.Visible?SizeType.AutoSize:SizeType.Absolute;
+            if(!tableTools.Visible)layout.RowStyles[4].Height=0;
+        };
         detail=new Label{Dock=DockStyle.Fill,AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(0,10,0,4),MaximumSize=new Size(0,46)};
         detail.Text=startupIssue??T("Dê dois cliques para editar. Use Adicionar item no final de cada categoria ou arraste um ZIP, RAR ou 7z.","Double-click to edit. Use Add item at the end of a category or drop a ZIP, RAR or 7z.");
         layout.Controls.Add(detail,0,6);
-        var bars=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,RowCount=2,Margin=new Padding(0,4,0,10)};
-        bars.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));bars.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        var bars=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=false,Height=44,MinimumSize=new Size(0,44),ColumnCount=3,RowCount=1,Margin=new Padding(0,4,0,10)};
+        bars.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        bars.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
+        bars.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
         next=Command(T("Pular mod","Skip mod"),RequestSkip);next.Visible=false;next.MinimumSize=new Size(112,44);next.Margin=new Padding(0,3,14,0);bars.Controls.Add(next,0,0);
-        currentProgress=new GeneralProgress{Dock=DockStyle.Fill,Caption=T("Item atual","Current item"),Margin=new Padding(0,0,0,5)};
-        totalProgress=new GeneralProgress{Dock=DockStyle.Fill,Caption=T("Progresso geral","Overall progress"),Margin=Padding.Empty};
-        bars.Controls.Add(currentProgress,1,0);bars.Controls.Add(totalProgress,1,1);layout.Controls.Add(bars,0,7);
+        currentProgress=new GeneralProgress{Dock=DockStyle.Fill,Caption=T("Item atual","Current item"),Margin=new Padding(0,3,8,0)};
+        totalProgress=new GeneralProgress{Dock=DockStyle.Fill,Caption=T("Progresso geral","Overall progress"),Margin=new Padding(8,3,0,0)};
+        bars.Controls.Add(currentProgress,1,0);bars.Controls.Add(totalProgress,2,0);layout.Controls.Add(bars,0,7);
         var bottom=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=false,Height=56,MinimumSize=new Size(0,56),ColumnCount=2,RowCount=1,Margin=Padding.Empty};bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));bottom.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));bottom.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         var remove=Command(T("Desinstalar selecionados","Uninstall selected"),async()=>await Uninstall(),true);((GeneralButton)remove).Destructive=true;((GeneralButton)remove).Primary=true;remove.Name="UninstallSelected";remove.MinimumSize=new Size(226,52);remove.Font=GeneralStyle.Font(13,true);remove.Margin=Padding.Empty;remove.Anchor=AnchorStyles.Left;bottom.Controls.Add(remove,0,0);
         var install=Command(T("Baixar/Instalar","Download/Install"),StartSelected);((GeneralButton)install).Primary=true;install.Name="DownloadInstall";install.MinimumSize=new Size(226,52);install.Font=GeneralStyle.Font(13,true);install.Margin=Padding.Empty;install.Anchor=AnchorStyles.Right;bottom.Controls.Add(install,1,0);
         layout.Controls.Add(bottom,0,8);
-        foreach(Control control in new Control[]{destination,preset}){control.BackColor=GeneralStyle.Surface;control.ForeColor=GeneralStyle.Foreground;}
+        preset.BackColor=GeneralStyle.Surface;preset.ForeColor=GeneralStyle.Foreground;
         EnableDrops(this);
         RebuildPresets();
         preset.SelectedIndexChanged+=(s,e)=>{if(drawing)return;if(!ConfirmPresetNavigation()){drawing=true;preset.SelectedIndex=state.List.Presets.FindIndex(p=>p.Id==state.SelectedPreset)+1;drawing=false;return;}state.SelectedPreset=preset.SelectedIndex>0?state.List.Presets[preset.SelectedIndex-1].Id:null;CapturePresetDraft();Guard(Persist);UpdateTableTitle();DrawRows();};

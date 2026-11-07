@@ -31,7 +31,13 @@ internal sealed partial class GeneralModWindow {
             check(form.preset.Height==44&&form.presetSettings.PointToScreen(Point.Empty).Y==form.preset.PointToScreen(Point.Empty).Y,"Seletor e salvar preset ficam alinhados na mesma linha.");
             check(((GeneralButton)form.optionsButton).Bare&&form.optionsButton.Text==""&&((GeneralButton)form.optionsButton).IconKind=="menu","Opções usa apenas ícone de menu sem moldura.");
             check(form.projectsButton.Right<=form.homeButton.Left&&form.homeButton.Right<=form.optionsButton.Left&&form.optionsButton.Parent.Controls.OfType<Button>().Count()==3,"Projetos, voltar e hamburger aparecem nesta ordem no cabeçalho.");
-            check(form.destination.Parent.Height==44,"Campo da pasta mantém altura compacta alinhada ao botão.");
+            check(!AllControls(form).OfType<TextBox>().Any(box=>box.AccessibleName=="Pasta de instalação"),"A pasta de instalação fica somente em Opções.");
+            using(var options=new GeneralOptionsDialog("light","pt",root,null,target)){
+                options.Show(form);Application.DoEvents();
+                var folder=AllControls(options).OfType<TextBox>().Single(box=>box.Name=="OptionsInstallationFolder");
+                check(folder.Text==target&&folder.Parent.Height==44,"Opções mostra o destino do projeto em um campo alinhado.");
+            }
+            check(form.currentProgress.Top==form.totalProgress.Top&&Math.Abs(form.currentProgress.Width-form.totalProgress.Width)<=1,"As barras do rodapé dividem a mesma linha em partes iguais.");
             check(form.Font.FontFamily.Name.IndexOf("Jost",StringComparison.OrdinalIgnoreCase)>=0,"A fonte Jost está embutida e em uso.");
             var click=new DataGridViewCellMouseEventArgs(0,-1,1,1,new MouseEventArgs(MouseButtons.Left,1,1,1,0));
             typeof(DataGridView).GetMethod("OnColumnHeaderMouseClick",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(form.grid,new object[]{click});

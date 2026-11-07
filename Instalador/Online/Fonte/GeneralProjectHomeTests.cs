@@ -54,7 +54,7 @@ internal sealed partial class GeneralModWindow {
                             typeof(ListBox).GetMethod("OnMouseLeave",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(choices,new object[]{EventArgs.Empty});
                             check(home.HoveredSavedProject==-1,"Sair da lista remove o highlight de hover.");
                             ClickReadyWithoutRename(home,check);
-                            check(opened!=null&&opened.Id!=blank.Id&&opened.TemplateId=="cyberpunk-2077"&&opened.Name=="Cyberpunk 2077"&&store.Load(opened).List.Mods.Count==135&&store.Load(blank).List.Mods.Count==0,"Pacote pronto abre com identidade fixa e preserva os projetos personalizados.");
+                            check(opened!=null&&opened.Id!=blank.Id&&opened.TemplateId=="cyberpunk-2077"&&opened.Name=="Cyberpunk 2077"&&store.Load(opened).List.Mods.Count==141&&store.Load(blank).List.Mods.Count==0,"Pacote pronto abre com identidade fixa e preserva os projetos personalizados.");
                             check(store.Load(opened).Destination==null,"Fixture do pacote pronto não descobre nem altera o jogo real.");
                             var builtIn=opened;var configured=store.Load(builtIn);var first=configured.List.Mods.First();configured.ChosenVariants[first.Id]=first.DefaultVariant;
                             new GeneralModLibrary(Path.Combine(store.DataPath(builtIn),"lista.json")).Save(configured);
@@ -74,7 +74,7 @@ internal sealed partial class GeneralModWindow {
                             }
                             store.SavePreferences("light-red","pt",root);home.Build();
                             using(var timer=new Timer{Interval=60}){
-                                timer.Tick+=(ss,ee)=>{var dialog=Application.OpenForms.OfType<GeneralOptionsDialog>().FirstOrDefault();if(dialog==null)return;timer.Stop();var theme=AllControls(dialog).OfType<GeneralPicker>().Single(p=>p.AccessibleName=="Tema");check(theme.Items.Count==3&&theme.SelectedIndex==2,"Opções lista o novo tema claro vermelho e mantém a escolha atual.");AllControls(dialog).OfType<Button>().Single(button=>button.Text=="Salvar").PerformClick();};
+                                timer.Tick+=(ss,ee)=>{var dialog=Application.OpenForms.OfType<GeneralOptionsDialog>().FirstOrDefault();if(dialog==null)return;timer.Stop();var theme=AllControls(dialog).OfType<GeneralPicker>().Single(p=>p.AccessibleName=="Tema");check(theme.Items.Count==4&&theme.SelectedIndex==2,"Opções lista o novo tema claro vermelho e mantém a escolha atual.");AllControls(dialog).OfType<Button>().Single(button=>button.Text=="Salvar").PerformClick();};
                                 timer.Start();((Button)home.Controls.Find("HomeOptions",true).Single()).PerformClick();
                             }
                             check(store.Read().Theme=="light-red","Salvar opções da Home preserva o tema vermelho.");
@@ -122,7 +122,7 @@ internal sealed partial class GeneralModWindow {
                             store.Delete(blank);home.Build();check(store.Read().Projects.Count==1&&File.Exists(Path.Combine(store.DataPath(blank),"lista.json")),"Excluir metadados retira o projeto da Home e conserva seus dados.");
                             var remaining=store.Read().Projects.Single();string before=Safe.Hash(Path.Combine(store.DataPath(remaining),"lista.json"));home.OpenRequested=actualOpen;
                             using(var timer=new Timer{Interval=60}){
-                                timer.Tick+=(ss,ee)=>{var window=Application.OpenForms.OfType<GeneralModWindow>().FirstOrDefault();if(window==null)return;timer.Stop();try{check(window.state.List.Mods.Count==135&&window.data==store.DataPath(remaining),"Abrir projeto usa a lista e a pasta próprias na janela real.");window.homeButton.PerformClick();}catch(Exception ex){failure=ex;window.Close();}};
+                                timer.Tick+=(ss,ee)=>{var window=Application.OpenForms.OfType<GeneralModWindow>().FirstOrDefault();if(window==null)return;timer.Stop();try{check(window.state.List.Mods.Count==141&&window.data==store.DataPath(remaining),"Abrir projeto usa a lista e a pasta próprias na janela real.");window.homeButton.PerformClick();}catch(Exception ex){failure=ex;window.Close();}};
                                 timer.Start();home.OpenRequested(remaining);
                             }
                             if(failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
