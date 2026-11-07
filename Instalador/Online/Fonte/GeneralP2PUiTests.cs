@@ -65,6 +65,29 @@ internal static class GeneralP2PUiTests {
                         incoming.Completed=true;incoming.Stage=null;incoming.Phase="installed";
                         update();
                         check(!pause.Visible&&active.Left==prep.Left&&active.Width==prep.Width&&active.Value==100,"Conclusão realinha a barra com o preparo: "+theme+locale);
+                        var viewport=Find<GeneralScrollView>(dialog,"p2p-cards");
+                        Rectangle field=Position(output.Parent,dialog.Content);
+                        Rectangle received=Position(input.Parent,dialog.Content);
+                        Rectangle actions=Position(connect.Parent,dialog.Content);
+                        Rectangle frame=Position(cards[0],dialog.Content);
+                        check(field.Left==received.Left&&field.Right==received.Right&&frame.Left==field.Left&&frame.Right==field.Right&&connect.Parent==generate.Parent&&Position(connect,dialog.Content).Right==field.Right,
+                            "Fields, rightmost action and transfer cards share the visible edges: "+theme+locale);
+                        check(actions.Top-received.Bottom==frame.Top-actions.Bottom&&Position(connect,dialog.Content).Top==Position(generate,dialog.Content).Top,
+                            "Action row is evenly spaced and buttons share the same baseline: "+theme+locale);
+                        if(!viewport.Bar.Visible)check(dialog.Content.ClientSize.Height-Position(cards[1],dialog.Content).Bottom==field.Left,
+                            "Bottom inset matches the side inset with fully visible cards: "+theme+locale);
+                        if(theme=="black"&&locale=="en"){
+                            foreach(int i in Enumerable.Range(1,10))service.Sessions.Add(new P2PSession{Id="ml-"+i.ToString("x32"),Name="Transfer "+i,Mode="installed-zip"});
+                            update();
+                            var frameWithScroll=Position(cards[0],dialog.Content);
+                            check(viewport.Bar.Visible&&frameWithScroll.Left==field.Left&&frameWithScroll.Right==field.Right,
+                                "Overflow places the scrollbar in the gutter without moving the card edges. "+frameWithScroll+" vs "+field+" rail="+viewport.Bar.Visible+" limit="+viewport.Bar.Limit+" count="+service.Sessions.Count+" height="+viewport.Height);
+                            viewport.Bar.MoveTo(viewport.Bar.Limit);Application.DoEvents();
+                            var lastCard=Children(viewport.Content).Last(c=>c.Name=="p2p-card");
+                            check(dialog.Content.ClientSize.Height-Position(lastCard,dialog.Content).Bottom==field.Left,
+                                "The last transfer keeps the bottom inset at the scroll limit.");
+                            service.Sessions.RemoveRange(2,10);update();
+                        }
                         service.Sessions.Clear();
                         using(var image=new Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(root,"p2p-"+theme+"-"+locale+".png"),System.Drawing.Imaging.ImageFormat.Png);}dialog.Close();
                     }
@@ -77,5 +100,6 @@ internal static class GeneralP2PUiTests {
     internal static void Preview(string parent){Run(parent);}
     static T Find<T>(Control root,string name)where T:Control{return Children(root).OfType<T>().Single(c=>c.Name==name);}
     static IEnumerable<Control> Children(Control root){foreach(Control child in root.Controls){yield return child;foreach(var nested in Children(child))yield return nested;}}
+    static Rectangle Position(Control item,Control root){return new Rectangle(root.PointToClient(item.PointToScreen(Point.Empty)),item.Size);}
     static bool Inside(Control item,Control root){for(Control current=item;current!=root;current=current.Parent){if(current.Parent==null||!current.Parent.ClientRectangle.Contains(new Rectangle(current.Location,current.Size)))return false;}return true;}
 }

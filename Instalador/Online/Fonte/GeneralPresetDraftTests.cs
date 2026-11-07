@@ -15,15 +15,15 @@ internal sealed partial class GeneralModWindow {
         var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
         TestForm(FixedData.Load(),state,Path.Combine(root,"state"),root,async form=>{
             form.Persist();form.CapturePresetDraft();form.UpdateTableTitle();
-            check(!form.presetSettings.Enabled&&!form.discardPreset.Enabled&&form.deletePreset.Enabled,"Salvar/descartar aguardam alterações; excluir requer um preset.");
-            check(((GeneralButton)form.presetSettings).IconKind=="save"&&((GeneralButton)form.discardPreset).IconKind=="close"&&((GeneralButton)form.deletePreset).IconKind=="trash","Preset usa os ícones oficiais de disquete, X e lixeira.");
-            check(form.preset.PointToScreen(Point.Empty).Y==form.presetSettings.PointToScreen(Point.Empty).Y&&form.presetSettings.Right<=form.discardPreset.Left&&form.discardPreset.Right<=form.deletePreset.Left,"Ações do preset ficam alinhadas ao seletor e na ordem pedida.");
+            check(!form.presetSettings.Enabled&&form.deletePreset.Enabled,"Salvar aguarda alterações; excluir requer um preset.");
+            check(((GeneralButton)form.presetSettings).IconKind=="save"&&((GeneralButton)form.deletePreset).IconKind=="trash","Preset usa os ícones oficiais de disquete e lixeira.");
+            check(form.preset.PointToScreen(Point.Empty).Y==form.presetSettings.PointToScreen(Point.Empty).Y&&form.presetSettings.Right==form.deletePreset.Left&&form.tableName.Parent.Controls.Find("DiscardPreset",false).Length==0,
+                "Disquete e lixeira ficam adjacentes, sem X ou coluna vazia.");
             check(form.preset.IconOnly&&form.preset.Parent==form.tableName.Parent&&form.presetSettings.Parent==form.tableName.Parent&&form.mainLayout.GetControlFromPosition(0,2)==null,"Seletor e ações integrados ao título, sem a linha Preset duplicada.");
             check(!form.grid.Columns.Contains("ResetPreset"),"A lixeira antiga não fica duplicada no cabeçalho da tabela.");
             form.tableName.Text="Rascunho";form.marked.Add(a.Id);form.DrawRows();
-            check(form.ActivePreset.Name=="Original"&&form.library.Load().List.Presets.Single().Name=="Original"&&form.presetSettings.Enabled&&form.discardPreset.Enabled,"Nome digitado e seleção são rascunhos até salvar.");
-            form.discardPreset.PerformClick();
-            check(form.tableName.Text=="Original"&&form.marked.Count==0&&!form.presetSettings.Enabled&&!form.discardPreset.Enabled,"X restaura nome e seleção sem alterar a biblioteca.");
+            check(form.ActivePreset.Name=="Original"&&form.library.Load().List.Presets.Single().Name=="Original"&&form.presetSettings.Enabled,"Nome digitado e seleção são rascunhos até salvar.");
+            form.marked.Clear();form.DrawRows();
             form.tableName.Text="Renomeado";form.presetSettings.PerformClick();
             check(form.ActivePreset.Name=="Renomeado"&&form.ActivePreset.ModIds.Count==2&&form.library.Load().List.Presets.Single().Name=="Renomeado","Salvar só o nome preserva os membros do preset.");
             form.marked.Add(a.Id);form.DrawRows();form.presetSettings.PerformClick();
@@ -31,8 +31,7 @@ internal sealed partial class GeneralModWindow {
             form.marked.Add(b.Id);form.statusFilters=new HashSet<string>();form.DrawRows();form.presetSettings.PerformClick();
             check(form.ActivePreset.ModIds.Count==2,"Salvar preserva os itens marcados que um filtro está escondendo.");
             form.ResetColumnFilters();form.marked.Remove(b.Id);form.DrawRows();form.presetSettings.PerformClick();
-            form.marked.Clear();form.DrawRows();form.discardPreset.PerformClick();check(form.marked.SetEquals(new[]{a.Id}),"X volta à seleção do último salvamento.");
-            form.tableName.Text="   ";check(!form.presetSettings.Enabled&&form.discardPreset.Enabled,"Nome vazio impede salvar e permite descartar.");form.discardPreset.PerformClick();
+            form.tableName.Text="   ";check(!form.presetSettings.Enabled,"Nome vazio impede salvar.");form.tableName.Text="Renomeado";
             using(var timer=new Timer{Interval=60}){
                 timer.Tick+=(s,e)=>{var dialog=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(item=>item.Text=="Excluir preset");if(dialog==null)return;timer.Stop();((Button)dialog.AcceptButton).PerformClick();};timer.Start();form.deletePreset.PerformClick();
             }
@@ -44,6 +43,7 @@ internal sealed partial class GeneralModWindow {
                 var remove=AllControls(form).OfType<Button>().Single(button=>button.Name=="UninstallSelected");var install=AllControls(form).OfType<Button>().Single(button=>button.Name=="DownloadInstall");
                 check(Math.Abs(remove.PointToScreen(Point.Empty).Y+remove.Height/2-install.PointToScreen(Point.Empty).Y-install.Height/2)<=1,"Botões do rodapé têm o mesmo centro vertical: "+theme);
                 check(((GeneralButton)remove).Primary&&((GeneralButton)remove).Destructive&&remove.Height==install.Height&&remove.Font.Size==install.Font.Size&&remove.Font.Bold==install.Font.Bold,"Desinstalar segue altura, preenchimento e tipografia de Baixar/Instalar: "+theme);
+                check(form.detail.Parent==remove.Parent&&form.detail.Parent==install.Parent&&form.detail.Left>=remove.Right&&form.detail.Right<=install.Left,"Mensagem fica entre os botões, na mesma linha do rodapé: "+theme);
                 var windowBounds=form.Bounds;int rows=form.grid.RowCount,height=form.grid.Height;string selectedPreset=form.state.SelectedPreset;var markedBefore=form.marked.ToArray();
                 form.expandList.PerformClick();form.PerformLayout();await Task.Delay(25);
                 check(form.listExpanded&&form.Bounds==windowBounds&&form.grid.Height>height+100&&form.tableName.Visible&&form.expandList.Visible,"Expandir aumenta só a lista dentro da janela: "+theme);

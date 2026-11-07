@@ -5,7 +5,7 @@ using System.Linq;
 using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
-    Button discardPreset,deletePreset;
+    Button deletePreset;
     bool hasPresetDraft,settingDraftName;
     string draftPresetId,draftName;
     HashSet<string> draftChecked=new HashSet<string>();
@@ -19,12 +19,11 @@ internal sealed partial class GeneralModWindow {
         if(presetSettings==null)return;bool available=!working&&!scanning&&(p2p==null||!p2p.Installing);
         bool valid=ActivePreset==null||!String.IsNullOrWhiteSpace(draftName)&&draftName.Length<=120&&!draftName.Any(Char.IsControl);
         presetSettings.Enabled=available&&valid&&(ActivePreset==null?marked.Any():DraftNameChanged||DraftSelectionChanged);
-        if(discardPreset!=null)discardPreset.Enabled=available&&(DraftNameChanged||DraftSelectionChanged);
         if(deletePreset!=null)deletePreset.Enabled=available&&ActivePreset!=null&&!ProtectedPreset;
     }
     bool ConfirmPresetNavigation(){
         if(!DraftNameChanged||testMode)return true;
-        return GeneralDialog.Message(this,T("Descartar o nome do preset que ainda não foi salvo? Use o disquete para salvar ou o X para descartar.","Discard the unsaved preset name? Use the save icon to save or X to discard."),T("Alterações não salvas","Unsaved changes"),MessageBoxButtons.OKCancel)==DialogResult.OK;
+        return GeneralDialog.Message(this,T("Descartar o nome do preset que ainda não foi salvo? Cancele para voltar e salvar.","Discard the unsaved preset name? Cancel to go back and save it."),T("Alterações não salvas","Unsaved changes"),MessageBoxButtons.OKCancel)==DialogResult.OK;
     }
     void SaveCurrentPreset(){
         if(working||scanning)return;
@@ -36,10 +35,5 @@ internal sealed partial class GeneralModWindow {
         selected.Name=name;if(DraftSelectionChanged)selected.ModIds=PresetCheckedIds();
         try{Persist();}catch{selected.Name=previous;selected.ModIds=members;throw;}
         CapturePresetDraft();RebuildPresets();detail.Text=T("Preset salvo.","Preset saved.");
-    }
-    void DiscardPresetDraft(){
-        if(working||scanning)return;
-        marked.Clear();foreach(string id in draftChecked.Where(id=>state.List.Mods.Any(mod=>mod.Id==id)))marked.Add(id);
-        CapturePresetDraft();UpdateTableTitle();DrawRows();detail.Text=T("Alterações do preset descartadas.","Preset changes discarded.");
     }
 }

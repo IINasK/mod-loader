@@ -7,10 +7,12 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 
 internal sealed class GeneralP2PDialog : GeneralDialog {
+    const int Inset=24,Gap=16,LabelHeight=24,LinkHeight=56,ControlHeight=44;
+    const int TargetHeight=LabelHeight+ControlHeight+Gap;
     readonly P2PService service;
     readonly GeneralModState state;
     readonly FixedCatalog catalog;
-    readonly GeneralPicker presets=new GeneralPicker{Dock=DockStyle.Fill,Name="p2p-export-preset"};
+    readonly GeneralPicker presets=new GeneralPicker{Dock=DockStyle.Fill,Margin=Padding.Empty,Name="p2p-export-preset"};
     string ExportPreset {get{return presets.SelectedIndex<=0?null:state.List.Presets[presets.SelectedIndex-1].Id;}}
     string[] ExportIds {get{return ExportPreset==null?state.List.Mods.Select(item=>item.Id).ToArray():state.List.Presets[presets.SelectedIndex-1].ModIds.ToArray();}}
     readonly bool autoStart;
@@ -40,13 +42,18 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         Func<ModVersionDifference,bool> versionChoice=difference=>GeneralVersionChoiceDialog.Ask(this,difference);
         service.ChooseVersion=versionChoice;
         Disposed+=(s,e)=>{if(Object.ReferenceEquals(service.ChooseVersion,versionChoice))service.ChooseVersion=previousChoice;};
-        Name="p2p-dialog";
+        Name="p2p-dialog";Content.Margin=Padding.Empty;
         ClientSize=new Size(Math.Min(720,Screen.FromPoint(Cursor.Position).WorkingArea.Width-28),420);
-        body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=10,Padding=new Padding(24,8,24,16),Margin=Padding.Empty};
+        cardScroll=new GeneralScrollView(cardStack,true,reserveBarSpace:true){Name="p2p-cards"};
+        int rail=cardScroll.Bar.Width;
+        body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=10,Padding=new Padding(Inset,Inset,Inset-rail,Inset),Margin=Padding.Empty};
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-        foreach(int height in new[]{state.List.Mods.Count==0?0:54,24,64,24,64,76,52,0,0,0})body.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
+        // The scrollbar lives in the outer gutter, so the painted card edge stays aligned with the fields.
+        body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,rail));
+        foreach(int height in new[]{state.List.Mods.Count==0?0:ControlHeight+Gap,LabelHeight,LinkHeight+Gap,LabelHeight,LinkHeight+Gap,TargetHeight,ControlHeight,0,0,0})
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
         Content.Controls.Add(body);
-        var presetRow=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,Margin=Padding.Empty,Padding=new Padding(0,0,0,10)};
+        var presetRow=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,Margin=Padding.Empty,Padding=new Padding(0,0,0,Gap)};
         presetRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         presetRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         var presetLabel=Heading(T("Preset para enviar","Preset to send"));
@@ -66,20 +73,20 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         send.Controls.Add(copy);send.SizeChanged+=(s,e)=>copy.Location=new Point(send.ClientSize.Width-62,6);body.Controls.Add(send,0,2);
         body.Controls.Add(Heading(T("Link recebido do amigo","Link received from your friend")),0,3);
         var receive=Field(input);receive.Padding=new Padding(14,16,14,8);body.Controls.Add(receive,0,4);
-        targetRow=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};
+        targetRow=new Panel{Dock=DockStyle.Fill,Margin=new Padding(0,0,0,Gap)};
         var target=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=2,Margin=Padding.Empty};
         target.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));target.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        target.RowStyles.Add(new RowStyle(SizeType.Absolute,24));target.RowStyles.Add(new RowStyle(SizeType.Absolute,44));
+        target.RowStyles.Add(new RowStyle(SizeType.Absolute,LabelHeight));target.RowStyles.Add(new RowStyle(SizeType.Absolute,ControlHeight));
         var targetLabel=Heading(T("Instalar na pasta local","Install into local folder"));target.Controls.Add(targetLabel,0,0);target.SetColumnSpan(targetLabel,2);
         var destinationField=Field(destination);destinationField.Margin=Padding.Empty;target.Controls.Add(destinationField,0,1);
         choose=GeneralStyle.Button(T("Escolher pasta","Choose folder"),ChooseFolder);choose.Margin=new Padding(8,0,0,0);choose.Name="p2p-folder";target.Controls.Add(choose,1,1);
         targetRow.Controls.Add(target);body.Controls.Add(targetRow,0,5);
-        var actions=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.RightToLeft,WrapContents=false,Margin=Padding.Empty};
+        var actions=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.RightToLeft,WrapContents=false,Margin=Padding.Empty,Name="p2p-actions"};
         connect=GeneralStyle.Button(T("Conectar","Connect"),()=>Run(Connect),true);connect.Name="p2p-connect";connect.Margin=new Padding(8,0,0,0);actions.Controls.Add(connect);
         generate=GeneralStyle.Button(T("Gerar modpack","Generate modpack"),()=>Run(GenerateModpack));generate.Name="modpack-generate";generate.Margin=Padding.Empty;actions.Controls.Add(generate);
         body.Controls.Add(actions,0,6);body.Controls.Add(status,0,7);
-        cardScroll=new GeneralScrollView(cardStack,true){Name="p2p-cards"};
-        body.Controls.Add(cardScroll,0,9);
+        status.Margin=new Padding(0,Gap,0,0);
+        body.Controls.Add(cardScroll,0,9);body.SetColumnSpan(cardScroll,2);
         cardStack.ClientSizeChanged+=(s,e)=>LayoutCards();
         destination.Text=state.Destination??"";
         output.TextChanged+=(s,e)=>UpdateActions();input.TextChanged+=(s,e)=>UpdateActions();status.TextChanged+=(s,e)=>UpdateActions();
@@ -102,7 +109,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         button.AccessibleName=label;tips.SetToolTip(button,label);
     }
     static Label Heading(string text){return new Label{Text=text,Dock=DockStyle.Fill,Font=GeneralStyle.Font(11),Margin=Padding.Empty};}
-    static GeneralSurface Field(Control control){var field=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(14,9,14,9),Margin=new Padding(0,0,0,8)};field.Controls.Add(control);return field;}
+    static GeneralSurface Field(Control control){var field=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(14,9,14,9),Margin=new Padding(0,0,0,Gap)};field.Controls.Add(control);return field;}
     void Copy(string text){if(!text.StartsWith("ML-P2P1:",StringComparison.Ordinal))return;try{Clipboard.SetText(text);}catch(Exception ex){Failed(ex);}}
     void Report(string text){if(!IsDisposed&&IsHandleCreated)BeginInvoke((Action)(()=>{if(!IsDisposed)status.Text=text;}));}
     void Failed(Exception ex){
@@ -128,16 +135,16 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         bool receiving=false;
         try{receiving=P2PInvite.Decode(input.Text).Kind=="offer";}catch(IOException){}
         body.SuspendLayout();
-        targetRow.Visible=receiving;body.RowStyles[5].Height=receiving?76:0;
-        status.Visible=status.Text.Length!=0;body.RowStyles[7].Height=status.Text.Length==0?0:42;
+        targetRow.Visible=receiving;body.RowStyles[5].Height=receiving?TargetHeight:0;
+        status.Visible=status.Text.Length!=0;body.RowStyles[7].Height=status.Text.Length==0?0:Gap+42;
         body.ResumeLayout(false);
         FitCards();
     }
     void FitCards(){
         int chrome=56+body.Padding.Vertical+(int)body.RowStyles.Cast<RowStyle>().Take(8).Sum(row=>row.Height);
         int maximum=Screen.FromControl(this).WorkingArea.Height-32;
-        int shown=Math.Min(cardStack.MinimumSize.Height,Math.Max(0,maximum-chrome-8));
-        int gap=shown==0?0:8;
+        int shown=Math.Min(cardStack.MinimumSize.Height,Math.Max(0,maximum-chrome-Gap));
+        int gap=shown==0?0:Gap;
         cardScroll.Visible=shown>0;
         body.RowStyles[8].Height=gap;body.RowStyles[9].Height=shown;
         int height=chrome+gap+shown;
@@ -155,9 +162,9 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         int top=0;
         foreach(TransferCard card in cards.Values.OrderBy(c=>c.Order)){
             card.Frame.SetBounds(0,top,cardStack.ClientSize.Width,card.Height);
-            top+=card.Height+10;
+            top+=card.Height+Gap;
         }
-        int height=Math.Max(0,top-10);
+        int height=Math.Max(0,top-Gap);
         if(cardStack.MinimumSize.Height!=height)cardStack.MinimumSize=new Size(0,height);
     }
     void RefreshCards(Dictionary<P2PSession,P2PTransferStatus> views){

@@ -42,14 +42,14 @@ internal sealed class GeneralScrollView : Panel {
     readonly Panel viewport=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};
     readonly GeneralScrollBar bar=new GeneralScrollBar{Dock=DockStyle.Right,Margin=Padding.Empty};
     readonly Control content;
-    readonly bool panelContent;
+    readonly bool panelContent,reserveBarSpace;
     NativeEvents events;
     bool queued,refreshing;
     internal Control Content {get{return content;}}
     internal GeneralScrollBar Bar {get{return bar;}}
     [DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr handle,int message,IntPtr first,IntPtr second);
-    internal GeneralScrollView(Control content,bool panelContent=false){
-        this.panelContent=panelContent;
+    internal GeneralScrollView(Control content,bool panelContent=false,bool reserveBarSpace=false){
+        this.panelContent=panelContent;this.reserveBarSpace=reserveBarSpace;
         this.content=content;Dock=DockStyle.Fill;Margin=Padding.Empty;Padding=Padding.Empty;BackColor=GeneralStyle.Surface;
         content.Dock=DockStyle.None;content.Margin=Padding.Empty;viewport.Controls.Add(content);Controls.Add(viewport);Controls.Add(bar);
         var text=content as TextBox;if(text!=null&&text.Multiline){text.ScrollBars=ScrollBars.None;text.WordWrap=true;}
@@ -74,7 +74,8 @@ internal sealed class GeneralScrollView : Panel {
             else if(text!=null&&text.Multiline){total=(int)SendMessage(text.Handle,0x00ba,IntPtr.Zero,IntPtr.Zero);page=Math.Max(1,text.ClientSize.Height/Math.Max(1,text.Font.Height));value=(int)SendMessage(text.Handle,0x00ce,IntPtr.Zero,IntPtr.Zero);}
             bar.Configure(total,page,value);bool visible=total>page;if(bar.Visible!=visible){bar.Visible=visible;PerformLayout();}
             int nativeWidth=list==null?0:Math.Max(0,list.Width-list.ClientSize.Width);
-            var bounds=new Rectangle(0,panelContent?-Math.Min(value,Math.Max(0,total-page)):0,Math.Max(1,viewport.ClientSize.Width+nativeWidth),Math.Max(1,panelContent?Math.Max(total,page):viewport.ClientSize.Height));
+            int width=reserveBarSpace?ClientSize.Width-bar.Width:viewport.ClientSize.Width+nativeWidth;
+            var bounds=new Rectangle(0,panelContent?-Math.Min(value,Math.Max(0,total-page)):0,Math.Max(1,width),Math.Max(1,panelContent?Math.Max(total,page):viewport.ClientSize.Height));
             if(content.Bounds!=bounds)content.Bounds=bounds;
         }finally{refreshing=false;}
     }

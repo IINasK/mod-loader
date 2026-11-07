@@ -1,0 +1,187 @@
+{
+  "Version": "1.1.32",
+  "GeneralSuitePassed": true,
+  "P2PUiChecks": 212,
+  "SetupChecks": 24,
+  "Reports": [
+    {
+      "Report": "resultado-loader-geral.json",
+      "Checks": 14,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/resultado-loader-geral.json"
+    },
+    {
+      "Report": "resultado-pintura-botoes.json",
+      "Checks": 36,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/resultado-pintura-botoes.json"
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 28,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/resultado-snapshot-installer.json"
+    },
+    {
+      "Report": "resultado-automatic-update.json",
+      "Checks": 25,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/au-626db574/resultado-automatic-update.json"
+    },
+    {
+      "Report": "resultado.json",
+      "Checks": 0,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/bi-4c3d3699/resultado.json"
+    },
+    {
+      "Report": "resultado-brand.json",
+      "Checks": 45,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/br-af5bd043/resultado-brand.json"
+    },
+    {
+      "Report": "resultado-project-clone.json",
+      "Checks": 21,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/c/resultado-project-clone.json"
+    },
+    {
+      "Report": "resultado-category-delete.json",
+      "Checks": 16,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/ca-cf47d072/resultado-category-delete.json"
+    },
+    {
+      "Report": "resultado-project-deletion.json",
+      "Checks": 45,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/d/resultado-project-deletion.json"
+    },
+    {
+      "Report": "resultado-floating.json",
+      "Checks": 30,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/fl-5bd7115d/resultado-floating.json"
+    },
+    {
+      "Report": "resultado-project-home.json",
+      "Checks": 119,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/h/resultado-project-home.json"
+    },
+    {
+      "Report": "resultado-historico.json",
+      "Checks": 0,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/hi-597da1d3/resultado-historico.json"
+    },
+    {
+      "Report": "resultado-project-hub.json",
+      "Checks": 59,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/j/resultado-project-hub.json"
+    },
+    {
+      "Report": "resultado-menu-host.json",
+      "Checks": 73,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/me-569ea41c/resultado-menu-host.json"
+    },
+    {
+      "Report": "resultado-no-copy.json",
+      "Checks": 28,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/n/resultado-no-copy.json"
+    },
+    {
+      "Report": "resultado-progresso-geral.json",
+      "Checks": 38,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/on-18c458f7/resultado-progresso-geral.json"
+    },
+    {
+      "Report": "resultado-status-presentation.json",
+      "Checks": 47,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/online-testes-status-3695fdf0cd3e40d7bafbd2689c55395e/resultado-status-presentation.json"
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Checks": 212,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/p2-225655af/resultado-p2p-ui.json"
+    },
+    {
+      "Report": "resultado-p2p.json",
+      "Checks": 47,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/p2-92b0a63e/resultado-p2p.json"
+    },
+    {
+      "Report": "resultado-app-paths.json",
+      "Checks": 7,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/pa-235352b5/resultado-app-paths.json"
+    },
+    {
+      "Report": "resultado-popup-stability.json",
+      "Checks": 80,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/po-0af77072/resultado-popup-stability.json"
+    },
+    {
+      "Report": "resultado-preset-clean.json",
+      "Checks": 26,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/pr-434310e6/resultado-preset-clean.json"
+    },
+    {
+      "Report": "resultado-preset-draft.json",
+      "Checks": 44,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/pr-7b9ee7ac/resultado-preset-draft.json"
+    },
+    {
+      "Report": "resultado-project-store.json",
+      "Checks": 55,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/pr-cecf6335/resultado-project-store.json"
+    },
+    {
+      "Report": "resultado-redesign.json",
+      "Checks": 29,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/re-6ef3d5d9/resultado-redesign.json"
+    },
+    {
+      "Report": "resultado-storage-by-mod.json",
+      "Checks": 31,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/s/resultado-storage-by-mod.json"
+    },
+    {
+      "Report": "resultado-project-search.json",
+      "Checks": 34,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/se-6de6b708/resultado-project-search.json"
+    },
+    {
+      "Report": "resultado-snapshot.json",
+      "Checks": 45,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/ss-c1a46300/resultado-snapshot.json"
+    },
+    {
+      "Report": "resultado-snapshot-density.json",
+      "Checks": 0,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/ss-c1a46300/on-dc71f27d/resultado-snapshot-density.json"
+    },
+    {
+      "Report": "resultado-table-dialogs.json",
+      "Checks": 81,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/ta-1422f39b/resultado-table-dialogs.json"
+    },
+    {
+      "Report": "resultado-ui-v2.json",
+      "Checks": 30,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/ui-22763255/resultado-ui-v2.json"
+    },
+    {
+      "Report": "resultado-updates.json",
+      "Checks": 30,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/up-31f7cd28/resultado-updates.json"
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Checks": 28,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/ve-c46a24e5/resultado-snapshot-installer.json"
+    },
+    {
+      "Report": "resultado-version-choice.json",
+      "Checks": 51,
+      "Evidence": "T/online-testes-66ba4b46c82446c993a96c0118981406/ve-c46a24e5/resultado-version-choice.json"
+    },
+    {
+      "Report": "resultado-setup.json",
+      "Checks": 24,
+      "Evidence": "T/setup-ba59cc96f9804b1bb9096115a96fee31/resultado-setup.json"
+    }
+  ],
+  "RealGameTouched": false,
+  "RemoteTwoComputerTestPerformed": false,
+  "OriginalScrollArtifactReproducedLive": false,
+  "EmbeddedCatalogSha256": "c6a0b3a6170e10c8d707c4d25361d30be7382bccb9a25dd8a50d27c956e2e6a2"
+}

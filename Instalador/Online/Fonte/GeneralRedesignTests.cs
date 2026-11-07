@@ -84,10 +84,15 @@ internal sealed partial class GeneralModWindow {
             var scroll=(GeneralScrollView)form.grid.Parent.Parent;scroll.RefreshScroll();
             check(form.grid.ScrollBars==ScrollBars.None&&scroll.Bar.Visible&&scroll.Bar.Limit>0,"Tabela usa barra própria, sem rolagem nativa sobreposta.");
             scroll.Bar.MoveTo(10);check(form.grid.FirstDisplayedScrollingRowIndex==10,"Mover a barra altera a posição da tabela.");
+            var tools=form.Controls.Find("TableTools",true).Single();
+            await Task.Delay(60);
+            check(!tools.Visible,"Rolagem para baixo recolhe busca e ferramentas após o redesenho.");
             check(scroll.Bar.AccessibilityObject.Value=="10","Acessibilidade expõe a posição da barra própria.");scroll.Bar.AccessibilityObject.Value="11";check(form.grid.FirstDisplayedScrollingRowIndex==11,"Acessibilidade pode ajustar a posição da barra.");
             int before=form.grid.FirstDisplayedScrollingRowIndex;scroll.Bar.Wheel(-120);check(form.grid.FirstDisplayedScrollingRowIndex>=before,"Roda do mouse avança a tabela.");
             scroll.Bar.MoveTo(Int32.MaxValue);check(scroll.Bar.Value==scroll.Bar.Limit,"Arraste/limite não passa do fim da tabela.");
             scroll.Bar.MoveTo(0);check(form.grid.FirstDisplayedScrollingRowIndex==0,"Início da barra retorna ao primeiro item.");
+            await Task.Delay(60);
+            check(tools.Visible,"Voltar ao início restaura busca e ferramentas após o redesenho.");
             CaptureUi(form,Path.Combine(root,"tabela-clara.png"));
             using(var menu=new GeneralActionsMenu()){
                 menu.StartPosition=FormStartPosition.Manual;menu.Location=new Point(-30000,-30000);menu.Show(form);Application.DoEvents();
