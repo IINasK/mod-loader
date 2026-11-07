@@ -34,7 +34,7 @@ internal sealed partial class GeneralModWindow {
             form.categoryFilters=new HashSet<string>{b.Category};form.DrawRows();check(form.VisibleMods().Count==0,"Search composes with category filters.");
             check(form.grid.Rows.Cast<DataGridViewRow>().Any(row=>row.Tag is SectionRow&&((SectionRow)row.Tag).Kind=="empty"),"No results has an explicit empty-state message.");
             form.categoryFilters=null;form.searchBox.Text="falha";await Task.Delay(220);check(form.VisibleMods().Single()==b,"Search finds failed status.");
-            form.searchBox.Text="nao baixado";await Task.Delay(220);check(form.VisibleMods().Single()==c,"Search finds not-downloaded status.");
+            form.searchBox.Text="pendente";await Task.Delay(220);check(form.VisibleMods().Single()==c,"Search finds pending status.");
             state.Language="en";form.BuildInterface();form.searchBox.Text="download complete";await Task.Delay(220);check(form.VisibleMods().Single()==a,"Status is searchable in the active English language.");
             form.searchBox.Text="principal";await Task.Delay(220);form.statusFilters=new HashSet<string>{"Failed"};form.DrawRows();check(form.VisibleMods().Single()==b,"Search composes with status and variant values.");
             form.statusFilters=null;form.searchBox.Text="feminina";await Task.Delay(220);form.preset.SelectedIndex=1;check(form.VisibleMods().Single()==a,"Preset membership and search are combined.");

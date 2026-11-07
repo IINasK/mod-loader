@@ -317,7 +317,7 @@ internal sealed partial class GeneralModWindow : Form {
         int failed=rows.Count(r=>{var m=state.List.Mods.Single(x=>x.Id==(string)r.Tag);string status;return statuses.TryGetValue(Key(m,Selected(m)),out status)&&GeneralStatusPresentation.Kind(status)=="error";});
         counts.Text=T("Mods na lista: ","Mods in list: ")+rows.Count+"   ·   "+T("Medidos: ","Measured: ")+rows.Count(r=>measuredMods.ContainsKey((string)r.Tag))+"/"+rows.Count+"   ·   "+T("Instalados: ","Installed: ")+installed+"   ·   "+T("Falhas: ","Failed: ")+failed;UpdatePresetCommands();UpdatePackCoverage();
     }
-    sealed class ModListGrid : DataGridView {
+    internal sealed class ModListGrid : DataGridView {
         public ModListGrid(){DoubleBuffered=true;}
     }
     void PaintSection(object sender,DataGridViewRowPrePaintEventArgs e){
@@ -380,7 +380,7 @@ internal sealed partial class GeneralModWindow : Form {
         string id=(string)grid.Rows[e.RowIndex].Tag,raw;var item=state.List.Mods.Single(m=>m.Id==id);
         if(!statuses.TryGetValue(Key(item,Selected(item)),out raw))raw="Não conferido";
         string kind=GeneralStatusPresentation.Kind(raw),label=GeneralStatusPresentation.Label(raw);
-        Color fill=ColorTranslator.FromHtml(kind=="installed"?"#157347":kind=="error"?"#b42348":kind=="active"?"#a85000":"#202026");
+        Color fill=ColorTranslator.FromHtml(GeneralStatusPresentation.DownloadComplete(raw)?"#157347":kind=="error"?"#b42348":kind=="active"?"#a85000":"#202026");
         e.PaintBackground(e.ClipBounds,true);e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         using(var font=GeneralStyle.Font(10.5f)){
             int width=Math.Min(e.CellBounds.Width-20,TextRenderer.MeasureText(label,font).Width+22);

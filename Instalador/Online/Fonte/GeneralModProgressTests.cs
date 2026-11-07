@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,7 +7,9 @@ internal sealed partial class GeneralModWindow {
     internal static bool DensityCountsAsInstalled(FixedCatalog catalog,GeneralModState state,string data){
         using(var form=new GeneralModWindow(catalog,new DownloadCache(Path.Combine(data,"cache")),data,state)){
             string status=form.Status(form.MakeWork(state.List.Mods.Single()),state.Destination);
-            return GeneralStatusPresentation.Kind(status)=="installed";
+            var pending=new List<Work>();
+            var downloads=form.PlanSelected(new List<Work>{form.MakeWork(state.List.Mods.Single())},state.Destination,pending);
+            return GeneralStatusPresentation.Kind(status)=="installed"&&pending.Count==0&&downloads.Count==0;
         }
     }
 

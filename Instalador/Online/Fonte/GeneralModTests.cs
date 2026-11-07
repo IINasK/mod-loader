@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -62,6 +62,22 @@ internal sealed partial class GeneralModWindow {
         TestForm(fake,queueState,stateDir,root,async form=>{
             form.launch=url=>opened.Add(url);
             var ordered=queueState.List.Mods.Take(3).Select(form.MakeWork).ToArray();
+            var selected=ordered.Concat(new[]{form.MakeWork(urgent)}).ToList();
+            var pending=new List<Work>();
+            var missing=form.PlanSelected(selected,game,pending);
+            check(pending.Count==4&&missing.SequenceEqual(new[]{"fixture1","fixture3"}),"A confirmação lista apenas downloads faltantes e mantém arquivos locais na fila.");
+            string manualPath=Safe.In(game,fake.Packages[0].Files[0].Path);
+            Directory.CreateDirectory(Path.GetDirectoryName(manualPath));
+            File.WriteAllText(manualPath,"fixture1",new UTF8Encoding(false));
+            pending.Clear();
+            missing=form.PlanSelected(selected,game,pending);
+            check(!pending.Contains(ordered[0])&&missing.SequenceEqual(new[]{"fixture3"}),"A confirmação reconhece a instalação manual pelos arquivos do jogo.");
+            fake.Packages[0].Dependencies=new[]{"fixture3"};
+            pending.Clear();
+            missing=form.PlanSelected(selected,game,pending);
+            check(pending.Contains(ordered[0])&&missing.SequenceEqual(new[]{"fixture3"}),"Uma dependência faltante entra uma só vez mesmo quando o mod selecionado já está presente.");
+            fake.Packages[0].Dependencies=new string[0];
+            File.Delete(Safe.In(game,fake.Packages[0].Files[0].Path));
             form.Enqueue(ordered,false);
             await Until(()=>opened.Count==1);
             check(opened[0].EndsWith("501"),"A fila abre somente a primeira página.");

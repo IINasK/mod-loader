@@ -40,7 +40,7 @@ internal sealed partial class GeneralModWindow {
     }
     string DefaultCategory {get{return categoryFilters!=null&&categoryFilters.Count==1?categoryFilters.Single():null;}}
     void ResetColumnFilters(){categoryFilters=variantFilters=statusFilters=null;nameFilter="";searchQuery="";searchTerms=new string[0];if(searchBox!=null&&!searchBox.IsDisposed)searchBox.Clear();}
-    static string StatusFilterKey(string value){return value=="Não baixado"||value=="Not downloaded"?"pending":value=="Baixando"||value=="Downloading"?"active":value=="Download concluído"||value=="Download complete"?"complete":"error";}
+    static string StatusFilterKey(string value){return value=="Pendente"||value=="Pending"?"pending":value=="Baixando"||value=="Downloading"?"active":value=="Download concluído"||value=="Download complete"?"complete":"error";}
     bool ColumnAllows(GeneralModEntry mod){
         string raw;statuses.TryGetValue(Key(mod,Selected(mod)),out raw);
         return (categoryFilters==null||categoryFilters.Contains(mod.Category??""))&&
@@ -53,7 +53,7 @@ internal sealed partial class GeneralModWindow {
         if(column<1||column>3)return;
         string uncat=UncatName();
         var values=column==1?new[]{uncat}.Concat(PresetCategories()).ToList():column==2?state.List.Mods.Select(mod=>Selected(mod).Name).Distinct().OrderBy(value=>value).ToList():
-            new[]{T("Não baixado","Not downloaded"),T("Baixando","Downloading"),T("Download concluído","Download complete"),T("Falha","Failed")}.ToList();
+            new[]{T("Pendente","Pending"),T("Baixando","Downloading"),T("Download concluído","Download complete"),T("Falha","Failed")}.ToList();
         var current=column==1?categoryFilters:column==2?variantFilters:statusFilters;
         IEnumerable<string> selected=current==null?null:column==3?values.Where(value=>current.Any(item=>StatusFilterKey(item)==StatusFilterKey(value))):current.Select(value=>column==1&&value==""?uncat:value);
         using(var dialog=new GeneralColumnFilterDialog(column==1?T("Filtrar mods","Filter mods"):column==2?T("Filtrar variantes","Filter variants"):T("Filtrar situação","Filter status"),values,selected,nameFilter,column==1)){

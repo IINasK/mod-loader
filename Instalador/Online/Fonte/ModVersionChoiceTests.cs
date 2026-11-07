@@ -70,9 +70,31 @@ internal static class ModVersionChoiceTests {
         }
         string binary=GeneralAutomaticUpdateTests.MakeExe(root,"version.dll","1.2.3","Fixture");check(ModVersionDifference.FileVersion(binary)=="1.2.3.0","Readable binary version is displayed without executing the file.");
         var blocked=new ModVersionDifference{Name="Protected",CanReplace=false,Detail="protected"};reject(()=>blocked.Require(d=>true),"Explicit choice cannot bypass protected replacement guard.");
-        foreach(string language in new[]{"pt","en"})foreach(string theme in new[]{"light","light-red","dark"}){
+        GeneralStyle.AnimationsEnabled=false;
+        foreach(string language in new[]{"pt","en"})foreach(string theme in new[]{"light","light-red","dark","black"}){
             GeneralStyle.UseTheme(theme);GeneralStyle.Language=language;
-            using(var dialog=new GeneralVersionChoiceDialog(new ModVersionDifference{Name="Mod",Current="1.0",Incoming="2.0",Detail="test"})){dialog.CreateControl();dialog.PerformLayout();var keep=dialog.Controls.Find("KeepInstalledVersion",true).OfType<Button>().Single();var replace=dialog.Controls.Find("UseIncomingVersion",true).OfType<Button>().Single();check(keep.Enabled&&replace.Enabled&&dialog.AcceptButton==keep,"Safe default and explicit choice in "+language+"/"+theme);}
+            using(var dialog=new GeneralVersionChoiceDialog(new ModVersionDifference{Name="Mod",Current="1.0",Incoming="2.0",Detail="test"})){
+                dialog.Show();
+                Application.DoEvents();
+                var keep=dialog.Controls.Find("KeepInstalledVersion",true).OfType<Button>().Single();
+                var replace=dialog.Controls.Find("UseIncomingVersion",true).OfType<Button>().Single();
+                check(keep.Enabled&&replace.Enabled&&dialog.AcceptButton==keep,"Safe default and explicit choice in "+language+"/"+theme);
+                foreach(float scale in new[]{1f,1.25f,1.5f}){
+                    if(scale>1f)dialog.Scale(new System.Drawing.SizeF(scale/(scale==1.25f?1f:1.25f),scale/(scale==1.25f?1f:1.25f)));
+                    dialog.PerformLayout();
+                    foreach(var action in new[]{keep,replace}){
+                        var painted=action.Bounds;
+                        painted.Inflate(action.Margin.Left,action.Margin.Bottom);
+                        check(action.Parent.ClientRectangle.Contains(painted),"Complete action and margins at scale "+scale+" in "+language+"/"+theme);
+                    }
+                }
+                if(theme=="dark"&&language=="en"){
+                    using(var image=new System.Drawing.Bitmap(dialog.Width,dialog.Height)){
+                        dialog.DrawToBitmap(image,new System.Drawing.Rectangle(System.Drawing.Point.Empty,image.Size));
+                        image.Save(Path.Combine(root,"version-actions-en-dark.png"));
+                    }
+                }
+            }
         }
         GeneralStyle.Language="pt";GeneralStyle.UseTheme("light-red");GeneralModWindow.RunVersionQueueTests(root,check);
         check(GeneralModInstallerTests.Run(root)==11,"Existing generic installation/removal regression checks pass.");

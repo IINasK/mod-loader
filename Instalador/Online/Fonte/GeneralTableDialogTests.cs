@@ -21,6 +21,30 @@ internal static class GeneralTableDialogTests {
                 Open(dialog); Find<TextBox>(dialog, "NameInput").Text = "Discarded"; Find<Button>(dialog, "CancelName").PerformClick();
                 check(dialog.DialogResult == DialogResult.Cancel && dialog.ResultName == null, "Cancel does not publish the edited name.");
             }
+            var pending = Enumerable.Range(1, 25).Select(index => "Mod " + index).ToArray();
+            using (var dialog = new GeneralInstallConfirmation(Path.Combine(root, "game"), 30, pending)) {
+                Open(dialog);
+                var table = Find<DataGridView>(dialog, "PendingDownloads");
+                var scroll = Descendants(dialog).OfType<GeneralScrollView>().Single();
+                scroll.RefreshScroll();
+                check(table.ReadOnly && table.Rows.Count == 25 && table.Rows.Cast<DataGridViewRow>().Select(row => (string)row.Cells[0].Value).SequenceEqual(pending),
+                    "Install confirmation shows all pending downloads in individual read-only rows.");
+                check(scroll.Bar.Visible && table.DisplayedRowCount(false) < pending.Length, "Long confirmations use the shared scrollbar.");
+                scroll.ScrollTo(24);
+                check(table.Rows[24].Displayed && Find<Button>(dialog, "ConfirmPendingInstall").Visible, "Scrolling reaches the last mod while actions stay visible.");
+                using (var image = new Bitmap(dialog.Width, dialog.Height)) {
+                    dialog.DrawToBitmap(image, new Rectangle(Point.Empty, image.Size));
+                    image.Save(Path.Combine(root, "pending-downloads.png"));
+                }
+                Find<Button>(dialog, "CancelPendingInstall").PerformClick();
+                check(dialog.DialogResult == DialogResult.Cancel, "Cancel leaves the installation unconfirmed.");
+            }
+            using (var dialog = new GeneralInstallConfirmation(Path.Combine(root, "game"), 2, new string[0])) {
+                Open(dialog);
+                check(!Descendants(dialog).OfType<DataGridView>().Any(), "Already downloaded files can be installed without an empty download table.");
+                Find<Button>(dialog, "ConfirmPendingInstall").PerformClick();
+                check(dialog.DialogResult == DialogResult.OK, "Ready-to-install files can be confirmed.");
+            }
             var original = new HashSet<string>(new[] { "A" }, StringComparer.Ordinal);
             using (var dialog = new GeneralColumnFilterDialog("Filter", new[] { "B", "A", "", "A" }, original, "old", true)) {
                 Open(dialog); var list = Find<CheckedListBox>(dialog, "ColumnChoices");

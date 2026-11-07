@@ -510,3 +510,11 @@ Pedido de Douglas, 28/10/2026: configurar mods com o coop, registrar processos v
 - O Maneo MascV usa os mesmos caminhos da versão FemV. O catálogo fixa somente FemV. A ficha informa a alternativa MascV e a regra de instalar uma edição por vez.
 - O OneSlowZZ 8594 e sua loja 8572 ficaram fora do catálogo. A loja foi conferida e o download do arquivo principal dos relógios ficou incompleto.
 - Os 12 pacotes e 32 arquivos passaram pela preparação isolada do instalador com hashes conferidos. Compatibilidade de DLC e corpo é documental e estática. Jogo real, terceira pessoa e coop não foram testados.
+
+## Revisão 1.1.41 — confirmação de instalação e status
+
+- A confirmação verifica os arquivos da instalação e dos downloads. Lista os nomes dos downloads pendentes e mantém os arquivos locais prontos na fila. Dependências faltantes são consideradas mesmo se o mod selecionado já está instalado.
+- NightCoop instalado manualmente passa pela mesma conferência de hashes do catálogo. A Baixa personalizada reconhecida atende à seleção Baixa. Outras densidades continuam sujeitas à confirmação de troca.
+- O rótulo Pendente substitui a suposição sobre o download. O rótulo e a cor do selo de download concluído usam a mesma regra. O rodapé do diálogo de versão mede os botões em vez de usar altura fixa.
+
+- A confirmação usa a tabela do aplicativo com uma linha por mod com download pendente e rolagem. O caminho e as ações ficam fixos.

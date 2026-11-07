@@ -110,3 +110,74 @@ internal static class GeneralTableDialogLayout {
         return new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.RightToLeft, Margin = new Padding(0, 14, 0, 0) };
     }
 }
+
+internal sealed class GeneralInstallConfirmation : GeneralDialog {
+    internal GeneralInstallConfirmation(string destination, int queued, IReadOnlyList<string> downloads)
+        : base(GeneralStyle.T("Confirmar instalação", "Confirm installation")) {
+        ClientSize = new Size(660, downloads.Count == 0 ? 250 : 310 + Math.Min(6, downloads.Count - 1) * 34);
+        var layout = new TableLayoutPanel {
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(20, 8, 20, 20)
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        var folder = new Label {
+            Name = "InstallDestination", Text = destination, Dock = DockStyle.Top, AutoSize = true,
+            AccessibleName = GeneralStyle.T("Pasta de instalação", "Installation folder"),
+            MaximumSize = new Size(600, 0), Margin = new Padding(0, 0, 0, 10), Font = GeneralStyle.Font(11)
+        };
+        var summary = new Label {
+            Name = "InstallSummary", Text = queued + GeneralStyle.T(" na fila · ", " queued · ") +
+                downloads.Count + GeneralStyle.T(" com download pendente", " with pending downloads"),
+            Dock = DockStyle.Top, AutoSize = true, Font = GeneralStyle.Font(11, true),
+            Margin = new Padding(0, 0, 0, 10)
+        };
+        layout.Controls.Add(folder, 0, 0);
+        layout.Controls.Add(summary, 0, 1);
+
+        if (downloads.Count > 0) {
+            var table = new GeneralModWindow.ModListGrid {
+                Name = "PendingDownloads", AccessibleName = GeneralStyle.T("Mods com download pendente", "Mods with pending downloads"),
+                Dock = DockStyle.Fill, ReadOnly = true, MultiSelect = false, RowHeadersVisible = false,
+                AllowUserToAddRows = false, AllowUserToDeleteRows = false, AllowUserToResizeRows = false, AllowUserToResizeColumns = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect, BackgroundColor = GeneralStyle.Surface,
+                BorderStyle = BorderStyle.None, CellBorderStyle = DataGridViewCellBorderStyle.None,
+                ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None, EnableHeadersVisualStyles = false,
+                ColumnHeadersHeight = 34, ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+            };
+            table.DefaultCellStyle = new DataGridViewCellStyle {
+                BackColor = GeneralStyle.Surface, ForeColor = GeneralStyle.Foreground, SelectionBackColor = GeneralStyle.Selection,
+                SelectionForeColor = GeneralStyle.Foreground, Font = GeneralStyle.Font(11), Padding = new Padding(8, 0, 8, 0)
+            };
+            table.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle {
+                BackColor = GeneralStyle.Surface, ForeColor = GeneralStyle.Muted, Font = GeneralStyle.Font(11, true), Padding = new Padding(8, 0, 8, 0)
+            };
+            table.RowTemplate.Height = 34;
+            table.Columns.Add(new DataGridViewTextBoxColumn {
+                HeaderText = GeneralStyle.T("Mod", "Mod"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, SortMode = DataGridViewColumnSortMode.NotSortable
+            });
+            foreach (string name in downloads) {
+                int row = table.Rows.Add(name);
+                table.Rows[row].Cells[0].ToolTipText = name;
+            }
+            var surface = new GeneralSurface { Dock = DockStyle.Fill, Padding = new Padding(12), Margin = Padding.Empty };
+            surface.Controls.Add(new GeneralScrollView(table));
+            layout.Controls.Add(surface, 0, 2);
+        }
+
+        var actions = GeneralTableDialogLayout.Commands();
+        var proceed = GeneralStyle.Button(GeneralStyle.T("Continuar", "Continue"), () => Complete(DialogResult.OK), true);
+        proceed.Name = "ConfirmPendingInstall";
+        var cancel = GeneralStyle.Button(GeneralStyle.T("Cancelar", "Cancel"), () => Complete(DialogResult.Cancel));
+        cancel.Name = "CancelPendingInstall";
+        actions.Controls.Add(proceed);
+        actions.Controls.Add(cancel);
+        layout.Controls.Add(actions, 0, 3);
+        Content.Controls.Add(layout);
+        AcceptButton = proceed;
+        CancelButton = cancel;
+        GeneralStyle.Apply(this, GeneralStyle.Dark);
+    }
+}

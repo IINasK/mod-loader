@@ -10,8 +10,12 @@ internal static class GeneralStatusPresentation {
         if(value=="versão mantida")return GeneralStyle.T("Versão mantida","Version kept");
         if(Kind(raw)=="error")return GeneralStyle.T("Falha","Failed");
         if(value=="baixando")return GeneralStyle.T("Baixando","Downloading");
-        if(Kind(raw)=="installed"||value=="pronto para instalar"||value=="instalando")return GeneralStyle.T("Download concluído","Download complete");
-        return GeneralStyle.T("Não baixado","Not downloaded");
+        if(DownloadComplete(raw))return GeneralStyle.T("Download concluído","Download complete");
+        return GeneralStyle.T("Pendente","Pending");
+    }
+    internal static bool DownloadComplete(string raw) {
+        string value=(raw??"").Trim().ToLowerInvariant();
+        return Kind(raw)=="installed"||value=="pronto para instalar"||value=="instalando";
     }
     internal static string Kind(string raw) {
         switch ((raw ?? "").Trim().ToLowerInvariant()) {
@@ -62,11 +66,15 @@ internal static class GeneralStatusPresentationTests {
         if (GeneralStatusPresentation.Kind(null) != "pending") throw new IOException("Status ausente precisa ser tratado como não iniciado.");
         results.Add(new { Status = (string)null, Kind = "pending" });
         string previous=GeneralStyle.Language;GeneralStyle.Language="pt";
-        foreach(var value in new[]{new[]{"Não conferido","Não baixado"},new[]{"Na fila","Não baixado"},new[]{"Baixando","Baixando"},new[]{"Pronto para instalar","Download concluído"},new[]{"Instalando","Download concluído"},new[]{"Instalado","Download concluído"},new[]{"Falhou","Falha"},new[]{"Parcial","Falha"}}){
+        foreach(var value in new[]{new[]{"Não conferido","Pendente"},new[]{"Na fila","Pendente"},new[]{"Baixando","Baixando"},new[]{"Pronto para instalar","Download concluído"},new[]{"Instalando","Download concluído"},new[]{"Instalado","Download concluído"},new[]{"Falhou","Falha"},new[]{"Parcial","Falha"}}){
             if(GeneralStatusPresentation.Label(value[0])!=value[1])throw new IOException("Rótulo incorreto: "+value[0]);
             results.Add(new{Status=value[0],Label=value[1]});
         }
+        foreach(string status in new[]{"Pronto para instalar","Instalando","Instalado"})
+            if(!GeneralStatusPresentation.DownloadComplete(status))throw new IOException("Cor de download concluído ausente: "+status);
+        if(GeneralStatusPresentation.DownloadComplete("Na fila"))throw new IOException("A fila ainda tem download pendente.");
         GeneralStyle.Language="en";
+        if(GeneralStatusPresentation.Label("Não conferido")!="Pending")throw new IOException("Rótulo pendente não traduzido.");
         if(GeneralStatusPresentation.Label("Instalado")!="Download complete")throw new IOException("Rótulo não traduzido.");
         results.Add(new{Status="Instalado",Label="Download complete"});GeneralStyle.Language=previous;
         string root = Path.Combine(Path.GetFullPath(parent), "online-testes-status-" + Guid.NewGuid().ToString("N"));

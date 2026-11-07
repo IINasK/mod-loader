@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -82,7 +82,7 @@ internal sealed partial class GeneralModWindow {
         var listed=state.List.Mods.FirstOrDefault(m=>m.Id==work.Entry.Id);
         if(visible!=null&&listed!=null&&Object.ReferenceEquals(Selected(listed),work.Variant)){
             visible.Cells["Status"].Value=GeneralStatusPresentation.Label(status);visible.Cells["Status"].ToolTipText=StatusDetail(work.Key,status);
-            visible.Cells["Progress"].Value=pct.HasValue?(object)pct.Value:"—";UpdateCounts();
+            visible.Cells["Progress"].Value=pct.HasValue?(object)pct.Value:"—";grid.InvalidateCell(visible.Cells["Status"]);UpdateCounts();
         }
         if(message!=null)detail.Text=message;
         if(working||scanning)UpdateFlow(work,status,pct);
@@ -187,6 +187,7 @@ internal sealed partial class GeneralModWindow {
                 if(visibleRows.TryGetValue(work.Entry.Id,out row)&&row.DataGridView==grid){
                     row.Cells["Status"].Value=GeneralStatusPresentation.Label(result);
                     row.Cells["Status"].ToolTipText=GeneralStyle.Status(result);
+                    grid.InvalidateCell(row.Cells["Status"]);
                 }
                 operationFinished++;work.Ended=true;Stage(work,"scan.end");
                 totalProgress.Caption=T("Mods verificados: ","Mods checked: ")+operationFinished+" / "+operationTotal;
@@ -203,20 +204,100 @@ internal sealed partial class GeneralModWindow {
             DrawRows();RefreshStorageSize();
         }finally{scanCurrent=null;detail.Text=previous;scanning=false;Busy(false);}
     }
-    void StartSelected(){
+    async void StartSelected(){
         if(working||scanning)return;
-        var jobs=Marked();
-        if(jobs.Count>1&&IsCyberpunk(root:state.Destination)&&!GameEdition.HasPL(state.Destination)){
-            jobs=jobs.Where(w=>w.Variant.CyberpunkId==null||!FixedData.Expand(catalog,new[]{w.Variant.CyberpunkId}).Any(GameEdition.NeedsPL)).ToList();
-            if(jobs.Count==0){detail.Text=T("Os mods marcados precisam de Phantom Liberty.","The selected mods require Phantom Liberty.");return;}
+        try{
+            var jobs=Marked();
+            if(jobs.Count>1&&IsCyberpunk(root:state.Destination)&&!GameEdition.HasPL(state.Destination)){
+                jobs=jobs.Where(w=>w.Variant.CyberpunkId==null||!FixedData.Expand(catalog,new[]{w.Variant.CyberpunkId}).Any(GameEdition.NeedsPL)).ToList();
+                if(jobs.Count==0){detail.Text=T("Os mods marcados precisam de Phantom Liberty.","The selected mods require Phantom Liberty.");return;}
+            }
+            if(jobs.Count==0){var item=FocusedEntry();if(item!=null)jobs.Add(MakeWork(item));}
+            if(jobs.Count==0){detail.Text=T("Selecione um mod na lista.","Select a mod from the list.");return;}
+            string root=Root();
+            var pending=new List<Work>();
+            List<string> downloads;
+            scanning=true;Busy(true);next.Visible=false;
+            detail.Text=T("Conferindo os mods selecionados…","Checking the selected mods…");
+            try{downloads=await Task.Run(()=>PlanSelected(jobs,root,pending));}
+            finally{scanning=false;Busy(false);}
+            if(IsDisposed)return;
+            if(pending.Count==0){
+                detail.Text=T("Os mods selecionados já estão instalados.","The selected mods are already installed.");
+                return;
+            }
+            using(var dialog=new GeneralInstallConfirmation(root,pending.Count,downloads))
+                if(dialog.ShowDialog(this)==DialogResult.OK)Enqueue(pending,false);
+                else detail.Text=T("Instalação cancelada.","Installation canceled.");
+        }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
+    }
+
+    List<string> PlanSelected(List<Work> selected,string root,List<Work> pending){
+        var reads=new ScanReads(this,root);
+        var known=new Dictionary<string,FixedMod>();
+        var downloads=new List<string>();
+        foreach(var work in selected){
+            string status=Status(work,root,reads);
+            if(work.Variant.CyberpunkId==null){
+                if(GeneralStatusPresentation.Kind(status)=="installed")continue;
+                pending.Add(work);
+                if(work.Variant.Sources.Select((source,index)=>GeneralModDownload.IsWebSource(source)&&!File.Exists(LocalSource(work,index))).Any(missing=>missing))
+                    downloads.Add(work.Entry.Name+" — "+work.Variant.Name);
+                continue;
+            }
+            if(SnapshotInstalled(work,root))continue;
+            if(status=="Requer Cyberpunk 2077"||status=="Requer Phantom Liberty"){pending.Add(work);continue;}
+
+            var recipe=Recipe(work);
+            var unresolved=new List<FixedMod>();
+            bool blocked=false;
+            foreach(var mod in FixedData.Expand(catalog,new[]{recipe.Id})){
+                if(mod.Id==recipe.Id&&work.Variant.CyberpunkVariant!=null){
+                    if(GeneralStatusPresentation.Kind(status)=="installed")continue;
+                    if(!NightCityDensity.Read(recipe,root).CanApply){blocked=true;break;}
+                    unresolved.Add(NightCityDensity.Resolve(recipe,work.Variant.CyberpunkVariant));
+                    continue;
+                }
+                var scan=FixedData.Scan(mod,root,true,reads.Hash,false);
+                if(scan.IsCorrect)continue;
+                if(scan.IsConflict||!String.IsNullOrEmpty(mod.BlockedReason)||GameEdition.NeedsPL(mod)&&!reads.PhantomLiberty){blocked=true;break;}
+                unresolved.Add(mod);
+            }
+            if(!blocked&&unresolved.Count==0)continue;
+            pending.Add(work);
+            if(!blocked)foreach(var mod in unresolved)
+                known[mod.Id+"/"+String.Join("/",mod.Assets.Select(asset=>asset.Sha256))]=mod;
         }
-        if(jobs.Count==0){var item=FocusedEntry();if(item!=null)jobs.Add(MakeWork(item));}
-        if(jobs.Count==0){detail.Text=T("Selecione um mod na lista.","Select a mod from the list.");return;}
-        string root=Root();
-        string description=String.Join("\n",jobs.Take(9).Select(w=>"• "+w.Entry.Name+" — "+w.Variant.Name));
-        if(jobs.Count>9)description+="\n… e mais "+(jobs.Count-9)+".";
-        if(GeneralDialog.Message(this,T("Baixar/Instalar ","Download/Install ")+jobs.Count+T(" mod(s) em:\n"," mod(s) in:\n")+root+"\n\n"+description,T("Confirmar instalação","Confirm installation"),MessageBoxButtons.OKCancel,MessageBoxIcon.Question)!=DialogResult.OK)return;
-        Enqueue(jobs,false);
+        var missingAssets=MissingArchiveHashes(known.Values.SelectMany(mod=>mod.Assets));
+        downloads.AddRange(known.Values.Where(mod=>mod.Assets.Any(asset=>missingAssets.Contains(asset.Sha256))).Select(mod=>mod.Name));
+        return downloads;
+    }
+
+    HashSet<string> MissingArchiveHashes(IEnumerable<FixedAsset> assets){
+        var missing=assets.GroupBy(asset=>asset.Sha256).Select(group=>group.First())
+            .Where(asset=>!cache.Contains(asset)).ToLookup(asset=>asset.Size);
+        var hashes=new HashSet<string>(missing.SelectMany(group=>group).Select(asset=>asset.Sha256),StringComparer.Ordinal);
+        if(hashes.Count==0||!Directory.Exists(state.DownloadFolder))return hashes;
+        Safe.NoLinks(state.DownloadFolder);
+        foreach(string file in Directory.EnumerateFiles(state.DownloadFolder).Take(10000)){
+            if(!GeneralModDownload.IsArchivePath(file))continue;
+            try{
+                var info=new FileInfo(file);
+                if(!missing[info.Length].Any(asset=>hashes.Contains(asset.Sha256)))continue;
+                Safe.NoLinks(file);
+                using(var stream=new FileStream(file,FileMode.Open,FileAccess.Read,FileShare.None))
+                using(var sha=System.Security.Cryptography.SHA256.Create())
+                    hashes.Remove(Safe.Hex(sha.ComputeHash(stream)));
+            }catch(IOException){}catch(UnauthorizedAccessException){}
+            if(hashes.Count==0)break;
+        }
+        return hashes;
+    }
+
+    bool SnapshotInstalled(Work work,string root){
+        string receipt;
+        return work.Variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts.TryGetValue(work.Key,out receipt)&&
+            Snapshot(root).Status(receipt,work.Key)==GeneralModInstaller.Installed;
     }
     async void Enqueue(IEnumerable<Work> jobs,bool urgent){
         if(scanning)return;
@@ -245,13 +326,12 @@ internal sealed partial class GeneralModWindow {
             skipRequests.Remove(work);
             RowStatus(work,"Verificando",null,work.Entry.Name+T(": verificando arquivos…",": checking files…"));
             OnlineDiagnostics.Record("general.install.begin",work.Entry.Id,"Iniciando item da fila.",new{Variant=work.Variant.Id});
-            string snapshot;
-            if(work.Variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts.TryGetValue(work.Key,out snapshot)&&Snapshot(root).Status(snapshot,work.Key)==GeneralModInstaller.Installed){RowStatus(work,"Instalado",100);return;}
+            if(SnapshotInstalled(work,root)){RowStatus(work,"Instalado",100);return;}
             if(work.Variant.Sources.Any(GeneralModDownload.IsInstalledSource))throw new IOException(T("Este mod veio de um pacote instalado. Para reparar, receba um novo pacote do remetente.","This mod came from an installed pack. Receive a new pack from the sender to repair it."));
             if(work.Variant.CyberpunkId!=null)await InstallKnown(work,root);
             else await InstallGeneral(work,root);
             var final=await Task.Run(()=>Status(work,root));
-            if(final!="Instalado")throw new IOException(T("A conferência final não confirmou esta variante: ","Final verification did not confirm this variant: ")+GeneralStyle.Status(final));
+            if(GeneralStatusPresentation.Kind(final)!="installed")throw new IOException(T("A conferência final não confirmou esta variante: ","Final verification did not confirm this variant: ")+GeneralStyle.Status(final));
             RowStatus(work,"Instalado",100,work.Entry.Name+T(": instalado e conferido.",": installed and verified."));
             OnlineDiagnostics.Record("general.install.complete",work.Entry.Id,"Instalação conferida.",new{Variant=work.Variant.Id});
         }catch(ModVersionKeptException ex){RowStatus(work,"Versão mantida",null,ex.Message);OnlineDiagnostics.Record("general.version.kept",work.Entry.Id,ex.Message);}
@@ -282,7 +362,7 @@ internal sealed partial class GeneralModWindow {
             if(mod.Id==recipe.Id&&work.Variant.CyberpunkVariant!=null){
                 var density=await Task.Run(()=>NightCityDensity.Read(recipe,root));
                 if(!density.CanApply)throw new IOException(density.Detail);
-                if(density.Id==work.Variant.CyberpunkVariant)continue;
+                if(density.Id==work.Variant.CyberpunkVariant||density.Id=="legacy-low"&&work.Variant.CyberpunkVariant=="low")continue;
                 if(density.Id!=null&&density.Id!="absent")new ModVersionDifference{Name=mod.Name,Current=density.Name,Incoming=work.Variant.Name,Detail=T("A variante instalada será substituída pela selecionada.","The installed variant will be replaced with the selected one.")}.Require(ChooseVersion);
             }else{
                 var scan=await Task.Run(()=>FixedData.Scan(mod,root));
@@ -295,6 +375,7 @@ internal sealed partial class GeneralModWindow {
             }
             pending.Add(mod);
         }
+        if(pending.Count==0)return;
         foreach(var mod in pending)foreach(var asset in mod.Assets){
             CheckSkip(work);
             if(await Task.Run(()=>cache.Contains(asset)))continue;
@@ -317,7 +398,7 @@ internal sealed partial class GeneralModWindow {
             var engine=Cyberpunk(root);
             if(work.Variant.CyberpunkVariant==null){engine.Install(new[]{recipe.Id},true,Report);return;}
             if(recipe.Dependencies.Length>0)engine.Install(recipe.Dependencies,true,Report);
-            engine.ApplyDensityProfile(work.Variant.CyberpunkVariant,Report);
+            if(pending.Any(mod=>mod.Id==recipe.Id))engine.ApplyDensityProfile(work.Variant.CyberpunkVariant,Report);
         };
         var approvals=new HashSet<string>();
         while(true){
