@@ -6,6 +6,7 @@
 !/README.md
 !/AGENTS.md
 !/Build.ps1
+!/.github/workflows/release.yml
 !/Instalador/Fonte/*.cs
 !/Instalador/Fonte/*.ps1
 !/Instalador/Fonte/app.manifest

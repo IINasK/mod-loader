@@ -58,7 +58,9 @@ Baixe o [instalador atual](https://github.com/IINasK/mod-loader/releases/latest/
 
 Para migrar do instalador Inno, feche o Mod Loader, desinstale a versão antiga em Aplicativos instalados do Windows e execute o novo Setup. Os projetos e as preferências usam pastas separadas da instalação.
 
-Para empacotar a edição atual, use o SDK .NET 8 e o vpk 1.2.161. Restaure as dependências de "Instalador/Setup/Velopack.Dependencies.csproj" com "dotnet restore --packages" e passe essa pasta em "-NuGetPackages" para "Instalador/Setup/compilar-velopack.ps1". Aponte "-Vpk" para o executável do vpk. Para gerar deltas, use "vpk download github" no diretório Release de saída antes de empacotar. Publique "Mod-Loader-Setup.exe", "releases.win.json" e os ".nupkg" apontados pelo feed na mesma Release.
+Cada envio à `main` aciona a publicação estável em [GitHub Actions](https://github.com/IINasK/mod-loader/actions/workflows/release.yml). O fluxo usa a versão declarada no código quando ela é superior à última publicação. Caso contrário, incrementa o último número da versão para o pacote. Ele testa o atualizador, envia o instalador e o feed como rascunho, confere os arquivos e só então publica a atualização. Em caso de falha, confira a execução e use **Re-run jobs**. A versão anterior continua disponível enquanto a nova está em preparação.
+
+Para empacotar localmente, use o SDK .NET 8 e o vpk 1.2.161. Restaure as dependências de `Instalador/Setup/Velopack.Dependencies.csproj` com `dotnet restore --packages` e passe essa pasta em `-NuGetPackages` para `Instalador/Setup/compilar-velopack.ps1`. Aponte `-Vpk` para o executável do vpk.
 
 ## Compilar
 
