@@ -332,7 +332,7 @@ internal sealed partial class P2PService {
                 },id=>{session.TransactionId=id;Save();},checkpoint,value=>session.InstallProgress=value,allowReuse:AllowsLocalReuse(session));
                 var manifest=installer.ReadManifest(session.ReceiptId);
                 ApplyApprovedSyncCleanup(session,manifest);
-                session.ModsOutsidePack=manifest.Project==null?0:manifest.Project.Mods.Count-manifest.List.Mods.Count;
+                session.ModsOutsidePack=InstalledSnapshot.CountOutsidePack(manifest);
                 session.Completed=true;
                 session.Error=null;
                 SetPhase(session,"installed");
@@ -395,6 +395,7 @@ internal sealed partial class P2PService {
             session.AutoInstall=false;
             session.Error=null;
             SetPhase(session,"discarded");
+            ForgetSyncDifferences(session);
             if(Engine.Running)Engine.RemoveFolder(session.Id);
             P2PPack.DeleteSnapshot(Folder(session));
         }

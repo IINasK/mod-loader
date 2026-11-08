@@ -40,20 +40,31 @@ internal sealed partial class GeneralModWindow {
     }
     string DefaultCategory {get{return categoryFilters!=null&&categoryFilters.Count==1?categoryFilters.Single():null;}}
     void ResetColumnFilters(){categoryFilters=variantFilters=statusFilters=null;nameFilter="";searchQuery="";searchTerms=new string[0];if(searchBox!=null&&!searchBox.IsDisposed)searchBox.Clear();}
-    static string StatusFilterKey(string value){return value=="Pendente"||value=="Pending"?"pending":value=="Baixando"||value=="Downloading"?"active":value=="Download concluído"||value=="Download complete"?"complete":"error";}
+    static string StatusFilterKey(string value){
+        if(value=="Pendente"||value=="Pending")return "pending";
+        if(value=="Baixando"||value=="Downloading")return "active";
+        if(value=="Download concluído"||value=="Download complete")return "complete";
+        if(value=="Outra versão escolhida"||value=="Other version selected")return "other-choice";
+        if(value=="Corpo detectado"||value=="Body detected")return "manual-body";
+        if(value=="Desabilitado"||value=="Disabled")return "disabled";
+        return "error";
+    }
     bool ColumnAllows(GeneralModEntry mod){
-        string raw;statuses.TryGetValue(Key(mod,Selected(mod)),out raw);
+        string raw=ListStatus(mod);
         return (categoryFilters==null||categoryFilters.Contains(mod.Category??""))&&
             (variantFilters==null||variantFilters.Contains(Selected(mod).Name))&&
             (statusFilters==null||statusFilters.Any(value=>StatusFilterKey(value)==StatusFilterKey(GeneralStatusPresentation.Label(raw))))&&
             (String.IsNullOrWhiteSpace(nameFilter)||mod.Name.IndexOf(nameFilter,StringComparison.CurrentCultureIgnoreCase)>=0)&&
-            GeneralModSearch.Matches(searchTerms,mod.Name,Selected(mod).Name,GeneralStatusPresentation.Label(raw));
+            GeneralModSearch.Matches(searchTerms,mod.Nsfw?mod.Name+" NSFW Not Safe for Work":mod.Name,Selected(mod).Name,GeneralStatusPresentation.Label(raw));
     }
     void ShowColumnFilter(int column){
         if(column<1||column>3)return;
         string uncat=UncatName();
         var values=column==1?new[]{uncat}.Concat(PresetCategories()).ToList():column==2?state.List.Mods.Select(mod=>Selected(mod).Name).Distinct().OrderBy(value=>value).ToList():
-            new[]{T("Pendente","Pending"),T("Baixando","Downloading"),T("Download concluído","Download complete"),T("Falha","Failed")}.ToList();
+            new[]{T("Pendente","Pending"),T("Baixando","Downloading"),T("Download concluído","Download complete"),
+                GeneralStatusPresentation.Label(GeneralStatusPresentation.OtherChoice),GeneralStatusPresentation.Label(GeneralStatusPresentation.ManualBody),
+                GeneralStatusPresentation.Label(GeneralStatusPresentation.Disabled),
+                T("Falha","Failed")}.ToList();
         var current=column==1?categoryFilters:column==2?variantFilters:statusFilters;
         IEnumerable<string> selected=current==null?null:column==3?values.Where(value=>current.Any(item=>StatusFilterKey(item)==StatusFilterKey(value))):current.Select(value=>column==1&&value==""?uncat:value);
         using(var dialog=new GeneralColumnFilterDialog(column==1?T("Filtrar mods","Filter mods"):column==2?T("Filtrar variantes","Filter variants"):T("Filtrar situação","Filter status"),values,selected,nameFilter,column==1)){

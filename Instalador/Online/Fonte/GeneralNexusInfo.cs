@@ -29,7 +29,7 @@ internal sealed class GeneralNexusLink {
     }
 }
 internal static class GeneralNexusInfo {
-    internal static string Advice {get{return GeneralStyle.T("Dica: no Nexus, escolha a versão do mod e copie o link da tela com Slow download e Premium. Assim o app identifica o arquivo e o tamanho certos. Outros links continuam aceitos.","Tip: choose the mod version on Nexus, then copy the page with Slow download and Premium. This lets the app identify the right file and size. Other links are still accepted.");}}
+    internal static string Advice {get{return GeneralStyle.T("No Nexus, copie o link da tela Slow download da versão desejada.","On Nexus, copy the link to the Slow download page for the version you want.");}}
     internal static async Task<GeneralSourceInfo> Read(string source){
         var link=GeneralNexusLink.Parse(source);if(link==null)return null;
         return await Task.Run(()=>{

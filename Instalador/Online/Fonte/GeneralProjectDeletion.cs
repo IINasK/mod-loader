@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 internal sealed class ProjectDeleteFile {
     internal string Path,Hash,Reason;
     internal long Size;
-    internal bool Owned;
+    internal bool Owned, ReplacesPrevious;
     internal List<string> OwnerKeys;
 }
 internal sealed class ProjectDeletePlan {
@@ -152,14 +152,14 @@ public sealed partial class GeneralModInstaller {
         Safe.NoLinks(records);if(!Directory.Exists(records))yield break;
         foreach(string path in Directory.GetFiles(records,"*.json")){
             Safe.NoLinks(path);var record=ReadRecord(path,inspection);if(record==null)continue;
-            foreach(var file in record.Files)yield return new ProjectDeleteFile{Path=file.Path,Hash=file.Sha256,Size=file.Size,Owned=file.Owned,OwnerKeys=new List<string>{record.Key}};
+            foreach(var file in record.Files)yield return new ProjectDeleteFile{Path=file.Path,Hash=file.Sha256,Size=file.Size,Owned=file.Owned,ReplacesPrevious=file.Before!=null,OwnerKeys=new List<string>{record.Key}};
         }
     }
 }
 public sealed partial class FixedInstaller {
     internal IEnumerable<ProjectDeleteFile> ProjectDeletionFiles(HashSet<string> ids,bool inspection=false){
-        string folder=Safe.In(Data,"importados");Safe.NoLinks(folder);if(!Directory.Exists(folder)||ids.Count==0)yield break;
-        foreach(var receipt in Directory.GetFiles(folder,"*.json").Select(path=>ReadReceiptCore(path,inspection)).Where(item=>item.Operation==LocalModPackage.ReceiptOperation&&item.Status=="instalado"&&item.Mods.Count==1&&ids.Contains(item.Mods[0])).GroupBy(item=>item.Mods[0]).Select(group=>group.OrderByDescending(item=>item.CreatedUtc).First()))
+        string folder=Safe.In(Data,"importados");Safe.NoLinks(folder);if(!Directory.Exists(folder)||ids!=null&&ids.Count==0)yield break;
+        foreach(var receipt in Directory.GetFiles(folder,"*.json").Select(path=>ReadReceiptCore(path,inspection)).Where(item=>item.Operation==LocalModPackage.ReceiptOperation&&item.Status=="instalado"&&item.Mods.Count==1&&(ids==null||ids.Contains(item.Mods[0]))).GroupBy(item=>item.Mods[0]).Select(group=>group.OrderByDescending(item=>item.CreatedUtc).First()))
             foreach(var file in receipt.Files.Where(file=>file.Applied&&!file.Reverted&&!file.UndoStarted))yield return new ProjectDeleteFile{Path=file.Path,Hash=file.After,Size=File.Exists(Safe.In(game,file.Path))?new FileInfo(Safe.In(game,file.Path)).Length:0,Owned=file.Before==null,OwnerKeys=receipt.Mods.ToList()};
     }
 }
@@ -170,7 +170,7 @@ public sealed partial class InstalledSnapshotInstaller {
             var owners=receipt.Manifest.Files.GroupBy(payload=>payload.Path,StringComparer.OrdinalIgnoreCase).ToDictionary(group=>group.Key,group=>group.SelectMany(payload=>payload.Owners).Where(receipt.ActiveOwners.Contains).Distinct().ToList(),StringComparer.OrdinalIgnoreCase);
             foreach(var file in receipt.Files.Where(file=>file.Applied&&!file.Reverted)){
                 List<string> keys;if(!owners.TryGetValue(file.Path,out keys)||keys.Count==0)continue;
-                yield return new ProjectDeleteFile{Path=file.Path,Hash=file.After,Size=file.Size,Owned=file.Owned&&file.Before==null,OwnerKeys=keys};
+                yield return new ProjectDeleteFile{Path=file.Path,Hash=file.After,Size=file.Size,Owned=file.Owned&&file.Before==null,ReplacesPrevious=file.Before!=null,OwnerKeys=keys};
             }
         }
     }

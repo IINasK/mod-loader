@@ -119,11 +119,16 @@ internal class GeneralDialog : Form {
         reveal=new GeneralReveal(this);SetStyle(ControlStyles.ResizeRedraw|ControlStyles.OptimizedDoubleBuffer,true);
     }
     protected override void OnTextChanged(EventArgs e){base.OnTextChanged(e);if(title!=null)title.Text=Text;}
+    protected virtual bool AnimateAppearance { get { return true; } }
     protected override void SetVisibleCore(bool value){
-        if(value&&!Visible&&reveal!=null){allowClose=closing=false;origin=new Point(Width-36,0);reveal.PrepareOpen(origin);}
+        if(value&&!Visible&&reveal!=null){
+            allowClose=closing=false;
+            origin=new Point(Width-36,0);
+            if(AnimateAppearance)reveal.PrepareOpen(origin);else reveal.SetRound();
+        }
         base.SetVisibleCore(value);
     }
-    protected override void OnShown(EventArgs e){base.OnShown(e);if(closing||allowClose)return;origin=new Point(Width-36,0);reveal.Begin(true,origin);}
+    protected override void OnShown(EventArgs e){base.OnShown(e);if(closing||allowClose||!AnimateAppearance)return;origin=new Point(Width-36,0);reveal.Begin(true,origin);}
     protected override void OnPaint(PaintEventArgs e){
         base.OnPaint(e);GeneralStyle.PaintCard(e.Graphics,ClientSize);
     }
@@ -138,7 +143,7 @@ internal class GeneralDialog : Form {
     }
     protected override bool ProcessCmdKey(ref Message message,Keys keyData){if(keyData==Keys.Escape){Complete(DialogResult.Cancel);return true;}return base.ProcessCmdKey(ref message,keyData);}
     protected override void OnFormClosing(FormClosingEventArgs e){
-        base.OnFormClosing(e);if(e.Cancel||allowClose||!Visible||!GeneralStyle.AnimationsEnabled)return;
+        base.OnFormClosing(e);if(e.Cancel||allowClose||!Visible||!AnimateAppearance||!GeneralStyle.AnimationsEnabled)return;
         e.Cancel=true;if(closing)return;closing=true;
         var result=DialogResult==DialogResult.None?DialogResult.Cancel:DialogResult;
         reveal.Begin(false,origin,()=>{allowClose=true;Complete(result);});

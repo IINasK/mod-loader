@@ -297,6 +297,15 @@ internal static class GeneralP2PLifecycleTests {
                 File.ReadAllText(Safe.In(target,outside))=="local version"&&File.ReadAllText(Safe.In(target,stale))=="test "+stale,
                 "Only checked extras are moved. Existing host files and unchecked mods stay while the approved version is updated.");
             Check(checks,received.SyncLocalExtrasKept==1&&received.SyncHostFilesDifferent==1,"Known differences remain visible after installation.");
+            using(var reopened=new P2PService(friend.Root,friend.Store,true)){
+                var session=reopened.SnapshotSessions().Single(item=>item.Id==received.Id);
+                var differences=reopened.ReadSyncDifferences(session);
+                Check(checks,differences.Length==2&&differences.Any(item=>item.Kind=="kept"&&item.Mod=="keep"&&item.Path==keep)&&
+                    differences.Any(item=>item.Kind=="different"&&item.Path==outside),
+                    "Completed comparison keeps only unresolved paths and their origin across restarts.");
+                reopened.DismissCompletedTransfer(session);
+                Check(checks,reopened.ReadSyncDifferences(session)==null,"Dismissing the transfer discards its local differences report.");
+            }
             new FixedInstaller(catalog,target,true).Undo(_=>{});
             Check(checks,File.Exists(Safe.In(target,remove))&&File.Exists(Safe.In(target,sidecar))&&
                 Directory.Exists(Safe.In(target,empty))&&File.Exists(Safe.In(target,bundle+"/mod.dll")),"The removal journal restores files and empty folders.");

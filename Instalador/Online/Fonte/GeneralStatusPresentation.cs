@@ -3,7 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 
 internal static class GeneralStatusPresentation {
+    internal const string OtherChoice="Outra versão escolhida";
+    internal const string ManualBody="Corpo detectado";
+    internal const string Disabled="Desabilitado";
     internal static string Label(string raw) {
+        if(raw==OtherChoice)return GeneralStyle.T(OtherChoice,"Other version selected");
+        if(raw==ManualBody)return GeneralStyle.T(ManualBody,"Body detected");
+        if(raw==Disabled)return GeneralStyle.T(Disabled,"Disabled");
         string value=(raw??"").Trim().ToLowerInvariant();
         if(value=="atualização disponível")return GeneralStyle.T("Atualização disponível","Update available");
         if(value=="versão diferente")return GeneralStyle.T("Versão diferente","Different version");

@@ -72,6 +72,7 @@ public static partial class InstalledSnapshot {
         var fixedEngine=cyberpunk?new FixedInstaller(catalog,root):null;
         var genericEngine=cyberpunk?null:new GeneralModInstaller(root,Path.Combine(appData,"Instalacoes"));
         var receivedEngine=new InstalledSnapshotInstaller(root,appData,catalog);
+        var disabled=new DisabledMods(root,appData).Read();
         var problems=new List<string>();
         var byPath=new Dictionary<string,InstalledSnapshotFile>(StringComparer.Ordinal);
         for(int index=0;index<entries.Count;index++){
@@ -80,6 +81,10 @@ public static partial class InstalledSnapshot {
             if(inspectProgress!=null)inspectProgress(index,entries.Count,mod.Name);
             try {
             var variant=mod.Variants.Single(v=>v.Id==Selected(state,mod));
+            if(disabled.ContainsKey(Owner(mod,variant))){
+                if(allowMissing)continue;
+                throw new IOException("Este mod está desabilitado.");
+            }
             if(allowMissing&&Uninstalled(state,mod,variant,catalog,root,appData))continue;
             if(cyberpunk && variant.CyberpunkId==NightCityDensity.ModId) {
                 var density=NightCityDensity.Read(catalog.Packages.Single(m=>m.Id==variant.CyberpunkId),root);

@@ -63,6 +63,11 @@ public sealed partial class DownloadCache {
         }}catch(IOException){}catch(UnauthorizedAccessException){}
         return count;
     }
+    internal long ClearRetainedDownloads(){
+        string folder=RetainedRoot;
+        if(folder==null)return 0;
+        return String.Equals(Root,folder,StringComparison.OrdinalIgnoreCase)?ClearDownloads():new DownloadCache(folder).ClearDownloads();
+    }
     public long ClearDownloads() {
         if(!Directory.Exists(Root))return 0;
         if(StorageMaintenance.AnotherLoaderRunning())throw new IOException("Feche as outras janelas do Mod Loader antes de limpar os downloads.");

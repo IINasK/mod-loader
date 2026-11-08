@@ -42,20 +42,21 @@ internal sealed class GeneralScrollView : Panel {
     readonly Panel viewport=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};
     readonly GeneralScrollBar bar=new GeneralScrollBar{Dock=DockStyle.Right,Margin=Padding.Empty};
     readonly Control content;
-    readonly bool panelContent,reserveBarSpace;
+    readonly bool panelContent,reserveBarSpace,fitPanelContent;
     NativeEvents events;
     bool queued,refreshing;
     internal Control Content {get{return content;}}
     internal GeneralScrollBar Bar {get{return bar;}}
     [DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr handle,int message,IntPtr first,IntPtr second);
-    internal GeneralScrollView(Control content,bool panelContent=false,bool reserveBarSpace=false){
-        this.panelContent=panelContent;this.reserveBarSpace=reserveBarSpace;
+    internal GeneralScrollView(Control content,bool panelContent=false,bool reserveBarSpace=false,bool fitPanelContent=false){
+        this.panelContent=panelContent;this.reserveBarSpace=reserveBarSpace;this.fitPanelContent=fitPanelContent;
         this.content=content;Dock=DockStyle.Fill;Margin=Padding.Empty;Padding=Padding.Empty;BackColor=GeneralStyle.Surface;
         content.Dock=DockStyle.None;content.Margin=Padding.Empty;viewport.Controls.Add(content);Controls.Add(viewport);Controls.Add(bar);
         var text=content as TextBox;if(text!=null&&text.Multiline){text.ScrollBars=ScrollBars.None;text.WordWrap=true;}
         var grid=content as DataGridView;if(grid!=null){grid.ScrollBars=ScrollBars.None;grid.Scroll+=(s,e)=>Queue();grid.RowsAdded+=(s,e)=>Queue();grid.RowsRemoved+=(s,e)=>Queue();}
         var list=content as ListBox;if(list!=null){list.HorizontalScrollbar=false;list.IntegralHeight=false;}
         bar.Changed=ScrollTo;content.HandleCreated+=(s,e)=>Attach();content.HandleDestroyed+=(s,e)=>{if(events!=null)events.ReleaseHandle();};content.TextChanged+=(s,e)=>Queue();content.FontChanged+=(s,e)=>Queue();content.Resize+=(s,e)=>Queue();
+        if(fitPanelContent)content.Layout+=(s,e)=>{if(!refreshing)Queue();};
         viewport.Resize+=(s,e)=>RefreshScroll();HandleCreated+=(s,e)=>Attach();if(content.IsHandleCreated)Attach();
     }
     void Attach(){if(!content.IsHandleCreated)return;if(events!=null)events.ReleaseHandle();events=new NativeEvents(this,content.Handle);Queue();}
@@ -65,7 +66,12 @@ internal sealed class GeneralScrollView : Panel {
         try{
             int total=0,page=1,value=0;
             var grid=content as DataGridView;var list=content as ListBox;var text=content as TextBox;
-            if(panelContent){total=content.MinimumSize.Height;page=Math.Max(1,viewport.ClientSize.Height);value=Math.Max(0,-content.Top);}
+            if(panelContent){
+                int measureWidth = reserveBarSpace ? ClientSize.Width - bar.Width : viewport.ClientSize.Width;
+                total = fitPanelContent ? content.GetPreferredSize(new Size(Math.Max(1, measureWidth), 0)).Height : content.MinimumSize.Height;
+                page = Math.Max(1, viewport.ClientSize.Height);
+                value = Math.Min(Math.Max(0, -content.Top), Math.Max(0, total - page));
+            }
             else if(grid!=null){
                 total=grid.RowCount;page=Math.Max(1,grid.DisplayedRowCount(false));value=Math.Max(0,grid.FirstDisplayedScrollingRowIndex);
                 if(grid.Rows.GetRowsHeight(DataGridViewElementStates.Visible)<=grid.ClientSize.Height-grid.ColumnHeadersHeight)page=Math.Max(1,total);

@@ -271,33 +271,19 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     }
     int[] ReviewSyncExtras(P2PSyncComparison comparison){
         if(IsDisposed||comparison.Session.Discarded)return null;
-        using(var dialog=new GeneralDialog(T("Revisar sincronização","Review sync")){ClientSize=new Size(720,490)}){
-            var panel=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(24,8,24,24),ColumnCount=1,RowCount=4};
-            panel.RowStyles.Add(new RowStyle(SizeType.Absolute,60));
-            panel.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-            panel.RowStyles.Add(new RowStyle(SizeType.Absolute,comparison.HostOutsideDifferences.Length>0?66:0));
-            panel.RowStyles.Add(new RowStyle(SizeType.Absolute,56));
-            var intro=Heading(String.Format(T("Há {0} mod(s) extra(s) neste PC. Marque os que deseja guardar em backup e retirar do jogo.\n{1} faltando e {2} diferentes serão tratados pelo pacote.",
-                "There are {0} extra mod(s) on this PC. Check the ones you want to back up and remove from the game.\nThe pack covers {1} missing and {2} different mods."),
-                comparison.Extras.Length,comparison.Missing.Length,comparison.Different.Length));
-            panel.Controls.Add(intro,0,0);
-            var choices=new CheckedListBox{Name="SyncExtraMods",Dock=DockStyle.Fill,CheckOnClick=true,BorderStyle=BorderStyle.None,IntegralHeight=false};
-            choices.Items.AddRange(comparison.Extras.Cast<object>().ToArray());
-            panel.Controls.Add(new GeneralScrollView(choices),0,1);
-            var outside=Heading(String.Format(T("{0} arquivo(s) do anfitrião fora do preset estão diferentes ou ausentes neste PC. Inclua os mods correspondentes no projeto do anfitrião para enviá-los.",
-                "{0} host file(s) outside the preset differ or are missing on this PC. Add their mods to the host project to send them."),comparison.HostOutsideDifferences.Length));
-            panel.Controls.Add(outside,0,2);
-            tips.SetToolTip(outside,String.Join("\r\n",comparison.HostOutsideDifferences.Take(24)));
-            var commands=GeneralTableDialogLayout.Commands();
-            var keep=GeneralStyle.Button(T("Manter e sincronizar","Keep and sync"),()=>dialog.Complete(DialogResult.No));
-            var remove=GeneralStyle.Button(T("Remover marcados","Remove checked"),()=>dialog.Complete(DialogResult.Yes),true);
-            remove.Enabled=false;
-            choices.ItemCheck+=(s,e)=>remove.Enabled=choices.CheckedItems.Count+(e.NewValue==CheckState.Checked?1:-1)>0;
-            commands.Controls.Add(remove);commands.Controls.Add(keep);panel.Controls.Add(commands,0,3);
-            dialog.Content.Controls.Add(panel);GeneralStyle.Apply(dialog,GeneralStyle.Dark);
+        using(var dialog=new GeneralSyncReviewDialog(comparison)){
             var answer=dialog.ShowDialog(this);
-            return answer==DialogResult.Yes?choices.CheckedIndices.Cast<int>().ToArray():answer==DialogResult.No?new int[0]:null;
+            return answer==DialogResult.Yes?dialog.SelectedExtras:answer==DialogResult.No?new int[0]:null;
         }
+    }
+
+    async void ShowSyncDifferences(P2PSession session) {
+        try {
+            var differences = await Task.Run(() => service.ReadSyncDifferences(session));
+            if (IsDisposed || !Visible || session.HistoryDismissed) return;
+            using (var dialog = new GeneralSyncDifferencesDialog(differences))
+                dialog.ShowDialog(this);
+        } catch (Exception ex) { if (!IsDisposed) Failed(ex); }
     }
     void Retry(P2PSession session){Run(async()=>{
         if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));
@@ -384,7 +370,10 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         readonly TableLayoutPanel bars=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,Margin=Padding.Empty};
         readonly GeneralProgress preparation=new GeneralProgress{Dock=DockStyle.Fill,Margin=Padding.Empty,Name="p2p-preparation"};
         readonly List<GeneralProgress> progress=new List<GeneralProgress>();
-        readonly Label detail=new Label{Dock=DockStyle.Fill,AutoEllipsis=true,Margin=Padding.Empty,UseMnemonic=false,Name="p2p-transfer-status"};
+        readonly LinkLabel detail=new LinkLabel{
+            Dock=DockStyle.Fill,AutoEllipsis=true,Margin=Padding.Empty,UseMnemonic=false,Name="p2p-transfer-status",
+            UseCompatibleTextRendering=false,LinkArea=new LinkArea(0,0)
+        };
         readonly FlowLayoutPanel actions=new FlowLayoutPanel{Dock=DockStyle.Fill,Margin=Padding.Empty,WrapContents=false};
         readonly Button pause,retry,import,reply,dismiss,update,full;
         P2PTransferStatus last;
@@ -393,6 +382,9 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
 
         internal TransferCard(GeneralP2PDialog owner,P2PSession session){
             this.owner=owner;this.session=session;
+            detail.LinkColor=detail.VisitedLinkColor=GeneralStyle.Accent;
+            detail.ActiveLinkColor=GeneralStyle.Foreground;
+            detail.LinkClicked+=(s,e)=>owner.ShowSyncDifferences(session);
             Frame.Padding=new Padding(16,12,16,12);Frame.AccessibleName=session.ToString();
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
             foreach(int height in new[]{28,42,42,0,0})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
@@ -455,11 +447,12 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             }
             bool syncDifferences=session.SyncLocalExtrasKept>0||session.SyncHostFilesDifferent>0;
             bool ready=!session.Sender&&session.Completed&&session.ListImported&&session.ProjectError==null&&session.ModsOutsidePack==0&&!syncDifferences;
+            string differencesLink=T("Ver diferenças fora do pacote","View differences outside the pack");
             string message=session.Error??"";
             if(session.Held||session.RecoveryPending)message=T("Arquivo preservado. Clique em Retomar quando quiser continuar.","File preserved. Click Resume when you are ready.");
             else if(session.Completed&&message.Length==0)message=session.Sender?T("Envio concluído","Send complete")
                 :session.ProjectError??(ready?T("Tudo pronto para jogar","Ready to play")
-                    :session.ListImported&&syncDifferences?T("Projeto salvo. Ainda há diferenças fora do pacote.","Project saved. Differences remain outside the pack.")
+                    :session.ListImported&&syncDifferences?T("Projeto salvo · ","Project saved · ")+differencesLink
                     :session.ListImported&&session.ModsOutsidePack>0?T("Projeto salvo. Mods fora do pacote: ","Project saved. Mods outside the pack: ")+session.ModsOutsidePack
                     :session.ListImported?T("Instalação concluída. Projeto salvo.","Installation complete. Project saved."):T("Instalação concluída","Installation complete"));
             else if(message.Length==0&&session.Phase!=null)message=P2PService.PhaseLabel(session.Phase);
@@ -486,7 +479,11 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             else if(message.Length==0&&!session.CompareBeforePack&&!prepared)message=T("Convite antigo. Gere um novo convite para escolher como receber.","Older invitation. Create a new invitation to choose how to receive.");
             else if(message.Length==0&&view.RemotePaused)message=T("Pausado pelo amigo","Paused by friend");
             else if(message.Length==0&&!view.Connected&&view.Recipients.Length==0)message=T("Aguardando conexão","Waiting for connection");
-            detail.Text=message;
+            if(detail.Text!=message){
+                detail.Text=message;
+                int linkStart=message.LastIndexOf(differencesLink,StringComparison.Ordinal);
+                detail.LinkArea=linkStart<0?new LinkArea(0,0):new LinkArea(linkStart,differencesLink.Length);
+            }
             detail.ForeColor=session.Error!=null||session.ProjectError!=null||view.Unavailable?GeneralStyle.Danger
                 :ready?(GeneralStyle.Dark?Color.PaleGreen:Color.DarkGreen):GeneralStyle.Foreground;
             owner.tips.SetToolTip(detail,message);

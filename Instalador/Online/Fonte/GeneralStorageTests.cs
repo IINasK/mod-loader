@@ -74,6 +74,23 @@ internal sealed partial class GeneralModWindow {
         check(size.Cache==support&&size.Retained==archives,"Metadata cache stays small; old dependency packages are shown separately until explicit cleanup.");
         string first=Safe.In(target,"archive/pc/mod/base.archive"),second=Safe.In(target,"archive/pc/mod/outfit.archive");File.Delete(first);File.Delete(second);size=GeneralProjectStorage.Measure(store,catalog,cache,project);
         check(size.Identified==0&&size.ModCount==1&&!size.ModBytes.ContainsKey("outfit")&&size.Mods==0&&size.Cache>0,"Cached packages are not mistaken for installed mod space or measured mods.");
+        var projectCache=new DownloadCache(Path.Combine(root,"project-index"),()=>root,cache.Root);
+        var oldPackage=GeneralProjectStorage.Measure(store,catalog,projectCache,project);
+        check(oldPackage.Retained==archives&&projectCache.Root!=projectCache.RetainedRoot,"Project-local index does not hide the legacy cache measured by the UI.");
+        using(var label=new GeneralStorageLabel(projectCache)){
+            label.SetSize(oldPackage,false);
+            var link=label.Links.Cast<LinkLabel.Link>().Single();
+            check((string)link.LinkData==cache.Root&&label.Text.Substring(link.Start,link.Length)==GeneralStorageSize.RetainedText(oldPackage),"Only the old packages metric links to the exact directory being measured.");
+            label.SetSize(oldPackage,true);
+            check((string)label.Links.Cast<LinkLabel.Link>().Single().LinkData==cache.Root,"The home counter opens the same measured directory.");
+            label.SetSize(new GeneralStorageSize(),true);
+            check(label.LinkArea.Length==0,"No old packages link appears after the legacy cache is empty.");
+        }
+        string originalDownload=Path.Combine(root,"outfit.zip"),otherFile=Path.Combine(cache.Root,"unrecognized.cache");
+        File.WriteAllText(otherFile,"keep");
+        var previousProbe=StorageMaintenance.OtherLoaderProbe;StorageMaintenance.OtherLoaderProbe=()=>false;
+        try{check(projectCache.ClearRetainedDownloads()==archives&&File.Exists(originalDownload)&&File.Exists(otherFile),"Project cleanup removes only the measured legacy copies and preserves the original downloads.");}
+        finally{StorageMaintenance.OtherLoaderProbe=previousProbe;}
         var real=FixedData.Load();var density=real.Packages.Single(recipe=>recipe.Id==NightCityDensity.ModId);string densityPath=Safe.In(target,density.Files[0].Path);Directory.CreateDirectory(Path.GetDirectoryName(densityPath));File.WriteAllText(densityPath,"changed");
         var densityList=GeneralModLibrary.Seed(real,new ModImportItem[0]);densityList.Mods=densityList.Mods.Where(mod=>mod.Id==density.Id).ToList();densityList.Presets.Clear();var densityProject=store.Create("Densidade medida",densityList,"light","pt",target);
         var densitySize=GeneralProjectStorage.Measure(store,real,cache,densityProject);check(densitySize.Identified==1&&densitySize.ModBytes[density.Id]==7,"Density size uses existing known paths even when contents differ; integrity and variant checks stay separate.");

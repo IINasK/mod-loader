@@ -129,6 +129,7 @@ internal sealed partial class P2PService : IDisposable {
             session.HistoryDismissed=true;
             try{Save();}
             catch{session.HistoryDismissed=false;throw;}
+            ForgetSyncDifferences(session);
         }
     }
     internal void CancelSend(P2PSession session){

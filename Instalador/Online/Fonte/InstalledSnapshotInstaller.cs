@@ -282,7 +282,7 @@ public sealed partial class InstalledSnapshotInstaller {
         return present == 0 ? GeneralModInstaller.Missing : present == paths.Count ? GeneralModInstaller.Installed : GeneralModInstaller.Partial;
     }
 
-    public string Remove(string receiptId, IEnumerable<string> workKeys, Action<string> report) {
+    public string Remove(string receiptId, IEnumerable<string> workKeys, Action<string> report, bool forgetOnly=false) {
         var initial = Read(receiptId);
         if (initial == null) return "Nenhum snapshot instalado para remover.";
         using (AcquireLock(initial.Manifest.Game)) {
@@ -291,10 +291,10 @@ public sealed partial class InstalledSnapshotInstaller {
             if (removing.Any(k => !WorkKeys(receipt.Manifest).Contains(k))) throw new IOException("Mod fora do recibo de instalação.");
             removing.IntersectWith(receipt.ActiveOwners);
             var others = AllReceipts().Where(r => r.Id != receipt.Id && r.Status == "installed" && r.ActiveOwners.Count > 0).ToList();
-            EnsureDependencies(receipt, removing, others);
+            if(!forgetOnly)EnsureDependencies(receipt, removing, others);
             var remaining = new HashSet<string>(receipt.ActiveOwners.Where(k => !removing.Contains(k)), StringComparer.Ordinal);
             int removed = 0, preserved = 0;
-            foreach (var change in receipt.Files.AsEnumerable().Reverse()) {
+            foreach (var change in forgetOnly ? Enumerable.Empty<Change>() : receipt.Files.AsEnumerable().Reverse()) {
                 var owners = receipt.Manifest.Files.Where(f => f.Path.Equals(change.Path, StringComparison.OrdinalIgnoreCase)).SelectMany(f => f.Owners).Distinct().ToList();
                 if (!owners.Any(removing.Contains)) continue;
                 if (owners.Any(remaining.Contains) || receipt.Manifest.Game == "cyberpunk2077" && IsImmutable(change.Path)

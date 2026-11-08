@@ -148,15 +148,15 @@ public sealed partial class GeneralModInstaller {
         }
     }
 
-    public string Remove(string key) {
+    public string Remove(string key, bool forgetOnly=false, Func<string,bool> activeOwner=null) {
         string receipt = RecordPath(key);
         using (AcquireLock()) {
             Record record = ReadRecord(receipt);
             if (record == null) return "Nenhuma instalação registrada para remover.";
-            var shared = new HashSet<string>(OtherFiles(receipt).Select(file => file.Path), StringComparer.OrdinalIgnoreCase);
+            var shared = new HashSet<string>(OtherFiles(receipt, activeOwner).Select(file => file.Path), StringComparer.OrdinalIgnoreCase);
             int removed = 0;
             int preserved = 0;
-            foreach (RecordFile file in record.Files) {
+            foreach (RecordFile file in forgetOnly ? Enumerable.Empty<RecordFile>() : record.Files) {
                 string target = Safe.In(destination, file.Path);
                 if (!File.Exists(target)) continue;
                 if (!file.Owned || shared.Contains(file.Path) || !Matches(target, file)) {
@@ -227,11 +227,11 @@ public sealed partial class GeneralModInstaller {
         return record;
     }
 
-    IEnumerable<RecordFile> OtherFiles(string receipt) {
+    IEnumerable<RecordFile> OtherFiles(string receipt, Func<string,bool> activeOwner=null) {
         foreach (string path in Directory.EnumerateFiles(records, "*.json")) {
             if (String.Equals(path, receipt, StringComparison.OrdinalIgnoreCase)) continue;
             Record record = ReadRecord(path);
-            if (record == null) continue;
+            if (record == null || (activeOwner != null && !activeOwner(record.Key))) continue;
             foreach (RecordFile file in record.Files) yield return file;
         }
     }

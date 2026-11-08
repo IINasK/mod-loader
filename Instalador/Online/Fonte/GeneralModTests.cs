@@ -33,6 +33,11 @@ internal sealed partial class GeneralModWindow {
             "Rostos e alternativas Hyst NSFW compartilham a categoria de corpo.");
         var independent=new GeneralModEntry{Id="independent",Name="Independente"};
         var jobs=bodies.Concat(new[]{independent}).Select(entry=>new Work{Entry=entry}).ToList();
+        var package=new InstalledSnapshotManifest{Project=new GeneralModList{Mods=bodies.Concat(new[]{independent}).ToList()},
+            List=new GeneralModList{Mods=new List<GeneralModEntry>{bodies[0]}}};
+        check(InstalledSnapshot.CountOutsidePack(package)==1,"Uma opção enviada satisfaz o grupo sem contar a alternativa no P2P.");
+        package.List.Mods.Clear();
+        check(InstalledSnapshot.CountOutsidePack(package)==2,"Um grupo ausente conta uma vez no P2P.");
         check(ChooseAlternatives(jobs,choices=>choices[1].Id).Select(work=>work.Entry.Id).SequenceEqual(new[]{bodies[1].Id,independent.Id})&&
             ChooseAlternatives(jobs,choices=>"").Single().Entry==independent&&ChooseAlternatives(jobs,choices=>null)==null&&
             ChooseAlternatives(jobs.Skip(1).ToList(),choices=>{throw new IOException("Uma opção não deve abrir o seletor.");}).Count==2,
@@ -114,6 +119,26 @@ internal sealed partial class GeneralModWindow {
             check(form.Status(form.MakeWork(urgent),game)=="Instalado","Instalação CET reconhecida pelo recibo legado.");
             await Task.Run(()=>form.Cyberpunk(game).RemoveImported(ImportItem(local).Id,s=>{}));
             check(!File.Exists(urgentPath)&&File.Exists(first),"Remoção direcionada de importado preserva os outros mods.");
+            form.state.List.Mods.AddRange(bodies);
+            var baseBody=form.MakeWork(bodies.Single(body=>body.Id=="hyst-ebb-rb"));
+            var pushUp=form.MakeWork(bodies.Single(body=>body.Id=="hyst-ebbp-rb"));
+            string marker=Safe.In(game,"archive/pc/mod/EBBRB.xl");
+            File.WriteAllText(marker,"fixture");
+            check(form.Status(baseBody,game)=="Não iniciado","O marcador sozinho não comprova a presença do corpo.");
+            File.WriteAllText(Safe.In(game,"archive/pc/mod/05_Hyst_Refit_ForcedBigBreastsBooty.archive"),"fixture");
+            form.statuses[baseBody.Key]=form.Status(baseBody,game);
+            form.statuses[pushUp.Key]=form.Status(pushUp,game);
+            check(form.ListStatus(baseBody.Entry)==GeneralStatusPresentation.ManualBody&&
+                form.ListStatus(pushUp.Entry)==GeneralStatusPresentation.OtherChoice&&
+                !GeneralStatusPresentation.DownloadComplete(form.ListStatus(baseBody.Entry)),
+                "Corpo manual aparece separado de instalação verificada e exclui a alternativa pendente.");
+            pending.Clear();
+            check(form.PlanSelected(new List<Work>{baseBody},game,pending).Count==0&&pending.Count==0,
+                "O corpo detectado não é solicitado outra vez.");
+            form.searchTerms=GeneralModSearch.Terms("NSFW");
+            check(form.ColumnAllows(baseBody.Entry)&&form.ColumnAllows(pushUp.Entry)&&!form.ColumnAllows(urgent),
+                "Buscar NSFW encontra as entradas marcadas.");
+            form.searchTerms=new string[0];
         });
         string general=Path.Combine(root,"outro-jogo");
         Directory.CreateDirectory(general);

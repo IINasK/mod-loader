@@ -4,6 +4,14 @@ using System.IO;
 using System.Linq;
 
 public static partial class InstalledSnapshot {
+    internal static int CountOutsidePack(InstalledSnapshotManifest manifest){
+        if(manifest.Project==null)return 0;
+        var included=new HashSet<string>(manifest.List.Mods.Select(ChoiceKey),StringComparer.Ordinal);
+        return manifest.Project.Mods.Select(ChoiceKey).Distinct(StringComparer.Ordinal).Count(key=>!included.Contains(key));
+    }
+    static string ChoiceKey(GeneralModEntry mod){
+        return mod.AlternativeGroup==null?"mod/"+mod.Id:"choice/"+mod.AlternativeGroup;
+    }
     internal static bool Uninstalled(GeneralModState state,GeneralModEntry mod,GeneralModVariant variant,FixedCatalog catalog,string root,string appData){
         string work=Owner(mod,variant);
         if(state.SnapshotReceipts.ContainsKey(work))return false;

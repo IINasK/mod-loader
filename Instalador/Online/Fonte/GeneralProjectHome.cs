@@ -18,7 +18,7 @@ internal sealed class GeneralProjectHome : Form {
     string ReceiveData {get{return Path.Combine(store.Root,"P2P-Inbox");}}
     ListBox saved;
     LinkLabel update;
-    Label storageSize;
+    GeneralStorageLabel storageSize;
     GeneralUpdateRelease available=null;
     int buildVersion,hoverSaved=-1;
     internal bool DeletingProject {get;private set;}
@@ -54,7 +54,7 @@ internal sealed class GeneralProjectHome : Form {
         var menu=(GeneralButton)GeneralStyle.Button("",ToggleHomeMenu);menu.Name="HomeMenu";menu.Bare=true;menu.IconKind="menu";menu.AccessibleName=T("Menu","Menu");menu.Size=new Size(44,44);menu.AutoSize=false;menu.MinimumSize=new Size(44,44);menu.Dock=DockStyle.Fill;menu.Margin=Padding.Empty;header.Controls.Add(menu,1,0);layout.Controls.Add(header,0,0);
         var intro=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.TopDown,WrapContents=false,Margin=Padding.Empty};
         intro.Controls.Add(new Label{Name="HomeIntro",Text=T("Criado por Nask e Codex. Se achou ruim, faz você.","Made by Nask and Codex. If you don't like it, make your own."),AutoSize=true,ForeColor=GeneralStyle.Muted,Margin=new Padding(0,10,0,4)});
-        storageSize=new Label{Name="HomeStorage",Text=T("Calculando espaço…","Calculating size…"),AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(0,0,0,18),MaximumSize=new Size(Math.Max(200,ClientSize.Width-68),0)};intro.Controls.Add(storageSize);layout.Controls.Add(intro,0,1);
+        storageSize=new GeneralStorageLabel(cache){Name="HomeStorage",Text=T("Calculando espaço…","Calculating size…"),AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(0,0,0,18),MaximumSize=new Size(Math.Max(200,ClientSize.Width-68),0)};intro.Controls.Add(storageSize);layout.Controls.Add(intro,0,1);
         var actions=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=new Padding(0,0,0,22)};actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
         var create=GeneralStyle.Button(T("Criar novo projeto","Create new project"),()=>Guard(()=>OpenRequested(CreateProject(false))),true);create.Name="NewProject";create.Dock=DockStyle.Fill;create.AutoSize=false;create.MinimumSize=new Size(140,44);create.MaximumSize=new Size(0,44);create.Height=44;create.Margin=new Padding(0,0,8,0);actions.Controls.Add(create,0,0);
         var import=GeneralStyle.Button(T("Importar projeto","Import project"),()=>Guard(()=>OpenRequested(ImportProject())));import.Name="ImportProject";import.Dock=DockStyle.Fill;import.AutoSize=false;import.MinimumSize=new Size(140,44);import.MaximumSize=new Size(0,44);import.Height=44;import.Margin=new Padding(8,0,0,0);actions.Controls.Add(import,1,0);layout.Controls.Add(actions,0,2);
@@ -80,8 +80,8 @@ internal sealed class GeneralProjectHome : Form {
     }
     async void RefreshStorageSize(){
         int version=buildVersion;var label=storageSize;
-        try{var size=await Task.Run(()=>GeneralProjectStorage.Measure(store,catalog,cache));if(!IsDisposed&&version==buildVersion&&!label.IsDisposed)label.Text=GeneralStorageSize.HomeText(size);}
-        catch(Exception){if(!IsDisposed&&version==buildVersion&&!label.IsDisposed)label.Text=T("Espaço indisponível","Size unavailable");}
+        try{var size=await Task.Run(()=>GeneralProjectStorage.Measure(store,catalog,cache));if(!IsDisposed&&version==buildVersion&&!label.IsDisposed)label.SetSize(size,true);}
+        catch(Exception){if(!IsDisposed&&version==buildVersion&&!label.IsDisposed)label.SetSize(null,true);}
     }
     internal static Rectangle DeleteProjectBounds(Rectangle row){return new Rectangle(row.Right-44,row.Y+(row.Height-44)/2,44,44);}
     async void DeleteSavedProject(GeneralProject project){await DeleteSavedProjectAsync(project);}
@@ -235,8 +235,8 @@ internal sealed class GeneralProjectHome : Form {
     }
 
     void Options(Control anchor){
-        var preferences=store.Read();using(var dialog=new GeneralOptionsDialog(preferences.Theme,preferences.Language,preferences.DownloadFolder,()=>cache.ClearDownloads())){
-            dialog.AnchorTo(anchor);if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+        var preferences=store.Read();using(var dialog=new GeneralOptionsDialog(preferences.Theme,preferences.Language,preferences.DownloadFolder,()=>cache.ClearRetainedDownloads())){
+            dialog.AnchorTo(anchor);if(dialog.ShowDialog(this)!=DialogResult.OK){RefreshStorageSize();return;}
             store.SavePreferences(dialog.ThemeValue,dialog.LanguageValue,dialog.DownloadFolder);Build();
         }
     }

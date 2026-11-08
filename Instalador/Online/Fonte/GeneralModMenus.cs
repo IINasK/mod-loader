@@ -90,13 +90,13 @@ internal sealed partial class GeneralModWindow {
     }
     async void ShowOptions(){
         if(working||scanning)return;
-        using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder,()=>cache.ClearDownloads(),state.Destination??"")){
+        using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder,()=>cache.ClearRetainedDownloads(),state.Destination??"")){
             dialog.AnchorTo(optionsButton);
-            if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+            if(dialog.ShowDialog(this)!=DialogResult.OK){RefreshStorageSize();return;}
             bool moved=!String.Equals(state.Destination??"",dialog.Destination,StringComparison.OrdinalIgnoreCase);
             if(moved){state.Destination=dialog.Destination;statuses.Clear();statusDetails.Clear();progress.Clear();}
             state.Theme=dialog.ThemeValue;state.Language=dialog.LanguageValue;state.DownloadFolder=dialog.DownloadFolder;
-            Persist();if(projectStore!=null)projectStore.SavePreferences(state.Theme,state.Language,state.DownloadFolder);BuildInterface();if(moved)await Scan();
+            Persist();if(projectStore!=null)projectStore.SavePreferences(state.Theme,state.Language,state.DownloadFolder);BuildInterface();if(moved)await Scan();else RefreshStorageSize();
         }
     }
 }

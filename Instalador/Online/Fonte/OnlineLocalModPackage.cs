@@ -93,7 +93,7 @@ internal static class LocalModPackage {
 }
 
 public sealed partial class FixedInstaller {
-    internal string RemoveImported(string id,Action<string> report) {
+    internal string RemoveImported(string id,Action<string> report,bool forgetOnly=false) {
         Closed();Safe.NoLinks(Data);
         string folder=Safe.In(Data,"importados");
         if(!Directory.Exists(folder))return "Nenhuma instalação registrada para remover.";
@@ -102,7 +102,11 @@ public sealed partial class FixedInstaller {
             var found=Directory.GetFiles(folder,"*.json").Select(p=>new{Path=p,Receipt=ReadReceipt(p)})
                 .Where(x=>x.Receipt.Status=="instalado"&&x.Receipt.Mods.Count==1&&x.Receipt.Mods[0]==id)
                 .OrderByDescending(x=>x.Receipt.CreatedUtc).FirstOrDefault();
-            return found==null?"Nenhuma instalação registrada para remover.":UndoReceipt(found.Receipt,found.Path,report);
+            if(found==null)return "Nenhuma instalação registrada para remover.";
+            if(!forgetOnly)return UndoReceipt(found.Receipt,found.Path,report);
+            found.Receipt.Status="desfeito";
+            Save(found.Path,found.Receipt);
+            return "Registro da instalação removido.";
         }
     }
 

@@ -22,8 +22,8 @@ internal sealed partial class GeneralModWindow {
         if(storageReading){storageQueued=true;return;}storageReading=true;
         try{do{
             storageQueued=false;int generation=++storageGeneration;var label=storageSize;
-            try{var size=await Task.Run(()=>GeneralProjectStorage.Measure(projectStore,catalog,cache,project));if(!IsDisposed&&generation==storageGeneration&&!label.IsDisposed){label.Text=GeneralStorageSize.ProjectText(size);measuredMods=size.ModBytes;UpdateMeasuredRows();}}
-            catch(Exception){if(!IsDisposed&&generation==storageGeneration&&!label.IsDisposed){label.Text=T("Espaço indisponível","Size unavailable");measuredMods.Clear();UpdateMeasuredRows();}}
+            try{var size=await Task.Run(()=>GeneralProjectStorage.Measure(projectStore,catalog,cache,project));if(!IsDisposed&&generation==storageGeneration&&!label.IsDisposed){label.SetSize(size,false);measuredMods=size.ModBytes;UpdateMeasuredRows();}}
+            catch(Exception){if(!IsDisposed&&generation==storageGeneration&&!label.IsDisposed){label.SetSize(null,false);measuredMods.Clear();UpdateMeasuredRows();}}
         }while(storageQueued&&!IsDisposed);}finally{storageReading=false;}
     }
     string ModSpace(string id){long bytes;return measuredMods.TryGetValue(id,out bytes)?GeneralStorageSize.Format(bytes):"—";}
@@ -44,7 +44,7 @@ internal sealed partial class GeneralModWindow {
     }
     static string DroppedText(IDataObject data){return data.GetDataPresent(DataFormats.UnicodeText)?data.GetData(DataFormats.UnicodeText) as string:data.GetDataPresent(DataFormats.Text)?data.GetData(DataFormats.Text) as string:null;}
     async void ImportWebSources(string text){
-        if(scanning||String.IsNullOrWhiteSpace(text))return;
+        if(scanning||associationChoice!=null||String.IsNullOrWhiteSpace(text))return;
         try{
             var links=text.Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries).Select(value=>value.Trim()).Where(GeneralModDownload.IsWebSource).Take(32).Select(GeneralModLibrary.ValidateSource).Distinct().ToArray();
             foreach(string source in links){
@@ -54,6 +54,11 @@ internal sealed partial class GeneralModWindow {
         }catch(Exception ex){ShowError(ex);}
     }
     protected override bool ProcessCmdKey(ref Message message,Keys keys){
+        if(associationChoice!=null){
+            if(keys==Keys.Escape){associationChoice.TrySetResult(null);return true;}
+            if(keys==Keys.Enter&&grid.ContainsFocus){ConfirmAlternative();return true;}
+            return base.ProcessCmdKey(ref message,keys);
+        }
         if(keys==(Keys.Control|Keys.V)&&!(ActiveControl is TextBoxBase)&&!(ActiveControl is GeneralPicker)){
             if(Clipboard.ContainsText()){string text=Clipboard.GetText();if(GeneralModDownload.IsWebSource(text.Trim())){ImportWebSources(text);return true;}}
         }

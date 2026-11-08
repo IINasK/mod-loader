@@ -17,7 +17,12 @@ internal sealed class P2PSyncComparison {
     internal string[] Required, Missing, Different, LocalOnly;
     internal P2PSyncExtra[] Extras=new P2PSyncExtra[0];
     internal string[] HostOutsideDifferences=new string[0];
+    internal HashSet<string> HostOutsideMissing=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     internal int Matching, Unavailable;
+}
+
+internal sealed class P2PSyncDifference {
+    public string Kind, Mod, Path;
 }
 
 internal sealed partial class P2PService {
@@ -194,7 +199,7 @@ internal sealed partial class P2PService {
             }
         }
         var extras=new P2PSyncExtra[0];
-        var outside=new List<string>();
+        var outside=new List<string>();var outsideMissing=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if(cyberpunk&&preview.SyncGameInventory!=null){
             Action checkpoint=()=>{if(disposed||session.Discarded)throw new OperationCanceledException();};
             if(report!=null)report(0,0,"Mods fora do pacote");
@@ -202,12 +207,16 @@ internal sealed partial class P2PService {
             foreach(var item in preview.SyncGameInventory){
                 checkpoint();
                 string path=Safe.In(destination,item.Key);
-                if(item.Value==null?!Directory.Exists(path):!File.Exists(path)||Safe.Hash(path)!=item.Value)outside.Add(item.Key);
+                bool isFile=File.Exists(path), isDirectory=Directory.Exists(path);
+                if(item.Value==null?!isDirectory:!isFile||Safe.Hash(path)!=item.Value){
+                    outside.Add(item.Key);
+                    if(!isFile&&!isDirectory)outsideMissing.Add(item.Key);
+                }
             }
         }
         return new P2PSyncComparison{
             Session=session,PreviewHash=hash,Destination=destination,Required=required.ToArray(),Missing=absentNames.ToArray(),Different=differentNames.ToArray(),
-            Extras=extras,HostOutsideDifferences=outside.ToArray(),
+            Extras=extras,HostOutsideDifferences=outside.ToArray(),HostOutsideMissing=outsideMissing,
             LocalOnly=localOnly.ToArray(),Matching=preview.List.Mods.Count-required.Count,Unavailable=preview.Project.Mods.Count-preview.List.Mods.Count
         };
     }
@@ -260,6 +269,32 @@ internal sealed partial class P2PService {
         }finally{session.SyncProgress=null;session.SyncMode=0;}
     }
 
+    static IEnumerable<P2PSyncDifference> HostDifferences(P2PSyncComparison comparison) {
+        return comparison.HostOutsideDifferences.Select(path => new P2PSyncDifference {
+            Kind = comparison.HostOutsideMissing.Contains(path) ? "missing" : "different", Path = path
+        });
+    }
+
+    string SyncDifferencesPath(P2PSession session) {
+        return Safe.In(PrivateFolder(session), session.Id + "-sync-differences.json");
+    }
+
+    internal P2PSyncDifference[] ReadSyncDifferences(P2PSession session) {
+        string path = SyncDifferencesPath(session);
+        if (!File.Exists(path)) return null;
+        return Safe.Json.Deserialize<P2PSyncDifference[]>(GeneralProjectStorage.ReadText(path, MaxSyncMessage));
+    }
+
+    void ForgetSyncDifferences(P2PSession session) {
+        if (session.Sender || !session.CompareBeforePack) return;
+        try {
+            string path = SyncDifferencesPath(session);
+            Safe.NoLinks(path);
+            File.Delete(path);
+        } catch (IOException) { }
+          catch (UnauthorizedAccessException) { }
+    }
+
     internal void SubmitSyncChoice(P2PSyncComparison comparison,bool full,int[] selected=null) {
         var session=comparison.Session;
         lock(session){
@@ -273,8 +308,16 @@ internal sealed partial class P2PService {
                 throw new IOException("A seleção de mods extras é inválida.");
             var cleanup=selected.SelectMany(index=>comparison.Extras[index].Files).ToList();
             session.SyncCleanup=cleanup.Count==0?null:cleanup;
-            session.SyncLocalExtrasKept=comparison.Extras.Length-selected.Length;
-            session.SyncHostFilesDifferent=comparison.HostOutsideDifferences.Length;
+            var approved = new HashSet<int>(selected);
+            var kept = comparison.Extras.Where((extra, index) => !approved.Contains(index)).ToArray();
+            var differences = kept.SelectMany(extra => extra.Files.Select(file => new P2PSyncDifference {
+                Kind = "kept", Mod = extra.Name, Path = file.Path
+            })).Concat(HostDifferences(comparison)).ToArray();
+            if (differences.Length > 0)
+                Safe.WriteJson(SyncDifferencesPath(session), differences);
+            else ForgetSyncDifferences(session);
+            session.SyncLocalExtrasKept = kept.Length;
+            session.SyncHostFilesDifferent = comparison.HostOutsideDifferences.Length;
             Save();
             var choice=new SyncChoice{PreviewHash=hash,Full=full,Required=full?new string[0]:comparison.Required};
             WriteSyncMessage(session,Engine.Device,ChoicePath(session,Engine.Device),ChoiceName,choice);
