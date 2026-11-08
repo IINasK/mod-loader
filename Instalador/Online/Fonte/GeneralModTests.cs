@@ -20,7 +20,18 @@ internal sealed partial class GeneralModWindow {
         var real=FixedData.Load();
         var realSeed=GeneralModLibrary.Seed(real,new ModImportItem[0]);
         var nca=realSeed.Mods.Single(m=>m.Id==NightCityDensity.ModId);
-        check(realSeed.Mods.Count==153&&nca.DefaultVariant=="low"&&nca.Variants.Count==3,"Catálogo preservado com três densidades e Baixa principal.");
+        check(realSeed.Mods.Count==157&&nca.DefaultVariant=="low"&&nca.Variants.Count==3,"Catálogo preservado com três densidades e Baixa principal.");
+        var bodies=realSeed.Mods.Where(mod=>GeneralModLibrary.IsHystBody(mod.Id)).ToList();
+        check(bodies.Count==2&&bodies.All(mod=>mod.Nsfw&&mod.Category==GeneralModLibrary.BodyCategory&&mod.Variants.Count==3)&&
+            bodies[0].AlternativeGroup!=null&&bodies[0].AlternativeGroup==bodies[1].AlternativeGroup&&
+            realSeed.Mods.Where(mod=>GeneralModLibrary.IsFacialMod(mod.Id)).All(mod=>mod.Category==GeneralModLibrary.BodyCategory),
+            "Rostos e alternativas Hyst NSFW compartilham a categoria de corpo.");
+        var independent=new GeneralModEntry{Id="independent",Name="Independente"};
+        var jobs=bodies.Concat(new[]{independent}).Select(entry=>new Work{Entry=entry}).ToList();
+        check(ChooseAlternatives(jobs,choices=>choices[1].Id).Select(work=>work.Entry.Id).SequenceEqual(new[]{bodies[1].Id,independent.Id})&&
+            ChooseAlternatives(jobs,choices=>"").Single().Entry==independent&&ChooseAlternatives(jobs,choices=>null)==null&&
+            ChooseAlternatives(jobs.Skip(1).ToList(),choices=>{throw new IOException("Uma opção não deve abrir o seletor.");}).Count==2,
+            "Fila usa só a opção escolhida, permite pular o grupo ou cancelar e preserva os demais mods.");
         string local=TestZip(root,"custom.zip","CETExample/init.lua","return {}");
         var imported=NewEntry("Nome original",local);
         imported.Name="Personalizado renomeado";imported.Category="Minha categoria";
@@ -36,6 +47,8 @@ internal sealed partial class GeneralModWindow {
         string export=Path.Combine(root,"export.json");
         library.Export(export,loaded.List);
         var roundTrip=library.Import(export);
+        check(roundTrip.Mods.Where(mod=>GeneralModLibrary.IsHystBody(mod.Id)).All(mod=>mod.AlternativeGroup==bodies[0].AlternativeGroup),
+            "A associação sobrevive à exportação e importação da lista.");
         string text=File.ReadAllText(export);
         check(!text.Contains("CyberpunkId")&&!text.Contains("Destination")&&!text.Contains("ResolvedDownloads")&&!text.Contains("ChosenVariants")&&!text.Contains("DownloadFolder"),"Exportação exclui pastas de destino, escolhas locais e receitas internas.");
         check(roundTrip.Categories.Contains(imported.Category)&&roundTrip.Mods.Single(m=>m.Id==imported.Id).Variants[0].Sources[0]==local,"Exportação leva referências locais e organização.");

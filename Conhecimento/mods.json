@@ -2,16 +2,16 @@
   "Schema": 1,
   "CheckedOn": "2026-11-07",
   "CatalogId": "cp25-fixed-20261028",
-  "BaselineCatalogSha256": "ad2d3b823c0cf872b481a2b18d0d9abca52403f57b0ce87d552cc65781ea2a32",
-  "Count": 156,
+  "BaselineCatalogSha256": "30893825cee091022eee8335b86e702c2695a82e6c0b92e41da61ca7cb31d37c",
+  "Count": 158,
   "Profiles": {
     "WithPL": {
-      "Total": 156,
-      "Visible": 153
+      "Total": 158,
+      "Visible": 155
     },
     "WithoutPL": {
-      "Total": 144,
-      "Visible": 141
+      "Total": 146,
+      "Visible": 143
     },
     "Required": [
       "19-ThirdPerson",
@@ -21669,6 +21669,138 @@
       "Limitations": [
         "O arquivo oficial contém o script de registro e o archive de recursos da loja.",
         "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado."
+      ]
+    },
+    {
+      "Id": "mod-9429",
+      "Name": "Cyberware-EX",
+      "FixedVersion": "1.6.0",
+      "GameVersion": "2.5",
+      "Category": "Núcleo e dependências",
+      "Function": "Expande espaços de implantes e permite combinar sistemas operacionais.",
+      "HowToUse": [
+        "Abra Cibernética no menu do jogo ou visite um medicânico."
+      ],
+      "Dependencies": [
+        "NightCoop",
+        "redscript",
+        "TweakXL",
+        "Codeware"
+      ],
+      "GenderAndBody": "Configuração de implantes para V.",
+      "KnownConflictsAndLimits": [
+        "Use apenas uma configuração de espaços de implantes por vez."
+      ],
+      "PhantomLiberty": {
+        "Status": "not-required",
+        "Required": false,
+        "Evidence": "Sem exigência de Phantom Liberty ou REDmod identificada. Teste em jogo pendente.",
+        "Sources": [
+          "https://www.nexusmods.com/cyberpunk2077/mods/9429"
+        ],
+        "RuntimeWithoutDLCValidated": false,
+        "WithoutDLCProfileEligible": true
+      },
+      "Blocked": false,
+      "CoopEvidence": "Ainda sem teste em NightCoop.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Cyberware-EX 9429 1.6.0 2026-10-25T08-53Z aI50IAAsU.zip",
+          "ModId": 9429,
+          "FileId": 168239,
+          "Size": 17264,
+          "Sha256": "911a291ec9a91cd2d46c0d06f2fc0b7f2feb96dd967124b7704c47a410c43348",
+          "OfficialUrl": "https://www.nexusmods.com/cyberpunk2077/mods/9429?tab=files&file_id=168239"
+        }
+      ],
+      "Files": [
+        {
+          "RelativeInstallPath": "r6/config/redsUserHints/CyberwareEx.toml",
+          "Size": 354,
+          "Sha256": "f2cede087904510a167e2f7e49ed58aab20b752cedabf1e4f1b821cd107c8735"
+        },
+        {
+          "RelativeInstallPath": "r6/scripts/CyberwareEx/CyberwareEx.Global.reds",
+          "Size": 48985,
+          "Sha256": "53ecd2e5c102d5fa87e6d8436e4f5299619c94e9e8892dabcb67154a03a8ff56"
+        },
+        {
+          "RelativeInstallPath": "r6/scripts/CyberwareEx/CyberwareEx.reds",
+          "Size": 38527,
+          "Sha256": "9a220f19bd7285906b17ca8634f149b3cff79efea7531785fe33b5b8e457f333"
+        },
+        {
+          "RelativeInstallPath": "r6/scripts/CyberwareEx/LICENSE",
+          "Size": 1090,
+          "Sha256": "4a99ff8d0b12c4d4d0bbbc840e0793b2602a349c6177f5a9928e4849af02c3a0"
+        }
+      ],
+      "Sources": [
+        "https://www.nexusmods.com/cyberpunk2077/mods/9429",
+        "https://www.nexusmods.com/cyberpunk2077/mods/9429?tab=files&file_id=168239"
+      ],
+      "CheckedOn": "2026-11-07",
+      "EvidenceGroup": "Cyberware",
+      "Limitations": [
+        "Sem exigência de Phantom Liberty ou REDmod identificada. Teste em jogo pendente."
+      ]
+    },
+    {
+      "Id": "mod-36802",
+      "Name": "More Cyberware Slots",
+      "FixedVersion": "1",
+      "GameVersion": "2.5",
+      "Category": "Jogabilidade",
+      "Function": "Adiciona espaços de implantes com uma configuração do Cyberware-EX.",
+      "HowToUse": [
+        "Desbloqueie Painkiller na árvore Corpo, disponível a partir de Corpo 4, e confira Cibernética."
+      ],
+      "Dependencies": [
+        "mod-9429"
+      ],
+      "GenderAndBody": "Configuração de implantes para V.",
+      "KnownConflictsAndLimits": [
+        "Requer Painkiller (Corpo 4). Escolha uma única configuração entre Principal, Extra Arms, Extended Slots e Override Mode."
+      ],
+      "PhantomLiberty": {
+        "Status": "not-required",
+        "Required": false,
+        "Evidence": "Sem exigência de Phantom Liberty ou REDmod identificada. Teste em jogo pendente.",
+        "Sources": [
+          "https://www.nexusmods.com/cyberpunk2077/mods/36802"
+        ],
+        "RuntimeWithoutDLCValidated": false,
+        "WithoutDLCProfileEligible": true
+      },
+      "Blocked": false,
+      "CoopEvidence": "Ainda sem teste em NightCoop.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "More Cyberware Slots (Cyberware EX Config) 36802 1 2026-11-01T10-10Z ozVyzbZZg.rar",
+          "ModId": 36802,
+          "FileId": 171963,
+          "Size": 616,
+          "Sha256": "f2229c549d05cf053634bc95dcd0dda482e257a63ef4c91ba32b1e4180fbd915",
+          "OfficialUrl": "https://www.nexusmods.com/cyberpunk2077/mods/36802?tab=files&file_id=171963"
+        }
+      ],
+      "Files": [
+        {
+          "RelativeInstallPath": "r6/scripts/CyberwareEx/CyberwareEx.Customization.reds",
+          "Size": 3405,
+          "Sha256": "020bcdacc85fa99c79dbdc19581b504edace5a8f7a9d6e72cd7efceba615e1dd"
+        }
+      ],
+      "Sources": [
+        "https://www.nexusmods.com/cyberpunk2077/mods/36802",
+        "https://www.nexusmods.com/cyberpunk2077/mods/36802?tab=files&file_id=171963"
+      ],
+      "CheckedOn": "2026-11-07",
+      "EvidenceGroup": "Cyberware",
+      "Limitations": [
+        "Sem exigência de Phantom Liberty ou REDmod identificada. Teste em jogo pendente."
       ]
     }
   ],

@@ -1,0 +1,222 @@
+{
+  "Schema": 1,
+  "Categories": [
+    "Aparência",
+    "Lojas",
+    "Roupas femininas",
+    "Melhorias do corpo"
+  ],
+  "Mods": [
+    {
+      "Id": "hyst-ebb-rb",
+      "Name": "Hyst EBB + RB",
+      "Description": "Para V feminina. Busto menos projetado e quadril RB (Big Booty). Requer VTK Head 3.0+, ArchiveXL, Codeware e redscript. Há variantes com refits das roupas originais.",
+      "Nsfw": true,
+      "Category": "Melhorias do corpo",
+      "DefaultVariant": "default",
+      "Variants": [
+        {
+          "Id": "default",
+          "Name": "5.0.0 · Somente corpo",
+          "Sources": [
+            "https://www.nexusmods.com/cyberpunk2077/mods/4654?tab=files&file_id=170224"
+          ],
+          "SourceInfo": {
+            "https://www.nexusmods.com/cyberpunk2077/mods/4654?tab=files&file_id=170224": {
+              "Bytes": 185058002,
+              "Name": "Hyst EBB + RB"
+            }
+          }
+        },
+        {
+          "Id": "with-refit-base",
+          "Name": "5.0.0 · Corpo + refit do jogo base",
+          "Sources": [
+            "https://www.nexusmods.com/cyberpunk2077/mods/4654?tab=files&file_id=170224",
+            "https://www.nexusmods.com/cyberpunk2077/mods/5408?tab=files&file_id=38119"
+          ],
+          "SourceInfo": {
+            "https://www.nexusmods.com/cyberpunk2077/mods/5408?tab=files&file_id=38119": {
+              "Name": "Vanilla Refit - ENHANCED BIG BREAST WITH BIG BOOTY",
+              "Bytes": 77937362,
+              "FileName": "Vanilla Refit - ENHANCED BIG BREAST WITH BIG BOOTY-5408-1-03-1674868416.zip"
+            },
+            "https://www.nexusmods.com/cyberpunk2077/mods/4654?tab=files&file_id=170224": {
+              "Bytes": 185058002,
+              "Name": "Hyst EBB + RB"
+            }
+          }
+        },
+        {
+          "Id": "with-refit-dlc",
+          "Name": "5.0.0 · Corpo + refits com Phantom Liberty",
+          "Sources": [
+            "https://www.nexusmods.com/cyberpunk2077/mods/4654?tab=files&file_id=170224",
+            "https://www.nexusmods.com/cyberpunk2077/mods/5408?tab=files&file_id=38119",
+            "https://www.nexusmods.com/cyberpunk2077/mods/9461?tab=files&file_id=50544"
+          ],
+          "SourceInfo": {
+            "https://www.nexusmods.com/cyberpunk2077/mods/9461?tab=files&file_id=50544": {
+              "Name": "PL Vanilla Refit ENHANCED BIG BREAST WITH BIG BUTT",
+              "Bytes": 18688184,
+              "FileName": "PL Vanilla Refit ENHANCED BIG BREAST WITH BIG BUTT-9461-1-0-1696191280.zip"
+            },
+            "https://www.nexusmods.com/cyberpunk2077/mods/5408?tab=files&file_id=38119": {
+              "Name": "Vanilla Refit - ENHANCED BIG BREAST WITH BIG BOOTY",
+              "Bytes": 77937362,
+              "FileName": "Vanilla Refit - ENHANCED BIG BREAST WITH BIG BOOTY-5408-1-03-1674868416.zip"
+            },
+            "https://www.nexusmods.com/cyberpunk2077/mods/4654?tab=files&file_id=170224": {
+              "Bytes": 185058002,
+              "Name": "Hyst EBB + RB"
+            }
+          }
+        }
+      ],
+      "AlternativeGroup": "hyst-femv-body"
+    },
+    {
+      "Id": "hyst-ebbp-rb",
+      "Name": "Hyst EBBP + RB (Push-Up)",
+      "Description": "Para V feminina. Busto mais projetado, com efeito Push-Up mais forte, e o mesmo quadril RB (Big Booty). Requer VTK Head 3.0+, ArchiveXL, Codeware e redscript. Há variantes com refits próprios.",
+      "Nsfw": true,
+      "Category": "Melhorias do corpo",
+      "AlternativeGroup": "hyst-femv-body",
+      "DefaultVariant": "default",
+      "Variants": [
+        {
+          "Id": "default",
+          "Name": "5.0.0 · Somente corpo",
+          "Sources": [
+            "https://www.nexusmods.com/cyberpunk2077/mods/9083?tab=files&file_id=170228"
+          ],
+          "SourceInfo": {
+            "https://www.nexusmods.com/cyberpunk2077/mods/9083?tab=files&file_id=170228": {
+              "FileName": "Hyst_BigBreasts PUSH UP - Big Booty (EBBP RB) 9083 5.0.0 2026-10-28T23-20Z 4rpqrK5vr.zip",
+              "Name": "Hyst EBBP + RB",
+              "Bytes": 185225676
+            }
+          }
+        },
+        {
+          "Id": "with-refit-base",
+          "Name": "5.0.0 · Corpo + refit do jogo base",
+          "Sources": [
+            "https://www.nexusmods.com/cyberpunk2077/mods/9083?tab=files&file_id=170228",
+            "https://www.nexusmods.com/cyberpunk2077/mods/9074?tab=files&file_id=50284"
+          ],
+          "SourceInfo": {
+            "https://www.nexusmods.com/cyberpunk2077/mods/9083?tab=files&file_id=170228": {
+              "FileName": "Hyst_BigBreasts PUSH UP - Big Booty (EBBP RB) 9083 5.0.0 2026-10-28T23-20Z 4rpqrK5vr.zip",
+              "Name": "Hyst EBBP + RB",
+              "Bytes": 185225676
+            },
+            "https://www.nexusmods.com/cyberpunk2077/mods/9074?tab=files&file_id=50284": {
+              "FileName": "Vanilla Clothes - EBB PUSH with BIG BOOTY-9074-1-2-1-1696092577.zip",
+              "Name": "Vanilla Clothes - EBB PUSH with BIG BOOTY",
+              "Bytes": 80315740
+            }
+          }
+        },
+        {
+          "Id": "with-refit-dlc",
+          "Name": "5.0.0 · Corpo + refits com Phantom Liberty",
+          "Sources": [
+            "https://www.nexusmods.com/cyberpunk2077/mods/9083?tab=files&file_id=170228",
+            "https://www.nexusmods.com/cyberpunk2077/mods/9074?tab=files&file_id=50284",
+            "https://www.nexusmods.com/cyberpunk2077/mods/9295?tab=files&file_id=50103"
+          ],
+          "SourceInfo": {
+            "https://www.nexusmods.com/cyberpunk2077/mods/9083?tab=files&file_id=170228": {
+              "FileName": "Hyst_BigBreasts PUSH UP - Big Booty (EBBP RB) 9083 5.0.0 2026-10-28T23-20Z 4rpqrK5vr.zip",
+              "Name": "Hyst EBBP + RB",
+              "Bytes": 185225676
+            },
+            "https://www.nexusmods.com/cyberpunk2077/mods/9074?tab=files&file_id=50284": {
+              "FileName": "Vanilla Clothes - EBB PUSH with BIG BOOTY-9074-1-2-1-1696092577.zip",
+              "Name": "Vanilla Clothes - EBB PUSH with BIG BOOTY",
+              "Bytes": 80315740
+            },
+            "https://www.nexusmods.com/cyberpunk2077/mods/9295?tab=files&file_id=50103": {
+              "FileName": "EBB PUSH - BIG BOOTY - Phantom Liberty - Clothes-9295-1-2-1696007561.zip",
+              "Name": "EBB PUSH - BIG BOOTY - Phantom Liberty - Clothes",
+              "Bytes": 19876456
+            }
+          }
+        }
+      ]
+    },
+    {
+      "Id": "hyst-atelier",
+      "Name": "Hyst Atelier Store",
+      "Description": "Loja da Hyst. Requer Virtual Atelier e redscript.",
+      "Nsfw": false,
+      "Category": "Lojas",
+      "DefaultVariant": "default",
+      "Variants": [
+        {
+          "Id": "default",
+          "Name": "1.36",
+          "Sources": [
+            "https://www.nexusmods.com/cyberpunk2077/mods/6015?tab=files&file_id=174979"
+          ]
+        }
+      ]
+    },
+    {
+      "Id": "hyst-seduce-dress",
+      "Name": "Seduce Dress",
+      "Description": "Vestido FemV para corpo padrão e Hyst. Requer ArchiveXL e TweakXL. Disponível na Hyst Atelier Store.",
+      "Nsfw": false,
+      "Category": "Roupas femininas",
+      "DefaultVariant": "default",
+      "Variants": [
+        {
+          "Id": "default",
+          "Name": "1.0",
+          "Sources": [
+            "https://www.nexusmods.com/cyberpunk2077/mods/27036?tab=files&file_id=133661"
+          ]
+        }
+      ]
+    },
+    {
+      "Id": "kala-vtk-tattoos",
+      "Name": "VTK FemV — Tatuagens da Kala",
+      "Description": "Tatuagens para V feminina com corpo VTK/HD Feet, como Hyst. Escolha uma variante para evitar sobreposição de texturas. O encaixe com EBBP RB 5.0.0 precisa de teste visual.",
+      "Nsfw": true,
+      "Category": "Aparência",
+      "DefaultVariant": "japanese",
+      "Variants": [
+        {
+          "Id": "japanese",
+          "Name": "Japanese",
+          "Sources": [
+            "https://www.nexusmods.com/cyberpunk2077/mods/7638?tab=files&file_id=40336"
+          ]
+        },
+        {
+          "Id": "sacred",
+          "Name": "Sacred",
+          "Sources": [
+            "https://www.nexusmods.com/cyberpunk2077/mods/7638?tab=files&file_id=40341"
+          ]
+        },
+        {
+          "Id": "blackout-mandala",
+          "Name": "Blackout 2.0 Mandala",
+          "Sources": [
+            "https://www.nexusmods.com/cyberpunk2077/mods/7638?tab=files&file_id=40325"
+          ]
+        },
+        {
+          "Id": "blackout-skull",
+          "Name": "Blackout Skull",
+          "Sources": [
+            "https://www.nexusmods.com/cyberpunk2077/mods/7638?tab=files&file_id=40326"
+          ]
+        }
+      ]
+    }
+  ]
+}

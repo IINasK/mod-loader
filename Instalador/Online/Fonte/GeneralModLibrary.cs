@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -21,7 +21,7 @@ public sealed class GeneralModPreset {
 }
 
 public sealed class GeneralModEntry {
-    public string Id, Name, Category, DefaultVariant;
+    public string Id, Name, Category, DefaultVariant, AlternativeGroup;
     public string Description;
     public List<string> Tags = new List<string>();
     public bool Nsfw;
@@ -50,6 +50,9 @@ public sealed class GeneralModLibrary {
         null, "Kit principal", "Núcleo e dependências", "Jogabilidade", "Lojas", "Veículos",
         "Roupas e acessórios", "Aparência", "Modo Foto", "Áudio", "Importados", "Outros"
     };
+    internal const string BodyCategory = "Melhorias do corpo";
+    internal static bool IsHystBody(string id) { return id == "hyst-ebb-rb" || id == "hyst-ebbp-rb"; }
+    internal static bool IsFacialMod(string id) { return id.StartsWith("face-", StringComparison.Ordinal); }
     readonly string statePath;
 
     public GeneralModLibrary(string statePath) {
@@ -82,12 +85,18 @@ public sealed class GeneralModLibrary {
         Write(fullPath, new {
             list.Schema, list.Categories, list.CategoryDescriptions, list.Presets, list.UncategorizedName, list.UncategorizedDescription,
             Mods = list.Mods.Select(mod => new {
-                mod.Id, mod.Name, mod.Category, mod.DefaultVariant, mod.Description, mod.Tags, mod.Nsfw,
+                mod.Id, mod.Name, mod.Category, mod.DefaultVariant, mod.Description, mod.Tags, mod.Nsfw, mod.AlternativeGroup,
                 Variants = mod.Variants.Select(variant => new { variant.Id, variant.Name, variant.Sources, variant.SourceInfo }).ToList()
             }).ToList()
         });
     }
 
+    internal static void AssociateAlternative(GeneralModEntry entry, GeneralModEntry other) {
+        if (other == null) { entry.AlternativeGroup = null; return; }
+        if (entry.Id == other.Id) throw new IOException("Escolha outro mod para associar.");
+        if (String.IsNullOrEmpty(other.AlternativeGroup)) other.AlternativeGroup = Guid.NewGuid().ToString("N");
+        entry.AlternativeGroup = other.AlternativeGroup;
+    }
     public static void DeleteCategory(GeneralModList list, string category) {
         string requested = RequiredText(category, 120, "Categoria");
         ValidateList(list, true);
@@ -130,14 +139,14 @@ public sealed class GeneralModLibrary {
 
     public static GeneralModList Seed(FixedCatalog catalog, IEnumerable<ModImportItem> items) {
         var list = new GeneralModList { Categories = CyberpunkCategories.Skip(1).ToList() };
-        list.Categories.AddRange(new[]{"Roupas femininas","Roupas masculinas","Roupas para ambas"});
+        list.Categories.AddRange(new[]{"Roupas femininas","Roupas masculinas","Roupas para ambas",BodyCategory});
         foreach (var mod in catalog.Packages.Where(mod => String.IsNullOrWhiteSpace(mod.BlockedReason))) {
             var fit=ModCategories.Supports(mod.Id,ClothingFit.Both)?"Roupas para ambas":
                 ModCategories.Supports(mod.Id,ClothingFit.Feminine)?"Roupas femininas":
                 ModCategories.Supports(mod.Id,ClothingFit.Masculine)?"Roupas masculinas":null;
             var entry = new GeneralModEntry {
                 Id = mod.Id, Name = mod.Name, Description = mod.Description,
-                Category = fit??CyberpunkCategories[(int)ModCategories.CategoryOf(mod.Id, mod.Profile)],
+                Category = IsFacialMod(mod.Id) ? BodyCategory : fit??CyberpunkCategories[(int)ModCategories.CategoryOf(mod.Id, mod.Profile)],
                 DefaultVariant = mod.DensityProfiles == null ? "default" : "low"
             };
             if (mod.DensityProfiles == null) {
@@ -147,6 +156,12 @@ public sealed class GeneralModLibrary {
                     entry.Variants.Add(FromFixed(mod.Id, profile.Id, profile.Name, profile.Assets, profile.Id));
             }
             list.Mods.Add(entry);
+        }
+        if (list.Mods.Any(mod => mod.Id == "face-16930-99414")) {
+            using (var reader = new StreamReader(typeof(GeneralModLibrary).Assembly.GetManifestResourceStream("ModLoader.Hyst.modloader.json"))) {
+                var hyst = Safe.Json.Deserialize<GeneralModList>(reader.ReadToEnd());
+                list.Mods.AddRange(hyst.Mods.Where(mod => IsHystBody(mod.Id)));
+            }
         }
         foreach (var item in items.Where(item => item.Kind == "Arquivo"&&!RetiredPackEntries.PreparedArchive(item))) {
             list.Mods.Add(new GeneralModEntry {
@@ -161,7 +176,7 @@ public sealed class GeneralModLibrary {
             Id = "no-pl", Name = "Sem DLC Phantom Liberty",
             ModIds = catalog.Packages.Where(mod => String.IsNullOrWhiteSpace(mod.BlockedReason) &&
                 FixedData.Expand(catalog, new[] { mod.Id }).All(dependency => !GameEdition.NeedsPL(dependency) && String.IsNullOrWhiteSpace(dependency.BlockedReason)))
-                .Select(mod => mod.Id).ToList()
+                .Select(mod => mod.Id).Concat(list.Mods.Where(mod => IsHystBody(mod.Id)).Select(mod => mod.Id)).ToList()
         });
         ValidateList(list, true);
         return list;
@@ -258,6 +273,8 @@ public sealed class GeneralModLibrary {
                 NormalizeSources(variant);
                 if (!trustRecipes) { variant.CyberpunkId = null; variant.CyberpunkVariant = null; }
             }
+            if (String.IsNullOrEmpty(mod.AlternativeGroup)) mod.AlternativeGroup = null;
+            else if (!ValidId(mod.AlternativeGroup)) throw new IOException("Associação de alternativas inválida.");
             if (!variantIds.Contains(mod.DefaultVariant)) throw new IOException("Escolha a versão principal de " + mod.Name + ".");
         }
         if (list.Presets == null) list.Presets = new List<GeneralModPreset>();

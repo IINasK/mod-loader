@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -88,7 +88,7 @@ public static class GeneralModLibraryV2Tests {
         var seed = GeneralModLibrary.Seed(catalog, new ModImportItem[0]);
         var noPl = seed.Presets.Single(preset => preset.Id == "no-pl");
         check(seed.Presets.Single(preset => preset.Id == "all").ModIds.SequenceEqual(seed.Mods.Select(mod => mod.Id)), "Todos contém cada entrada visível do catálogo.");
-        var expected = seed.Mods.Where(mod => GameEdition.Reason(catalog, new[] { mod.Id }) == null).Select(mod => mod.Id).ToArray();
+        var expected = seed.Mods.Where(mod => GeneralModLibrary.IsHystBody(mod.Id) || GameEdition.Reason(catalog, new[] { mod.Id }) == null).Select(mod => mod.Id).ToArray();
         check(noPl.ModIds.SequenceEqual(expected), "Sem Phantom Liberty considera os requisitos transitivos do catálogo real.");
         var dependent = new FixedCatalog { Packages = new List<FixedMod> {
             Fixed("base", false, new string[0]), Fixed("dlc", true, new string[0]),

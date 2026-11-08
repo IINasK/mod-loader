@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -44,6 +44,32 @@ internal static class GeneralTableDialogTests {
                 check(!Descendants(dialog).OfType<DataGridView>().Any(), "Already downloaded files can be installed without an empty download table.");
                 Find<Button>(dialog, "ConfirmPendingInstall").PerformClick();
                 check(dialog.DialogResult == DialogResult.OK, "Ready-to-install files can be confirmed.");
+            }
+            using (var dialog = new GeneralInstallConfirmation(Path.Combine(root, "game"), 3, pending, 1)) {
+                Open(dialog);
+                var optIn = Find<CheckBox>(dialog, "IncludeNsfw");
+                check(optIn.Visible && !dialog.IncludeNsfw, "A mixed queue shows an unchecked NSFW opt-in.");
+                optIn.Checked = true;
+                Find<Button>(dialog, "ConfirmPendingInstall").PerformClick();
+                check(dialog.DialogResult == DialogResult.OK && dialog.IncludeNsfw, "Explicit opt-in includes NSFW in the confirmed queue.");
+            }
+            using (var dialog = new GeneralInstallConfirmation(Path.Combine(root, "game"), 1, new string[0], 1)) {
+                Open(dialog); Find<Button>(dialog, "ConfirmPendingInstall").PerformClick();
+                check(dialog.DialogResult == DialogResult.OK && !dialog.IncludeNsfw, "Continuing without opt-in skips NSFW even when its archive is already downloaded.");
+            }
+            using (var dialog = new GeneralModAlternativeDialog(new[] {
+                new GeneralModEntry { Id = "regular", Name = "Regular", Description = "Less projected" },
+                new GeneralModEntry { Id = "push", Name = "Push-Up", Description = "Stronger effect" }
+            })) {
+                Open(dialog);
+                var options = Find<GeneralPicker>(dialog, "AlternativeChoices");
+                var use = Find<Button>(dialog, "UseAlternative");
+                check(options.Items.Count == 2 && !use.Enabled &&
+                    Find<TextBox>(dialog, "AlternativeDetails").Text.Contains("Stronger effect"),
+                    "Alternative selection explains both options and requires an explicit choice.");
+                options.SelectedIndex = 1;
+                use.PerformClick();
+                check(dialog.DialogResult == DialogResult.OK && dialog.SelectedId == "push", "The alternative dialog returns the chosen mod.");
             }
             var original = new HashSet<string>(new[] { "A" }, StringComparer.Ordinal);
             using (var dialog = new GeneralColumnFilterDialog("Filter", new[] { "B", "A", "", "A" }, original, "old", true)) {

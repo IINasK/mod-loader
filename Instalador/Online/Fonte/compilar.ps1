@@ -1,4 +1,4 @@
-﻿param([string]$VelopackBuildDirectory,[string]$NuGetPackages)
+param([string]$VelopackBuildDirectory,[string]$NuGetPackages)
 $ErrorActionPreference='Stop'
 & (Join-Path $PSScriptRoot 'preparar-leitor.ps1')
 & (Join-Path $PSScriptRoot 'preparar-logo.ps1')
@@ -10,6 +10,8 @@ $hash=(Get-FileHash -LiteralPath (Join-Path $out 'catalogo.json') -Algorithm SHA
 Set-Content -LiteralPath (Join-Path $PSScriptRoot 'OnlineIdentity.cs') -Encoding UTF8 -Value ('internal static class OnlineIdentity { internal const string CatalogHash="'+$hash+'"; }')
 $extensions=@('OnlineDensityWindowTests.cs','OnlineDensity.cs','OnlineDensityTests.cs','OnlineDeactivate.cs','OnlineDownloads.cs','OnlineImport.cs','OnlineImportTests.cs','OnlineAutoInstall.cs','OnlineAutoInstallTests.cs','OnlineDownloadWatch.cs','OnlineDownloadWatchTests.cs','OnlineBrowserSession.cs','OnlineBrowserSessionTests.cs','OnlineWindowWatchTests.cs','DefaultBrowser.cs','DefaultBrowserTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += '/resource:'+(Join-Path $out 'catalogo.json')+',CyberpunkCoop.catalogo.json'
+$project=Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+$extensions += '/resource:'+(Join-Path $project 'Conhecimento\Candidatos\Hyst - corpo opcional.modloader.json')+',ModLoader.Hyst.modloader.json'
 $extensions += Join-Path $PSScriptRoot 'OnlineGameEdition.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineGameEditionTests.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineCategories.cs'

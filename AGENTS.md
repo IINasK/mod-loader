@@ -518,3 +518,8 @@ Pedido de Douglas, 28/10/2026: configurar mods com o coop, registrar processos v
 - O rótulo Pendente substitui a suposição sobre o download. O rótulo e a cor do selo de download concluído usam a mesma regra. O rodapé do diálogo de versão mede os botões em vez de usar altura fixa.
 
 - A confirmação usa a tabela do aplicativo com uma linha por mod com download pendente e rolagem. O caminho e as ações ficam fixos.
+
+## Revisão 1.1.42 — Cyberware
+
+- Cyberware-EX 1.6.0 (9429/168239) e More Cyberware Slots principal (36802/171963) têm cinco destinos conferidos e são complementos opcionais. Selecionar a configuração inclui a dependência. Extra Arms, Extended Slots e Override Mode ficaram fora.
+- A ponte Equipment-EX NightCoop 1.25 (37148/173301) substitui arquivos da base e ficou fora. Ver Conhecimento/Candidatos/mod-37148.md. Compatibilidade dos complementos em jogo e coop ainda não verificada.

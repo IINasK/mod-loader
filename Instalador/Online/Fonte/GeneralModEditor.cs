@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -23,6 +23,15 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
     readonly Func<string,Task<GeneralSourceInfo>> lookup;
     string lastAutoName;
     int sourceGeneration;
+    readonly GeneralPicker alternative = new GeneralPicker { Name = "AlternativeMod", Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList };
+    internal GeneralModEntry LinkedAlternative {
+        get { var choice = alternative.SelectedItem as AlternativeChoice; return choice == null ? null : choice.Entry; }
+    }
+    sealed class AlternativeChoice {
+        internal readonly GeneralModEntry Entry;
+        internal AlternativeChoice(GeneralModEntry entry) { Entry=entry; }
+        public override string ToString() { return Entry==null?T("Sem associação","No association"):Entry.Name; }
+    }
     readonly Button save, install, removeVariant, browse;
     readonly FlowLayoutPanel variantActions;
     readonly List<GeneralModVariant> model;
@@ -34,7 +43,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
     internal bool InstallRequested { get; private set; }
     internal bool AttachRequested { get; private set; }
 
-    internal GeneralModEditor(GeneralModEntry entry, IEnumerable<string> categories, string selected, bool allowInstall, string installInfo,Func<string,Task<GeneralSourceInfo>> lookup=null) {
+    internal GeneralModEditor(GeneralModEntry entry, IEnumerable<string> categories, string selected, bool allowInstall, string installInfo,Func<string,Task<GeneralSourceInfo>> lookup=null, IEnumerable<GeneralModEntry> alternatives=null) {
         this.lookup=lookup;
         model = entry.Variants.Select(v => new GeneralModVariant {
             Id = v.Id, Name = v.Name, Sources = v.Sources.ToList(), SourceInfo=v.SourceInfo==null?new Dictionary<string,GeneralSourceInfo>():v.SourceInfo.ToDictionary(pair=>pair.Key,pair=>new GeneralSourceInfo{Name=pair.Value.Name,FileName=pair.Value.FileName,Bytes=pair.Value.Bytes}), CyberpunkId = v.CyberpunkId, CyberpunkVariant = v.CyberpunkVariant
@@ -129,6 +138,19 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         installNote = LabelFor(installInfo ?? "");
         installNote.Font = validation.Font = usePending.Font = GeneralStyle.Font(10, false);
         feedback.SizeChanged += (s, e) => ResizeFeedback(feedback.ClientSize.Width);
+        if (alternatives!=null) {
+            var options=alternatives.Where(other=>other.Id!=entry.Id).OrderBy(other=>other.Name).ToList();
+            alternative.AccessibleName=T("Associar a outro mod","Link to another mod");
+            alternative.Items.Add(new AlternativeChoice(null));
+            foreach(var other in options)alternative.Items.Add(new AlternativeChoice(other));
+            alternative.SelectedIndex=options.FindIndex(other=>entry.AlternativeGroup!=null&&other.AlternativeGroup==entry.AlternativeGroup)+1;
+            feedback.Controls.Add(LabelFor(alternative.AccessibleName));
+            feedback.Controls.Add(alternative);
+            var associationHint=LabelFor(T("Se alternativas do mesmo grupo estiverem marcadas, a instalação pede para escolher uma.","If alternatives in the same group are selected, installation asks you to choose one."));
+            associationHint.Font=GeneralStyle.Font(10,false);
+            feedback.Controls.Add(associationHint);
+            feedback.SizeChanged+=(s,e)=>associationHint.MaximumSize=new Size(Math.Max(120,feedback.ClientSize.Width-8),0);
+        }
         feedback.Controls.Add(installNote);
         feedback.Controls.Add(usePending);
         feedback.Controls.Add(validation);

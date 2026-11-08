@@ -19027,6 +19027,112 @@
       "PhantomLibertyStatus": "not-required",
       "PhantomLibertyNotes": "Sem exigência de Phantom Liberty ou REDmod identificada na documentação e nos arquivos de configuração. A análise é estática. O uso em jogo, sem DLC, em terceira pessoa e em coop ainda não foi testado.",
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/37000"
+    },
+    {
+      "Id": "mod-9429",
+      "Name": "Cyberware-EX",
+      "Version": "1.6.0",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "NightCoop",
+        "redscript",
+        "TweakXL",
+        "Codeware"
+      ],
+      "Warning": "Use apenas uma configuração de espaços de implantes por vez.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Cyberware-EX 9429 1.6.0 2026-10-25T08-53Z aI50IAAsU.zip",
+          "Sha256": "911a291ec9a91cd2d46c0d06f2fc0b7f2feb96dd967124b7704c47a410c43348",
+          "Size": 17264,
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/9429?tab=files&file_id=168239",
+          "ModId": 9429,
+          "FileId": 168239
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "r6/config/redsUserHints/CyberwareEx.toml",
+          "Path": "r6/config/redsUserHints/CyberwareEx.toml",
+          "Sha256": "f2cede087904510a167e2f7e49ed58aab20b752cedabf1e4f1b821cd107c8735",
+          "Size": 354
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/CyberwareEx/CyberwareEx.Global.reds",
+          "Path": "r6/scripts/CyberwareEx/CyberwareEx.Global.reds",
+          "Sha256": "53ecd2e5c102d5fa87e6d8436e4f5299619c94e9e8892dabcb67154a03a8ff56",
+          "Size": 48985
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/CyberwareEx/CyberwareEx.reds",
+          "Path": "r6/scripts/CyberwareEx/CyberwareEx.reds",
+          "Sha256": "9a220f19bd7285906b17ca8634f149b3cff79efea7531785fe33b5b8e457f333",
+          "Size": 38527
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/CyberwareEx/LICENSE",
+          "Path": "r6/scripts/CyberwareEx/LICENSE",
+          "Sha256": "4a99ff8d0b12c4d4d0bbbc840e0793b2602a349c6177f5a9928e4849af02c3a0",
+          "Size": 1090
+        }
+      ],
+      "NexusModId": 9429,
+      "NexusFileId": 168239,
+      "PageUrl": "https://www.nexusmods.com/cyberpunk2077/mods/9429",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Sem exigência de Phantom Liberty ou REDmod identificada. Teste em jogo pendente.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/9429"
+    },
+    {
+      "Id": "mod-36802",
+      "Name": "More Cyberware Slots",
+      "Version": "1",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "mod-9429"
+      ],
+      "Warning": "Requer Painkiller (Corpo 4). Escolha uma única configuração entre Principal, Extra Arms, Extended Slots e Override Mode.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "More Cyberware Slots (Cyberware EX Config) 36802 1 2026-11-01T10-10Z ozVyzbZZg.rar",
+          "Sha256": "f2229c549d05cf053634bc95dcd0dda482e257a63ef4c91ba32b1e4180fbd915",
+          "Size": 616,
+          "Format": "tar",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/36802?tab=files&file_id=171963",
+          "ModId": 36802,
+          "FileId": 171963
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/CyberwareEx/CyberwareEx.Customization.reds",
+          "Path": "r6/scripts/CyberwareEx/CyberwareEx.Customization.reds",
+          "Sha256": "020bcdacc85fa99c79dbdc19581b504edace5a8f7a9d6e72cd7efceba615e1dd",
+          "Size": 3405
+        }
+      ],
+      "NexusModId": 36802,
+      "NexusFileId": 171963,
+      "PageUrl": "https://www.nexusmods.com/cyberpunk2077/mods/36802",
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "Sem exigência de Phantom Liberty ou REDmod identificada. Teste em jogo pendente.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/36802"
     }
   ],
   "Excluded": [

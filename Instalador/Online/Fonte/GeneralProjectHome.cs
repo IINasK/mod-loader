@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Collections.Generic;
 using System.IO;
@@ -229,6 +229,16 @@ internal sealed partial class GeneralModWindow {
         projectStore=store;this.project=project;var preferences=store.Read();
         bool refreshed=false;
         if(BuiltInProject){
+            if(seed.Mods.Any(item=>GeneralModLibrary.IsFacialMod(item.Id))){
+                if(!state.List.Categories.Contains(GeneralModLibrary.BodyCategory)){
+                    state.List.Categories.Add(GeneralModLibrary.BodyCategory);
+                    refreshed=true;
+                }
+                foreach(var item in state.List.Mods.Where(item=>GeneralModLibrary.IsFacialMod(item.Id)&&item.Category=="Aparência")){
+                    item.Category=GeneralModLibrary.BodyCategory;
+                    refreshed=true;
+                }
+            }
             var added=seed.Mods.Where(item=>!state.List.Mods.Any(current=>current.Id==item.Id)).ToArray();
             if(added.Length!=0){
                 state.List.Mods.AddRange(added);

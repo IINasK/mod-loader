@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -101,6 +101,39 @@ internal sealed class GeneralPresetActionsDialog : GeneralDialog {
     void Choose(string id) { ActionId = id; Complete(DialogResult.OK); }
 }
 
+internal sealed class GeneralModAlternativeDialog : GeneralDialog {
+    internal string SelectedId { get; private set; }
+
+    internal GeneralModAlternativeDialog(IReadOnlyList<GeneralModEntry> entries)
+        : base(GeneralStyle.T("Escolher uma versão","Choose one version")) {
+        Name="ModAlternativeChoice";ClientSize=new Size(680,445);
+        var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Padding=new Padding(20,8,20,20)};
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute,48));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.Controls.Add(GeneralModEditor.LabelFor(GeneralStyle.T(
+            "Estes mods são alternativas. Escolha uma versão para esta instalação.",
+            "These mods are alternatives. Choose one version for this installation.")),0,0);
+        var options=new GeneralPicker{Name="AlternativeChoices",Dock=DockStyle.Fill,DropDownStyle=ComboBoxStyle.DropDownList};
+        foreach(var entry in entries)options.Items.Add(entry.Name);
+        layout.Controls.Add(options,0,1);
+        var text=new TextBox{Name="AlternativeDetails",Multiline=true,ReadOnly=true,WordWrap=true,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None};
+        layout.Controls.Add(new GeneralScrollView(text),0,2);
+        var buttons=GeneralTableDialogLayout.Commands();
+        var use=GeneralStyle.Button(GeneralStyle.T("Usar esta versão","Use this version"),()=>{
+            SelectedId=entries[options.SelectedIndex].Id;Complete(DialogResult.OK);
+        },true);
+        use.Name="UseAlternative";use.Enabled=false;
+        var skip=GeneralStyle.Button(GeneralStyle.T("Pular grupo","Skip group"),()=>{SelectedId="";Complete(DialogResult.OK);});
+        var cancel=GeneralStyle.Button(GeneralStyle.T("Cancelar","Cancel"),()=>Complete(DialogResult.Cancel));
+        options.SelectedIndexChanged+=(s,e)=>{use.Enabled=options.SelectedIndex>=0;};
+        text.Text=String.Join("\r\n\r\n",entries.Select(entry=>entry.Name+(String.IsNullOrWhiteSpace(entry.Description)?"":"\r\n"+entry.Description)));
+        buttons.Controls.Add(use);buttons.Controls.Add(skip);buttons.Controls.Add(cancel);
+        layout.Controls.Add(buttons,0,3);Content.Controls.Add(layout);CancelButton=cancel;
+        GeneralStyle.Apply(this,GeneralStyle.Dark);text.BorderStyle=BorderStyle.None;
+    }
+}
 internal static class GeneralTableDialogLayout {
     internal static GeneralSurface Input(TextBox text) {
         var field = new GeneralSurface { Dock = DockStyle.Top, Height = 44, MinimumSize = new Size(120, 44), MaximumSize = new Size(0, 44), Padding = new Padding(14, 10, 14, 0), Margin = Padding.Empty };
@@ -112,9 +145,12 @@ internal static class GeneralTableDialogLayout {
 }
 
 internal sealed class GeneralInstallConfirmation : GeneralDialog {
-    internal GeneralInstallConfirmation(string destination, int queued, IReadOnlyList<string> downloads)
+    readonly CheckBox includeNsfw = new CheckBox { AutoSize = true, Name = "IncludeNsfw" };
+    internal bool IncludeNsfw { get { return includeNsfw.Checked; } }
+
+    internal GeneralInstallConfirmation(string destination, int queued, IReadOnlyList<string> downloads, int nsfwCount = 0)
         : base(GeneralStyle.T("Confirmar instalação", "Confirm installation")) {
-        ClientSize = new Size(660, downloads.Count == 0 ? 250 : 310 + Math.Min(6, downloads.Count - 1) * 34);
+        ClientSize = new Size(660, (downloads.Count == 0 ? 250 : 310 + Math.Min(6, downloads.Count - 1) * 34) + (nsfwCount > 0 ? 42 : 0));
         var layout = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(20, 8, 20, 20)
         };
@@ -167,6 +203,17 @@ internal sealed class GeneralInstallConfirmation : GeneralDialog {
             layout.Controls.Add(surface, 0, 2);
         }
 
+        if (nsfwCount > 0) {
+            layout.RowCount = 5;
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            includeNsfw.Text = String.Format(GeneralStyle.T(
+                "Incluir conteúdo NSFW (18+) nesta fila ({0} item(ns))",
+                "Include NSFW content (18+) in this queue ({0} item(s))"), nsfwCount);
+            includeNsfw.Font = GeneralStyle.Font(11);
+            includeNsfw.Margin = new Padding(0, 12, 0, 0);
+            layout.Controls.Add(includeNsfw, 0, 3);
+        }
+
         var actions = GeneralTableDialogLayout.Commands();
         var proceed = GeneralStyle.Button(GeneralStyle.T("Continuar", "Continue"), () => Complete(DialogResult.OK), true);
         proceed.Name = "ConfirmPendingInstall";
@@ -174,7 +221,7 @@ internal sealed class GeneralInstallConfirmation : GeneralDialog {
         cancel.Name = "CancelPendingInstall";
         actions.Controls.Add(proceed);
         actions.Controls.Add(cancel);
-        layout.Controls.Add(actions, 0, 3);
+        layout.Controls.Add(actions, 0, nsfwCount > 0 ? 4 : 3);
         Content.Controls.Add(layout);
         AcceptButton = proceed;
         CancelButton = cancel;

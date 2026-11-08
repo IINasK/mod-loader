@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -408,10 +408,12 @@ internal sealed partial class GeneralModWindow : Form {
             bool existing=state.List.Mods.Contains(item);var selected=Selected(item);
             string info=T("Destino: ","Destination: ")+(state.Destination??T("Escolha uma pasta na tela principal.","Choose a folder on the main screen."));
             var recipe=catalog.Packages.FirstOrDefault(m=>m.Id==selected.CyberpunkId);if(recipe!=null)info=T("Versão do pacote: ","Package version: ")+recipe.Version+"   ·   "+info;
-            using(var dialog=new GeneralModEditor(item,PresetCategories(),selected.Id,!working||current!=null,info,LookupSourceInfo)){
+            using(var dialog=new GeneralModEditor(item,PresetCategories(),selected.Id,!working||current!=null,info,LookupSourceInfo,working?null:state.List.Mods)){
                 if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+                if(working)dialog.Result.AlternativeGroup=item.AlternativeGroup;
+                else GeneralModLibrary.AssociateAlternative(dialog.Result,dialog.LinkedAlternative);
                 ApplyEdited(item,dialog.Result,dialog.SelectedVariant,existing);DrawRows();
-                if(dialog.InstallRequested)Enqueue(new[]{MakeWork(dialog.Result)},true);else if(!working)await Scan();
+                if(dialog.InstallRequested)ConfirmUrgentInstall(dialog.Result);else if(!working)await Scan();
             }
         }catch(Exception ex){ShowError(ex);}
     }
@@ -453,11 +455,11 @@ internal sealed partial class GeneralModWindow : Form {
                     if(editor.AttachRequested){
                         if(!Object.ReferenceEquals(current,target)||!waiting)return;
                         var meta=editor.Result;
-                        var updated=new GeneralModEntry{Id=target.Entry.Id,Name=meta.Name,Category=meta.Category,Description=meta.Description,Tags=meta.Tags,Nsfw=meta.Nsfw,DefaultVariant=target.Entry.DefaultVariant,Variants=target.Entry.Variants};
+                        var updated=new GeneralModEntry{Id=target.Entry.Id,Name=meta.Name,Category=meta.Category,Description=meta.Description,Tags=meta.Tags,Nsfw=meta.Nsfw,AlternativeGroup=target.Entry.AlternativeGroup,DefaultVariant=target.Entry.DefaultVariant,Variants=target.Entry.Variants};
                         ApplyEdited(target.Entry,updated,target.Variant.Id,true);target.Entry=updated;association=source;
                     }else{
                         ApplyEdited(added,editor.Result,editor.SelectedVariant,false);
-                        if(editor.InstallRequested)Enqueue(new[]{MakeWork(editor.Result)},true);
+                        if(editor.InstallRequested)ConfirmUrgentInstall(editor.Result);
                     }
                 }}finally{editingAttachment=false;}
                 return;

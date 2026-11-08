@@ -4,8 +4,8 @@
 
 ## Perfis Phantom Liberty
 
-- Com Phantom Liberty, 156 registros e 153 visíveis. Três componentes continuam retidos.
-- Sem Phantom Liberty, 144 registros elegíveis e 141 visíveis. Ver a classificação atual emmods.json. Night City FPV foi retirado de todos os pacotes em1.1.3.
+- Com Phantom Liberty, 158 registros e 155 visíveis. Três componentes continuam retidos.
+- Sem Phantom Liberty, 146 registros elegíveis e 143 visíveis. Ver a classificação atual emmods.json. Night City FPV foi retirado de todos os pacotes em1.1.3.
 - A base NightCoop nao exige DLC segundo aFAQoficial; o anfitriao pode reiniciar sem a expansao pelo fluxo oferecido pelo proprio mod. Nao apagar arquivos de expansao nem converter saves automaticamente.
 - Esta separacao e documental/estatica. Nao foi executado um jogo semDLC para validar aparencia, gameplay ou rede. Confirmacoescoop anteriores do usuario continuam atribuidas a ele.
 
@@ -22,6 +22,11 @@
 | [Maneo Retro Wrist Watch (FemV)](Mods/mod-22565.md) | [Yusei’s Virtual Atelier](Mods/mod-16645.md) | Incluído |
 | [NetWatch Cyberware and Accessories](Mods/mod-37005.md) | [MRTH Atelier · NetWatch Collection](Mods/mod-37000.md) | Incluído |
 | [OneSlowZZ · MMM Watchya Saaay](Mods/mod-8594.md) | [OneSlowZZ Virtual Store](Mods/mod-8572.md) | Pendente |
+
+## Cibernética
+
+- [Cyberware-EX](Mods/mod-9429.md)
+- [More Cyberware Slots](Mods/mod-36802.md)
 
 ## Consulta
 

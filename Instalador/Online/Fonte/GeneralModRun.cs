@@ -215,6 +215,12 @@ internal sealed partial class GeneralModWindow {
             if(jobs.Count==0){var item=FocusedEntry();if(item!=null)jobs.Add(MakeWork(item));}
             if(jobs.Count==0){detail.Text=T("Selecione um mod na lista.","Select a mod from the list.");return;}
             string root=Root();
+            jobs=ChooseAlternatives(jobs,entries=>{
+                using(var dialog=new GeneralModAlternativeDialog(entries))
+                    return dialog.ShowDialog(this)==DialogResult.OK?dialog.SelectedId:null;
+            });
+            if(jobs==null||jobs.Count==0){detail.Text=T("Nenhum mod foi colocado na fila.","No mods were queued.");return;}
+
             var pending=new List<Work>();
             List<string> downloads;
             scanning=true;Busy(true);next.Visible=false;
@@ -226,12 +232,22 @@ internal sealed partial class GeneralModWindow {
                 detail.Text=T("Os mods selecionados já estão instalados.","The selected mods are already installed.");
                 return;
             }
-            using(var dialog=new GeneralInstallConfirmation(root,pending.Count,downloads))
-                if(dialog.ShowDialog(this)==DialogResult.OK)Enqueue(pending,false);
-                else detail.Text=T("Instalação cancelada.","Installation canceled.");
+            ConfirmAndEnqueue(pending,root,downloads,false);
         }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
     }
 
+    static List<Work> ChooseAlternatives(List<Work> jobs,Func<IReadOnlyList<GeneralModEntry>,string> choose){
+        var excluded=new HashSet<string>(StringComparer.Ordinal);
+        foreach(var group in jobs.Where(work=>work.Entry.AlternativeGroup!=null).GroupBy(work=>work.Entry.AlternativeGroup)){
+            var entries=group.Select(work=>work.Entry).ToList();
+            if(entries.Count<2)continue;
+            string selected=choose(entries);
+            if(selected==null)return null;
+            if(selected.Length!=0&&!entries.Any(entry=>entry.Id==selected))throw new IOException("Alternativa inválida.");
+            foreach(var entry in entries.Where(entry=>entry.Id!=selected))excluded.Add(entry.Id);
+        }
+        return jobs.Where(work=>!excluded.Contains(work.Entry.Id)).ToList();
+    }
     List<string> PlanSelected(List<Work> selected,string root,List<Work> pending){
         var reads=new ScanReads(this,root);
         var known=new Dictionary<string,FixedMod>();
@@ -299,6 +315,35 @@ internal sealed partial class GeneralModWindow {
         return work.Variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts.TryGetValue(work.Key,out receipt)&&
             Snapshot(root).Status(receipt,work.Key)==GeneralModInstaller.Installed;
     }
+    void ConfirmAndEnqueue(List<Work> jobs,string root,IReadOnlyList<string> downloads,bool urgent){
+        int nsfwCount=jobs.Count(work=>work.Entry.Nsfw);
+        if(!urgent||nsfwCount>0){
+            using(var dialog=new GeneralInstallConfirmation(root,jobs.Count,downloads,nsfwCount)){
+                if(dialog.ShowDialog(this)!=DialogResult.OK){
+                    detail.Text=T("Instalação cancelada.","Installation canceled.");
+                    return;
+                }
+                if(!dialog.IncludeNsfw)jobs=jobs.Where(work=>!work.Entry.Nsfw).ToList();
+            }
+        }
+        if(jobs.Count==0){
+            detail.Text=T("Conteúdo NSFW pulado.","NSFW content skipped.");
+            return;
+        }
+        if(IsCyberpunk(root)&&jobs.Any(work=>GeneralModLibrary.IsHystBody(work.Entry.Id)))
+            jobs.RemoveAll(work=>work.Variant.CyberpunkId=="mod-7049");
+        Enqueue(jobs,urgent);
+    }
+
+    void ConfirmUrgentInstall(GeneralModEntry entry){
+        if(entry.AlternativeGroup!=null&&normal.Concat(priority).Concat(new[]{current,priorityCurrent}).Any(work=>
+            work!=null&&work.Entry.Id!=entry.Id&&work.Entry.AlternativeGroup==entry.AlternativeGroup)){
+            detail.Text=T("Outra alternativa deste grupo já está na fila.","Another alternative from this group is already queued.");
+            return;
+        }
+        ConfirmAndEnqueue(new List<Work>{MakeWork(entry)},Root(),new string[0],true);
+    }
+
     async void Enqueue(IEnumerable<Work> jobs,bool urgent){
         if(scanning)return;
         string root;try{root=Root();}catch(Exception ex){detail.Text=ex.Message;return;}
@@ -328,6 +373,14 @@ internal sealed partial class GeneralModWindow {
             OnlineDiagnostics.Record("general.install.begin",work.Entry.Id,"Iniciando item da fila.",new{Variant=work.Variant.Id});
             if(SnapshotInstalled(work,root)){RowStatus(work,"Instalado",100);return;}
             if(work.Variant.Sources.Any(GeneralModDownload.IsInstalledSource))throw new IOException(T("Este mod veio de um pacote instalado. Para reparar, receba um novo pacote do remetente.","This mod came from an installed pack. Receive a new pack from the sender to repair it."));
+            var otherAlternatives=work.Entry.AlternativeGroup==null?new Work[0]:state.List.Mods
+                .Where(entry=>entry.Id!=work.Entry.Id&&entry.AlternativeGroup==work.Entry.AlternativeGroup)
+                .SelectMany(entry=>entry.Variants.Select(variant=>new Work{Entry=entry,Variant=variant})).ToArray();
+            if(otherAlternatives.Length!=0){
+                var conflict=await Task.Run(()=>otherAlternatives.FirstOrDefault(other=>GeneralStatusPresentation.Kind(Status(other,root))=="installed"));
+                if(conflict!=null)throw new IOException(T("Remova a alternativa instalada antes de trocar: ","Remove the installed alternative before switching: ")+conflict.Entry.Name);
+            }
+            CheckHystBody(work,root);
             if(work.Variant.CyberpunkId!=null)await InstallKnown(work,root);
             else await InstallGeneral(work,root);
             var final=await Task.Run(()=>Status(work,root));
@@ -346,6 +399,19 @@ internal sealed partial class GeneralModWindow {
             }
         }
         finally{RefreshStorageSize();work.Ended=true;operationFinished++;UpdateFlow(null,"");skipRequests.Remove(work);Stage(work,"work.end");}
+    }
+    static void CheckHystBody(Work work,string root){
+        bool ebb=work.Entry.Id=="hyst-ebb-rb",pushUp=work.Entry.Id=="hyst-ebbp-rb";
+        bool vanillaFeet=work.Variant.CyberpunkId=="mod-7049";
+        if((!ebb&&!pushUp&&!vanillaFeet)||!IsCyberpunk(root))return;
+        const string baseBody="archive/pc/mod/EBBRB.xl",pushBody="archive/pc/mod/EBBPRB.xl";
+        const string feet="archive/pc/mod/Vanilla_ArchiveXL_FeetComponentsFV.archive";
+        var paths=vanillaFeet?new[]{baseBody,pushBody}:new[]{ebb?pushBody:baseBody,feet};
+        if(paths.Any(path=>File.Exists(Safe.In(root,path))))
+            throw new IOException(T("Outra versão de corpo ou o Togglable Feet do corpo padrão está ativo. Remova o conflito antes de instalar.",
+                "Another body version or vanilla Togglable Feet is active. Remove the conflict before installing."));
+        if(!vanillaFeet&&work.Variant.Id=="with-refit-dlc"&&!GameEdition.HasPL(root))
+            throw new IOException(T("Esta variante de roupa requer Phantom Liberty.","This clothing variant requires Phantom Liberty."));
     }
     Func<ModVersionDifference,bool> testVersionChoice;
     bool ChooseVersion(ModVersionDifference difference){return testMode?(testVersionChoice!=null&&testVersionChoice(difference)):GeneralVersionChoiceDialog.Ask(this,difference);}
