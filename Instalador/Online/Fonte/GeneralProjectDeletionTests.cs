@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -38,7 +38,8 @@ internal sealed partial class GeneralModWindow {
         var retry=store.Create("Interrompido",new GeneralModList(),"light","pt",game);var retryInstaller=new GeneralModInstaller(game,Path.Combine(store.DataPath(retry),"Instalacoes"));
         retryInstaller.Install(TestZip(root,"retry-a.zip","mods/retry-a.txt","a"),"a",null);retryInstaller.Install(TestZip(root,"retry-b.zip","mods/retry-b.txt","b"),"b",null);
         var retryEngine=new GeneralProjectDeletion(store,catalog,true);var retryPlan=retryEngine.Plan(retry);
-        refuse(()=>retryEngine.Apply(retryPlan,null,1),"Interrupted permanent deletion reports failure instead of pretending it completed.");
+        try { retryEngine.Apply(retryPlan,null,1); throw new InvalidOperationException("Expected deletion interruption."); }
+        catch(IOException ex) { check(ex.Message=="Interrupção de teste após exclusão.","Unexpected deletion failure: "+ex); }
         check(store.Read().Projects.Any(item=>item.Id==retry.Id)&&!File.Exists(Safe.In(game,"mods/retry-a.txt"))&&File.Exists(Safe.In(game,"mods/retry-b.txt")),"Partial failure leaves the project listed and preserves pending files for review.");
         retryPlan=retryEngine.Plan(retry);check(retryPlan.Missing==1&&retryPlan.Remove.Count==1,"Retry rebuilds a fresh preview and recognizes files already erased.");retryEngine.Apply(retryPlan);
         check(!store.Read().Projects.Any(item=>item.Id==retry.Id)&&!File.Exists(Safe.In(game,"mods/retry-b.txt")),"Retry completes without restoring or duplicating already erased files.");

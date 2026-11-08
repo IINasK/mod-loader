@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -28,19 +28,22 @@ internal sealed class GeneralProjectDeletion {
     internal ProjectDeletePlan Plan(GeneralProject project){approved=Inspect(project);return approved;}
     ProjectDeletePlan Inspect(GeneralProject project){
         if(project==null||project.TemplateId!=null)throw new IOException("O projeto padrão não pode ser excluído.");
-        var state=store.Load(project);var result=new ProjectDeletePlan{Project=project,Data=store.DataPath(project)};
+        var index=store.Read();
+        var proof=new List<string>{store.IndexFingerprint()};
+        var result=new ProjectDeletePlan{Project=project,Data=store.DataPath(project)};
+        var state=LoadForProof(project,result.Data,proof);
         if(String.IsNullOrWhiteSpace(state.Destination)){
             if(state.List.Mods.Count>0)throw new IOException("O projeto não tem destino de instalação. Você ainda pode escolher excluir somente do app.");
-            result.Proof=Safe.Json.Serialize(store.Read());return result;
+            result.Proof=String.Join("/",proof);return result;
         }
         result.Root=Path.GetFullPath(state.Destination).TrimEnd('\\');Safe.NoLinks(result.Root);
         if(result.Root.Length<=3||result.Root.StartsWith(@"\\"))throw new IOException("Escolha um destino local específico para remover mods.");
         if(!Directory.Exists(result.Root))throw new IOException("O destino de instalação está ausente. Use excluir somente do app se quiser manter os arquivos.");
         Closed(result.Root);
-        var proof=new List<string>{Safe.Json.Serialize(store.Read()),Safe.Json.Serialize(state)};
+
         var shared=new HashSet<string>(StringComparer.OrdinalIgnoreCase);result.Peers.Add(result.Data);
-        foreach(var peer in store.Read().Projects.Where(item=>item.Id!=project.Id)){
-            var other=store.Load(peer);proof.Add(Safe.Json.Serialize(other));
+        foreach(var peer in index.Projects.Where(item=>item.Id!=project.Id)){
+            var other=LoadForProof(peer,store.DataPath(peer),proof);
             if(String.IsNullOrWhiteSpace(other.Destination)||!String.Equals(Path.GetFullPath(other.Destination).TrimEnd('\\'),result.Root,StringComparison.OrdinalIgnoreCase))continue;
             string data=store.DataPath(peer);result.Peers.Add(data);
             foreach(var file in Files(other,data,result.Root))shared.Add(Normalize(result.Root,file).Path);
@@ -60,8 +63,19 @@ internal sealed class GeneralProjectDeletion {
             if(file.Reason==null)result.Remove.Add(file);else result.Preserve.Add(file);
         }
         result.Remove.Sort((a,b)=>StringComparer.OrdinalIgnoreCase.Compare(a.Path,b.Path));result.Preserve.Sort((a,b)=>StringComparer.OrdinalIgnoreCase.Compare(a.Path,b.Path));
-        result.Proof=Safe.Json.Serialize(proof);return result;
+        if(proof[0]!=store.IndexFingerprint())throw new IOException("O índice de projetos mudou durante a conferência.");
+        result.Proof=String.Join("/",proof);return result;
     }
+    GeneralModState LoadForProof(GeneralProject project,string data,List<string> proof){
+        string path=Safe.In(data,"lista.json");
+        Safe.NoLinks(path);
+        string before=Safe.Hash(path);
+        var state=store.Load(project);
+        if(before!=Safe.Hash(path))throw new IOException("O projeto mudou durante a conferência: "+project.Name);
+        proof.Add(before);
+        return state;
+    }
+
     internal IEnumerable<ProjectDeleteFile> Files(GeneralModState state,string data,string root){
         foreach(var file in new GeneralModInstaller(root,Path.Combine(data,"Instalacoes")).ProjectDeletionFiles())yield return file;
         foreach(var file in new InstalledSnapshotInstaller(root,data,catalog).ProjectDeletionFiles())yield return file;
@@ -93,7 +107,7 @@ internal sealed class GeneralProjectDeletion {
                 foreach(string data in plan.Peers.OrderBy(value=>value,StringComparer.OrdinalIgnoreCase))leases.Add(new GeneralModInstaller(plan.Root,Path.Combine(data,"Instalacoes")).ProjectDeletionLock());
             }
             var fresh=Inspect(plan.Project);
-            if(fresh.Proof!=plan.Proof||Signature(fresh)!=Signature(plan))throw new IOException("O projeto ou os arquivos mudaram após a conferência. Revise novamente; nada foi apagado nesta tentativa.");
+            if(fresh.Proof!=plan.Proof||!SameFiles(fresh,plan))throw new IOException("O projeto ou os arquivos mudaram após a conferência. Revise novamente; nada foi apagado nesta tentativa.");
             foreach(var file in plan.Remove){string path=Safe.In(plan.Root,file.Path);if(!Matches(path,file))throw new IOException("Arquivo mudou antes da exclusão: "+file.Path);}
             string journal=Safe.In(plan.Data,"exclusao-permanente-"+Guid.NewGuid().ToString("N")+".json");
             var removed=new List<string>();
@@ -115,7 +129,11 @@ internal sealed class GeneralProjectDeletion {
             }
         }finally{foreach(var lease in leases.AsEnumerable().Reverse())lease.Dispose();}
     }
-    static string Signature(ProjectDeletePlan plan){return Safe.Json.Serialize(new{Remove=plan.Remove.Select(file=>new{file.Path,file.Hash,file.Size}),Preserve=plan.Preserve.Select(file=>new{file.Path,file.Reason}),plan.Missing});}
+    static bool SameFiles(ProjectDeletePlan left,ProjectDeletePlan right){
+        return left.Missing==right.Missing&&
+            left.Remove.Select(file=>Tuple.Create(file.Path,file.Hash,file.Size)).SequenceEqual(right.Remove.Select(file=>Tuple.Create(file.Path,file.Hash,file.Size)))&&
+            left.Preserve.Select(file=>Tuple.Create(file.Path,file.Reason)).SequenceEqual(right.Preserve.Select(file=>Tuple.Create(file.Path,file.Reason)));
+    }
     static ProjectDeleteFile Normalize(string root,ProjectDeleteFile file){file.Path=Safe.In(root,file.Path).Substring(root.Length+1).Replace('\\','/');return file;}
     static bool Matches(string path,ProjectDeleteFile file){Safe.NoLinks(path);return File.Exists(path)&&new FileInfo(path).Length==file.Size&&Safe.Hash(path)==file.Hash;}
     void Closed(string root){

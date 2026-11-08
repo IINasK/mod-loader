@@ -30,6 +30,13 @@ internal sealed class GeneralProjectStore {
         Safe.NoLinks(Root);
     }
 
+    internal string IndexFingerprint() {
+        lock (gate) {
+            Safe.NoLinks(IndexPath);
+            return File.Exists(IndexPath) ? Safe.Hash(IndexPath) : "";
+        }
+    }
+
     internal GeneralProjectIndex Read(bool inspection=false) {
         lock (gate) {
             Safe.NoLinks(IndexPath);
