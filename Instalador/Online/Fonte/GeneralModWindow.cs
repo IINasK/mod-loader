@@ -416,6 +416,8 @@ internal sealed partial class GeneralModWindow : Form {
             bool existing=state.List.Mods.Contains(item);var selected=Selected(item);
             string info=T("Destino: ","Destination: ")+(state.Destination??T("Escolha uma pasta na tela principal.","Choose a folder on the main screen."));
             var recipe=catalog.Packages.FirstOrDefault(m=>m.Id==selected.CyberpunkId);if(recipe!=null)info=T("Versão do pacote: ","Package version: ")+recipe.Version+"   ·   "+info;
+            string pack=ActivePreset!=null?ActivePreset.Name:project==null?null:project.Name;
+            if(!String.IsNullOrWhiteSpace(pack))info=T("Pacote: ","Pack: ")+pack+"   ·   "+info;
             using(var dialog=new GeneralModEditor(item,PresetCategories(),selected.Id,!working||current!=null,info,LookupSourceInfo,working?null:state.List.Mods)){
                 DialogResult answer;
                 while((answer=dialog.ShowDialog(this))==DialogResult.Retry){

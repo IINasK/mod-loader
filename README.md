@@ -62,6 +62,12 @@ Cada envio à `main` aciona a publicação estável em [GitHub Actions](https://
 
 Para empacotar localmente, use o SDK .NET 8 e o vpk 1.2.161. Restaure as dependências de `Instalador/Setup/Velopack.Dependencies.csproj` com `dotnet restore --packages` e passe essa pasta em `-NuGetPackages` para `Instalador/Setup/compilar-velopack.ps1`. Aponte `-Vpk` para o executável do vpk.
 
+## Metadados do Nexus no cadastro
+
+Cole o endereço da tela de download da versão escolhida, com `file_id`. O endereço geral do mod também é aceito e o editor informa como escolher um arquivo. O cadastro mostra a versão, o nome e o tamanho quando confirmados para aquele ID. O catálogo do projeto fornece dados dos arquivos fixados.
+
+A integração com a API oficial está em teste. Para habilitar as consultas públicas de nome, tags e classificação adulta, inicie o aplicativo com `MOD_LOADER_NEXUS_API_TEST=1` no ambiente do processo. Para testar também a versão e o nome do arquivo selecionado, defina `MOD_LOADER_NEXUS_API_KEY` no mesmo processo com uma chave pessoal de teste. A chave fica fora dos projetos, do cache e das exportações. O Nexus solicita o registro do aplicativo para disponibilizar a integração aos usuários. [Política de uso da API](https://help.nexusmods.com/article/114-api-acceptable-use-policy).
+
 ## Compilar
 
 A logo original está em `Instalador/Online/Fonte/Assets/ModLoader.svg`. `preparar-logo.ps1` gera o ícone do Windows diretamente desse vetor, sem ferramentas ou downloads adicionais. O mesmo SVG é desenhado no cabeçalho do aplicativo.

@@ -9,7 +9,12 @@ using System.Windows.Forms;
 internal sealed partial class GeneralModEditor : GeneralDialog {
     readonly TextBox modName = new TextBox { Dock = DockStyle.Fill, MaxLength = 300 };
     readonly GeneralPicker category = new GeneralPicker { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDown, MaxLength = 120 };
-    readonly TextBox tags = new TextBox { Dock = DockStyle.Fill, MaxLength = 2015 };
+    readonly TextBox tags = new TextBox { Name = "TagInput", Dock = DockStyle.Fill, MaxLength = 60 };
+    readonly FlowLayoutPanel tagChips = new FlowLayoutPanel {
+        Name = "TagChips", Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+        Margin = new Padding(3, 0, 3, 3), Visible = false
+    };
+    readonly List<string> selectedTags = new List<string>();
     readonly TextBox description = new TextBox { Dock = DockStyle.Fill, Multiline = true, ScrollBars = ScrollBars.Vertical, MaxLength = 4000 };
     readonly CheckBox nsfw = new CheckBox { AutoSize = true };
     readonly CheckBox usePending = new CheckBox { AutoSize = true, Visible = false, Dock = DockStyle.Fill, UseMnemonic = false };
@@ -41,7 +46,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
     internal GeneralModEditor(GeneralModEntry entry, IEnumerable<string> categories, string selected, bool allowInstall, string installInfo,Func<string,Task<GeneralSourceInfo>> lookup=null, IEnumerable<GeneralModEntry> alternatives=null) {
         this.lookup=lookup;
         model = entry.Variants.Select(v => new GeneralModVariant {
-            Id = v.Id, Name = v.Name, Sources = v.Sources.ToList(), SourceInfo=v.SourceInfo==null?new Dictionary<string,GeneralSourceInfo>():v.SourceInfo.ToDictionary(pair=>pair.Key,pair=>new GeneralSourceInfo{Name=pair.Value.Name,FileName=pair.Value.FileName,Bytes=pair.Value.Bytes}), CyberpunkId = v.CyberpunkId, CyberpunkVariant = v.CyberpunkVariant
+            Id = v.Id, Name = v.Name, Sources = v.Sources.ToList(), SourceInfo=v.SourceInfo==null?new Dictionary<string,GeneralSourceInfo>():v.SourceInfo.ToDictionary(pair=>pair.Key,pair=>pair.Value.SavedCopy()), CyberpunkId = v.CyberpunkId, CyberpunkVariant = v.CyberpunkVariant
         }).ToList();
         if (model.Count == 0) model.Add(new GeneralModVariant { Id = Guid.NewGuid().ToString("N"), Name = T("Principal", "Default") });
         principal = model.Any(v => v.Id == entry.DefaultVariant) ? entry.DefaultVariant : model[0].Id;
@@ -68,7 +73,6 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         modName.Text = entry.Name;
         category.Items.AddRange(categories.Cast<object>().ToArray());
         category.Text = entry.Category ?? "";
-        tags.Text = String.Join(", ", entry.Tags ?? new List<string>());
         description.Text = entry.Description ?? "";
         nsfw.Checked = entry.Nsfw;
         nsfw.Text = T("NSFW · conteúdo adulto", "NSFW · adult content");
@@ -77,7 +81,19 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
 
         AddEditorRow(layout, EditorSection(T("Identificação", "Identification"), false));
         AddEditorRow(layout, EditorField(T("Nome do mod *", "Mod name *"), modName), EditorField(T("Categoria", "Category"), category));
-        AddEditorRow(layout, EditorField(T("Tags (separadas por vírgulas)", "Tags (comma separated)"), tags), nsfw);
+        AddEditorRow(layout, EditorField(T("Tags (Enter para adicionar)", "Tags (Enter to add)"), tags), nsfw);
+        AddEditorRow(layout, tagChips);
+        tagChips.SizeChanged += (s, e) => {
+            foreach (Control chip in tagChips.Controls) FitTagChip(chip);
+        };
+        tags.PreviewKeyDown += (s, e) => { if (e.KeyData == Keys.Enter) e.IsInputKey = true; };
+        tags.KeyDown += (s, e) => {
+            if (e.KeyData != Keys.Enter) return;
+            e.SuppressKeyPress = true;
+            string tag = tags.Text.Trim();
+            if (tag.Length == 0 || selectedTags.Contains(tag, StringComparer.OrdinalIgnoreCase) || AddTag(tag))
+                tags.Clear();
+        };
         AddEditorRow(layout, EditorField(T("Descrição", "Description"), description, 72));
 
         AddEditorRow(layout, EditorSection(T("Versões para download", "Download versions"), true));
@@ -195,6 +211,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
             field.TextChanged += (s, e) => ValidateInputs();
         GeneralStyle.Apply(this, GeneralStyle.Dark);
         RemoveFieldBorders(this);
+        MergeSourceTags(entry.Tags);
         RefreshVariants(selected);
         sources.TextChanged += (s, e) => ScheduleSourceInfo();
         sourceDelay.Tick += async (s, e) => { sourceDelay.Stop(); await UpdateSourceInfo(); };
@@ -268,7 +285,11 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         usePending.CheckedChanged+=(s,e)=>{
             var metadata=usePending.Checked?target:independent;
             modName.Text=metadata.Name;category.Text=metadata.Category??"";description.Text=metadata.Description??"";
-            tags.Text=String.Join(", ",metadata.Tags??new List<string>());nsfw.Checked=metadata.Nsfw;
+            foreach (Control chip in tagChips.Controls.Cast<Control>().ToArray()) chip.Dispose();
+            selectedTags.Clear();
+            tags.Clear();
+            MergeSourceTags(metadata.Tags);
+            nsfw.Checked=metadata.Nsfw;
             install.Text=usePending.Checked?T("Vincular e continuar","Attach and continue"):T("Instalar","Install");
         };
     }
@@ -306,6 +327,43 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         installNote.MaximumSize = validation.MaximumSize = usePending.MaximumSize = sourceInfo.MaximumSize = maximum;
     }
 
+    internal void MergeSourceTags(IEnumerable<string> incoming) {
+        tagChips.SuspendLayout();
+        try {
+            foreach (string tag in incoming ?? Enumerable.Empty<string>()) AddTag((tag ?? "").Trim());
+            tagChips.Visible = selectedTags.Count > 0;
+        } finally { tagChips.ResumeLayout(true); }
+        ValidateInputs();
+    }
+
+    bool AddTag(string tag) {
+        if (tag.Length == 0 || tag.Length > 60 || tag.Any(Char.IsControl) || selectedTags.Count >= 32 ||
+            selectedTags.Contains(tag, StringComparer.OrdinalIgnoreCase)) return false;
+
+        selectedTags.Add(tag);
+        var chip = new GeneralButton {
+            Text = tag + " ×", AccessibleName = T("Remover tag ", "Remove tag ") + tag, AutoSize = true,
+            MinimumSize = new Size(44, 30), Padding = new Padding(12, 0, 12, 0), Margin = new Padding(0, 0, 6, 4)
+        };
+        editorTips.SetToolTip(chip, chip.AccessibleName);
+        chip.Click += (s, e) => {
+            selectedTags.Remove(tag);
+            tags.Focus();
+            chip.Dispose();
+            tagChips.Visible = selectedTags.Count > 0;
+            ValidateInputs();
+        };
+        FitTagChip(chip);
+        tagChips.Controls.Add(chip);
+        tagChips.Visible = true;
+        return true;
+    }
+
+    void FitTagChip(Control chip) {
+        if (tagChips.ClientSize.Width > 0)
+            chip.MaximumSize = new Size(Math.Max(44, tagChips.ClientSize.Width - chip.Margin.Horizontal), 0);
+    }
+
     void SaveCurrent() {
         if (current == null || attachment) return;
         current.Name = variantName.Text.Trim();
@@ -337,7 +395,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         SaveCurrent();
         return new GeneralModEntry {
             Id = id, Name = modName.Text.Trim(), Category = category.Text.Trim(), Description = description.Text.Trim(),
-            Tags = tags.Text.Split(',').Select(tag => tag.Trim()).Where(tag => tag.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            Tags = selectedTags.Concat(new[] { tags.Text.Trim() }).Where(tag => tag.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             Nsfw = nsfw.Checked, DefaultVariant = principal, Variants = model
         };
     }

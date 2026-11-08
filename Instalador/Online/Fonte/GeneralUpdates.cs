@@ -14,7 +14,7 @@ internal sealed class GeneralUpdateRelease {
 }
 
 internal sealed class GeneralUpdateChecker {
-    internal const string CurrentVersion="1.1.50";
+    internal const string CurrentVersion="1.1.51";
     internal static readonly GeneralUpdateChecker Session=new GeneralUpdateChecker();
     internal const string Repository="IINasK/mod-loader";
     internal const string Endpoint="https://api.github.com/repos/"+Repository+"/releases/latest";

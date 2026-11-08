@@ -270,7 +270,7 @@ public sealed class GeneralModLibrary {
                     throw new IOException("Versão inválida ou repetida em " + mod.Name + ".");
                 variant.Name = RequiredText(variant.Name, 300, "Nome da versão");
                 if(variant.SourceInfo==null)variant.SourceInfo=new Dictionary<string,GeneralSourceInfo>();
-                if(variant.SourceInfo.Count>32||variant.SourceInfo.Any(pair=>!variant.Sources.Contains(pair.Key)||pair.Value==null||pair.Value.Bytes<0||pair.Value.Bytes>128L*1024*1024*1024||String.IsNullOrWhiteSpace(pair.Value.Name)||pair.Value.Name.Length>300||pair.Value.Name.Any(Char.IsControl)||(pair.Value.FileName??"").Length>300||(pair.Value.FileName??"").Any(Char.IsControl)))throw new IOException("Metadados de arquivo inválidos.");
+                if(variant.SourceInfo.Count>32||variant.SourceInfo.Any(pair=>!variant.Sources.Contains(pair.Key)||pair.Value==null||pair.Value.Bytes<0||pair.Value.Bytes>128L*1024*1024*1024||String.IsNullOrWhiteSpace(pair.Value.Name)||pair.Value.Name.Length>300||pair.Value.Name.Any(Char.IsControl)||(pair.Value.FileName??"").Length>300||(pair.Value.FileName??"").Any(Char.IsControl)||!ValidSourceVersion(pair.Value.Version)||!ValidSourceVersion(pair.Value.ModVersion)))throw new IOException("Metadados de arquivo inválidos.");
                 NormalizeSources(variant);
                 if (!trustRecipes) { variant.CyberpunkId = null; variant.CyberpunkVariant = null; }
             }
@@ -321,6 +321,7 @@ public sealed class GeneralModLibrary {
         }
     }
 
+    static bool ValidSourceVersion(string value){return value==null||(value.Length<=120&&!value.Any(Char.IsControl));}
     static string RequiredText(string value, int maxLength, string label) {
         if (String.IsNullOrWhiteSpace(value) || value.Length > maxLength || value.Any(Char.IsControl))
             throw new IOException(label + " inválido ou vazio.");

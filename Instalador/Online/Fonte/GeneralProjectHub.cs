@@ -9,11 +9,21 @@ internal sealed partial class GeneralModWindow {
     int storageGeneration;
     readonly Dictionary<string,GeneralSourceInfo> sourceMetadata=new Dictionary<string,GeneralSourceInfo>();
     async Task<GeneralSourceInfo> LookupSourceInfo(string source){
-        GeneralSourceInfo info;if(sourceMetadata.TryGetValue(source,out info))return info;
         var link=GeneralNexusLink.Parse(source);if(link==null)return null;
-        if(link.Game=="cyberpunk2077")foreach(var mod in catalog.Packages)foreach(var asset in mod.Assets)if(asset.ModId==link.Mod&&asset.FileId==link.File){info=new GeneralSourceInfo{Name=mod.Name,FileName=asset.Name,Bytes=asset.Size};sourceMetadata[source]=info;return info;}
-        if(testMode)return null;
-        info=await GeneralNexusInfo.Read(source);if(info!=null){if(sourceMetadata.Count>=128)sourceMetadata.Clear();sourceMetadata[source]=info;}return info;
+        GeneralSourceInfo info;if(sourceMetadata.TryGetValue(link.Url,out info))return info;
+        var pinned=link.Game=="cyberpunk2077"&&link.File>0?(
+            from mod in catalog.Packages
+            from asset in mod.Assets
+            where asset.ModId==link.Mod&&asset.FileId==link.File
+            select new GeneralSourceInfo{Name=mod.Name,FileName=asset.Name,Bytes=asset.Size,Version=mod.Version}
+        ).FirstOrDefault():null;
+        info=testMode?null:await GeneralNexusInfo.Read(source);
+        if(pinned!=null){
+            if(info!=null){pinned.Tags=info.Tags;pinned.Nsfw=info.Nsfw;pinned.ModVersion=info.ModVersion;pinned.NexusChecked=info.NexusChecked;}
+            info=pinned;
+        }
+        if(info!=null){if(sourceMetadata.Count>=128)sourceMetadata.Clear();sourceMetadata[link.Url]=info;}
+        return info;
     }
     bool storageReading,storageQueued;
     Dictionary<string,long> measuredMods=new Dictionary<string,long>(StringComparer.Ordinal);

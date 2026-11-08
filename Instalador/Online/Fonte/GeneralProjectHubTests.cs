@@ -17,11 +17,19 @@ internal sealed partial class GeneralModWindow {
         check(GeneralNexusLink.Parse("https://www.nexusmods.com/games/cyberpunk2077/mods/34305?file_id=169285").Url==exact,"Modern Nexus route normalizes to the same public file page.");
         check(GeneralNexusLink.Parse("https://www.nexusmods.com/cyberpunk2077/mods/34305").File==0,"A mod overview is accepted and identified as non-specific.");
         foreach(string bad in new[]{"https://www.nexusmods.com.evil.test/cyberpunk2077/mods/34305","https://user@www.nexusmods.com/cyberpunk2077/mods/34305","https://www.nexusmods.com/cyberpunk2077/mods/34305?token=secret","https://www.nexusmods.com/cyberpunk2077/mods/34305?file_id=0","https://www.nexusmods.com/cyberpunk2077/mods/34305?file_id=1&file_id=2"})check(GeneralNexusLink.Parse(bad)==null,"Unsafe or ambiguous metadata URL is rejected: "+bad.Split('?')[0]);
-        string html="<h1>Spot On Radio &amp; music</h1><mod-file-download filename=\"SpotOnRadio\" filesize-bytes=\"4317184\" file-id=\"169285\">";
-        var info=GeneralNexusInfo.Parse(html,link);check(info.Name=="Spot On Radio & music"&&info.FileName=="SpotOnRadio"&&info.Bytes==4317184,"Public title, published file label and exact byte count are read together.");
-        check(GeneralNexusInfo.Parse(html.Replace("169285","169286"),link).Bytes==0,"A different file ID cannot supply the selected file size.");
-        check(GeneralNexusInfo.Parse(html.Replace("4317184","9999999999999"),link).Bytes==0,"Implausible metadata size is ignored.");
-        check(GeneralNexusInfo.Parse("<h1>Just a moment...</h1>",link)==null,"Cloudflare challenge is not treated as a mod name.");
+        const string modJson=@"{""data"":{""game_scoped_id"":""34305"",""name"":""Radio fixture"",""adult_content"":true,""version"":""2.0"",""tags"":[{""name"":""Audio""},{""name"":""audio""},{""name"":""Gameplay""}]}}";
+        const string fileJson=@"{""file_id"":169285,""file_name"":""SpotOnRadio.zip"",""version"":""1.5"",""size_kb"":4216}";
+        var overviewInfo=GeneralNexusInfo.ParseMod(modJson,link);
+        check(overviewInfo.Name=="Radio fixture"&&overviewInfo.ModVersion=="2.0"&&overviewInfo.Version==null&&overviewInfo.Nsfw&&overviewInfo.Tags.SequenceEqual(new[]{"Audio","Gameplay"}),"Public Nexus metadata keeps the mod version, adult flag and distinct tags.");
+        var info=GeneralNexusInfo.ParseMod(modJson,link);
+        GeneralNexusInfo.ApplyFile(fileJson,link,info);
+        check(info.FileName=="SpotOnRadio.zip"&&info.Version=="1.5"&&info.Bytes==4317184&&info.SizeApproximate,"Selected file metadata stays distinct from the mod version and labels the reported KiB as approximate.");
+        GeneralNexusInfo.ApplyFile(fileJson.Replace("169285","169286"),link,overviewInfo);
+        check(overviewInfo.Version==null&&overviewInfo.Bytes==0,"A different file ID cannot supply the selected file version or size.");
+        GeneralNexusInfo.ApplyFile(fileJson.Replace("4216","9999999999999"),link,overviewInfo);
+        check(overviewInfo.Bytes==0,"Implausible file size is ignored.");
+        overviewInfo=GeneralNexusInfo.ParseMod(modJson,link);
+        check(GeneralNexusInfo.ParseMod(modJson.Replace("34305","34306"),link)==null&&GeneralNexusInfo.ParseMod("<h1>Just a moment...</h1>",link)==null,"A different mod ID and non-JSON responses cannot supply metadata.");
         var catalog=new FixedCatalog{Schema=1,Id="hub-fixture",GameVersion="2.5",GameFileVersion="2.5.0.0",Packages=new List<FixedMod>()};
         string game=Path.Combine(root,"game");Directory.CreateDirectory(game);File.WriteAllText(Safe.In(game,".fixture-only"),"fixture");
         string zip=TestZip(root,"local.zip","mods/known.txt","known");
@@ -64,20 +72,33 @@ internal sealed partial class GeneralModWindow {
             var choices=AllControls(panel).OfType<ListBox>().Single(box=>box.Name=="ProjectChoices");check(choices.Items.Cast<string>().SequenceEqual(new[]{"Empty","Second","First"}),"Saved custom projects appear before the built-in project.");
             check(AllControls(panel).OfType<Button>().Any(button=>button.Name=="Projectnew")&&AllControls(panel).OfType<Button>().Any(button=>button.Name=="Projectimport"),"The compact panel offers create and import project.");
             await Task.Delay(60);check(AllControls(panel).OfType<Button>().Where(button=>button.Name=="Projectnew"||button.Name=="Projectimport").All(button=>button.Height==44&&button.Bottom<=button.Parent.Height),"Compact project actions fit their layout without clipping.");check(choices.ClientSize.Width>450,"Project choices use the panel width rather than a native control default.");CaptureUi(panel,Path.Combine(root,"projects-panel.png"));form.projectsButton.PerformClick();Application.DoEvents();check(form.menus.Current==null,"Clicking Projects a second time closes the panel.");
-            using(var editor=new GeneralModEditor(NewEntry("",exact),new string[0],"default",true,"",source=>Task.FromResult(info))){
+            using(var editor=new GeneralModEditor(NewEntry("",exact),new string[0],"default",true,"",source=>Task.FromResult(GeneralNexusLink.Parse(source).File>0?info:overviewInfo))){
                 editor.Show(form);await Until(()=>EditorField<TextBox>(editor,"modName").Text==info.Name);
-                check(EditorField<Label>(editor,"sourceInfo").Text.Contains(info.Bytes.ToString("N0")),"The editor displays the downloaded file byte count.");
+                string fileDetails=EditorField<Label>(editor,"sourceInfo").Text;
+                check(fileDetails.Contains(GeneralStyle.T("Aprox. ","About ")+GeneralStorageSize.Format(info.Bytes))&&fileDetails.Contains(GeneralStyle.T("Versão do arquivo: ","File version: ")+"1.5")&&!fileDetails.Contains("2.0"),"The exact link displays the chosen version and indicates when file size is approximate.");
+                var tags=EditorField<TextBox>(editor,"tags");
+                var chips=EditorField<FlowLayoutPanel>(editor,"tagChips");
+                check(EditorField<CheckBox>(editor,"nsfw").Checked&&chips.Controls.OfType<Button>().Count()==2,"Nexus adult status and tags populate the mod editor.");
+                tags.Text="Custom tag";
+                typeof(TextBox).GetMethod("OnKeyDown",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(tags,new object[]{new KeyEventArgs(Keys.Enter)});
+                check(tags.Text==""&&editor.Result==null&&chips.Controls.OfType<Button>().Any(button=>button.Text=="Custom tag ×"),"Enter adds a removable tag without saving or closing the editor.");
                 EditorField<TextBox>(editor,"modName").Text="My custom name";
                 EditorField<TextBox>(editor,"sources").Text="https://www.nexusmods.com/cyberpunk2077/mods/34305";
                 await Task.Delay(800);check(EditorField<TextBox>(editor,"modName").Text=="My custom name","Metadata refresh preserves a user-entered name.");
                 check(EditorField<Label>(editor,"sourceInfo").Text.Contains("Slow download")&&EditorField<Button>(editor,"save").Enabled&&EditorField<Label>(editor,"sourceInfo").RectangleToScreen(EditorField<Label>(editor,"sourceInfo").ClientRectangle).Bottom<=editor.RectangleToScreen(editor.ClientRectangle).Bottom,"Overview page shows simple advice without blocking save.");
                 editor.ClientSize=new Size(700,710);editor.PerformLayout();Application.DoEvents();await Task.Delay(40);check(EditorField<TextBox>(editor,"sources").Height>=80&&EditorField<Button>(editor,"save").RectangleToScreen(EditorField<Button>(editor,"save").ClientRectangle).Bottom<=editor.RectangleToScreen(editor.ClientRectangle).Bottom,"Source editor stays usable at minimum size with fixed action buttons and a scrollable body.");CaptureUi(editor,Path.Combine(root,"source-overview-warning.png"));
+                chips.Controls.OfType<Button>().Single(button=>button.Text=="Audio ×").PerformClick();
                 EditorField<Button>(editor,"save").PerformClick();var library=new GeneralModLibrary(Path.Combine(root,"saved.json"));library.Save(new GeneralModState{List=new GeneralModList{Mods=new List<GeneralModEntry>{editor.Result}}});
-                var loaded=library.Load().List.Mods.Single();check(loaded.Name=="My custom name"&&loaded.Variants[0].SourceInfo.Count==1,"Metadata and custom name survive save and reopen.");
+                var loaded=library.Load().List.Mods.Single();
+                check(loaded.Name=="My custom name"&&loaded.Nsfw&&loaded.Tags.SequenceEqual(new[]{"Gameplay","Custom tag"})&&loaded.Variants[0].SourceInfo.Values.Single().ModVersion=="2.0","Metadata, custom name and edited tags survive save and reopen.");
+                using(var reopened=new GeneralModEditor(loaded,new string[0],"default",true,"",source=>Task.FromResult(overviewInfo))){
+                    reopened.Show(form);await Task.Delay(800);
+                    check(!EditorField<FlowLayoutPanel>(reopened,"tagChips").Controls.OfType<Button>().Any(button=>button.Text=="Audio ×"),"A removed Nexus tag is not reapplied when reopening the saved item.");
+                }
             }
             var pending=new TaskCompletionSource<GeneralSourceInfo>();using(var editor=new GeneralModEditor(NewEntry("",exact),new string[0],"default",true,"",source=>pending.Task)){
                 editor.Show(form);await Task.Delay(800);EditorField<TextBox>(editor,"sources").Text="https://example.com/other.zip";pending.SetResult(info);await Task.Delay(40);
-                check(EditorField<TextBox>(editor,"modName").Text=="","A late lookup cannot fill a name after the source changed.");editor.Close();
+                check(EditorField<TextBox>(editor,"modName").Text==""&&!EditorField<CheckBox>(editor,"nsfw").Checked&&EditorField<FlowLayoutPanel>(editor,"tagChips").Controls.Count==0,"A late lookup cannot apply a name, adult flag or tags after the source changed.");editor.Close();
             }
             using(var editor=new GeneralModEditor(NewEntry("",exact),new string[0],"default",true,"",source=>Task.FromException<GeneralSourceInfo>(new IOException("Unavailable")))){
                 editor.Show(form);await Task.Delay(800);EditorField<TextBox>(editor,"modName").Text="Manual";check(EditorField<Button>(editor,"save").Enabled,"Unavailable Nexus metadata leaves manual editing usable.");editor.Close();

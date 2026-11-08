@@ -2,6 +2,12 @@
 
 Índice interno de componentes do instalador. Revisão de 07/11/2026; fontes primarias e pacotes fixados. Metadados e fichas, sem arquivos de mods, saves, logs ou credenciais.
 
+## Fichas para novos links
+
+Cada link novo recebe uma ficha curta em `Conhecimento/Mods` ou `Conhecimento/Candidatos`. Consulte a ficha existente antes de criar outra para o mesmo mod. Registre o que ele faz, como usar, a fonte oficial, a versão e o arquivo escolhidos quando confirmados, os requisitos obrigatórios e opcionais conhecidos e o que foi testado. Diferencie compatibilidade declarada pelo autor de compatibilidade reproduzida no jogo. Atualize o índice quando um candidato entrar no catálogo.
+
+O resumo da ficha é editorial. Os campos automáticos do Mod Loader identificam a página e o arquivo pelos respectivos IDs. Eles têm origem no catálogo conferido ou na API do Nexus e podem ficar vazios quando a fonte não fornece os dados.
+
 ## Perfis Phantom Liberty
 
 - Com Phantom Liberty, 158 registros e 155 visíveis. Três componentes continuam retidos.
