@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -16,7 +16,7 @@ public static class ModAuditTests {
         return new ModImportItem{Name=name,Kind="Arquivo",Source=path,Size=new FileInfo(path).Length,Sha256=Safe.Hash(path)};
     }
     static string Snapshot(string root){return String.Join("\n",Directory.GetFiles(root,"*",SearchOption.AllDirectories).OrderBy(p=>p).Select(p=>p+" "+Safe.Hash(p)));}
-    static string Canonical(object value){var map=value as IDictionary<string,object>;if(map!=null)return "{"+String.Join(",",map.Keys.OrderBy(k=>k,StringComparer.Ordinal).Select(k=>Safe.Json.Serialize(k)+":"+Canonical(map[k])))+"}";var array=value as object[];return array==null?Safe.Json.Serialize(value):"["+String.Join(",",array.Select(Canonical))+"]";}
+    internal static string Canonical(object value){var map=value as IDictionary<string,object>;if(map!=null)return "{"+String.Join(",",map.Keys.OrderBy(k=>k,StringComparer.Ordinal).Select(k=>Safe.Json.Serialize(k)+":"+Canonical(map[k])))+"}";var array=value as object[];return array==null?Safe.Json.Serialize(value):"["+String.Join(",",array.Select(Canonical))+"]";}
     static string Identity(FixedCatalog catalog){return Canonical(Safe.Json.DeserializeObject(Safe.Json.Serialize(catalog)));}
     static bool Has(ModAuditReport report,string code,string level=null){return report.Findings.Any(f=>f.Code==code&&(level==null||f.Level==level));}
     public static void Run(string parent){

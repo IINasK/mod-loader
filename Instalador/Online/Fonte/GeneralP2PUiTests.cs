@@ -12,12 +12,15 @@ internal static class GeneralP2PUiTests {
         Action<bool,string> check=(ok,text)=>{if(!ok)throw new IOException(text);checks.Add(text);};
         bool dark=GeneralStyle.Dark,red=GeneralStyle.RedTheme,black=GeneralStyle.BlackTheme,animation=GeneralStyle.AnimationsEnabled;string language=GeneralStyle.Language;
         try{
-            var catalog=FixedData.Load();var state=new GeneralModState{List=GeneralModLibrary.Seed(catalog,new ModImportItem[0]),Destination=Path.Combine(root,"game")};string before=Safe.Json.Serialize(state);
+            var catalog=FixedData.Load();var state=new GeneralModState{List=GeneralModLibrary.Seed(catalog,new ModImportItem[0]),Destination=Path.Combine(root,"game")};string before=StateContents(state);
             using(var service=new P2PService(Path.Combine(root,"private"),Path.Combine(root,"transport"),true)){
                 foreach(string theme in new[]{"light","light-red","dark","black"})foreach(string locale in new[]{"pt","en"}){
                     GeneralStyle.UseTheme(theme);GeneralStyle.Language=locale;GeneralStyle.AnimationsEnabled=false;
                     using(var dialog=new GeneralP2PDialog(service,state,catalog,false)){
-                        dialog.ShowInTaskbar=false;dialog.StartPosition=FormStartPosition.Manual;dialog.Location=new Point(-30000,-30000);dialog.Show();Application.DoEvents();
+                        dialog.ShowInTaskbar=false;dialog.StartPosition=FormStartPosition.Manual;dialog.Location=new Point(-30000,-30000);dialog.Show();
+                        // The test supplies the transfer status explicitly.
+                        ((Timer)typeof(GeneralP2PDialog).GetField("timer",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(dialog)).Stop();
+                        Application.DoEvents();
                         var input=Find<TextBox>(dialog,"p2p-input");var output=Find<TextBox>(dialog,"p2p-output");var destination=Find<TextBox>(dialog,"p2p-destination");var connect=Find<Button>(dialog,"p2p-connect");
                         check(output.ReadOnly&&!input.ReadOnly&&input.MaxLength==12000,"Link de envio protegido e link recebido editável/limitado: "+theme+locale);
                         check(!Find<Button>(dialog,"p2p-copy").Enabled,"Empty invitation is not copyable: "+theme+locale);
@@ -150,10 +153,13 @@ internal static class GeneralP2PUiTests {
                         using(var image=new Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(root,"p2p-"+theme+"-"+locale+".png"),System.Drawing.Imaging.ImageFormat.Png);}dialog.Close();
                     }
                 }
-                check(!service.Engine.Running&&!Directory.Exists(service.Store),"Renderização não inicia rede nem cria pacotes.");check(Safe.Json.Serialize(state)==before&&!Directory.Exists(state.Destination),"Formulário preserva estado e não toca no jogo.");
+                check(!service.Engine.Running&&!Directory.Exists(service.Store),"Renderização não inicia rede nem cria pacotes.");check(StateContents(state)==before&&!Directory.Exists(state.Destination),"Formulário preserva estado e não toca no jogo.");
             }
             Safe.WriteJson(Path.Combine(root,"resultado-p2p-ui.json"),new{Passed=true,Tests=checks,NetworkUsed=false,RealGameTouched=false});return checks.Count;
         }finally{GeneralStyle.Dark=dark;GeneralStyle.RedTheme=red;GeneralStyle.BlackTheme=black;GeneralStyle.Language=language;GeneralStyle.AnimationsEnabled=animation;}
+    }
+    static string StateContents(GeneralModState state){
+        return ModAuditTests.Canonical(Safe.Json.DeserializeObject(Safe.Json.Serialize(state)));
     }
     internal static void Preview(string parent){Run(parent);}
     static T Find<T>(Control root,string name)where T:Control{return Children(root).OfType<T>().Single(c=>c.Name==name);}
