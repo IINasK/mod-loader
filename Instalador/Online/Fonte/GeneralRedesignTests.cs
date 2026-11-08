@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -25,7 +25,7 @@ internal sealed partial class GeneralModWindow {
         list.Presets.Add(new GeneralModPreset{Id="kit",Name="Meu kit",ModIds=new List<string>{a.Id,b.Id}});
         var state=new GeneralModState{Destination=root,DownloadFolder=root,List=list};
         TestForm(FixedData.Load(),state,Path.Combine(root,"state"),root,async form=>{
-            form.statuses[Key(a,form.Selected(a))]="Instalado";form.statuses[Key(b,form.Selected(b))]="Falhou";form.DrawRows();form.Persist();string original=Safe.Hash(Path.Combine(form.data,"lista.json"));string projectBefore=Safe.Json.Serialize(state.List);
+            form.statuses[Key(a,form.Selected(a))]="Instalado";form.statuses[Key(b,form.Selected(b))]="Falhou";form.DrawRows();form.Persist();string original=Safe.Hash(Path.Combine(form.data,"lista.json"));string projectBefore=ModAuditTests.Canonical(Safe.Json.DeserializeObject(Safe.Json.Serialize(state.List)));
             form.marked.Add(b.Id);
             form.searchBox.Text="wlofcut feminina concluido";await Task.Delay(220);
             check(form.VisibleMods().Single()==a,"The native search field combines name typo, variant and visible status.");
@@ -50,7 +50,7 @@ internal sealed partial class GeneralModWindow {
                 CaptureUi(form,Path.Combine(root,"search-expanded-"+theme+".png"));form.expandList.PerformClick();CaptureUi(form,Path.Combine(root,"search-"+theme+".png"));
             }
             form.ResetColumnFilters();form.DrawRows();check(form.searchBox.Text==""&&form.VisibleMods().Count==3,"Reset clears the query and column filters together.");
-            check(Safe.Json.Serialize(state.List)==projectBefore,"Search/filter/expand preserve names, categories and preset members.");
+            check(ModAuditTests.Canonical(Safe.Json.DeserializeObject(Safe.Json.Serialize(state.List)))==projectBefore,"Search/filter/expand preserve names, categories and preset members.");
             form.optionsButton.PerformClick();var menu=(GeneralActionsMenu)form.menus.Current;
             check(form.homeButton.Visible&&!AllControls(menu).OfType<Button>().Any(button=>button.Name=="home"),"Back to main menu is outside the project menu.");form.menus.Close();
         });
