@@ -1,5 +1,6 @@
-param([string]$VelopackBuildDirectory,[string]$NuGetPackages)
+param([string]$VelopackBuildDirectory,[string]$NuGetPackages,[string]$DevelopmentBuildDirectory)
 $ErrorActionPreference='Stop'
+if($VelopackBuildDirectory -and $DevelopmentBuildDirectory){throw 'Escolha uma edição para compilar.'}
 & (Join-Path $PSScriptRoot 'preparar-leitor.ps1')
 & (Join-Path $PSScriptRoot 'preparar-logo.ps1')
 $out=Join-Path (Split-Path -Parent $PSScriptRoot) 'Programa'
@@ -99,6 +100,11 @@ if($VelopackBuildDirectory){
     $extensions+='/define:VELOPACK'
     $extensions+=Join-Path $PSScriptRoot 'GeneralVelopackUpdate.cs'
     $mainOutput=Join-Path $VelopackBuildDirectory 'ModLoader.exe'
+}
+if($DevelopmentBuildDirectory){
+    New-Item -ItemType Directory -Path $DevelopmentBuildDirectory -Force|Out-Null
+    $extensions+='/define:MODLOADER_DEV'
+    $mainOutput=Join-Path $DevelopmentBuildDirectory 'LoaderDev.exe'
 }
 & $compiler /nologo /target:winexe /main:OnlineProgram /platform:x64 /optimize+ /codepage:65001 ('/win32manifest:'+(Join-Path $shared 'app.manifest')) ('/out:'+$mainOutput) /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Core.dll /reference:System.Security.dll ('/reference:'+(Join-Path $framework 'System.Web.Extensions.dll')) ('/reference:'+(Join-Path $framework 'System.IO.Compression.dll')) ('/reference:'+(Join-Path $framework 'System.IO.Compression.FileSystem.dll')) (Join-Path $shared 'Installer.cs') (Join-Path $shared 'SelfTests.cs') (Join-Path $shared 'PackageIdentity.cs') (Join-Path $PSScriptRoot 'OnlineIdentity.cs') (Join-Path $PSScriptRoot 'OnlineCore.cs') (Join-Path $PSScriptRoot 'OnlineWindow.cs') (Join-Path $PSScriptRoot 'OnlineTests.cs') @extensions
 if($LASTEXITCODE -ne 0){throw 'Compilação falhou'}

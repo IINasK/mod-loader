@@ -39,8 +39,9 @@ internal static class PackCoverage {
 internal sealed partial class GeneralModWindow {
     void UpdatePackCoverage(){
         if(totalProgress==null)return;var preset=state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);
-        var mods=state.List.Mods.Where(m=>(preset==null||preset.ModIds.Contains(m.Id))&&ListStatus(m)!=GeneralStatusPresentation.OtherChoice).ToList();
         Func<GeneralModEntry,bool> available=mod=>{string status;return statuses.TryGetValue(Key(mod,Selected(mod)),out status)&&(GeneralStatusPresentation.Kind(status)=="installed"||status=="Pronto para instalar"||status=="Instalando");};
+        var mods=state.List.Mods.Where(mod=>preset==null||preset.ModIds.Contains(mod.Id)).GroupBy(GeneralModLibrary.ChoiceKey)
+            .Select(choice=>choice.FirstOrDefault(available)??choice.First()).ToList();
         int count=mods.Count(available);totalProgress.Segments=PackCoverage.Build(mods,available,UncatName());totalProgress.Value=mods.Count==0?0:100*count/mods.Count;
         totalProgress.Caption=T("Mods baixados / instalados: ","Downloaded / installed mods: ")+count+" / "+mods.Count;totalProgress.Invalidate();
     }

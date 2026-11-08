@@ -44,6 +44,8 @@ internal sealed partial class GeneralModWindow {
         if(value=="Pendente"||value=="Pending")return "pending";
         if(value=="Baixando"||value=="Downloading")return "active";
         if(value=="Download concluído"||value=="Download complete")return "complete";
+        if(value=="Instalando"||value=="Installing")return "installing";
+        if(value=="Instalado"||value=="Installed")return "installed";
         if(value=="Outra versão escolhida"||value=="Other version selected")return "other-choice";
         if(value=="Corpo detectado"||value=="Body detected")return "manual-body";
         if(value=="Desabilitado"||value=="Disabled")return "disabled";
@@ -62,6 +64,7 @@ internal sealed partial class GeneralModWindow {
         string uncat=UncatName();
         var values=column==1?new[]{uncat}.Concat(PresetCategories()).ToList():column==2?state.List.Mods.Select(mod=>Selected(mod).Name).Distinct().OrderBy(value=>value).ToList():
             new[]{T("Pendente","Pending"),T("Baixando","Downloading"),T("Download concluído","Download complete"),
+                T("Instalando","Installing"),T("Instalado","Installed"),
                 GeneralStatusPresentation.Label(GeneralStatusPresentation.OtherChoice),GeneralStatusPresentation.Label(GeneralStatusPresentation.ManualBody),
                 GeneralStatusPresentation.Label(GeneralStatusPresentation.Disabled),
                 T("Falha","Failed")}.ToList();

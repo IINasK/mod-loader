@@ -104,7 +104,7 @@ internal static class GeneralProjectStorage {
             WalkProject(data,project.Legacy,overhead,sizes,errors);if(projectFiles.Count>0)result.WithFiles++;
         }
         if(selected==null){Add(Path.Combine(store.Root,"projects.json"),overhead,sizes,errors);
-            if(cache.RetainedRoot!=null)try{Safe.NoLinks(cache.RetainedRoot);if(Directory.Exists(cache.RetainedRoot))foreach(string file in Directory.GetFiles(cache.RetainedRoot,"*.cache"))if(System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(file),"^[a-f0-9]{64}\\.cache$"))Add(file,retained,sizes,errors);}catch(IOException){errors.Add(cache.RetainedRoot);}catch(UnauthorizedAccessException){errors.Add(cache.RetainedRoot);}
+            if(cache.RetainedRoot!=null)try{foreach(string file in DownloadCache.RetainedDownloadFiles(cache.RetainedRoot))Add(file,retained,sizes,errors);}catch(IOException){errors.Add(cache.RetainedRoot);}catch(UnauthorizedAccessException){errors.Add(cache.RetainedRoot);}
         }
         total.UnionWith(overhead);total.UnionWith(retained);result.Retained=Bytes(retained,sizes);result.Mods=Bytes(mods,sizes);result.Cache=Bytes(overhead,sizes);result.Total=Bytes(total,sizes);result.Unavailable+=errors.Count;return result;
     }

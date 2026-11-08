@@ -14,10 +14,10 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
     internal string DownloadFolder { get; private set; }
     internal string Destination { get; private set; }
 
-    internal GeneralOptionsDialog(string theme, string language, string folder, Func<long> clearDownloads = null,string installationFolder=null)
+    internal GeneralOptionsDialog(string theme, string language, string folder, Func<DownloadCache.CleanupPlan> previewCleanup = null,string installationFolder=null)
         : base(T("Opções", "Options")) {
         projectOptions=installationFolder!=null;
-        ClientSize = new Size(620, (clearDownloads == null ? 340 : 420)+(projectOptions?86:0));
+        ClientSize = new Size(620, (previewCleanup == null ? 340 : 420)+(projectOptions?86:0));
         Font = GeneralStyle.Font(12);
         AutoScaleMode = AutoScaleMode.Dpi;
 
@@ -64,14 +64,12 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
             destination.AccessibleName=T("Pasta de instalação","Installation folder");
             layout.Controls.Add(FolderRow(destination.AccessibleName,destination,()=>Browse(destination,true)),0,2);
         }
-        if(clearDownloads!=null){
+        if(previewCleanup!=null){
             var cachePanel=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=new Padding(0,12,0,0)};
             cachePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));cachePanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             cachePanel.Controls.Add(new Label{Text=T("Cópias antigas do cache podem ser removidas. Os downloads originais e os mods instalados serão preservados.","Old cache copies can be removed. Original downloads and installed mods will be preserved."),Dock=DockStyle.Fill,AutoSize=true,MaximumSize=new Size(330,0)},0,0);
-            var clean=GeneralStyle.Button(T("Limpar cópias antigas","Clear old copies"),()=>{
-                if(GeneralDialog.Message(this,T("Remover os downloads guardados pelo app? Reinstalar poderá exigir baixar novamente. Seus mods instalados, saves e arquivos em Downloads serão preservados.","Remove the app's saved downloads? Reinstalling may require downloading again. Installed mods, saves and files in Downloads will be preserved."),T("Limpar cópias antigas","Clear old copies"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-                try{long bytes=clearDownloads();error.Text=T("Liberado: ","Freed: ")+GeneralStorageSize.Format(bytes);}catch(Exception ex){error.Text=ex.Message;}
-            });clean.Margin=Padding.Empty;cachePanel.Controls.Add(clean,1,0);layout.Controls.Add(cachePanel,0,3);
+            var clean=GeneralStyle.Button(T("Limpar cópias antigas","Clear old copies"),()=>ClearOldCopies(previewCleanup));
+            clean.Margin=Padding.Empty;cachePanel.Controls.Add(clean,1,0);layout.Controls.Add(cachePanel,0,3);
         }
 
         error.Dock = DockStyle.Fill;
@@ -99,6 +97,28 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
     }
 
     static string T(string pt, string en) { return GeneralStyle.T(pt, en); }
+
+    void ClearOldCopies(Func<DownloadCache.CleanupPlan> preview){
+        try{
+            var plan=preview();
+            if(plan.Count==0){ShowNotice(T("Nenhuma cópia antiga encontrada.","No old copies found."));return;}
+            string summary=String.Format(T(
+                "Cópias antigas encontradas: {0:N0} ({1}). Reinstalar poderá exigir baixar novamente. Mods instalados, saves, arquivos em Downloads e transferências P2P serão preservados.",
+                "Old copies found: {0:N0} ({1}). Reinstalling may require downloading again. Installed mods, saves, files in Downloads and P2P transfers will be preserved."),
+                plan.Count,GeneralStorageSize.Format(plan.Bytes));
+            if(GeneralDialog.Message(this,summary,T("Limpar cópias antigas","Clear old copies"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
+            int skipped;
+            long bytes=plan.Apply(out skipped);
+            string result=T("Espaço liberado: ","Space freed: ")+GeneralStorageSize.Format(bytes);
+            if(skipped>0)result+=" · "+String.Format(T("Não removidos: {0:N0}","Skipped: {0:N0}"),skipped);
+            ShowNotice(result);
+        }catch(Exception ex){ShowNotice(ex.Message,true);}
+    }
+
+    void ShowNotice(string text,bool failed=false){
+        error.ForeColor=failed?GeneralStyle.Danger:GeneralStyle.Foreground;
+        error.Text=text;
+    }
 
     static Label FieldLabel(string text) {
         return new Label { Text = text, AutoSize = true, Margin = new Padding(0, 0, 0, 6), UseMnemonic = false };
@@ -150,7 +170,7 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
                 Safe.NoLinks(dialog.SelectedPath);
                 field.Text=install?dialog.SelectedPath:new OnlineDownloadWatch(dialog.SelectedPath).Folder;
                 error.Text = "";
-            } catch (Exception ex) { error.Text = ex.Message; }
+            } catch (Exception ex) { ShowNotice(ex.Message,true); }
         }
     }
 
@@ -162,7 +182,7 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
             DownloadFolder = selectedFolder;
             Destination=projectOptions?destination.Text:null;
             DialogResult = DialogResult.OK;
-        } catch (Exception ex) { error.Text = ex.Message; }
+        } catch (Exception ex) { ShowNotice(ex.Message,true); }
     }
 }
 

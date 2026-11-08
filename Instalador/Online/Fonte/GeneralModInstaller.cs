@@ -43,20 +43,24 @@ public sealed partial class GeneralModInstaller {
     }
 
     public string Status(string key) {
+        return Status(key,null,Safe.Hash);
+    }
+
+    internal string Status(string key,string source,Func<string,string> readHash) {
         Record record = ReadRecord(RecordPath(key));
         if (record == null) return Missing;
+        if(record.SourceSha256!=null&&source!=null&&File.Exists(source)&&readHash(source)!=record.SourceSha256)return "Versão diferente";
         int present = 0;
         foreach (RecordFile file in record.Files) {
             string target = Safe.In(destination, file.Path);
             if (Directory.Exists(target)) return Modified;
             if (!File.Exists(target)) continue;
-            if (!Matches(target, file)) return Modified;
+            if (new FileInfo(target).Length!=file.Size||readHash(target)!=file.Sha256) return Modified;
             present++;
         }
         return present == 0 ? Missing : present == record.Files.Count ? Installed : Partial;
     }
 
-    internal bool SourceChanged(string source,string key){var record=ReadRecord(RecordPath(key));return record!=null&&record.SourceSha256!=null&&source!=null&&File.Exists(source)&&Safe.Hash(source)!=record.SourceSha256;}
     internal bool SourceMatches(string source,string key){var record=ReadRecord(RecordPath(key));return record!=null&&record.SourceSha256!=null&&File.Exists(source)&&Safe.Hash(source)==record.SourceSha256;}
     public string Install(string source, string key, Action<string> report, Func<ModVersionDifference,bool> chooseVersion = null) {
         string receipt = RecordPath(key);

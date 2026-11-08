@@ -11,6 +11,7 @@ public sealed class GeneralModList {
     public List<string> Categories = new List<string>();
     public Dictionary<string, string> CategoryDescriptions = new Dictionary<string, string>();
     public List<GeneralModPreset> Presets = new List<GeneralModPreset>();
+    public Dictionary<string,GeneralAlternativeGroup> AlternativeGroups = new Dictionary<string,GeneralAlternativeGroup>(StringComparer.Ordinal);
     public List<GeneralModEntry> Mods = new List<GeneralModEntry>();
 }
 
@@ -18,6 +19,10 @@ public sealed class GeneralModPreset {
     public string Id, Name;
     public List<string> ModIds = new List<string>();
     public List<string> Categories = new List<string>();
+}
+
+public sealed class GeneralAlternativeGroup {
+    public string Name, Color;
 }
 
 public sealed class GeneralModEntry {
@@ -84,12 +89,50 @@ public sealed class GeneralModLibrary {
         if (String.Equals(fullPath, statePath, StringComparison.OrdinalIgnoreCase))
             throw new IOException("Escolha outro nome para a lista exportada.");
         Write(fullPath, new {
-            list.Schema, list.Categories, list.CategoryDescriptions, list.Presets, list.UncategorizedName, list.UncategorizedDescription,
+            list.Schema, list.Categories, list.CategoryDescriptions, list.Presets, list.UncategorizedName, list.UncategorizedDescription, list.AlternativeGroups,
             Mods = list.Mods.Select(mod => new {
                 mod.Id, mod.Name, mod.Category, mod.DefaultVariant, mod.Description, mod.Tags, mod.Nsfw, mod.AlternativeGroup,
                 Variants = mod.Variants.Select(variant => new { variant.Id, variant.Name, variant.Sources, variant.SourceInfo }).ToList()
             }).ToList()
         });
+    }
+
+    internal static string ChoiceKey(GeneralModEntry mod) {
+        return mod.AlternativeGroup==null?"mod/"+mod.Id:"choice/"+mod.AlternativeGroup;
+    }
+
+    internal static string GroupDefaultName(string id) {
+        return id=="hyst-femv-body"?GeneralStyle.T("Corpo","Body"):GeneralStyle.T("Alternativas","Alternatives");
+    }
+
+    internal static bool GroupColorAvailable(GeneralModList list,string groupId,string color) {
+        return !list.AlternativeGroups.Any(pair=>pair.Key!=groupId&&String.Equals(pair.Value.Color,color,StringComparison.OrdinalIgnoreCase));
+    }
+
+    internal static string DefaultGroupColor(GeneralModList list,string id) {
+        int seed=PackCoverage.CategoryColor(id).ToArgb() & 0xffffff;
+        for(int offset=0;;offset++){
+            int shade=(seed+offset*191)&4095;
+            string color="#"+(220+shade%16).ToString("X2")+(141+shade/16%32).ToString("X2")+(9+shade/512*5).ToString("X2");
+            if(GroupColorAvailable(list,id,color))return color;
+        }
+    }
+
+    static void ValidateAlternativeGroups(GeneralModList list) {
+        var source=list.AlternativeGroups??new Dictionary<string,GeneralAlternativeGroup>();
+        if(source.Count>1000)throw new IOException("A lista contém grupos demais.");
+        var ids=list.Mods.Select(mod=>mod.AlternativeGroup).Where(id=>id!=null).Distinct(StringComparer.Ordinal).OrderBy(id=>id,StringComparer.Ordinal).ToList();
+        list.AlternativeGroups=new Dictionary<string,GeneralAlternativeGroup>(StringComparer.Ordinal);
+        foreach(string id in ids){
+            GeneralAlternativeGroup group;
+            if(!source.TryGetValue(id,out group))continue;
+            if(group==null||!Regex.IsMatch(group.Color??"",@"\A#[0-9a-fA-F]{6}\z")||!GroupColorAvailable(list,id,group.Color))
+                throw new IOException("Use uma cor diferente para cada grupo.");
+            string name=String.IsNullOrWhiteSpace(group.Name)?null:RequiredText(group.Name,18,"Grupo");
+            list.AlternativeGroups.Add(id,new GeneralAlternativeGroup{Name=name,Color=group.Color.ToUpperInvariant()});
+        }
+        foreach(string id in ids.Where(id=>!list.AlternativeGroups.ContainsKey(id)))
+            list.AlternativeGroups.Add(id,new GeneralAlternativeGroup{Color=DefaultGroupColor(list,id)});
     }
 
     internal static void AssociateAlternative(GeneralModEntry entry, GeneralModEntry other) {
@@ -278,6 +321,7 @@ public sealed class GeneralModLibrary {
             else if (!ValidId(mod.AlternativeGroup)) throw new IOException("Associação de alternativas inválida.");
             if (!variantIds.Contains(mod.DefaultVariant)) throw new IOException("Escolha a versão principal de " + mod.Name + ".");
         }
+        ValidateAlternativeGroups(list);
         if (list.Presets == null) list.Presets = new List<GeneralModPreset>();
         if (list.Presets.Count > 100) throw new IOException("Use no máximo 100 presets por lista.");
         var presetIds = new HashSet<string>(StringComparer.Ordinal);

@@ -53,8 +53,18 @@ public static class OnlineStorageTests {
         check(Directory.Exists(young)&&Directory.Exists(arbitrary),"Preparações recentes e pastas desconhecidas são preservadas.");
         check(cache.Contains(asset),"Manutenção automática não apaga pacotes comprimidos.");
         string unrelated=Path.Combine(cache.Root,"user.cache");File.WriteAllText(unrelated,"keep");
-        long removed=cache.ClearDownloads();
-        check(removed==asset.Size&&!File.Exists(cache.PathFor(asset)),"Limpeza explícita informa os bytes de pacotes removidos.");
+        string changed=Path.Combine(cache.Root,new string('a',64)+".cache");
+        string locked=Path.Combine(cache.Root,new string('b',64)+".cache");
+        string arrived=Path.Combine(cache.Root,new string('c',64)+".cache");
+        File.WriteAllText(changed,"before");File.WriteAllText(locked,"busy");
+        var preview=cache.PreviewRetainedDownloads();
+        check(preview.Count==3&&preview.Bytes==asset.Size+10&&cache.Contains(asset),"A prévia conta apenas cópias do cache e não altera arquivos.");
+        File.WriteAllText(changed,"different length");File.WriteAllText(arrived,"new after consent");
+        int skipped;long removed;
+        using(var guard=new FileStream(locked,FileMode.Open,FileAccess.Read,FileShare.ReadWrite))
+            removed=preview.Apply(out skipped);
+        check(removed==asset.Size&&skipped==2&&!File.Exists(cache.PathFor(asset)),"Limpeza explícita informa bytes removidos e itens ignorados.");
+        check(File.Exists(changed)&&File.Exists(locked)&&File.Exists(arrived),"Limpeza preserva arquivos bloqueados, alterados ou que chegaram depois da prévia.");
         check(File.ReadAllText(unrelated)=="keep"&&File.Exists(Path.Combine(root,"fixture.zip")),"Limpar cache não apaga arquivos desconhecidos nem o download original.");
         check(Directory.GetFiles(Path.Combine(game,".CoopModsOnline","backups"),"save.dat",SearchOption.AllDirectories).Length==1,"Limpar cache preserva os backups usados para desfazer.");
         var absent=new DownloadCache(Path.Combine(root,"absent-cache"));check(absent.ClearDownloads()==0&&!Directory.Exists(absent.Root),"Cache ausente não cria pasta ao ser limpo.");

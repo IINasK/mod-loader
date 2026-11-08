@@ -107,7 +107,7 @@ internal sealed partial class GeneralModWindow {
         string message;return statusDetails.TryGetValue(key,out message)?message:GeneralStyle.Status(status??"Não conferido");
     }
     string FailureReport(){
-        var lines=new List<string>{"Mod Loader "+GeneralUpdateChecker.CurrentVersion,"Catalog: "+OnlineIdentity.CatalogHash};
+        var lines=new List<string>{GeneralAppPaths.WindowTitle,"Catalog: "+OnlineIdentity.CatalogHash};
         foreach(var mod in state.List.Mods){var variant=Selected(mod);string key=Key(mod,variant),status;if(!statuses.TryGetValue(key,out status)||GeneralStatusPresentation.Kind(status)!="error")continue;lines.Add("\r\n"+mod.Name+" ["+mod.Id+"/"+variant.Id+"]\r\n"+StatusDetail(key,status));}
         return String.Join("\r\n",lines);
     }
@@ -115,11 +115,18 @@ internal sealed partial class GeneralModWindow {
     void CopyFailures(){try{Clipboard.SetText(FailureReport());detail.Text=T("Erros copiados. Cole a mensagem para compartilhar o diagnóstico.","Errors copied. Paste to share the diagnostics.");}catch(Exception ex){ShowError(ex);}}
     sealed class ScanReads {
         readonly ConcurrentDictionary<string,Lazy<string>> hashes=new ConcurrentDictionary<string,Lazy<string>>(StringComparer.OrdinalIgnoreCase);
+        readonly ConcurrentDictionary<FixedMod,Lazy<ModScan>> fixedMods=new ConcurrentDictionary<FixedMod,Lazy<ModScan>>();
+        readonly string root;
         internal readonly bool Exists,Cyberpunk,PhantomLiberty;
+        internal readonly Lazy<InstalledSnapshotInstaller.StatusScan> Snapshots;
+        internal readonly Lazy<GeneralModInstaller> Generic;
         internal readonly Lazy<HashSet<string>> Imports, Disabled;
         internal readonly Lazy<ILookup<long,string>> DownloadNames;
         internal int HashCount {get{return hashes.Count;}}
         internal ScanReads(GeneralModWindow window,string root){
+            this.root=root;
+            Snapshots=new Lazy<InstalledSnapshotInstaller.StatusScan>(()=>new InstalledSnapshotInstaller.StatusScan(window.Snapshot(root),Hash));
+            Generic=new Lazy<GeneralModInstaller>(()=>window.Generic(root));
             Exists=!String.IsNullOrEmpty(root)&&Directory.Exists(root);
             Cyberpunk=IsCyberpunk(root);
             PhantomLiberty=Cyberpunk&&GameEdition.HasPL(root);
@@ -128,6 +135,7 @@ internal sealed partial class GeneralModWindow {
             DownloadNames=new Lazy<ILookup<long,string>>(()=>LocalDownloadNames(window.state.DownloadFolder));
         }
         internal string Hash(string path){return hashes.GetOrAdd(Path.GetFullPath(path),key=>new Lazy<string>(()=>Safe.Hash(key))).Value;}
+        internal ModScan Fixed(FixedMod mod){return fixedMods.GetOrAdd(mod,item=>new Lazy<ModScan>(()=>FixedData.Scan(item,root,true,Hash,false))).Value;}
     }
 
     static ILookup<long,string> LocalDownloadNames(string folder) {
@@ -158,7 +166,7 @@ internal sealed partial class GeneralModWindow {
         };
         return recipe.Assets.Count > 0 && recipe.Assets.All(present) &&
             FixedData.Expand(catalog, recipe.Dependencies).All(dependency =>
-                FixedData.Scan(dependency, root, true, reads.Hash, false).IsCorrect || dependency.Assets.All(present));
+                reads.Fixed(dependency).IsCorrect || dependency.Assets.All(present));
     }
 
     string Status(Work work,string root,ScanReads reads=null){
@@ -169,7 +177,7 @@ internal sealed partial class GeneralModWindow {
         Func<string,string> hash=reads==null?null:(Func<string,string>)reads.Hash;
         string snapshot;
         if(exists&&work.Variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts.TryGetValue(work.Key,out snapshot)){
-            string found=Snapshot(root).Status(snapshot,work.Key);
+            string found=reads==null?Snapshot(root).Status(snapshot,work.Key):reads.Snapshots.Value.Status(snapshot,work.Key);
             if(found!=GeneralModInstaller.Missing||work.Variant.CyberpunkId==null)return found;
         }
         if(work.Variant.CyberpunkId!=null){
@@ -184,7 +192,7 @@ internal sealed partial class GeneralModWindow {
                 if(NightCityDensity.Supported(density.Id))return "Instalado: "+density.Name;
                 return LocalFixedAssets(NightCityDensity.Resolve(recipe,work.Variant.CyberpunkVariant),root,reads)?"Pronto para instalar":"Não instalado";
             }
-            var scan=FixedData.Scan(recipe,root,true,hash,reads==null);
+            var scan=reads==null?FixedData.Scan(recipe,root):reads.Fixed(recipe);
             if(scan.State=="Não instalado"&&LocalFixedAssets(recipe,root,reads))return "Pronto para instalar";
             return scan.IsCorrect?"Instalado":scan.State=="Atualização disponível"?scan.State:scan.Original>0?"Versão diferente":scan.State;
         }
@@ -196,8 +204,9 @@ internal sealed partial class GeneralModWindow {
                     return installed.Contains(CyberpunkImportId(work,i,hash))?GeneralModInstaller.Installed:GeneralModInstaller.Missing;
                 }).ToList();
             }else{
-                var engine=Generic(root);
-                results=Enumerable.Range(0,work.Variant.Sources.Count).Select(i=>engine.SourceChanged(LocalSource(work,i),work.Receipt(i))?"Versão diferente":engine.Status(work.Receipt(i))).ToList();
+                var engine=reads==null?Generic(root):reads.Generic.Value;
+                results=Enumerable.Range(0,work.Variant.Sources.Count)
+                    .Select(i=>engine.Status(work.Receipt(i),LocalSource(work,i),hash??(Func<string,string>)Safe.Hash)).ToList();
             }
             if(results.All(r=>r==GeneralModInstaller.Installed))return "Instalado";
             if(results.Contains("Versão diferente"))return "Versão diferente";
@@ -346,7 +355,7 @@ internal sealed partial class GeneralModWindow {
                     unresolved.Add(NightCityDensity.Resolve(recipe,work.Variant.CyberpunkVariant));
                     continue;
                 }
-                var scan=FixedData.Scan(mod,root,true,reads.Hash,false);
+                var scan=reads.Fixed(mod);
                 if(scan.IsCorrect)continue;
                 if(scan.IsConflict||!String.IsNullOrEmpty(mod.BlockedReason)||GameEdition.NeedsPL(mod)&&!reads.PhantomLiberty){blocked=true;break;}
                 unresolved.Add(mod);

@@ -27,7 +27,7 @@ internal sealed class GeneralProjectHome : Form {
     internal Action<GeneralProject> OpenRequested;
     internal GeneralProjectHome(FixedCatalog catalog,DownloadCache cache,string root,bool fixture=false){
         this.catalog=catalog;this.cache=cache;this.fixture=fixture;store=new GeneralProjectStore(root);OpenRequested=OpenProject;
-        Text="Mod Loader "+GeneralUpdateChecker.CurrentVersion;Icon=ModLoaderBrand.AppIcon;ClientSize=new Size(1020,740);MinimumSize=new Size(900,680);
+        Text=GeneralAppPaths.WindowTitle;Icon=ModLoaderBrand.AppIcon;ClientSize=new Size(1020,740);MinimumSize=new Size(900,680);
         StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;Build();Disposed+=(s,e)=>{
             savedTips.Dispose();menus.Dispose();
             foreach(var service in sharing.Values)try{service.Dispose();}catch(Exception){}
@@ -35,7 +35,7 @@ internal sealed class GeneralProjectHome : Form {
         Shown+=(s,e)=>RefreshStorageSize();
         if(!fixture)Shown+=async(s,e)=>await RestoreSharing();
 #if !VELOPACK
-        if(!fixture)Shown+=async(s,e)=>{available=await GeneralUpdateChecker.Session.CheckOnce();if(!IsDisposed)UpdateNotice();};
+        if(!fixture&&!GeneralAppPaths.IsDevelopment)Shown+=async(s,e)=>{available=await GeneralUpdateChecker.Session.CheckOnce();if(!IsDisposed)UpdateNotice();};
 #endif
     }
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
@@ -106,7 +106,7 @@ internal sealed class GeneralProjectHome : Form {
         var preferences=store.Read();
         if(ready){
             var existing=preferences.Projects.FirstOrDefault(item=>item.TemplateId=="cyberpunk-2077");if(existing!=null)return existing;
-            return store.Create("Cyberpunk 2077",GeneralModLibrary.Seed(catalog,new ModImportItem[0]),preferences.Theme,preferences.Language,!fixture?Discovery.Find().FirstOrDefault():null,"cyberpunk-2077");
+            return store.Create("Cyberpunk 2077",GeneralModLibrary.Seed(catalog,new ModImportItem[0]),preferences.Theme,preferences.Language,!fixture&&!GeneralAppPaths.IsDevelopment?Discovery.Find().FirstOrDefault():null,"cyberpunk-2077");
         }
         using(var name=new GeneralNameDialog(T("Nome do projeto","Project name"),"")){
             if(name.ShowDialog(this)!=DialogResult.OK)return null;
@@ -235,7 +235,7 @@ internal sealed class GeneralProjectHome : Form {
     }
 
     void Options(Control anchor){
-        var preferences=store.Read();using(var dialog=new GeneralOptionsDialog(preferences.Theme,preferences.Language,preferences.DownloadFolder,()=>cache.ClearRetainedDownloads())){
+        var preferences=store.Read();using(var dialog=new GeneralOptionsDialog(preferences.Theme,preferences.Language,preferences.DownloadFolder,cache.PreviewRetainedDownloads)){
             dialog.AnchorTo(anchor);if(dialog.ShowDialog(this)!=DialogResult.OK){RefreshStorageSize();return;}
             store.SavePreferences(dialog.ThemeValue,dialog.LanguageValue,dialog.DownloadFolder);Build();
         }
@@ -277,7 +277,7 @@ internal sealed partial class GeneralModWindow {
         if(refreshed||state.Theme!=preferences.Theme||state.Language!=preferences.Language){
             state.Theme=preferences.Theme;state.Language=preferences.Language;Persist();BuildInterface();
         }
-        Text="Mod Loader "+GeneralUpdateChecker.CurrentVersion+" — "+project.Name;
+        Text=GeneralAppPaths.WindowTitle+" — "+project.Name;
         UpdateTableTitle();
     }
     bool BuiltInProject {get{return project!=null&&!String.IsNullOrEmpty(project.TemplateId);}}

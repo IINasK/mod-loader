@@ -33,6 +33,15 @@ public static class InstalledSnapshotInstallerTests {
         File.Delete(first);
         engine = new InstalledSnapshotInstaller(target, data, catalog, true);
         Check(engine.Status(id, "first/default") == GeneralModInstaller.Installed && engine.ReadManifest(id).List.Mods[0].Id == "first", "Recibo e manifesto sobrevivem à exclusão do ZIP.");
+        var scan=new InstalledSnapshotInstaller.StatusScan(engine,Safe.Hash);
+        Check(scan.Status(id,"first/default")==GeneralModInstaller.Installed&&scan.Status(id,"missing/default")==GeneralModInstaller.Missing,
+            "A varredura indexada confere somente os proprietários ativos do recibo.");
+        string installed=Safe.In(target,"mods/first.txt");
+        File.WriteAllText(installed,"edits");
+        var nextScan=new InstalledSnapshotInstaller.StatusScan(engine,Safe.Hash);
+        Check(nextScan.Status(id,"first/default")==GeneralModInstaller.Modified,
+            "Uma nova varredura detecta arquivo alterado mesmo quando o tamanho é igual.");
+        File.WriteAllText(installed,"first");
         Check(engine.ReadInstalledFiles(id, "first/default").Count == 3, "Arquivos instalados podem ser reexportados sem o ZIP.");
         string second = Pack(root, "second", catalog, new Dictionary<string,string> { { "mods/second.txt", "second" }, { "mods/shared.txt", "shared" } });
         string id2 = engine.Install(second, Safe.Hash(second), null);

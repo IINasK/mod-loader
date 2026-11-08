@@ -175,6 +175,10 @@ public static partial class InstalledSnapshot {
         }
         list.Categories=state.List.Categories.Concat(list.Mods.Where(m=>!String.IsNullOrWhiteSpace(m.Category)).Select(m=>m.Category)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         foreach(string category in list.Categories) {string description;if(state.List.CategoryDescriptions.TryGetValue(category,out description))list.CategoryDescriptions[category]=description;}
+        foreach(string groupId in list.Mods.Select(mod=>mod.AlternativeGroup).Where(id=>id!=null).Distinct(StringComparer.Ordinal)){
+            GeneralAlternativeGroup group;
+            if(state.List.AlternativeGroups.TryGetValue(groupId,out group))list.AlternativeGroups.Add(groupId,Clone(group));
+        }
         var included=new HashSet<string>(list.Mods.Select(m=>m.Id),StringComparer.Ordinal);
         foreach(var original in state.List.Presets.OrderByDescending(p=>p.Id==state.SelectedPreset)){
             var copy=Clone(original);copy.ModIds=copy.ModIds.Where(included.Contains).ToList();list.Presets.Add(copy);

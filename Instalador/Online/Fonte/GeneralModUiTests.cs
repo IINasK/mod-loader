@@ -172,13 +172,16 @@ internal sealed partial class GeneralModWindow {
                             check(!form.listExpanded&&form.grid.Columns["Mark"].Visible&&!form.grid.ReadOnly&&
                                 form.searchBox.Text==presetEntry.Name&&form.marked.SetEquals(originalMarks)&&form.state.SelectedPreset=="example",
                                 "O modo de escolha restaura busca, preset, caixas e navegação.");
+                            var groupName=AllControls(editor).OfType<TextBox>().Single(box=>box.Name=="AlternativeGroupName");
+                            check(groupName.Visible&&groupName.MaxLength==18&&editor.GroupStyle.Color.StartsWith("#"),"Escolher outro mod libera o nome curto e a cor do grupo.");
+                            groupName.Text="Corpo leve";
                             stage=3;
                             AllControls(editor).OfType<Button>().Single(button=>button.Name=="AlternativeMod").PerformClick();
                         }else if(stage==3&&form.associationChoice!=null){
                             stage=4;
                             AllControls(form).OfType<Button>().Single(button=>button.Name=="CancelAlternativeSelection").PerformClick();
                         }else if(stage==4&&editor!=null){
-                            check(editor.LinkedAlternative==candidate&&source.AlternativeGroup==null&&candidate.AlternativeGroup==null,
+                            check(editor.LinkedAlternative==candidate&&source.AlternativeGroup==null&&candidate.AlternativeGroup==null&&editor.GroupStyle.Name=="Corpo leve",
                                 "Cancelar a escolha preserva o vínculo em rascunho e não grava a lista.");
                             stage=5;
                             timer.Stop();

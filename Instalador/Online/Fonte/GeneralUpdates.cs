@@ -92,7 +92,7 @@ internal sealed partial class GeneralModWindow {
         if(updateAvailable!=null)updateNotice.Text=T("Nova versão ","New version ")+updateAvailable.Version+T(" — baixar"," — download");
     }
     async void CheckUpdatesOnStartup(){
-        if(testMode)return;
+        if(testMode||GeneralAppPaths.IsDevelopment)return;
         var available=await updateChecker.CheckOnce();
         if(IsDisposed||Disposing)return;
         updateAvailable=available;ShowUpdateNotice();

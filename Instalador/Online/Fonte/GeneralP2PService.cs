@@ -35,7 +35,7 @@ internal sealed class P2PTransferStatus {
 }
 internal sealed partial class P2PService : IDisposable {
     internal readonly string Root, Store;
-    internal static string TransferStore {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"Mod Loader","Pacotes P2P");}}
+    internal static string TransferStore {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),GeneralAppPaths.ProductName,"Pacotes P2P");}}
     internal readonly SyncthingEngine Engine;
     internal readonly List<P2PSession> Sessions;
     readonly string statePath;

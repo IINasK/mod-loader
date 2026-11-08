@@ -55,7 +55,8 @@ internal static class GeneralNexusInfo {
     internal static Task<GeneralSourceInfo> Read(string source) {
         var link = GeneralNexusLink.Parse(source);
         string testKey = TestKey();
-        if (link == null || (testKey == null && Environment.GetEnvironmentVariable("MOD_LOADER_NEXUS_API_TEST") != "1"))
+        if (link == null || (!GeneralAppPaths.IsDevelopment && testKey == null &&
+            Environment.GetEnvironmentVariable("MOD_LOADER_NEXUS_API_TEST") != "1"))
             return Task.FromResult<GeneralSourceInfo>(null);
         return Task.Run(() => {
             string key = testKey;

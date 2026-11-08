@@ -90,7 +90,11 @@ internal sealed partial class GeneralModWindow {
         string originalDownload=Path.Combine(root,"outfit.zip"),otherFile=Path.Combine(cache.Root,"unrecognized.cache");
         File.WriteAllText(otherFile,"keep");
         var previousProbe=StorageMaintenance.OtherLoaderProbe;StorageMaintenance.OtherLoaderProbe=()=>false;
-        try{check(projectCache.ClearRetainedDownloads()==archives&&File.Exists(originalDownload)&&File.Exists(otherFile),"Project cleanup removes only the measured legacy copies and preserves the original downloads.");}
+        try{
+            var cleanup=projectCache.PreviewRetainedDownloads();int skipped;
+            check(cleanup.Count==2&&cleanup.Bytes==archives,"Cleanup previews the same old copies measured in project storage.");
+            check(cleanup.Apply(out skipped)==archives&&skipped==0&&File.Exists(originalDownload)&&File.Exists(otherFile),"Project cleanup removes only the measured legacy copies and preserves the original downloads.");
+        }
         finally{StorageMaintenance.OtherLoaderProbe=previousProbe;}
         var real=FixedData.Load();var density=real.Packages.Single(recipe=>recipe.Id==NightCityDensity.ModId);string densityPath=Safe.In(target,density.Files[0].Path);Directory.CreateDirectory(Path.GetDirectoryName(densityPath));File.WriteAllText(densityPath,"changed");
         var densityList=GeneralModLibrary.Seed(real,new ModImportItem[0]);densityList.Mods=densityList.Mods.Where(mod=>mod.Id==density.Id).ToList();densityList.Presets.Clear();var densityProject=store.Create("Densidade medida",densityList,"light","pt",target);

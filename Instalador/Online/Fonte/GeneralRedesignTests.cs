@@ -27,7 +27,7 @@ internal sealed partial class GeneralModWindow {
         TestForm(FixedData.Load(),state,Path.Combine(root,"state"),root,async form=>{
             form.statuses[Key(a,form.Selected(a))]="Instalado";form.statuses[Key(b,form.Selected(b))]="Falhou";form.DrawRows();form.Persist();string original=Safe.Hash(Path.Combine(form.data,"lista.json"));string projectBefore=ModAuditTests.Canonical(Safe.Json.DeserializeObject(Safe.Json.Serialize(state.List)));
             form.marked.Add(b.Id);
-            form.searchBox.Text="wlofcut feminina concluido";await Task.Delay(220);
+            form.searchBox.Text="wlofcut feminina instalado";await Task.Delay(220);
             check(form.VisibleMods().Single()==a,"The native search field combines name typo, variant and visible status.");
             check(original==Safe.Hash(Path.Combine(form.data,"lista.json")),"Typing a query does not save or replace the project.");
             check(form.ModRows().Count()==1&&form.marked.Contains(b.Id),"Filtering hides unmatched rows and preserves hidden checked items.");
@@ -35,7 +35,7 @@ internal sealed partial class GeneralModWindow {
             check(form.grid.Rows.Cast<DataGridViewRow>().Any(row=>row.Tag is SectionRow&&((SectionRow)row.Tag).Kind=="empty"),"No results has an explicit empty-state message.");
             form.categoryFilters=null;form.searchBox.Text="falha";await Task.Delay(220);check(form.VisibleMods().Single()==b,"Search finds failed status.");
             form.searchBox.Text="pendente";await Task.Delay(220);check(form.VisibleMods().Single()==c,"Search finds pending status.");
-            state.Language="en";form.BuildInterface();form.searchBox.Text="download complete";await Task.Delay(220);check(form.VisibleMods().Single()==a,"Status is searchable in the active English language.");
+            state.Language="en";form.BuildInterface();form.searchBox.Text="installed";await Task.Delay(220);check(form.VisibleMods().Single()==a,"Status is searchable in the active English language.");
             form.searchBox.Text="principal";await Task.Delay(220);form.statusFilters=new HashSet<string>{"Failed"};form.DrawRows();check(form.VisibleMods().Single()==b,"Search composes with status and variant values.");
             form.statusFilters=null;form.searchBox.Text="feminina";await Task.Delay(220);form.preset.SelectedIndex=1;check(form.VisibleMods().Single()==a,"Preset membership and search are combined.");
             form.searchBox.Text="radio";await Task.Delay(220);check(form.VisibleMods().Count==0,"Search never leaks items outside the current preset.");
@@ -72,13 +72,44 @@ internal sealed partial class GeneralModWindow {
             form.tableName.Text="Kit renomeado";form.SaveTableTitle();check(list.Presets[0].Name=="Kit renomeado"&&form.preset.SelectedItem.ToString()=="Kit renomeado","Renomear a tabela atualiza e persiste o preset.");
             form.statuses[Key(first,form.Selected(first))]="Instalado";form.statuses[Key(second,form.Selected(second))]="Baixando";form.statuses[Key(third,form.Selected(third))]="Falhou";
             form.categoryFilters=new HashSet<string>{"Principal"};form.DrawRows();check(form.VisibleMods().Count==2,"Cabeçalho Mods filtra múltiplas categorias.");
-            form.statusFilters=new HashSet<string>{"Download concluído"};form.DrawRows();check(form.VisibleMods().Single()==first,"Categoria e situação são compostas.");
+            form.statusFilters=new HashSet<string>{"Instalado"};form.DrawRows();check(form.VisibleMods().Single()==first,"Categoria e situação são compostas.");
+            form.statusFilters=new HashSet<string>{"Download concluído"};form.DrawRows();check(form.VisibleMods().Count==0,"O filtro Download concluído é distinto de Instalado.");
+            form.statusFilters=new HashSet<string>{"Instalado"};
             form.variantFilters=new HashSet<string>{"Alternativa"};form.DrawRows();check(form.VisibleMods().Count==0,"Filtro de variante se combina com os anteriores.");
             form.categoryFilters=new HashSet<string>{"Principal","Veículos"};form.variantFilters=null;form.statusFilters=new HashSet<string>{"Baixando","Falha"};form.DrawRows();check(form.VisibleMods().Count==2,"Multisseleção de situações conserva as duas situações escolhidas.");
             form.nameFilter="bet";form.DrawRows();check(form.VisibleMods().Single()==second,"Busca do cabeçalho Mod é combinada e não distingue maiúsculas.");
             form.ResetColumnFilters();form.DrawRows();check(form.VisibleMods().Count==3,"Limpar filtros restaura todos os itens do preset.");
             form.categoryFilters=new HashSet<string>();form.DrawRows();check(form.VisibleMods().Count==0,"Nenhuma categoria marcada é diferente de selecionar todas.");
             form.ResetColumnFilters();form.DrawRows();
+            GeneralModLibrary.AssociateAlternative(first,second);
+            GeneralModLibrary.ValidateList(list,true);
+            string linked=first.AlternativeGroup;
+            var style=list.AlternativeGroups[linked];
+            style.Name="Corpo";
+            check(style.Color.StartsWith("#"),"Um grupo novo recebe uma cor padrão.");
+            form.statuses[Key(second,form.Selected(second))]="Instalado";
+            form.DrawRows();
+            var badges=form.ModRows().Where(row=>Equals(row.Tag,first.Id)||Equals(row.Tag,second.Id)).Select(row=>row.Cells["Group"]).ToArray();
+            check(form.grid.Columns["Group"].DisplayIndex==form.grid.Columns["Status"].DisplayIndex-1&&badges.Length==2&&badges.All(cell=>Equals(cell.Value,"Corpo")),"A coluna Grupo vem antes de Situação e mostra o mesmo nome para as alternativas.");
+            check(form.totalProgress.Caption.EndsWith("1 / 2")&&form.counts.Text.Contains("Instalados: 1"),"Duas alternativas instaladas contam como uma escolha, com outro mod pendente.");
+            check(((Color)badges[0].Tag).GetBrightness()>((Color)badges[1].Tag).GetBrightness(),"A alternativa ativa usa a cor mais clara do grupo.");
+            form.statuses[Key(first,form.Selected(first))]="Não instalado";
+            form.statuses[Key(second,form.Selected(second))]="Não instalado";
+            form.DrawRows();
+            check(form.totalProgress.Caption.EndsWith("0 / 2"),"Duas alternativas pendentes continuam ocupando uma única vaga.");
+            form.statuses[Key(second,form.Selected(second))]="Pronto para instalar";
+            form.DrawRows();
+            check(form.totalProgress.Caption.EndsWith("1 / 2")&&form.counts.Text.Contains("Instalados: 0"),"Um arquivo pronto completa a cobertura do grupo e ainda não conta como instalado.");
+            string groupsExport=Path.Combine(root,"groups.json");
+            var groupsLibrary=new GeneralModLibrary(Path.Combine(root,"groups-state.json"));
+            groupsLibrary.Export(groupsExport,list);
+            var roundTrip=groupsLibrary.Import(groupsExport);
+            check(roundTrip.AlternativeGroups[linked].Name=="Corpo"&&roundTrip.AlternativeGroups[linked].Color==style.Color,"O nome e a cor do grupo sobrevivem à exportação.");
+            roundTrip.AlternativeGroups[linked].Name=new string('X',19);
+            bool rejected=false;
+            try{GeneralModLibrary.ValidateList(roundTrip,true);}catch(IOException){rejected=true;}
+            check(rejected,"Uma lista importada não aceita nomes de grupo com mais de 18 caracteres.");
+            CaptureUi(form,Path.Combine(root,"group-badges.png"));
             for(int i=0;i<70;i++){var item=NewEntry("Extra "+i,archive);list.Mods.Add(item);list.Presets[0].ModIds.Add(item.Id);}
             form.DrawRows();await Task.Delay(80);
             var scroll=(GeneralScrollView)form.grid.Parent.Parent;scroll.RefreshScroll();

@@ -28,7 +28,14 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
     readonly Func<string,Task<GeneralSourceInfo>> lookup;
     string lastAutoName;
     int sourceGeneration;
-    readonly Button alternative, unlink;
+    readonly Button alternative, unlink, groupColor;
+    readonly TextBox groupName = new TextBox { Name = "AlternativeGroupName", MaxLength = 18 };
+    readonly Control groupFields;
+    readonly GeneralModList groupList;
+    string groupColorValue;
+    internal GeneralAlternativeGroup GroupStyle {
+        get { return LinkedAlternative == null || groupFields == null ? null : new GeneralAlternativeGroup { Name = groupName.Text.Trim(), Color = groupColorValue }; }
+    }
     readonly Button save, install, removeVariant, setDefault, browse;
     readonly ToolTip editorTips = new ToolTip { UseAnimation = false, UseFading = false };
     internal GeneralModEntry LinkedAlternative { get; private set; }
@@ -43,8 +50,9 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
     internal bool InstallRequested { get; private set; }
     internal bool AttachRequested { get; private set; }
 
-    internal GeneralModEditor(GeneralModEntry entry, IEnumerable<string> categories, string selected, bool allowInstall, string installInfo,Func<string,Task<GeneralSourceInfo>> lookup=null, IEnumerable<GeneralModEntry> alternatives=null) {
+    internal GeneralModEditor(GeneralModEntry entry, IEnumerable<string> categories, string selected, bool allowInstall, string installInfo,Func<string,Task<GeneralSourceInfo>> lookup=null, IEnumerable<GeneralModEntry> alternatives=null, GeneralModList groupList=null) {
         this.lookup=lookup;
+        this.groupList=groupList??new GeneralModList();
         model = entry.Variants.Select(v => new GeneralModVariant {
             Id = v.Id, Name = v.Name, Sources = v.Sources.ToList(), SourceInfo=v.SourceInfo==null?new Dictionary<string,GeneralSourceInfo>():v.SourceInfo.ToDictionary(pair=>pair.Key,pair=>pair.Value.SavedCopy()), CyberpunkId = v.CyberpunkId, CyberpunkVariant = v.CyberpunkVariant
         }).ToList();
@@ -172,6 +180,17 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
             pairing.Controls.Add(alternative, 0, 0);
             pairing.Controls.Add(unlink, 1, 0);
             AddEditorRow(layout, pairing);
+            groupColor = GeneralStyle.Button("", ChooseGroupColor);
+            groupColor.Name = "AlternativeGroupColor";
+            groupColor.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
+            var groupSettings = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, ColumnCount = 2, Margin = Padding.Empty };
+            groupSettings.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            groupSettings.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            groupSettings.Controls.Add(EditorField(T("Nome do grupo", "Group name"), groupName), 0, 0);
+            groupSettings.Controls.Add(groupColor, 1, 0);
+            groupFields = groupSettings;
+            AddEditorRow(layout, groupFields);
+            groupName.TextChanged += (s, e) => ValidateInputs();
             SetLinkedAlternative(options.FirstOrDefault(other => entry.AlternativeGroup != null && other.AlternativeGroup == entry.AlternativeGroup));
         }
 
@@ -226,11 +245,44 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
     }
 
     internal void SetLinkedAlternative(GeneralModEntry entry) {
+        var previous=LinkedAlternative;
         LinkedAlternative = entry;
         if (alternative == null) return;
         alternative.Text = entry == null ? T("Vincular outro mod", "Link another mod") : entry.Name;
         alternative.AccessibleName = entry == null ? alternative.Text : T("Trocar mod vinculado: ", "Change linked mod: ") + entry.Name;
-        unlink.Enabled = entry != null;
+        unlink.Enabled = groupFields.Visible = entry != null;
+        if(entry!=null&&(previous==null||(entry.AlternativeGroup??entry.Id)!=(previous.AlternativeGroup??previous.Id))){
+            GeneralAlternativeGroup style;
+            groupList.AlternativeGroups.TryGetValue(entry.AlternativeGroup??"",out style);
+            groupName.Text=style!=null&&style.Name!=null?style.Name:GeneralModLibrary.GroupDefaultName(entry.AlternativeGroup);
+            groupColorValue=style==null?GeneralModLibrary.DefaultGroupColor(groupList,entry.Id):style.Color;
+            UpdateGroupColorLabel();
+        }
+        ValidateInputs();
+    }
+
+    void ChooseGroupColor(){
+        using(var chooser=new ColorDialog { Color=ColorTranslator.FromHtml(groupColorValue),FullOpen=true }){
+            if(chooser.ShowDialog(this)!=DialogResult.OK)return;
+            groupColorValue="#"+(chooser.Color.ToArgb()&0xffffff).ToString("X6");
+            UpdateGroupColorLabel();
+            ValidateInputs();
+        }
+    }
+
+    void UpdateGroupColorLabel(){
+        groupColor.Text=T("Cor do grupo","Group color")+" · "+groupColorValue;
+    }
+
+    string CurrentValidation(GeneralModEntry entry){
+        string error=ValidationMessage(entry);
+        var style=GroupStyle;
+        if(error.Length!=0||style==null)return error;
+        if(String.IsNullOrWhiteSpace(style.Name)||style.Name.Length>18||style.Name.Any(Char.IsControl))
+            return T("Informe um nome de até 18 caracteres para o grupo.","Enter a group name of up to 18 characters.");
+        if(!GeneralModLibrary.GroupColorAvailable(groupList,LinkedAlternative.AlternativeGroup,style.Color))
+            return T("Esta cor já é usada por outro grupo.","This color is already used by another group.");
+        return "";
     }
 
     static void AddEditorRow(TableLayoutPanel layout, Control left, Control right = null) {
@@ -424,7 +476,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
 
     void ValidateInputs() {
         if (changing || install == null || save == null) return;
-        string error = ValidationMessage(Draft(null));
+        string error = CurrentValidation(Draft(null));
         validation.Text = error;
         validation.Visible = error.Length != 0;
         install.Enabled = save.Enabled = error.Length == 0;
@@ -439,7 +491,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
 
     void Finish(string id, bool requested) {
         GeneralModEntry draft = Draft(id);
-        string error = ValidationMessage(draft);
+        string error = CurrentValidation(draft);
         if (error.Length != 0) { validation.Text = error; return; }
         foreach (var variant in draft.Variants) GeneralModLibrary.NormalizeSources(variant);
         Result = draft;

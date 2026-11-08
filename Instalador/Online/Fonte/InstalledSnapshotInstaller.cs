@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -267,19 +268,59 @@ public sealed partial class InstalledSnapshotInstaller {
     }
 
     public string Status(string receiptId, string workKey) {
-        var receipt = Read(receiptId);
-        if (receipt == null || receipt.Status != "installed" || !receipt.ActiveOwners.Contains(workKey)) return GeneralModInstaller.Missing;
-        var paths = new HashSet<string>(receipt.Manifest.Files.Where(f => f.Owners.Contains(workKey)).Select(f => f.Path), StringComparer.OrdinalIgnoreCase);
-        int present = 0;
-        foreach (var file in receipt.Files.Where(f => paths.Contains(f.Path))) {
-            string target = Safe.In(destination, file.Path);
-            if (Directory.Exists(target)) return GeneralModInstaller.Modified;
-            if (!File.Exists(target)) continue;
-            bool code = receipt.Manifest.Files.Any(f => f.Kind == "file" && f.Path.Equals(file.Path, StringComparison.OrdinalIgnoreCase));
-            if (code && !Matches(file)) return GeneralModInstaller.Modified;
+        return CheckStatus(IndexStatus(receiptId),workKey,Safe.Hash);
+    }
+
+    internal sealed class StatusScan {
+        readonly InstalledSnapshotInstaller installer;
+        readonly Func<string,string> readHash;
+        readonly ConcurrentDictionary<string,Lazy<ILookup<string,StatusFile>>> receipts =
+            new ConcurrentDictionary<string,Lazy<ILookup<string,StatusFile>>>(StringComparer.Ordinal);
+
+        internal StatusScan(InstalledSnapshotInstaller installer,Func<string,string> readHash) {
+            this.installer=installer;
+            this.readHash=readHash;
+        }
+
+        internal string Status(string receiptId,string workKey) {
+            var index=receipts.GetOrAdd(receiptId,id=>new Lazy<ILookup<string,StatusFile>>(()=>installer.IndexStatus(id))).Value;
+            return installer.CheckStatus(index,workKey,readHash);
+        }
+    }
+
+    sealed class StatusFile {
+        internal Change File;
+        internal bool Code;
+    }
+
+    ILookup<string,StatusFile> IndexStatus(string receiptId) {
+        var receipt=Read(receiptId);
+        var owners=new List<KeyValuePair<string,StatusFile>>();
+        if(receipt!=null&&receipt.Status=="installed"){
+            var active=new HashSet<string>(receipt.ActiveOwners,StringComparer.Ordinal);
+            var paths=receipt.Manifest.Files.ToLookup(file=>file.Path,StringComparer.OrdinalIgnoreCase);
+            foreach(var file in receipt.Files){
+                var entries=paths[file.Path];
+                var check=new StatusFile{File=file,Code=entries.Any(entry=>entry.Kind=="file")};
+                foreach(string owner in entries.SelectMany(entry=>entry.Owners).Where(active.Contains).Distinct(StringComparer.Ordinal))
+                    owners.Add(new KeyValuePair<string,StatusFile>(owner,check));
+            }
+        }
+        return owners.ToLookup(pair=>pair.Key,pair=>pair.Value,StringComparer.Ordinal);
+    }
+
+    string CheckStatus(ILookup<string,StatusFile> index,string owner,Func<string,string> readHash) {
+        int present=0,expected=0;
+        foreach(var check in index[owner]){
+            expected++;
+            var file=check.File;
+            string target=Safe.In(destination,file.Path);
+            if(Directory.Exists(target))return GeneralModInstaller.Modified;
+            if(!File.Exists(target))continue;
+            if(check.Code&&(new FileInfo(target).Length!=file.Size||readHash(target)!=file.After))return GeneralModInstaller.Modified;
             present++;
         }
-        return present == 0 ? GeneralModInstaller.Missing : present == paths.Count ? GeneralModInstaller.Installed : GeneralModInstaller.Partial;
+        return present==0?GeneralModInstaller.Missing:present==expected?GeneralModInstaller.Installed:GeneralModInstaller.Partial;
     }
 
     public string Remove(string receiptId, IEnumerable<string> workKeys, Action<string> report, bool forgetOnly=false) {
@@ -444,15 +485,16 @@ public sealed partial class InstalledSnapshotInstaller {
         var keys = new HashSet<string>(WorkKeys(receipt.Manifest), StringComparer.Ordinal);
         if (receipt.ActiveOwners.Count > keys.Count || receipt.ActiveOwners.Distinct().Count() != receipt.ActiveOwners.Count || receipt.ActiveOwners.Any(k => !keys.Contains(k))) throw new IOException("Proprietários inválidos no recibo.");
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var manifestPaths=receipt.Manifest.Files.ToLookup(file=>file.Path,StringComparer.OrdinalIgnoreCase);
         foreach (var file in receipt.Files) {
             if (file == null || !paths.Add(file.Path) || !FixedData.HashValid(file.After) || file.Size < 0 || file.Size > InstalledSnapshot.MaxFileBytes
                 || file.Before != null && !FixedData.HashValid(file.Before)||file.Expected!=null&&!FixedData.HashValid(file.Expected)
-                || !receipt.Manifest.Files.Any(f => f.Path.Equals(file.Path, StringComparison.OrdinalIgnoreCase))) throw new IOException("Arquivo inválido no recibo de snapshot.");
+                || !manifestPaths.Contains(file.Path)) throw new IOException("Arquivo inválido no recibo de snapshot.");
             Safe.In(destination, file.Path);
-            var payload = receipt.Manifest.Files.First(f => f.Path.Equals(file.Path, StringComparison.OrdinalIgnoreCase));
+            var payload = manifestPaths[file.Path].First();
             if (payload.Kind == "file" && (payload.Sha256 != file.After || payload.Size != file.Size)) throw new IOException("Arquivo do recibo não corresponde ao snapshot.");
         }
-        if (receipt.Status == "installed" && paths.Count != receipt.Manifest.Files.Select(f => f.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count()) throw new IOException("Recibo de snapshot incompleto.");
+        if (receipt.Status == "installed" && paths.Count != manifestPaths.Count) throw new IOException("Recibo de snapshot incompleto.");
         return receipt;
     }
     IEnumerable<Receipt> AllReceipts(bool inspection=false) {

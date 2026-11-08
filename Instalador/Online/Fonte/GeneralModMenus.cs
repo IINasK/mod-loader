@@ -90,7 +90,7 @@ internal sealed partial class GeneralModWindow {
     }
     async void ShowOptions(){
         if(working||scanning)return;
-        using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder,()=>cache.ClearRetainedDownloads(),state.Destination??"")){
+        using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder,cache.PreviewRetainedDownloads,state.Destination??"")){
             dialog.AnchorTo(optionsButton);
             if(dialog.ShowDialog(this)!=DialogResult.OK){RefreshStorageSize();return;}
             bool moved=!String.Equals(state.Destination??"",dialog.Destination,StringComparison.OrdinalIgnoreCase);
