@@ -26,18 +26,38 @@ internal sealed partial class GeneralModWindow {
             eclipse.Variants.Single().Sources.Single()=="https://www.nexusmods.com/cyberpunk2077/mods/33230?tab=files&file_id=162991"&&
             realSeed.Presets.All(preset=>preset.ModIds.Contains(eclipse.Id)),
             "Eclipse usa a edição corporal EBBRB fixada e aparece nos dois presets.");
+        var auditedAdult=realSeed.Mods.Single(mod=>mod.Id=="mod-7822");
+        var safeFeet=realSeed.Mods.Single(mod=>mod.Id==GeneralModLibrary.VanillaFeetId);
+        check(auditedAdult.Nsfw&&!safeFeet.Nsfw,"O catálogo aplica a classificação de adulto por origem Nexus confirmada.");
+        auditedAdult.Nsfw=false;
+        string legacyNsfw=Path.Combine(root,"legacy-nsfw.json");
+        Safe.WriteJson(legacyNsfw,new GeneralModState{List=realSeed});
+        check(new GeneralModLibrary(legacyNsfw).Load().List.Mods.Single(mod=>mod.Id==auditedAdult.Id).Nsfw&&
+            !GeneralNexusInfo.IsAuditedAdultSource("https://www.nexusmods.com/skyrimspecialedition/mods/7822"),
+            "Projetos antigos recuperam a marca por fonte e IDs iguais de outro jogo não são classificados.");
+        auditedAdult.Nsfw=true;
         var bodies=realSeed.Mods.Where(mod=>GeneralModLibrary.IsHystBody(mod.Id)).ToList();
         check(bodies.Count==2&&bodies.All(mod=>mod.Nsfw&&mod.Category==GeneralModLibrary.BodyCategory&&mod.Variants.Count==3)&&
             bodies[0].AlternativeGroup!=null&&bodies[0].AlternativeGroup==bodies[1].AlternativeGroup&&
             realSeed.Mods.Where(mod=>GeneralModLibrary.IsFacialMod(mod.Id)).All(mod=>mod.Category==GeneralModLibrary.BodyCategory),
             "Rostos e alternativas Hyst NSFW compartilham a categoria de corpo.");
+        var feet=realSeed.Mods.Single(mod=>mod.Id==GeneralModLibrary.VanillaFeetId);
+        check(bodies.Concat(new[]{feet}).Select(GeneralModLibrary.ChoiceKey).Distinct().Count()==1,
+            "Togglable Feet do corpo padrão e as duas variantes Hyst contam como uma opção.");
+        string bodyGroup=feet.AlternativeGroup;
+        feet.AlternativeGroup=null;
+        check(GeneralModLibrary.GroupBodyOptions(realSeed)&&feet.AlternativeGroup==bodyGroup&&!GeneralModLibrary.GroupBodyOptions(realSeed),
+            "O projeto padrão já salvo recebe o grupo Corpo uma única vez.");
         var independent=new GeneralModEntry{Id="independent",Name="Independente"};
         var jobs=bodies.Concat(new[]{independent}).Select(entry=>new Work{Entry=entry}).ToList();
-        var package=new InstalledSnapshotManifest{Project=new GeneralModList{Mods=bodies.Concat(new[]{independent}).ToList()},
-            List=new GeneralModList{Mods=new List<GeneralModEntry>{bodies[0]}}};
+        var package=new InstalledSnapshotManifest{Project=new GeneralModList{Mods=bodies.Concat(new[]{feet,independent}).ToList()},
+            List=new GeneralModList{Mods=new List<GeneralModEntry>{feet}}};
         check(InstalledSnapshot.CountOutsidePack(package)==1,"Uma opção enviada satisfaz o grupo sem contar a alternativa no P2P.");
         package.List.Mods.Clear();
         check(InstalledSnapshot.CountOutsidePack(package)==2,"Um grupo ausente conta uma vez no P2P.");
+        var bodyJobs=jobs.Concat(new[]{new Work{Entry=feet}}).ToList();
+        check(ChooseAlternatives(bodyJobs,choices=>feet.Id).Select(work=>work.Entry.Id).SequenceEqual(new[]{independent.Id,feet.Id}),
+            "A fila permite escolher Togglable Feet como alternativa às duas variantes Hyst.");
         check(ChooseAlternatives(jobs,choices=>choices[1].Id).Select(work=>work.Entry.Id).SequenceEqual(new[]{bodies[1].Id,independent.Id})&&
             ChooseAlternatives(jobs,choices=>"").Single().Entry==independent&&ChooseAlternatives(jobs,choices=>null)==null&&
             ChooseAlternatives(jobs.Skip(1).ToList(),choices=>{throw new IOException("Uma opção não deve abrir o seletor.");}).Count==2,
@@ -99,6 +119,29 @@ internal sealed partial class GeneralModWindow {
             pending.Clear();
             missing=form.PlanSelected(selected,game,pending);
             check(pending.Contains(ordered[0])&&missing.SequenceEqual(new[]{"fixture3"}),"Uma dependência faltante entra uma só vez mesmo quando o mod selecionado já está presente.");
+            var dependency=fake.Packages[2];
+            dependency.Assets[0].ModId=1873;
+            check(form.RequiresNsfwApproval(ordered[0],new ScanReads(form,game)),
+                "Dependência NSFW ausente exige autorização mesmo quando o item principal não é NSFW.");
+            string dependencyPath=Safe.In(game,dependency.Files[0].Path);
+            File.WriteAllText(dependencyPath,"fixture3",new UTF8Encoding(false));
+            check(!form.RequiresNsfwApproval(ordered[0],new ScanReads(form,game)),
+                "Dependência NSFW já instalada não pede autorização para instalar o outro mod.");
+            File.Delete(dependencyPath);
+            dependency.Assets[0].ModId=400;
+            var review=new ProjectVerification(false){Reads=new ScanReads(form,game)};
+            review.Record(ordered[0]);
+            var suggested=new Dictionary<string,Work>();
+            var issues=form.ReviewDependencies(review,suggested);
+            check(issues.Count==1&&issues[0].Requirement=="fixture3"&&suggested.Count==1&&
+                suggested.Values.Single().Entry.Id=="fixture3"&&issues[0].Url.EndsWith("file_id=503"),
+                "Verificar oferece o arquivo fixado da dependência ausente sem iniciar a instalação.");
+            string sacredPath=Safe.In(game,"archive/pc/mod/00_00VTK_Tattoo_KALA_Sacred_Body.archive");
+            File.WriteAllText(sacredPath,"arquivo instalado por fora",new UTF8Encoding(false));
+            var inventory=form.ReadGameInventory(game);
+            check(inventory.Count==1&&inventory[0].Path.EndsWith("Sacred_Body.archive")&&inventory[0].Mod.Contains("Sacred")&&File.Exists(sacredPath),
+                "A leitura encontra a tatuagem fora da lista sem adotar ou alterar o arquivo.");
+            File.Delete(sacredPath);
             fake.Packages[0].Dependencies=new string[0];
             File.Delete(Safe.In(game,fake.Packages[0].Files[0].Path));
             form.Enqueue(ordered,false);
@@ -161,6 +204,7 @@ internal sealed partial class GeneralModWindow {
         int libraryChecks=GeneralModLibraryV2Tests.Run(root);
         RunProgressTests(root);HistoricalReceiptTests.Run(root);
         RunUiTests(root);
+        RunVerificationFlowTests(root);
         GeneralButtonPaintTests.Run(root);
         GeneralP2PTests.Run(root);
         GeneralP2PUiTests.Run(root);

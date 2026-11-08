@@ -8,7 +8,7 @@ using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
     Button primaryAction;
-    enum ModAction { None, Disable, Enable, Change, Install, Download }
+    enum ModAction { None, Disable, ChooseDependency, Enable, Change, Install, Download }
 
     List<Work> SelectedJobs() {
         var jobs = Marked();
@@ -17,6 +17,7 @@ internal sealed partial class GeneralModWindow {
     }
 
     ModAction ActionFor(Work work, HashSet<string> selectedIds) {
+        if(GeneralModLibrary.NeedsDependencyVersion(work.Entry,work.Variant))return ModAction.ChooseDependency;
         string status;
         statuses.TryGetValue(work.Key, out status);
         bool active = GeneralStatusPresentation.Kind(status) == "installed";
@@ -54,9 +55,15 @@ internal sealed partial class GeneralModWindow {
 
     void RefreshPrimaryAction() {
         if (primaryAction == null || grid == null || drawing || working || scanning || associationChoice != null) return;
+        if(String.IsNullOrWhiteSpace(state.Destination)){
+            primaryAction.Text=T("Selecionar pasta","Select folder");
+            primaryAction.Enabled=true;
+            return;
+        }
         List<Work> ignored;
         var action = ClassifyJobs(SelectedJobs(), out ignored);
         primaryAction.Text = action == ModAction.Disable ? T("Desabilitar", "Disable")
+            : action == ModAction.ChooseDependency ? GeneralStatusPresentation.Label(GeneralStatusPresentation.ChooseDependency)
             : action == ModAction.Enable ? T("Reativar", "Enable")
             : action == ModAction.Change ? T("Mudar versão", "Change version")
             : action == ModAction.Install ? T("Instalar", "Install")

@@ -163,7 +163,20 @@ internal sealed partial class GeneralModWindow {
             check(Object.ReferenceEquals(form.updateChecker,GeneralUpdateChecker.Session),"Home e projetos compartilham uma consulta de atualização por abertura.");
             var store=new GeneralProjectStore(Path.Combine(root,"attached"));var item=store.Create("Projeto atual",new GeneralModList(),"light-red","pt");store.SavePreferences("dark","en");form.AttachProject(store,item);
             check(form.state.Theme=="dark"&&form.state.Language=="en"&&GeneralStyle.Dark,"Tema e idioma globais acompanham a abertura de outro projeto.");
-            check(form.Text.Contains("Projeto atual"),"Janela identifica o projeto aberto.");form.ProjectCommand("new");check(form.ProjectAction=="new","Novo projeto retorna à Home sem substituir a lista atual.");await Task.CompletedTask;
+            check(form.Text.Contains("Projeto atual"),"Janela identifica o projeto aberto.");
+            var oldPack=GeneralModLibrary.Seed(form.catalog,new ModImportItem[0]);
+            const string eclipse=GeneralModLibrary.EclipseTattooId;
+            foreach(var preset in oldPack.Presets)preset.ModIds.Remove(eclipse);
+            oldPack.Presets.Add(new GeneralModPreset{Id="custom",Name="Meu preset"});
+            var ready=store.Create("Cyberpunk 2077",oldPack,"dark","en",root,"cyberpunk-2077");
+            form.state=store.Load(ready);
+            form.AttachProject(store,ready);
+            var stored=new GeneralModLibrary(Path.Combine(form.data,"lista.json")).Load().List;
+            check(stored.Mods.Count(mod=>mod.Id==eclipse)==1&&
+                stored.Presets.Where(preset=>preset.Id!="custom").All(preset=>preset.ModIds.Contains(eclipse))&&
+                !stored.Presets.Single(preset=>preset.Id=="custom").ModIds.Contains(eclipse),
+                "Atualizar o pacote oficial recupera a Eclipse nos dois presets oficiais e preserva o personalizado.");
+            form.ProjectCommand("new");check(form.ProjectAction=="new","Novo projeto retorna à Home sem substituir a lista atual.");await Task.CompletedTask;
         });
         Safe.WriteJson(Path.Combine(root,"resultado-project-home.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});
     }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -38,7 +38,7 @@ internal sealed partial class GeneralModWindow {
         TestForm(catalog,visibleState,data,root,async form=>{
             form.AttachProject(store,project);form.RefreshStorageSize();await Until(()=>!form.storageReading);form.DrawRows();
             check(form.counts.Text.Contains("Medidos: 3/4"),"Counter reports identified sizes over all visible mod rows: "+form.counts.Text);
-            check(form.grid.Columns["Size"].DisplayIndex==2&&form.grid.Columns["Variant"].Index==2&&form.grid.Columns["Status"].Index==3,"Space sits next to the name without changing the existing column-filter identities.");
+            check(form.grid.Columns["Size"].DisplayIndex==form.grid.Columns["Name"].DisplayIndex+1&&form.grid.Columns["Variant"].Index==2&&form.grid.Columns["Status"].Index==3,"Space sits next to the name without changing the existing column-filter identities.");
             check((string)form.ModRows().Single(row=>(string)row.Tag==first.Id).Cells["Size"].Value=="5 B"&&(string)form.ModRows().Single(row=>(string)row.Tag==empty.Id).Cells["Size"].Value=="0 B","Rows show actual measured values, including zero.");
             check((string)form.ModRows().Single(row=>(string)row.Tag==absent.Id).Cells["Size"].Value=="—"&&form.ModRows().Single(row=>(string)row.Tag==absent.Id).Cells["Size"].ToolTipText.Contains("não identificado"),"Unknown sizes remain explicit and do not use download estimates.");
             form.marked.UnionWith(list.Mods.Select(mod=>mod.Id));form.DrawRows();check(form.counts.Text.Contains("Medidos: 3/4"),"Selecting all items does not change the measurement ratio.");

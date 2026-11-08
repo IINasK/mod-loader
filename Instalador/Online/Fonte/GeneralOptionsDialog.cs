@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Drawing;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 internal sealed class GeneralOptionsDialog : GeneralDialog {
@@ -56,6 +58,7 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
         layout.Controls.Add(choices, 0, 0);
 
         this.folder.Text=folder??"";
+        this.folder.ReadOnly=true;
         this.folder.AccessibleName=T("Pasta de downloads","Download folder");
         layout.Controls.Add(FolderRow(T("Procurar downloads em","Look for downloads in"),this.folder,()=>Browse(this.folder,false)),0,1);
         if(projectOptions){
@@ -134,7 +137,7 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
     }
 
     static Control FolderRow(string label,TextBox text,Action browseFolder){
-        text.ReadOnly=true;text.Dock=DockStyle.Fill;text.BorderStyle=BorderStyle.None;
+        text.Dock=DockStyle.Fill;text.BorderStyle=BorderStyle.None;
         var row = new TableLayoutPanel {
             Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, RowCount = 2,
             Margin = new Padding(0, 18, 0, 0)
@@ -161,28 +164,106 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
     }
 
     void Browse(TextBox field,bool install) {
-        using (var dialog = new FolderBrowserDialog {
-            Description = install?T("Escolha a pasta onde os mods serão instalados.","Choose where mods will be installed."):T("Escolha onde o navegador salva os downloads.", "Choose where your browser saves downloads."),
-            SelectedPath = field.Text
-        }) {
-            if (dialog.ShowDialog(this) != DialogResult.OK) return;
-            try {
-                Safe.NoLinks(dialog.SelectedPath);
-                field.Text=install?dialog.SelectedPath:new OnlineDownloadWatch(dialog.SelectedPath).Folder;
-                error.Text = "";
-            } catch (Exception ex) { ShowNotice(ex.Message,true); }
-        }
+        try {
+            string selected=WindowsFolderPicker.Choose(this,
+                install?T("Pasta de instalação","Installation folder"):T("Pasta de downloads","Download folder"),field.Text);
+            if(selected==null)return;
+            field.Text=install?WindowsFolderPicker.InstallationPath(selected):new OnlineDownloadWatch(selected).Folder;
+            error.Text="";
+        } catch(Exception ex) { ShowNotice(ex.Message,true); }
     }
 
     void Save() {
         try {
             string selectedFolder = new OnlineDownloadWatch(folder.Text).Folder;
+            Destination=projectOptions?WindowsFolderPicker.InstallationPath(destination.Text):null;
             ThemeValue = theme.SelectedIndex == 1 ? "dark" : theme.SelectedIndex == 2 ? "light-red" : theme.SelectedIndex == 3 ? "black" : "light";
             LanguageValue = language.SelectedIndex == 1 ? "en" : "pt";
             DownloadFolder = selectedFolder;
-            Destination=projectOptions?destination.Text:null;
             DialogResult = DialogResult.OK;
         } catch (Exception ex) { ShowNotice(ex.Message,true); }
     }
 }
 
+internal static class WindowsFolderPicker {
+    const uint PickFolders=0x20, ForceFileSystem=0x40, PathMustExist=0x800;
+    const uint FileSystemPath=0x80058000;
+    const int Cancelled=unchecked((int)0x800704C7);
+
+    internal static string InstallationPath(string input) {
+        string path=(input??"").Trim();
+        if(path.Length==0)return "";
+        if(path.Length>=2&&path[0]=='"'&&path[path.Length-1]=='"')path=path.Substring(1,path.Length-2);
+        path=path.Replace('/','\\');
+        bool absoluteDrive=path.Length>=3&&Char.IsLetter(path[0])&&path[1]==':'&&path[2]=='\\';
+        bool networkShare=path.StartsWith(@"\\",StringComparison.Ordinal)
+            &&!path.StartsWith(@"\\?\",StringComparison.Ordinal)&&!path.StartsWith(@"\\.\",StringComparison.Ordinal);
+        if((!absoluteDrive&&!networkShare)||!Directory.Exists(path))throw new IOException(GeneralStyle.T(
+            "Informe o caminho completo de uma pasta existente.","Enter the full path of an existing folder."));
+        path=Path.GetFullPath(path);
+        Safe.NoLinks(path);
+        return path;
+    }
+
+    internal static string Choose(IWin32Window owner,string title,string initial=null) {
+        var dialog=(IFileDialog)new FileOpenDialog();
+        IShellItem start=null,selected=null;
+        try {
+            uint options;
+            dialog.GetOptions(out options);
+            dialog.SetOptions(options|PickFolders|ForceFileSystem|PathMustExist);
+            dialog.SetTitle(title);
+            if(Directory.Exists(initial)){
+                Guid type=typeof(IShellItem).GUID;
+                if(SHCreateItemFromParsingName(initial,IntPtr.Zero,ref type,out start)>=0)
+                    dialog.SetFolder(start);
+            }
+            int result=dialog.Show(owner.Handle);
+            if(result==Cancelled)return null;
+            Marshal.ThrowExceptionForHR(result);
+            dialog.GetResult(out selected);
+            string path;
+            selected.GetDisplayName(FileSystemPath,out path);
+            return path;
+        } finally {
+            if(selected!=null)Marshal.ReleaseComObject(selected);
+            if(start!=null)Marshal.ReleaseComObject(start);
+            Marshal.ReleaseComObject(dialog);
+        }
+    }
+
+    [DllImport("shell32.dll",CharSet=CharSet.Unicode,ExactSpelling=true)]
+    static extern int SHCreateItemFromParsingName(string path,IntPtr bindContext,ref Guid type,out IShellItem item);
+
+    [ComImport,Guid("DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7")]
+    class FileOpenDialog {}
+
+    [ComImport,Guid("42F85136-DB7E-439C-85F1-E4075D135FC8"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IFileDialog {
+        [PreserveSig] int Show(IntPtr owner);
+        void SetFileTypes(uint count,IntPtr filters);
+        void SetFileTypeIndex(uint index);
+        void GetFileTypeIndex(out uint index);
+        void Advise(IntPtr events,out uint cookie);
+        void Unadvise(uint cookie);
+        void SetOptions(uint options);
+        void GetOptions(out uint options);
+        void SetDefaultFolder(IShellItem folder);
+        void SetFolder(IShellItem folder);
+        void GetFolder(out IShellItem folder);
+        void GetCurrentSelection(out IShellItem item);
+        void SetFileName([MarshalAs(UnmanagedType.LPWStr)] string name);
+        void GetFileName([MarshalAs(UnmanagedType.LPWStr)] out string name);
+        void SetTitle([MarshalAs(UnmanagedType.LPWStr)] string title);
+        void SetOkButtonLabel([MarshalAs(UnmanagedType.LPWStr)] string text);
+        void SetFileNameLabel([MarshalAs(UnmanagedType.LPWStr)] string label);
+        void GetResult(out IShellItem item);
+    }
+
+    [ComImport,Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IShellItem {
+        void BindToHandler(IntPtr bindContext,ref Guid handler,ref Guid type,out IntPtr result);
+        void GetParent(out IShellItem parent);
+        void GetDisplayName(uint format,[MarshalAs(UnmanagedType.LPWStr)] out string name);
+    }
+}

@@ -81,6 +81,20 @@ internal sealed partial class GeneralModWindow {
             form.ResetColumnFilters();form.DrawRows();check(form.VisibleMods().Count==3,"Limpar filtros restaura todos os itens do preset.");
             form.categoryFilters=new HashSet<string>();form.DrawRows();check(form.VisibleMods().Count==0,"Nenhuma categoria marcada é diferente de selecionar todas.");
             form.ResetColumnFilters();form.DrawRows();
+            var origin=form.grid.Columns["Origin"];
+            check(origin.DisplayIndex==form.grid.Columns["Mark"].DisplayIndex+1&&form.grid.Columns["Name"].DisplayIndex==origin.DisplayIndex+1&&
+                form.ModRows().All(row=>Equals(row.Cells["Origin"].Value,"Mod Loader")&&!String.IsNullOrWhiteSpace(row.Cells["Origin"].ToolTipText)),
+                "A origem fica entre a seleção e o nome e explica o selo do Mod Loader.");
+            form.gameInventory=new[]{new P2PSyncDifference{Mod="Sacred",Path="archive/pc/mod/sacred.archive",Kind="found"}};
+            form.searchTerms=GeneralModSearch.Terms("sacred");form.DrawRows();
+            var outside=form.grid.Rows.Cast<DataGridViewRow>().Single(row=>row.Tag is P2PSyncDifference);
+            check(outside.ReadOnly&&!(outside.Cells["Mark"] is DataGridViewCheckBoxCell)&&Equals(outside.Cells["Origin"].Value,"?")&&
+                !String.IsNullOrWhiteSpace(outside.Cells["Origin"].ToolTipText)&&!form.ModRows().Any(),
+                "A busca encontra arquivos fora do catálogo sem incluí-los na seleção de mods.");
+            form.statusFilters=new HashSet<string>{"Instalado"};form.DrawRows();
+            check(!form.grid.Rows.Cast<DataGridViewRow>().Any(row=>row.Tag is P2PSyncDifference),
+                "Arquivos encontrados têm situação própria e não são tratados como mods instalados do projeto.");
+            form.gameInventory=new P2PSyncDifference[0];form.ResetColumnFilters();form.DrawRows();
             GeneralModLibrary.AssociateAlternative(first,second);
             GeneralModLibrary.ValidateList(list,true);
             string linked=first.AlternativeGroup;
@@ -90,7 +104,7 @@ internal sealed partial class GeneralModWindow {
             form.statuses[Key(second,form.Selected(second))]="Instalado";
             form.DrawRows();
             var badges=form.ModRows().Where(row=>Equals(row.Tag,first.Id)||Equals(row.Tag,second.Id)).Select(row=>row.Cells["Group"]).ToArray();
-            check(form.grid.Columns["Group"].DisplayIndex==form.grid.Columns["Status"].DisplayIndex-1&&badges.Length==2&&badges.All(cell=>Equals(cell.Value,"Corpo")),"A coluna Grupo vem antes de Situação e mostra o mesmo nome para as alternativas.");
+            check(form.grid.Columns["Group"].DisplayIndex==form.grid.Columns["Status"].DisplayIndex+1&&badges.Length==2&&badges.All(cell=>Equals(cell.Value,"Corpo")),"A coluna Grupo vem depois de Situação e mostra o mesmo nome para as alternativas.");
             check(form.totalProgress.Caption.EndsWith("1 / 2")&&form.counts.Text.Contains("Instalados: 1"),"Duas alternativas instaladas contam como uma escolha, com outro mod pendente.");
             check(((Color)badges[0].Tag).GetBrightness()>((Color)badges[1].Tag).GetBrightness(),"A alternativa ativa usa a cor mais clara do grupo.");
             form.statuses[Key(first,form.Selected(first))]="Não instalado";

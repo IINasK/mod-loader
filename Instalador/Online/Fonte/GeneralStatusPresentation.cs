@@ -8,10 +8,12 @@ internal static class GeneralStatusPresentation {
     internal const string OtherChoice="Outra versão escolhida";
     internal const string ManualBody="Corpo detectado";
     internal const string Disabled="Desabilitado";
+    internal const string ChooseDependency="Escolher versão";
     internal static string Label(string raw) {
         if(raw==OtherChoice)return GeneralStyle.T(OtherChoice,"Other version selected");
         if(raw==ManualBody)return GeneralStyle.T(ManualBody,"Body detected");
         if(raw==Disabled)return GeneralStyle.T(Disabled,"Disabled");
+        if(raw==ChooseDependency)return GeneralStyle.T(ChooseDependency,"Choose version");
         string value=(raw??"").Trim().ToLowerInvariant();
         if(value=="atualização disponível")return GeneralStyle.T("Atualização disponível","Update available");
         if(value=="versão diferente")return GeneralStyle.T("Versão diferente","Different version");
@@ -26,6 +28,7 @@ internal static class GeneralStatusPresentation {
     }
     internal static Color ColorFor(string raw) {
         if(raw==OtherChoice)return ColorTranslator.FromHtml("#705815");
+        if(raw==ChooseDependency)return ColorTranslator.FromHtml("#A14C00");
         if(raw==Disabled||raw=="Versão mantida")return ColorTranslator.FromHtml("#514E78");
         if(raw==ManualBody)return ColorTranslator.FromHtml("#226B64");
         string value=(raw??"").Trim().ToLowerInvariant();

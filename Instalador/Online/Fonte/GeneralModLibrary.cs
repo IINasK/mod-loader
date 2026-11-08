@@ -27,7 +27,8 @@ public sealed class GeneralAlternativeGroup {
 
 public sealed class GeneralModEntry {
     public string Id, Name, Category, DefaultVariant, AlternativeGroup;
-    public string Description;
+    public string Description, DependencySource;
+    public int DependencyFile;
     public List<string> Tags = new List<string>();
     public bool Nsfw;
     public List<GeneralModVariant> Variants = new List<GeneralModVariant>();
@@ -56,6 +57,8 @@ public sealed class GeneralModLibrary {
         "Roupas e acessórios", "Aparência", "Modo Foto", "Áudio", "Importados", "Outros"
     };
     internal const string BodyCategory = "Melhorias do corpo";
+    internal const string VanillaFeetId = "mod-7049";
+    const string BodyGroup = "hyst-femv-body";
     internal const string EclipseTattooId = "mod-33230";
     internal static bool IsHystBody(string id) { return id == "hyst-ebb-rb" || id == "hyst-ebbp-rb"; }
     internal static bool IsFacialMod(string id) { return id.StartsWith("face-", StringComparison.Ordinal); }
@@ -73,6 +76,7 @@ public sealed class GeneralModLibrary {
         ValidateList(state.List, true);
         ValidateChoices(state);
         RetiredPackEntries.Remove(state);
+        ApplyAuditedAdultFlags(state.List);
         return state;
     }
 
@@ -80,18 +84,20 @@ public sealed class GeneralModLibrary {
         if (state == null) throw new IOException("Estado do Mod Loader inválido.");
         ValidateList(state.List, true);
         ValidateChoices(state);
+        ApplyAuditedAdultFlags(state.List);
         Write(statePath, state);
     }
 
     public void Export(string path, GeneralModList list) {
         ValidateList(list, true);
+        ApplyAuditedAdultFlags(list);
         string fullPath = Path.GetFullPath(path);
         if (String.Equals(fullPath, statePath, StringComparison.OrdinalIgnoreCase))
             throw new IOException("Escolha outro nome para a lista exportada.");
         Write(fullPath, new {
             list.Schema, list.Categories, list.CategoryDescriptions, list.Presets, list.UncategorizedName, list.UncategorizedDescription, list.AlternativeGroups,
             Mods = list.Mods.Select(mod => new {
-                mod.Id, mod.Name, mod.Category, mod.DefaultVariant, mod.Description, mod.Tags, mod.Nsfw, mod.AlternativeGroup,
+                mod.Id, mod.Name, mod.Category, mod.DefaultVariant, mod.Description, mod.Tags, mod.Nsfw, mod.AlternativeGroup, mod.DependencySource, mod.DependencyFile,
                 Variants = mod.Variants.Select(variant => new { variant.Id, variant.Name, variant.Sources, variant.SourceInfo }).ToList()
             }).ToList()
         });
@@ -102,7 +108,14 @@ public sealed class GeneralModLibrary {
     }
 
     internal static string GroupDefaultName(string id) {
-        return id=="hyst-femv-body"?GeneralStyle.T("Corpo","Body"):GeneralStyle.T("Alternativas","Alternatives");
+        return id==BodyGroup?GeneralStyle.T("Corpo","Body"):GeneralStyle.T("Alternativas","Alternatives");
+    }
+
+    internal static bool GroupBodyOptions(GeneralModList list) {
+        if(!list.Mods.Any(mod=>IsHystBody(mod.Id)))return false;
+        var ungrouped=list.Mods.Where(mod=>(mod.Id==VanillaFeetId||IsHystBody(mod.Id))&&mod.AlternativeGroup!=BodyGroup).ToList();
+        foreach(var mod in ungrouped)mod.AlternativeGroup=BodyGroup;
+        return ungrouped.Count!=0;
     }
 
     internal static bool GroupColorAvailable(GeneralModList list,string groupId,string color) {
@@ -157,6 +170,7 @@ public sealed class GeneralModLibrary {
         var list = Read<GeneralModList>(Path.GetFullPath(path), "Schema", "Categories", "Mods");
         ValidateList(list, false);
         RetiredPackEntries.Remove(list);
+        ApplyAuditedAdultFlags(list);
         return list;
     }
 
@@ -215,6 +229,7 @@ public sealed class GeneralModLibrary {
                 } }
             });
         }
+        GroupBodyOptions(list);
         list.Presets.Add(new GeneralModPreset { Id = "all", Name = "Com DLC Phantom Liberty", ModIds = list.Mods.Select(mod => mod.Id).ToList() });
         list.Presets.Add(new GeneralModPreset {
             Id = "no-pl", Name = "Sem DLC Phantom Liberty",
@@ -223,7 +238,21 @@ public sealed class GeneralModLibrary {
                 .Select(mod => mod.Id).Concat(list.Mods.Where(mod => IsHystBody(mod.Id)).Select(mod => mod.Id)).ToList()
         });
         ValidateList(list, true);
+        ApplyAuditedAdultFlags(list);
         return list;
+    }
+
+    internal static bool NeedsDependencyVersion(GeneralModEntry mod,GeneralModVariant variant) {
+        if(mod.DependencySource==null)return false;
+        var expected=GeneralNexusLink.Parse(mod.DependencySource);
+        var links=variant.Sources.Select(GeneralNexusLink.Parse)
+            .Where(link=>link!=null&&link.Game==expected.Game&&link.Mod==expected.Mod).ToList();
+        return !links.Any(link=>link.File>0&&(mod.DependencyFile==0||link.File==mod.DependencyFile))||links.Any(link=>link.File==0);
+    }
+
+    static void ApplyAuditedAdultFlags(GeneralModList list) {
+        foreach(var mod in list.Mods.Where(mod=>!mod.Nsfw))
+            mod.Nsfw=mod.Variants.SelectMany(variant=>variant.Sources).Any(GeneralNexusInfo.IsAuditedAdultSource);
     }
 
     static GeneralModVariant FromFixed(string modId, string variantId, string name, List<FixedAsset> assets, string density) {
@@ -295,6 +324,13 @@ public sealed class GeneralModLibrary {
                 throw new IOException("A lista contém um mod inválido ou repetido.");
             mod.Name = RequiredText(mod.Name, 300, "Nome do mod");
             mod.Description = OptionalDescription(mod.Description);
+            if(mod.DependencyFile<0||mod.DependencyFile>0&&mod.DependencySource==null)
+                throw new IOException("Versão da dependência inválida.");
+            if(mod.DependencySource!=null){
+                var dependency=GeneralNexusLink.Parse(mod.DependencySource);
+                if(dependency==null||dependency.File!=0)throw new IOException("Origem de dependência inválida.");
+                mod.DependencySource=dependency.Url;
+            }
             if (mod.Tags == null) mod.Tags = new List<string>();
             if (mod.Tags.Count > 32) throw new IOException("Use no máximo 32 tags por mod.");
             var tags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

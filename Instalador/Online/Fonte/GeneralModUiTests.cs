@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -8,6 +8,17 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint="SendMessageW")]
+    static extern IntPtr SendUiMouseMessage(IntPtr window,uint message,IntPtr keys,IntPtr position);
+
+    static void ClickModCell(DataGridView grid,Point point,bool doubleClick=false) {
+        var position=new IntPtr((point.Y<<16)|point.X);
+        SendUiMouseMessage(grid.Handle,0x0200,IntPtr.Zero,position);
+        SendUiMouseMessage(grid.Handle,doubleClick?0x0203U:0x0201U,new IntPtr(1),position);
+        SendUiMouseMessage(grid.Handle,0x0202,IntPtr.Zero,position);
+        Application.DoEvents();
+    }
+
     internal static void RunUiTests(string parent){
         string root=OnlineTests.NestedRoot(parent,"ui-v2-");
         Directory.CreateDirectory(root);
@@ -32,13 +43,61 @@ internal sealed partial class GeneralModWindow {
             check(((GeneralButton)form.optionsButton).Bare&&form.optionsButton.Text==""&&((GeneralButton)form.optionsButton).IconKind=="menu","Opções usa apenas ícone de menu sem moldura.");
             check(form.projectsButton.Right<=form.homeButton.Left&&form.homeButton.Right<=form.optionsButton.Left&&form.optionsButton.Parent.Controls.OfType<Button>().Count()==3,"Projetos, voltar e hamburger aparecem nesta ordem no cabeçalho.");
             check(!AllControls(form).OfType<TextBox>().Any(box=>box.AccessibleName=="Pasta de instalação"),"A pasta de instalação fica somente em Opções.");
+            form.state.Destination=null;
+            await form.Scan();
+            check(form.primaryAction.Text=="Selecionar pasta"&&form.primaryAction.Enabled
+                &&form.statuses.Count==0,"Projeto sem destino oferece Selecionar pasta sem varrer os mods.");
+            form.SetDestination(target);
+            form.RefreshPrimaryAction();
+            check(form.primaryAction.Text!="Selecionar pasta","O botão volta à ação dos mods após selecionar o destino.");
             using(var options=new GeneralOptionsDialog("light","pt",root,null,target)){
                 options.Show(form);Application.DoEvents();
                 var folder=AllControls(options).OfType<TextBox>().Single(box=>box.Name=="OptionsInstallationFolder");
                 check(folder.Text==target&&folder.Parent.Height==44,"Opções mostra o destino do projeto em um campo alinhado.");
+                check(!folder.ReadOnly&&folder.ShortcutsEnabled,"O campo da pasta aceita colagem.");
+                folder.Text=archive;
+                var save=(Button)options.AcceptButton;
+                save.PerformClick();
+                check(options.DialogResult!=DialogResult.OK,"Uma pasta inválida não é salva.");
+                folder.SelectAll();
+                folder.Paste("\""+target+"\"");
+                save.PerformClick();
+                check(options.DialogResult==DialogResult.OK&&options.Destination==target,"O caminho copiado do Explorador, entre aspas, é aceito.");
             }
             check(form.currentProgress.Top==form.totalProgress.Top&&Math.Abs(form.currentProgress.Width-form.totalProgress.Width)<=1,"As barras do rodapé dividem a mesma linha em partes iguais.");
+            var verifyButton=AllControls(form).OfType<Button>().Single(button=>button.Name=="VerifyProject");
+            check(verifyButton.Right<form.primaryAction.Left&&verifyButton.Top==form.primaryAction.Top,
+                "Verificar fica ao lado da ação principal no rodapé.");
+            check(form.grid.Columns["Group"].DisplayIndex==form.grid.Columns["Status"].DisplayIndex+1,
+                "Grupo fica depois de Situação.");
             check(form.Font.FontFamily.Name.IndexOf("Jost",StringComparison.OrdinalIgnoreCase)>=0,"A fonte Jost está embutida e em uso.");
+            var firstRow=form.ModRows().First();
+            var statusCell=firstRow.Cells["Status"];
+            var markCell=firstRow.Cells["Mark"];
+            var statusBounds=form.grid.GetCellDisplayRectangle(statusCell.ColumnIndex,firstRow.Index,false);
+            var markBounds=form.grid.GetCellDisplayRectangle(markCell.ColumnIndex,firstRow.Index,false);
+            var statusPoint=new Point(statusBounds.Right-4,statusBounds.Top+8);
+            var markMargin=new Point(markBounds.Left+2,markBounds.Top+8);
+            var glyph=markCell.ContentBounds;
+            var markPoint=new Point(markBounds.Left+glyph.Left+glyph.Width/2,markBounds.Top+glyph.Top+glyph.Height/2);
+            ClickModCell(form.grid,statusPoint);
+            check(form.marked.SetEquals(new[]{one.Id}),"Um clique na área vazia de Situação marca a linha inteira.");
+            ClickModCell(form.grid,markMargin);
+            check(form.marked.Count==0,"A margem da célula de marcação também responde ao clique.");
+            ClickModCell(form.grid,markPoint);
+            check(form.marked.SetEquals(new[]{one.Id}),"O clique sobre o símbolo marca uma única vez.");
+            bool openedByDoubleClick=false;
+            using(var timer=new Timer{Interval=25}){
+                timer.Tick+=(s,e)=>{
+                    var editor=form.OwnedForms.OfType<GeneralModEditor>().FirstOrDefault(dialog=>dialog.Visible);
+                    if(editor==null)return;
+                    openedByDoubleClick=true;timer.Stop();editor.Complete(DialogResult.Cancel);
+                };
+                timer.Start();
+                ClickModCell(form.grid,statusPoint);
+                ClickModCell(form.grid,statusPoint,true);
+            }
+            check(openedByDoubleClick&&form.marked.SetEquals(new[]{one.Id}),"Dois cliques na linha abrem os detalhes e preservam a marca.");
             var click=new DataGridViewCellMouseEventArgs(0,-1,1,1,new MouseEventArgs(MouseButtons.Left,1,1,1,0));
             typeof(DataGridView).GetMethod("OnColumnHeaderMouseClick",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(form.grid,new object[]{click});
             check(form.marked.Count==3&&form.Marked().Count==3,"Selecionar todos ignora títulos e divisões.");
@@ -66,6 +125,28 @@ internal sealed partial class GeneralModWindow {
                 check(button.Bottom<=button.Parent.Height&&button.Right<=button.Parent.Width,"Ações do editor ficam dentro do popup.");
                 CaptureUi(editor,Path.Combine(root,"editor-claro.png"));editor.Close();
             }
+            form.marked.Clear();
+            var dependency=form.CreateDependency(new GeneralNexusRequirement{Name="Dependência teste",
+                Source=new GeneralNexusLink{Game="cyberpunk2077",Mod=8000},MinFile=123},null);
+            form.DrawRows();
+            var dependencyRow=form.ModRows().Single(row=>Equals(row.Tag,dependency.Id));
+            check(Equals(dependencyRow.Cells["Status"].Value,"Escolher versão")&&Equals(dependencyRow.Cells["Size"].Value,"")&&
+                !dependencyRow.Cells["Name"].Style.ForeColor.IsEmpty&&form.ModRows().Last()==dependencyRow,
+                "Dependência sem arquivo aparece em laranja no fim, com status específico e espaço em branco.");
+            form.statusFilters=new HashSet<string>{"Escolher versão"};
+            check(form.VisibleMods().Single()==dependency,"O filtro de situação encontra dependências sem versão.");
+            form.statusFilters=null;
+            form.grid.CurrentCell=dependencyRow.Cells["Name"];
+            form.RefreshPrimaryAction();
+            check(form.primaryAction.Text=="Escolher versão","A dependência indefinida abre o editor em vez de baixar.");
+            dependency.Variants[0].Sources[0]="https://www.nexusmods.com/cyberpunk2077/mods/9000?tab=files&file_id=123";
+            check(GeneralModLibrary.NeedsDependencyVersion(dependency,dependency.Variants[0]),"Arquivo de outro mod não resolve a dependência.");
+            dependency.Variants[0].Sources[0]="https://www.nexusmods.com/cyberpunk2077/mods/8000?tab=files&file_id=123";
+            check(!GeneralModLibrary.NeedsDependencyVersion(dependency,dependency.Variants[0]),"O arquivo explícito da origem libera a ação normal.");
+            form.grid.CurrentCell=null;
+            form.state.List.Mods.Remove(dependency);
+            form.state.List.Categories.Remove(DependencyCategory);
+            form.DrawRows();
             await TestAlternativePicking(form,one,two,three,root,check);
             TestSyncRemovalReview(form,root,check);
             string dropped=TestZip(root,"dropped.zip","mods/drop.txt","dropped");

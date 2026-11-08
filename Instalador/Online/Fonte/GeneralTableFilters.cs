@@ -34,9 +34,14 @@ internal sealed partial class GeneralModWindow {
     GeneralModPreset ActivePreset {get{return state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);}}
     IEnumerable<string> PresetCategories(){
         var active=ActivePreset;
-        if(active==null)return state.List.Categories;
-        var used=new HashSet<string>(state.List.Mods.Where(mod=>active.ModIds.Contains(mod.Id)).Select(mod=>mod.Category),StringComparer.OrdinalIgnoreCase);
-        return state.List.Categories.Where(category=>used.Contains(category)||active.Categories.Contains(category,StringComparer.OrdinalIgnoreCase));
+        var categories=state.List.Categories.AsEnumerable();
+        if(active!=null){
+            var used=new HashSet<string>(state.List.Mods.Where(mod=>active.ModIds.Contains(mod.Id)).Select(mod=>mod.Category),StringComparer.OrdinalIgnoreCase);
+            categories=categories.Where(category=>used.Contains(category)||active.Categories.Contains(category,StringComparer.OrdinalIgnoreCase));
+        }
+        var discovered=new HashSet<string>(state.List.Mods.Where(mod=>mod.DependencySource!=null&&
+            (active==null||active.ModIds.Contains(mod.Id))).Select(mod=>mod.Category),StringComparer.OrdinalIgnoreCase);
+        return categories.OrderBy(category=>discovered.Contains(category));
     }
     string DefaultCategory {get{return categoryFilters!=null&&categoryFilters.Count==1?categoryFilters.Single():null;}}
     void ResetColumnFilters(){categoryFilters=variantFilters=statusFilters=null;nameFilter="";searchQuery="";searchTerms=new string[0];if(searchBox!=null&&!searchBox.IsDisposed)searchBox.Clear();}
@@ -49,7 +54,18 @@ internal sealed partial class GeneralModWindow {
         if(value=="Outra versão escolhida"||value=="Other version selected")return "other-choice";
         if(value=="Corpo detectado"||value=="Body detected")return "manual-body";
         if(value=="Desabilitado"||value=="Disabled")return "disabled";
+        if(value==GeneralStatusPresentation.ChooseDependency||value=="Choose version")return "dependency-version";
+        if(value=="Encontrado no jogo"||value=="Found in game")return "game-inventory";
         return "error";
+    }
+    static string GameInventoryStatus {get{return T("Encontrado no jogo","Found in game");}}
+    IEnumerable<P2PSyncDifference> VisibleGameInventory(){
+        if(associationChoice!=null||categoryFilters!=null||variantFilters!=null||
+            statusFilters!=null&&!statusFilters.Any(value=>StatusFilterKey(value)=="game-inventory"))
+            return Enumerable.Empty<P2PSyncDifference>();
+        return gameInventory.Where(file=>
+            (String.IsNullOrWhiteSpace(nameFilter)||(file.Mod??file.Path).IndexOf(nameFilter,StringComparison.CurrentCultureIgnoreCase)>=0)&&
+            GeneralModSearch.Matches(searchTerms,file.Mod,file.Path,GameInventoryStatus));
     }
     bool ColumnAllows(GeneralModEntry mod){
         string raw=ListStatus(mod);
@@ -67,7 +83,9 @@ internal sealed partial class GeneralModWindow {
                 T("Instalando","Installing"),T("Instalado","Installed"),
                 GeneralStatusPresentation.Label(GeneralStatusPresentation.OtherChoice),GeneralStatusPresentation.Label(GeneralStatusPresentation.ManualBody),
                 GeneralStatusPresentation.Label(GeneralStatusPresentation.Disabled),
+                GeneralStatusPresentation.Label(GeneralStatusPresentation.ChooseDependency),
                 T("Falha","Failed")}.ToList();
+        if(column==3&&gameInventory.Count>0)values.Add(GameInventoryStatus);
         var current=column==1?categoryFilters:column==2?variantFilters:statusFilters;
         IEnumerable<string> selected=current==null?null:column==3?values.Where(value=>current.Any(item=>StatusFilterKey(item)==StatusFilterKey(value))):current.Select(value=>column==1&&value==""?uncat:value);
         using(var dialog=new GeneralColumnFilterDialog(column==1?T("Filtrar mods","Filter mods"):column==2?T("Filtrar variantes","Filter variants"):T("Filtrar situação","Filter status"),values,selected,nameFilter,column==1)){

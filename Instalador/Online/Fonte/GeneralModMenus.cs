@@ -88,13 +88,19 @@ internal sealed partial class GeneralModWindow {
         if(!Directory.Exists(state.DownloadFolder))throw new IOException(T("A pasta de downloads não está disponível. Escolha outra em Opções.","The download folder is unavailable. Choose another one in Options."));
         Safe.NoLinks(state.DownloadFolder);Process.Start(new ProcessStartInfo(state.DownloadFolder){UseShellExecute=true});
     }
+    bool SetDestination(string destination){
+        if(String.Equals(state.Destination??"",destination,StringComparison.OrdinalIgnoreCase))return false;
+        state.Destination=destination;
+        gameInventory=new P2PSyncDifference[0];
+        statuses.Clear();statusDetails.Clear();progress.Clear();
+        return true;
+    }
     async void ShowOptions(){
         if(working||scanning)return;
         using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder,cache.PreviewRetainedDownloads,state.Destination??"")){
             dialog.AnchorTo(optionsButton);
             if(dialog.ShowDialog(this)!=DialogResult.OK){RefreshStorageSize();return;}
-            bool moved=!String.Equals(state.Destination??"",dialog.Destination,StringComparison.OrdinalIgnoreCase);
-            if(moved){state.Destination=dialog.Destination;statuses.Clear();statusDetails.Clear();progress.Clear();}
+            bool moved=SetDestination(dialog.Destination);
             state.Theme=dialog.ThemeValue;state.Language=dialog.LanguageValue;state.DownloadFolder=dialog.DownloadFolder;
             Persist();if(projectStore!=null)projectStore.SavePreferences(state.Theme,state.Language,state.DownloadFolder);BuildInterface();if(moved)await Scan();else RefreshStorageSize();
         }

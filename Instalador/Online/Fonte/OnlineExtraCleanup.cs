@@ -57,9 +57,8 @@ public sealed partial class FixedInstaller {
         }
     }
 
-    List<string> FindExtraPaths(bool includeKnown=false) {
-        string version = FixedData.GameVersion(game);
-        if (!Installer.VersionSupported(version) || FixedData.GameBuild(game) != catalog.GameFileVersion)
+    List<string> FindExtraPaths(bool includeKnown=false,bool verifyBuild=true) {
+        if (verifyBuild&&(!Installer.VersionSupported(FixedData.GameVersion(game)) || FixedData.GameBuild(game) != catalog.GameFileVersion))
             throw new IOException("A limpeza precisa da mesma versão do jogo indicada no catálogo.");
         var known = new HashSet<string>(catalog.Packages.SelectMany(NightCityDensity.KnownFiles).Select(f => f.Path), StringComparer.OrdinalIgnoreCase);
         var paths = new List<string>();
@@ -83,6 +82,16 @@ public sealed partial class FixedInstaller {
         paths = paths.Where(path => (includeKnown||!known.Contains(path)) && ExtraFilePath(path)).OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToList();
         if (!includeKnown && paths.Count > ExtraResetLimit) throw new IOException("A lista de arquivos fora do catálogo excede o limite de limpeza.");
         return paths;
+    }
+
+    internal List<P2PSyncDifference> ReadUnlistedModFiles(IEnumerable<string> listedPaths) {
+        var listed=new HashSet<string>(listedPaths,StringComparer.OrdinalIgnoreCase);
+        var names=catalog.Packages.SelectMany(mod=>NightCityDensity.KnownFiles(mod).Select(file=>new{file.Path,mod.Name}))
+            .GroupBy(item=>item.Path,StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group=>group.Key,group=>group.First().Name,StringComparer.OrdinalIgnoreCase);
+        return FindExtraPaths(true,false).Where(path=>SyncModPath(path)&&!listed.Contains(path)).Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(path=>new P2PSyncDifference{Kind="found",Path=path,Mod=names.ContainsKey(path)?names[path]:SyncExtraName(path)})
+            .ToList();
     }
 
     internal List<OwnedChange> PlanExtraReset() {

@@ -36,11 +36,32 @@ internal sealed class GeneralNexusLink {
         return link;
     }
 }
+internal sealed class GeneralNexusRequirement {
+    internal string Name,MinVersion,MaxVersion;
+    internal GeneralNexusLink Source;
+    internal int MinFile,MaxFile;
+    internal bool Nsfw;
+}
+
 internal static class GeneralNexusInfo {
     const string ApiHost = "https://api.nexusmods.com";
     const string ApiKeyVariable = "MOD_LOADER_NEXUS_API_KEY";
     const int MaxResponse = 4 * 1024 * 1024;
     const long MaxFileBytes = 128L * 1024 * 1024 * 1024;
+
+    // Cyberpunk sources confirmed by Nexus REST v3 on 2026-11-08.
+    static readonly HashSet<int> AuditedAdultMods = new HashSet<int> {
+        1873, 4654, 6985, 7054, 7638, 7822, 9074, 9083, 18353, 20058, 35772
+    };
+
+    internal static bool IsAuditedAdultSource(string source) {
+        var link=GeneralNexusLink.Parse(source);
+        return link!=null&&link.Game=="cyberpunk2077"&&AuditedAdultMods.Contains(link.Mod);
+    }
+
+    internal static bool IsAuditedAdultRecipe(FixedMod mod) {
+        return mod.Assets.Any(asset=>AuditedAdultMods.Contains(asset.ModId));
+    }
 
     internal static string Advice {get{return GeneralStyle.T("No Nexus, copie o link da tela Slow download da versão desejada.","On Nexus, copy the link to the Slow download page for the version you want.");}}
 
@@ -73,6 +94,59 @@ internal static class GeneralNexusInfo {
                 ApplyFile(ReadJson("/v1" + resource + "/files/" + link.File + ".json", key, out status), link, info);
             return info;
         });
+    }
+
+    internal static Task<List<GeneralNexusRequirement[]>> ReadRequirements(GeneralNexusLink link) {
+        string key=TestKey();
+        if(link.File<=0||key==null)return Task.FromResult<List<GeneralNexusRequirement[]>>(null);
+        return Task.Run(()=>{
+            HttpStatusCode status;
+            string game="/games/"+link.Game;
+            var selected=ParseObject(ReadJson("/v1"+game+"/mods/"+link.Mod+"/files/"+link.File+".json",key,out status));
+            if(!MatchesId(selected,"file_id",link.File))return null;
+            var file=Object(ParseObject(ReadJson("/v3"+game+"/mod-file-versions/"+link.File,key,out status)),"data");
+            string id=Text(file,"id",120);
+            if(!MatchesId(file,"game_scoped_id",link.File)||id==null||!Regex.IsMatch(id,@"\A[a-zA-Z0-9_-]+\z"))return null;
+            return ParseRequirements(ReadJson("/v3/mod-file-versions/"+id+"/dependencies",key,out status));
+        });
+    }
+
+    internal static List<GeneralNexusRequirement[]> ParseRequirements(string json) {
+        var definitions=Value(ParseObject(json),"dependency_definitions") as object[];
+        if(definitions==null||definitions.Length>128)return null;
+        var result=new List<GeneralNexusRequirement[]>();
+        foreach(var definition in definitions){
+            var ranges=Value(definition as Dictionary<string,object>,"ranges") as object[];
+            if(ranges==null||ranges.Length==0||ranges.Length>128)return null;
+            var alternatives=new List<GeneralNexusRequirement>();
+            foreach(var item in ranges){
+                var range=item as Dictionary<string,object>;
+                var mod=Object(Object(range,"target_mod_file"),"mod");
+                string name=Text(mod,"name",300);
+                string game=Text(Object(mod,"game"),"domain_name",100);
+                int modId=ReadId(mod,"game_scoped_id"), min=ReadId(Object(range,"min_version"),"game_scoped_id");
+                var maxVersion=Value(range,"max_version");
+                int max=ReadId(maxVersion as Dictionary<string,object>,"game_scoped_id");
+                if(name==null||game==null||!Regex.IsMatch(game,@"\A[a-z0-9][a-z0-9_-]*\z")||modId==0||min==0||
+                    (maxVersion!=null&&max==0))return null;
+                alternatives.Add(new GeneralNexusRequirement{Name=name,
+                    Source=new GeneralNexusLink{Game=game,Mod=modId},MinFile=min,MaxFile=max,
+                    Nsfw=Equals(Value(mod,"adult_content"),true),
+                    MinVersion=Text(Object(range,"min_version"),"version",120),
+                    MaxVersion=Text(maxVersion as Dictionary<string,object>,"version",120)});
+            }
+            result.Add(alternatives.ToArray());
+        }
+        return result;
+    }
+
+    static Dictionary<string,object> Object(Dictionary<string,object> data,string key) {
+        return Value(data,key) as Dictionary<string,object>;
+    }
+    static int ReadId(Dictionary<string,object> data,string key) {
+        int id;
+        return Int32.TryParse(Convert.ToString(Value(data,key),CultureInfo.InvariantCulture),
+            NumberStyles.None,CultureInfo.InvariantCulture,out id)&&id>0?id:0;
     }
 
     static string ReadJson(string route, string key, out HttpStatusCode status) {

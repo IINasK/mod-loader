@@ -19,6 +19,15 @@ internal sealed partial class GeneralModWindow {
         foreach(string bad in new[]{"https://www.nexusmods.com.evil.test/cyberpunk2077/mods/34305","https://user@www.nexusmods.com/cyberpunk2077/mods/34305","https://www.nexusmods.com/cyberpunk2077/mods/34305?token=secret","https://www.nexusmods.com/cyberpunk2077/mods/34305?file_id=0","https://www.nexusmods.com/cyberpunk2077/mods/34305?file_id=1&file_id=2"})check(GeneralNexusLink.Parse(bad)==null,"Unsafe or ambiguous metadata URL is rejected: "+bad.Split('?')[0]);
         const string modJson=@"{""data"":{""game_scoped_id"":""34305"",""name"":""Radio fixture"",""adult_content"":true,""version"":""2.0"",""tags"":[{""name"":""Audio""},{""name"":""audio""},{""name"":""Gameplay""}]}}";
         const string fileJson=@"{""file_id"":169285,""file_name"":""SpotOnRadio.zip"",""version"":""1.5"",""size_kb"":4216}";
+        const string requirementsJson=@"{""dependency_definitions"":[{""ranges"":[{""target_mod_file"":{""mod"":{""game_scoped_id"":""4591"",""name"":""RadioExt"",""game"":{""domain_name"":""cyberpunk2077""}}},""min_version"":{""game_scoped_id"":""168536"",""version"":""2.92""},""max_version"":null},{""target_mod_file"":{""mod"":{""game_scoped_id"":""9999"",""name"":""Alternate"",""game"":{""domain_name"":""cyberpunk2077""}}},""min_version"":{""game_scoped_id"":""6000""},""max_version"":{""game_scoped_id"":""6000""}}]}],""dlc_dependency_definitions"":[]}";
+        var requirements=GeneralNexusInfo.ParseRequirements(requirementsJson);
+        check(requirements.Count==1&&requirements[0].Length==2&&requirements[0][0].Source.Mod==4591&&
+            requirements[0][0].MinVersion=="2.92"&&requirements[0][1].MaxFile==6000,
+            "Nexus requirements keep OR alternatives and exact file bounds.");
+        check(GeneralNexusInfo.ParseRequirements("{}")==null&&
+            GeneralNexusInfo.ParseRequirements(@"{""dependency_definitions"":[]}").Count==0&&
+            GeneralNexusInfo.ParseRequirements(requirementsJson.Replace("cyberpunk2077","evil/route"))==null,
+            "An unavailable, empty or invalid requirements response stays distinguishable.");
         var overviewInfo=GeneralNexusInfo.ParseMod(modJson,link);
         check(overviewInfo.Name=="Radio fixture"&&overviewInfo.ModVersion=="2.0"&&overviewInfo.Version==null&&overviewInfo.Nsfw&&overviewInfo.Tags.SequenceEqual(new[]{"Audio","Gameplay"}),"Public Nexus metadata keeps the mod version, adult flag and distinct tags.");
         var info=GeneralNexusInfo.ParseMod(modJson,link);

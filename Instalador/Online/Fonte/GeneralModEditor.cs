@@ -26,6 +26,8 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
     readonly Label sourceInfo=new Label{Name="SourceMetadata",AutoSize=true,Dock=DockStyle.Fill,UseMnemonic=false};
     readonly Timer sourceDelay=new Timer{Interval=650};
     readonly Func<string,Task<GeneralSourceInfo>> lookup;
+    readonly string dependencySource;
+    readonly int dependencyFile;
     string lastAutoName;
     int sourceGeneration;
     readonly Button alternative, unlink, groupColor;
@@ -52,6 +54,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
 
     internal GeneralModEditor(GeneralModEntry entry, IEnumerable<string> categories, string selected, bool allowInstall, string installInfo,Func<string,Task<GeneralSourceInfo>> lookup=null, IEnumerable<GeneralModEntry> alternatives=null, GeneralModList groupList=null) {
         this.lookup=lookup;
+        dependencySource=entry.DependencySource;dependencyFile=entry.DependencyFile;
         this.groupList=groupList??new GeneralModList();
         model = entry.Variants.Select(v => new GeneralModVariant {
             Id = v.Id, Name = v.Name, Sources = v.Sources.ToList(), SourceInfo=v.SourceInfo==null?new Dictionary<string,GeneralSourceInfo>():v.SourceInfo.ToDictionary(pair=>pair.Key,pair=>pair.Value.SavedCopy()), CyberpunkId = v.CyberpunkId, CyberpunkVariant = v.CyberpunkVariant
@@ -448,7 +451,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         return new GeneralModEntry {
             Id = id, Name = modName.Text.Trim(), Category = category.Text.Trim(), Description = description.Text.Trim(),
             Tags = selectedTags.Concat(new[] { tags.Text.Trim() }).Where(tag => tag.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
-            Nsfw = nsfw.Checked, DefaultVariant = principal, Variants = model
+            Nsfw = nsfw.Checked, DefaultVariant = principal, Variants = model, DependencySource=dependencySource, DependencyFile=dependencyFile
         };
     }
 
@@ -476,10 +479,12 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
 
     void ValidateInputs() {
         if (changing || install == null || save == null) return;
-        string error = CurrentValidation(Draft(null));
+        var draft=Draft(null);
+        string error = CurrentValidation(draft);
         validation.Text = error;
         validation.Visible = error.Length != 0;
-        install.Enabled = save.Enabled = error.Length == 0;
+        save.Enabled=error.Length==0;
+        install.Enabled=save.Enabled&&current!=null&&!GeneralModLibrary.NeedsDependencyVersion(draft,current);
         if (current != null && variants.SelectedIndex >= 0) {
             changing = true;
             int index = variants.SelectedIndex;
@@ -493,11 +498,17 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         GeneralModEntry draft = Draft(id);
         string error = CurrentValidation(draft);
         if (error.Length != 0) { validation.Text = error; return; }
-        foreach (var variant in draft.Variants) GeneralModLibrary.NormalizeSources(variant);
+        foreach(var variant in draft.Variants){
+            GeneralModLibrary.NormalizeSources(variant);
+            if(dependencySource!=null&&(variant.Name=="Indefinida"||variant.Name=="Undefined")&&
+                !GeneralModLibrary.NeedsDependencyVersion(draft,variant))
+                variant.Name=variant.SourceInfo.Values.Select(info=>info.Version).FirstOrDefault(value=>!String.IsNullOrEmpty(value))
+                    ??T("Selecionada","Selected");
+        }
         Result = draft;
         SelectedVariant = current.Id;
         AttachRequested = usePending.Checked;
-        InstallRequested = requested && !AttachRequested;
+        InstallRequested = requested && !AttachRequested&&!GeneralModLibrary.NeedsDependencyVersion(draft,current);
         DialogResult = DialogResult.OK;
     }
 }

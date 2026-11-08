@@ -273,6 +273,14 @@ internal sealed partial class GeneralModWindow {
                 }
                 refreshed=true;
             }
+            const string eclipse=GeneralModLibrary.EclipseTattooId;
+            foreach(var reference in seed.Presets.Where(p=>p.ModIds.Contains(eclipse))){
+                var saved=state.List.Presets.FirstOrDefault(p=>p.Id==reference.Id);
+                if(saved==null||saved.ModIds.Contains(eclipse))continue;
+                saved.ModIds.Add(eclipse);
+                refreshed=true;
+            }
+            if(GeneralModLibrary.GroupBodyOptions(state.List))refreshed=true;
         }
         if(refreshed||state.Theme!=preferences.Theme||state.Language!=preferences.Language){
             state.Theme=preferences.Theme;state.Language=preferences.Language;Persist();BuildInterface();

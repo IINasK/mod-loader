@@ -36,13 +36,28 @@ internal sealed partial class GeneralModWindow {
             catch(Exception){if(!IsDisposed&&generation==storageGeneration&&!label.IsDisposed){label.SetSize(null,false);measuredMods.Clear();UpdateMeasuredRows();}}
         }while(storageQueued&&!IsDisposed);}finally{storageReading=false;}
     }
-    string ModSpace(string id){long bytes;return measuredMods.TryGetValue(id,out bytes)?GeneralStorageSize.Format(bytes):"—";}
+    GeneralSourceInfo DependencySize(GeneralModEntry mod){
+        if(mod.DependencySource==null)return null;
+        return Selected(mod).SourceInfo.Values.FirstOrDefault(info=>info.Bytes>0);
+    }
+    string ModSpace(GeneralModEntry mod){
+        if(GeneralModLibrary.NeedsDependencyVersion(mod,Selected(mod)))return "";
+        long bytes;if(measuredMods.TryGetValue(mod.Id,out bytes))return GeneralStorageSize.Format(bytes);
+        var info=DependencySize(mod);
+        return info!=null?(info.SizeApproximate?"≈ ":"")+GeneralStorageSize.Format(info.Bytes):mod.DependencySource==null?"—":"";
+    }
     void UpdateMeasuredRows(){
         if(grid==null||grid.IsDisposed)return;
-        foreach(var row in ModRows()){string id=(string)row.Tag;row.Cells["Size"].Value=ModSpace(id);row.Cells["Size"].ToolTipText=SpaceTip(id);}
+        var byId=state.List.Mods.ToDictionary(mod=>mod.Id,StringComparer.Ordinal);
+        foreach(var row in ModRows()){
+            var mod=byId[(string)row.Tag];row.Cells["Size"].Value=ModSpace(mod);row.Cells["Size"].ToolTipText=SpaceTip(mod);
+        }
         UpdateCounts();
     }
-    string SpaceTip(string id){return measuredMods.ContainsKey(id)?T("Arquivos instalados deste mod. Arquivos compartilhados aparecem em cada mod; o total do projeto os conta uma vez.","Installed files for this mod. Shared files appear for each mod; the project total counts them once."):T("Tamanho não identificado: nenhum arquivo instalado foi localizado ou a leitura não foi concluída. O tamanho do download não é usado como tamanho instalado.","Size not identified: no installed files were found or measurement is incomplete. Download size is not used as installed size.");}
+    string SpaceTip(GeneralModEntry mod){
+        if(GeneralModLibrary.NeedsDependencyVersion(mod,Selected(mod)))return T("Escolha a versão da dependência.","Choose the dependency version.");
+        if(!measuredMods.ContainsKey(mod.Id)&&DependencySize(mod)!=null)return T("Tamanho do download informado pelo Nexus.","Download size reported by Nexus.");
+        return measuredMods.ContainsKey(mod.Id)?T("Arquivos instalados deste mod. Arquivos compartilhados aparecem em cada mod; o total do projeto os conta uma vez.","Installed files for this mod. Shared files appear for each mod; the project total counts them once."):T("Tamanho não identificado: nenhum arquivo instalado foi localizado ou a leitura não foi concluída. O tamanho do download não é usado como tamanho instalado.","Size not identified: no installed files were found or measurement is incomplete. Download size is not used as installed size.");}
     void ToggleProjectsPanel(){
         if(working||scanning)return;
         menus.Toggle(this,projectsButton,()=>new GeneralProjectsPanel(projectStore,catalog,cache,project==null?null:project.Id),dialog=>Guard(()=>{

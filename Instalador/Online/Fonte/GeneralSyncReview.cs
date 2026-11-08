@@ -99,8 +99,8 @@ internal sealed class GeneralSyncReviewDialog : GeneralDialog {
 }
 
 internal sealed class GeneralSyncDifferencesDialog : GeneralDialog {
-    internal GeneralSyncDifferencesDialog(IReadOnlyList<P2PSyncDifference> differences)
-        : base(T("Diferenças fora do pacote", "Differences outside the pack")) {
+    internal GeneralSyncDifferencesDialog(IReadOnlyList<P2PSyncDifference> differences,bool inventory=false)
+        : base(inventory?T("Arquivos no jogo fora da lista","Game files outside the list"):T("Diferenças fora do pacote", "Differences outside the pack")) {
         ClientSize = new Size(810, 475);
         var layout = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(24, 8, 24, 18)
@@ -131,10 +131,11 @@ internal sealed class GeneralSyncDifferencesDialog : GeneralDialog {
             };
             grid.RowTemplate.Height = 36;
             grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = T("Situação", "Status"), Width = 166 });
-            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Mod", Width = 176 });
+            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = inventory?T("Nome encontrado","Detected name"):"Mod", Width = 215 });
             grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = T("Arquivo ou pasta", "File or folder"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
             foreach (var difference in differences.OrderBy(item => item.Kind).ThenBy(item => item.Mod).ThenBy(item => item.Path)) {
-                string status = difference.Kind == "kept" ? T("Extra mantido", "Extra kept")
+                string status = difference.Kind == "found" ? T("Encontrado no jogo","Found in game")
+                    : difference.Kind == "kept" ? T("Extra mantido", "Extra kept")
                     : difference.Kind == "missing" ? T("Ausente neste PC", "Missing on this PC") : T("Arquivo diferente", "Different file");
                 int row = grid.Rows.Add(status, difference.Mod ?? "—", difference.Path);
                 grid.Rows[row].Cells[1].ToolTipText = difference.Mod ?? "";

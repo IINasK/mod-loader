@@ -60,7 +60,7 @@ internal static class GeneralP2PUiTests {
                         };
                         service.Sessions.Add(outgoing);service.Sessions.Add(incoming);
                         var refresh=typeof(GeneralP2PDialog).GetMethod("RefreshCards",BindingFlags.Instance|BindingFlags.NonPublic);
-                        Action update=()=>{refresh.Invoke(dialog,new object[]{views});dialog.PerformLayout();Application.DoEvents();};
+                        Action update=()=>{Application.DoEvents();refresh.Invoke(dialog,new object[]{views});dialog.PerformLayout();};
                         update();
                         var cards=Children(dialog.Content).Where(control=>control.Name=="p2p-card").ToArray();
                         check(cards.Length==2&&cards[0] is GeneralSurface&&cards[1] is GeneralSurface,"Envio e recebimento aparecem juntos em molduras separadas: "+theme+locale);
