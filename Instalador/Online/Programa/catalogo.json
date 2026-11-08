@@ -19133,6 +19133,96 @@
       "PhantomLibertyStatus": "not-required",
       "PhantomLibertyNotes": "Sem exigência de Phantom Liberty ou REDmod identificada. Teste em jogo pendente.",
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/36802"
+    },
+    {
+      "Id": "mod-33230",
+      "Name": "Eclipse · Tatuagens CCXL (EBB + RB)",
+      "Version": "1.5",
+      "Profile": "Aparência adicional",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "ArchiveXL"
+      ],
+      "Description": "Para V feminina com EBB + RB sem Push-Up. O arquivo corporal original inclui Eclipse e outros desenhos. Escolha Eclipse por região na edição de aparência da V. Desative a Sacred antes do teste. A visibilidade para outro jogador precisa ser conferida no NightCoop.",
+      "Warning": "Requer EBB + RB sem Push-Up. O autor alerta para retirar as tatuagens antes de jogar como Johnny.",
+      "NexusModId": 33230,
+      "NexusFileId": 162991,
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertyNotes": "O ZIP contém um arquivo corporal e extensões de personalização da V feminina. Não foi identificado requisito de DLC ou REDmod.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/33230",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Fun Tattoos EBBRB Body 33230 1.5 2026-09-28T12-25Z lcXrcZbj8.zip",
+          "Sha256": "8ab38af55854211c621b83a6873f3e1b9a3dc0fa26347654095292c629a111a2",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/33230?tab=files&file_id=162991",
+          "Size": 130378348,
+          "ModId": 33230,
+          "FileId": 162991
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/arm_tattoo_funsix_ccxl.archive.xl",
+          "Path": "archive/pc/mod/arm_tattoo_funsix_ccxl.archive.xl",
+          "Sha256": "86db98d260bb2614b9caa1eba47025f90235c0fe1d616918653c25a43f08bd5c",
+          "Size": 93
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/back_tattoo_funsix_ccxl.archive.xl",
+          "Path": "archive/pc/mod/back_tattoo_funsix_ccxl.archive.xl",
+          "Sha256": "1dc4ebf267ab11610857c10631ae5eb51f112fedd6ab478df8b189f18726e8c3",
+          "Size": 95
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/chest_tattoo_funsix_ccxl.archive.xl",
+          "Path": "archive/pc/mod/chest_tattoo_funsix_ccxl.archive.xl",
+          "Sha256": "7e86b0c705ed334addc6cef64d6fdf8096fc53e48834b524e0b5f0af99663c54",
+          "Size": 97
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/fun_tattoos_EBBRB_funsix.archive",
+          "Path": "archive/pc/mod/fun_tattoos_EBBRB_funsix.archive",
+          "Sha256": "83dac7bcab338e8e2f0d71afe22641ef94abe79078c10cf96691e16f2b4426d8",
+          "Size": 133189632
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/hands_tattoo_funsix_ccxl.archive.xl",
+          "Path": "archive/pc/mod/hands_tattoo_funsix_ccxl.archive.xl",
+          "Sha256": "511e020890b94a506d2aaf8ae25d038586f1983ee6b98d9d8673a2ffb857b407",
+          "Size": 97
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/llegs_tattoo_funsix_ccxl.archive.xl",
+          "Path": "archive/pc/mod/llegs_tattoo_funsix_ccxl.archive.xl",
+          "Sha256": "ed3470b02dcfb77395e2d8daf4966b7ba3ed1cc87e95c0f8e6492783a5ee76a1",
+          "Size": 97
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/uchest_tattoo_funsix_ccxl.archive.xl",
+          "Path": "archive/pc/mod/uchest_tattoo_funsix_ccxl.archive.xl",
+          "Sha256": "3ed73387084908b8cd08f2d1ba3a09b1a09a425270c8f8ccba9b8d3545d0a951",
+          "Size": 99
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/ulegs_tattoo_funsix_ccxl.archive.xl",
+          "Path": "archive/pc/mod/ulegs_tattoo_funsix_ccxl.archive.xl",
+          "Sha256": "cb20510020bcd5f572df3d8cd87c6e1e445fe5a72e8b113a5a6cc5e42d6cc0be",
+          "Size": 97
+        }
+      ]
     }
   ],
   "Excluded": [

@@ -21,6 +21,23 @@ internal sealed partial class GeneralModWindow {
                         try{
                             check(home.Controls.Find("NewProject",true).Length==1&&home.Controls.Find("ImportProject",true).Length==1,"Tela inicial oferece criar e importar projeto.");
                             check(home.Controls.Find("EmptyProjects",true).Length==1&&store.Read().Projects.Count==0,"Primeira abertura mostra biblioteca vazia sem criar o pacote Cyberpunk automaticamente.");
+                            var homeMenu=(Button)home.Controls.Find("HomeMenu",true).Single();
+                            using(var closeSharing=new Timer{Interval=60}){
+                                bool openedSharing=false;
+                                closeSharing.Tick+=(ss,ee)=>{
+                                    var dialog=Application.OpenForms.OfType<GeneralP2PDialog>().FirstOrDefault();
+                                    if(dialog==null)return;
+                                    closeSharing.Stop();
+                                    openedSharing=dialog.Controls.Find("p2p-input",true).Single().Visible&&
+                                        !dialog.Controls.Find("p2p-output",true).Single().Visible;
+                                    dialog.Close();
+                                };
+                                homeMenu.PerformClick();
+                                var actions=home.OwnedForms.OfType<GeneralActionsMenu>().Single();
+                                closeSharing.Start();
+                                ((Button)actions.Controls.Find("share",true).Single()).PerformClick();
+                                check(openedSharing&&store.Read().Projects.Count==0,"Home abre o mesmo compartilhamento para receber antes de existir um projeto.");
+                            }
                             var create=(Button)home.Controls.Find("NewProject",true).Single();var import=(Button)home.Controls.Find("ImportProject",true).Single();
                             check(create.Top==import.Top&&create.Height==import.Height&&create.Right<=import.Left,"Criar e importar ficam lado a lado e alinhados.");
                             check(create.Height==44&&import.Height==44,"Ações principais da Home têm a altura compacta de 44px.");
@@ -54,7 +71,7 @@ internal sealed partial class GeneralModWindow {
                             typeof(ListBox).GetMethod("OnMouseLeave",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(choices,new object[]{EventArgs.Empty});
                             check(home.HoveredSavedProject==-1,"Sair da lista remove o highlight de hover.");
                             ClickReadyWithoutRename(home,check);
-                            check(opened!=null&&opened.Id!=blank.Id&&opened.TemplateId=="cyberpunk-2077"&&opened.Name=="Cyberpunk 2077"&&store.Load(opened).List.Mods.Count==157&&store.Load(blank).List.Mods.Count==0,"Pacote pronto abre com identidade fixa e preserva os projetos personalizados.");
+                            check(opened!=null&&opened.Id!=blank.Id&&opened.TemplateId=="cyberpunk-2077"&&opened.Name=="Cyberpunk 2077"&&store.Load(opened).List.Mods.Count==158&&store.Load(blank).List.Mods.Count==0,"Pacote pronto abre com identidade fixa e preserva os projetos personalizados.");
                             check(store.Load(opened).Destination==null,"Fixture do pacote pronto não descobre nem altera o jogo real.");
                             var builtIn=opened;var configured=store.Load(builtIn);var first=configured.List.Mods.First();configured.ChosenVariants[first.Id]=first.DefaultVariant;
                             new GeneralModLibrary(Path.Combine(store.DataPath(builtIn),"lista.json")).Save(configured);
@@ -66,16 +83,18 @@ internal sealed partial class GeneralModWindow {
                                 store.SavePreferences(theme,language,root);home.Build();home.ClientSize=new Size(900,680);home.PerformLayout();await Task.Delay(40);
                                 var newButton=home.Controls.Find("NewProject",true).Single();var importButton=home.Controls.Find("ImportProject",true).Single();var ready=home.Controls.Find("ReadyCyberpunk",true).Single();var saved=home.Controls.Find("SavedProjects",true).Single();
                                 check(newButton.Height==importButton.Height&&newButton.Width>200&&importButton.Right<=importButton.Parent.ClientSize.Width,"Ações cabem na Home: "+theme+"/"+language);
-                                check(HomeInside(newButton,home)&&HomeInside(importButton,home)&&HomeInside(home.Controls.Find("HomeOptions",true).Single(),home),"Ações e engrenagem ficam dentro da janela após reduzir largura: "+theme+"/"+language);
+                                check(HomeInside(newButton,home)&&HomeInside(importButton,home)&&HomeInside(home.Controls.Find("HomeMenu",true).Single(),home),"Ações e menu ficam dentro da janela após reduzir largura: "+theme+"/"+language);
                                 check(ready.PointToScreen(Point.Empty).Y>=saved.PointToScreen(Point.Empty).Y+saved.Height&&ready.Bottom<=ready.Parent.ClientSize.Height,"Projetos prontos ficam abaixo dos salvos sem recorte: "+theme+"/"+language);
-                                check(((GeneralButton)home.Controls.Find("HomeOptions",true).Single()).IconKind=="settings","Opções usa engrenagem independente na Home: "+theme+"/"+language);
+                                check(((GeneralButton)home.Controls.Find("HomeMenu",true).Single()).IconKind=="menu","Home usa o mesmo ícone de menu do editor: "+theme+"/"+language);
                                 check(home.Controls.Find("HomeIntro",true).Single().Text==(language=="pt"?"Criado por Nask e Codex. Se achou ruim, faz você.":"Made by Nask and Codex. If you don't like it, make your own."),"Home usa o crédito combinado nos dois idiomas: "+theme+"/"+language);
                                 CaptureUi(home,Path.Combine(root,"home-"+theme+"-"+language+".png"));
                             }
                             store.SavePreferences("light-red","pt",root);home.Build();
                             using(var timer=new Timer{Interval=60}){
                                 timer.Tick+=(ss,ee)=>{var dialog=Application.OpenForms.OfType<GeneralOptionsDialog>().FirstOrDefault();if(dialog==null)return;timer.Stop();var theme=AllControls(dialog).OfType<GeneralPicker>().Single(p=>p.AccessibleName=="Tema");check(theme.Items.Count==4&&theme.SelectedIndex==2,"Opções lista o novo tema claro vermelho e mantém a escolha atual.");AllControls(dialog).OfType<Button>().Single(button=>button.Text=="Salvar").PerformClick();};
-                                timer.Start();((Button)home.Controls.Find("HomeOptions",true).Single()).PerformClick();
+                                ((Button)home.Controls.Find("HomeMenu",true).Single()).PerformClick();
+                                var actions=home.OwnedForms.OfType<GeneralActionsMenu>().Single();
+                                timer.Start();((Button)actions.Controls.Find("options",true).Single()).PerformClick();
                             }
                             check(store.Read().Theme=="light-red","Salvar opções da Home preserva o tema vermelho.");
                             var disposable=store.Create("Projeto descartável",new GeneralModList(),"light-red","pt");
@@ -122,7 +141,7 @@ internal sealed partial class GeneralModWindow {
                             store.Delete(blank);home.Build();check(store.Read().Projects.Count==1&&File.Exists(Path.Combine(store.DataPath(blank),"lista.json")),"Excluir metadados retira o projeto da Home e conserva seus dados.");
                             var remaining=store.Read().Projects.Single();string before=Safe.Hash(Path.Combine(store.DataPath(remaining),"lista.json"));home.OpenRequested=actualOpen;
                             using(var timer=new Timer{Interval=60}){
-                                timer.Tick+=(ss,ee)=>{var window=Application.OpenForms.OfType<GeneralModWindow>().FirstOrDefault();if(window==null)return;timer.Stop();try{check(window.state.List.Mods.Count==157&&window.data==store.DataPath(remaining),"Abrir projeto usa a lista e a pasta próprias na janela real.");window.homeButton.PerformClick();}catch(Exception ex){failure=ex;window.Close();}};
+                                timer.Tick+=(ss,ee)=>{var window=Application.OpenForms.OfType<GeneralModWindow>().FirstOrDefault();if(window==null)return;timer.Stop();try{check(window.state.List.Mods.Count==158&&window.data==store.DataPath(remaining),"Abrir projeto usa a lista e a pasta próprias na janela real.");window.homeButton.PerformClick();}catch(Exception ex){failure=ex;window.Close();}};
                                 timer.Start();home.OpenRequested(remaining);
                             }
                             if(failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();

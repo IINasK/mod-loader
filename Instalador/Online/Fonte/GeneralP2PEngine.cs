@@ -16,6 +16,52 @@ internal sealed class P2PInvite {
     public string Kind, Device, Folder, ManifestHash, Name, Mode;
     public long Size;
     public bool Deferred, Automatic;
+    public string SuggestedFolder;
+    public bool PrivateFolder;
+
+    static readonly string[] PersonalParts={
+        "Users","Usuários","Usuarios","Utilizadores","Documents and Settings","AppData",
+        "Desktop","Área de Trabalho","Documents","Documentos","Downloads"
+    };
+    static readonly char[] InvalidFolderChars=Path.GetInvalidFileNameChars();
+
+    static bool FolderSyntax(string path){
+        return path!=null&&path.Length<=240&&Regex.IsMatch(path,@"\A[A-Za-z]:\\[^\\]")&&
+            path.Substring(3).Split('\\').All(part=>part.Length!=0&&part.IndexOfAny(InvalidFolderChars)<0&&
+                !part.EndsWith(".")&&!part.EndsWith(" ")&&
+                !part.Any(c=>Char.GetUnicodeCategory(c)==System.Globalization.UnicodeCategory.Format)&&
+                !Regex.IsMatch(part,@"\A(?:CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])(?:\.|\z)",RegexOptions.IgnoreCase));
+    }
+    static bool HasPersonalParts(string path){
+        return path.Split('\\').Any(part=>PersonalParts.Contains(part,StringComparer.OrdinalIgnoreCase)||
+            part.StartsWith("OneDrive",StringComparison.OrdinalIgnoreCase));
+    }
+    internal void SuggestHostFolder(string path){
+        if(String.IsNullOrWhiteSpace(path))return;
+        path=path.TrimEnd('\\');
+        if(!FolderSyntax(path))return;
+        string user=Environment.UserName;
+        PrivateFolder=HasPersonalParts(path)||path.Substring(3).Split('\\').Any(part=>String.Equals(part,user,StringComparison.OrdinalIgnoreCase))||
+            new[]{Environment.SpecialFolder.UserProfile,Environment.SpecialFolder.MyDocuments,Environment.SpecialFolder.DesktopDirectory,Environment.SpecialFolder.LocalApplicationData}
+            .Select(folder=>Environment.GetFolderPath(folder,Environment.SpecialFolderOption.DoNotVerify))
+            .Where(folder=>!String.IsNullOrEmpty(folder)).Select(folder=>folder.TrimEnd('\\'))
+            .Any(folder=>path.Equals(folder,StringComparison.OrdinalIgnoreCase)||path.StartsWith(folder+"\\",StringComparison.OrdinalIgnoreCase));
+        SuggestedFolder=PrivateFolder?null:path;
+    }
+    internal string LocalSuggestedFolder(){
+        if(!FolderSyntax(SuggestedFolder)||HasPersonalParts(SuggestedFolder))return null;
+        string current=SuggestedFolder.Substring(0,3);
+        try{
+            var drive=new DriveInfo(current);
+            if(drive.DriveType!=DriveType.Fixed&&drive.DriveType!=DriveType.Removable)return null;
+            // Check each parent before probing its children so a junction cannot redirect the lookup.
+            foreach(string part in SuggestedFolder.Substring(3).Split('\\')){
+                current=Path.Combine(current,part);
+                if((File.GetAttributes(current)&(FileAttributes.Directory|FileAttributes.ReparsePoint))!=FileAttributes.Directory)return null;
+            }
+            return current;
+        }catch(IOException){return null;}catch(UnauthorizedAccessException){return null;}
+    }
     internal string Encode(){Validate();return "ML-P2P1:"+Convert.ToBase64String(Encoding.UTF8.GetBytes(Safe.Json.Serialize(this)));}
     internal static P2PInvite Decode(string code){
         try{
@@ -26,6 +72,9 @@ internal sealed class P2PInvite {
     }
     internal void Validate(){
         if(Mode!=null&&Mode!="installed-zip")throw new IOException("Formato de compartilhamento desconhecido.");
+        if((PrivateFolder||SuggestedFolder!=null)&&(Kind!="offer"||Mode!="installed-zip"||
+            SuggestedFolder!=null&&(PrivateFolder||!FolderSyntax(SuggestedFolder)||HasPersonalParts(SuggestedFolder))))
+            throw new IOException("Sugestão de pasta inválida no convite.");
         if(Automatic&&!Deferred)throw new IOException("Aceitação automática requer convite antecipado.");
         if(Deferred&&(Mode!="installed-zip"||Size!=0))throw new IOException("Convite antecipado inválido.");
         if(Mode=="installed-zip"&&!Deferred&&(Size<=0||Size>P2PPack.MaxTotal))throw new IOException("Tamanho de pacote instalado inválido.");

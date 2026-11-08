@@ -332,6 +332,8 @@ internal sealed partial class GeneralModWindow {
         }
         if(IsCyberpunk(root)&&jobs.Any(work=>GeneralModLibrary.IsHystBody(work.Entry.Id)))
             jobs.RemoveAll(work=>work.Variant.CyberpunkId=="mod-7049");
+        if(jobs.Any(work=>work.Entry.Id=="hyst-ebb-rb"))
+            jobs=jobs.OrderBy(work=>work.Variant.CyberpunkId==GeneralModLibrary.EclipseTattooId).ToList();
         Enqueue(jobs,urgent);
     }
 
@@ -403,8 +405,15 @@ internal sealed partial class GeneralModWindow {
     static void CheckHystBody(Work work,string root){
         bool ebb=work.Entry.Id=="hyst-ebb-rb",pushUp=work.Entry.Id=="hyst-ebbp-rb";
         bool vanillaFeet=work.Variant.CyberpunkId=="mod-7049";
-        if((!ebb&&!pushUp&&!vanillaFeet)||!IsCyberpunk(root))return;
+        bool eclipse=work.Variant.CyberpunkId==GeneralModLibrary.EclipseTattooId;
+        if((!ebb&&!pushUp&&!vanillaFeet&&!eclipse)||!IsCyberpunk(root))return;
         const string baseBody="archive/pc/mod/EBBRB.xl",pushBody="archive/pc/mod/EBBPRB.xl";
+        if(eclipse){
+            if(!File.Exists(Safe.In(root,baseBody))||File.Exists(Safe.In(root,pushBody)))
+                throw new IOException(T("Instale primeiro o corpo Hyst EBB + RB sem Push-Up para usar a tatuagem Eclipse.",
+                    "Install the Hyst EBB + RB body without Push-Up before installing the Eclipse tattoo."));
+            return;
+        }
         const string feet="archive/pc/mod/Vanilla_ArchiveXL_FeetComponentsFV.archive";
         var paths=vanillaFeet?new[]{baseBody,pushBody}:new[]{ebb?pushBody:baseBody,feet};
         if(paths.Any(path=>File.Exists(Safe.In(root,path))))

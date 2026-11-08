@@ -29,6 +29,17 @@ internal static class GeneralP2PUiTests {
                         check(!Children(dialog.Content).OfType<ListBox>().Any()&&!Children(dialog.Content).OfType<CheckBox>().Any(),"Sem lista, seleção de configuração ou ações legadas: "+theme+locale);
                         var offered=new P2PInvite{Device=String.Join("-",Enumerable.Repeat("AAAAAAA",8)),Folder="ml-"+new string('a',32),ManifestHash=new string('b',64),Kind="offer",Name="Pacote do amigo",Mode="installed-zip",Size=1024};input.Text=offered.Encode();output.Text=offered.Encode();Application.DoEvents();
                         check(destination.Visible&&destination.ReadOnly&&Find<Button>(dialog,"p2p-folder").Enabled,"Colar convite mostra destino local e escolha de pasta antes de conectar: "+theme+locale);
+                        var folderHint=Find<Label>(dialog,"p2p-folder-hint");
+                        string localDestination=destination.Text;
+                        offered.SuggestedFolder=@"D:\SteamLibrary\steamapps\common\Cyberpunk 2077";
+                        input.Text=offered.Encode();Application.DoEvents();
+                        check(folderHint.Visible&&folderHint.Text.Contains(offered.SuggestedFolder)&&Inside(folderHint,dialog.Content)&&destination.Text==localDestination,
+                            "Sugestão de pasta é visível e preserva o destino local: "+theme+locale);
+                        offered.SuggestedFolder=null;offered.PrivateFolder=true;input.Text=offered.Encode();Application.DoEvents();
+                        check(folderHint.Visible&&folderHint.Text.Contains(locale=="pt"?"pasta pessoal":"personal folder")&&destination.Text==localDestination,
+                            "Pasta pessoal vira aviso e não preenche o destino: "+theme+locale);
+                        offered.PrivateFolder=false;input.Text=offered.Encode();Application.DoEvents();
+                        check(!folderHint.Visible,"Convite legado mantém o seletor local sem sugestão: "+theme+locale);
                         using(var image=new Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(root,"layout-"+theme+"-"+locale+".png"),System.Drawing.Imaging.ImageFormat.Png);}
                         Safe.WriteJson(Path.Combine(root,"layout.json"),Children(dialog.Content).Where(c=>!String.IsNullOrEmpty(c.Name)||c is TableLayoutPanel).Select(c=>new{Name=c.Name,Type=c.GetType().Name,Bounds=c.Bounds.ToString(),Parent=c.Parent.ClientRectangle.ToString()}).ToArray());
                         foreach(Control control in new Control[]{input,output,destination,connect,generate,Find<Button>(dialog,"p2p-folder"),Find<Button>(dialog,"p2p-copy"),Find<Label>(dialog,"p2p-status")})check(!control.Visible||Inside(control,dialog.Content),"Controle sem recorte: "+control.Name+theme+locale);

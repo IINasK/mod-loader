@@ -20,7 +20,12 @@ internal sealed partial class GeneralModWindow {
         var real=FixedData.Load();
         var realSeed=GeneralModLibrary.Seed(real,new ModImportItem[0]);
         var nca=realSeed.Mods.Single(m=>m.Id==NightCityDensity.ModId);
-        check(realSeed.Mods.Count==157&&nca.DefaultVariant=="low"&&nca.Variants.Count==3,"Catálogo preservado com três densidades e Baixa principal.");
+        check(realSeed.Mods.Count==158&&nca.DefaultVariant=="low"&&nca.Variants.Count==3,"Catálogo preservado com três densidades e Baixa principal.");
+        var eclipse=realSeed.Mods.Single(mod=>mod.Id==GeneralModLibrary.EclipseTattooId);
+        check(eclipse.Category==GeneralModLibrary.BodyCategory&&
+            eclipse.Variants.Single().Sources.Single()=="https://www.nexusmods.com/cyberpunk2077/mods/33230?tab=files&file_id=162991"&&
+            realSeed.Presets.All(preset=>preset.ModIds.Contains(eclipse.Id)),
+            "Eclipse usa a edição corporal EBBRB fixada e aparece nos dois presets.");
         var bodies=realSeed.Mods.Where(mod=>GeneralModLibrary.IsHystBody(mod.Id)).ToList();
         check(bodies.Count==2&&bodies.All(mod=>mod.Nsfw&&mod.Category==GeneralModLibrary.BodyCategory&&mod.Variants.Count==3)&&
             bodies[0].AlternativeGroup!=null&&bodies[0].AlternativeGroup==bodies[1].AlternativeGroup&&

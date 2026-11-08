@@ -279,7 +279,12 @@ internal sealed partial class P2PService : IDisposable {
             try{P2PPack.DeleteSnapshot(folder);}catch(Exception){}throw;
         }
     }
-    internal string Invitation(P2PSession session){return new P2PInvite{Schema=session.CompareBeforePack?3:session.Lifecycle?2:1,Kind=session.Sender?"offer":"accept",Device=Engine.Device,Folder=session.Id,ManifestHash=session.Hash,Name=session.Name,Mode=session.Mode,Size=session.Deferred?0:session.Size,Deferred=session.Deferred,Automatic=session.Automatic}.Encode();}
+    internal string Invitation(P2PSession session){
+        var invite=new P2PInvite{Schema=session.CompareBeforePack?3:session.Lifecycle?2:1,Kind=session.Sender?"offer":"accept",Device=Engine.Device,
+            Folder=session.Id,ManifestHash=session.Hash,Name=session.Name,Mode=session.Mode,Size=session.Deferred?0:session.Size,Deferred=session.Deferred,Automatic=session.Automatic};
+        if(session.Sender&&session.Mode=="installed-zip")invite.SuggestHostFolder(session.Destination);
+        return invite.Encode();
+    }
     internal P2PSession Accept(string code,string destination=null,bool autoInstall=false){
         var invite=P2PInvite.Decode(code);if(invite.Kind!="offer")throw new IOException("Cole o convite de quem está enviando o pacote.");
         if(!Engine.Running||invite.Device==Engine.Device)throw new IOException("Use o convite do outro computador.");

@@ -12,7 +12,10 @@ internal sealed class GeneralProjectHome : Form {
     readonly GeneralProjectStore store;
     readonly bool fixture;
     readonly Dictionary<string,P2PService> sharing=new Dictionary<string,P2PService>(StringComparer.OrdinalIgnoreCase);
+    readonly GeneralMenuHost menus=new GeneralMenuHost();
     GeneralModWindow sharingWindow;
+    GeneralP2PDialog sharingDialog;
+    string ReceiveData {get{return Path.Combine(store.Root,"P2P-Inbox");}}
     ListBox saved;
     LinkLabel update;
     Label storageSize;
@@ -26,7 +29,7 @@ internal sealed class GeneralProjectHome : Form {
         this.catalog=catalog;this.cache=cache;this.fixture=fixture;store=new GeneralProjectStore(root);OpenRequested=OpenProject;
         Text="Mod Loader "+GeneralUpdateChecker.CurrentVersion;Icon=ModLoaderBrand.AppIcon;ClientSize=new Size(1020,740);MinimumSize=new Size(900,680);
         StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;Build();Disposed+=(s,e)=>{
-            savedTips.Dispose();
+            savedTips.Dispose();menus.Dispose();
             foreach(var service in sharing.Values)try{service.Dispose();}catch(Exception){}
         };FormClosing+=(s,e)=>{if(DeletingProject)e.Cancel=true;};
         Shown+=(s,e)=>RefreshStorageSize();
@@ -38,7 +41,7 @@ internal sealed class GeneralProjectHome : Form {
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
     internal void Build(){
         var index=store.Read();GeneralStyle.UseTheme(index.Theme);GeneralStyle.Language=index.Language;
-        buildVersion++;hoverSaved=-1;saved=null;
+        menus.Close();buildVersion++;hoverSaved=-1;saved=null;
         SuspendLayout();while(Controls.Count>0){var old=Controls[0];Controls.Remove(old);old.Dispose();}
         Font=GeneralStyle.Font(12);BackColor=GeneralStyle.Background;ForeColor=GeneralStyle.Foreground;
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=8,Padding=new Padding(32,28,32,24)};
@@ -48,7 +51,7 @@ internal sealed class GeneralProjectHome : Form {
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         var brand=new FlowLayoutPanel{AutoSize=true,WrapContents=false,Margin=Padding.Empty};brand.Controls.Add(new ModLoaderLogo{Size=new Size(44,44),Margin=new Padding(0,0,12,0)});
         var brandTitle=new Label{Text="MOD LOADER",AutoSize=true,Font=GeneralStyle.Font(27,true),ForeColor=GeneralStyle.Accent,Margin=Padding.Empty};brand.Controls.Add(brandTitle);header.Controls.Add(brand,0,0);
-        var options=(GeneralButton)GeneralStyle.Button("",()=>Guard(Options));options.Name="HomeOptions";options.Bare=true;options.IconKind="settings";options.AccessibleName=T("Opções","Options");options.Size=new Size(44,44);options.AutoSize=false;options.MinimumSize=new Size(44,44);options.Dock=DockStyle.Fill;options.Margin=Padding.Empty;header.Controls.Add(options,1,0);layout.Controls.Add(header,0,0);
+        var menu=(GeneralButton)GeneralStyle.Button("",ToggleHomeMenu);menu.Name="HomeMenu";menu.Bare=true;menu.IconKind="menu";menu.AccessibleName=T("Menu","Menu");menu.Size=new Size(44,44);menu.AutoSize=false;menu.MinimumSize=new Size(44,44);menu.Dock=DockStyle.Fill;menu.Margin=Padding.Empty;header.Controls.Add(menu,1,0);layout.Controls.Add(header,0,0);
         var intro=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.TopDown,WrapContents=false,Margin=Padding.Empty};
         intro.Controls.Add(new Label{Name="HomeIntro",Text=T("Criado por Nask e Codex. Se achou ruim, faz você.","Made by Nask and Codex. If you don't like it, make your own."),AutoSize=true,ForeColor=GeneralStyle.Muted,Margin=new Padding(0,10,0,4)});
         storageSize=new Label{Name="HomeStorage",Text=T("Calculando espaço…","Calculating size…"),AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(0,0,0,18),MaximumSize=new Size(Math.Max(200,ClientSize.Width-68),0)};intro.Controls.Add(storageSize);layout.Controls.Add(intro,0,1);
@@ -145,8 +148,8 @@ internal sealed class GeneralProjectHome : Form {
         P2PService service;
         if(sharing.TryGetValue(projectData,out service))return service;
         service=new P2PService(Path.Combine(projectData,"P2P"),
-            P2PService.TransferStore,offerRecovery:true);
-        service.EnableInstalledReceive(catalog,projectData);
+            fixture?Path.Combine(store.Root,"P2P-Transfers"):P2PService.TransferStore,localOnly:fixture,offerRecovery:true);
+        service.EnableInstalledReceive(catalog,projectData,fixture);
         service.RegisterProject=session=>{
             store.CreateReceived(session,projectData,catalog);
             if(IsHandleCreated&&!IsDisposed)try{BeginInvoke((Action)(()=>{if(!IsDisposed&&Visible)Build();}));}
@@ -156,7 +159,8 @@ internal sealed class GeneralProjectHome : Form {
             if(IsDisposed||!IsHandleCreated)return false;
             return (bool)Invoke((Func<bool>)(()=>{
                 var window=sharingWindow;
-                var owner=window!=null&&!window.IsDisposed?window.SharingPromptOwner:this;
+                var owner=sharingDialog!=null&&!sharingDialog.IsDisposed&&sharingDialog.Visible?(Control)sharingDialog:
+                    window!=null&&!window.IsDisposed?window.SharingPromptOwner:this;
                 return GeneralVersionChoiceDialog.Ask(owner,difference);
             }));
         };
@@ -165,23 +169,25 @@ internal sealed class GeneralProjectHome : Form {
     }
 
     async Task RestoreSharing(){
-        foreach(var project in store.Read().Projects){
-            if(IsDisposed)return;
-            string projectData=store.DataPath(project);
-            if(!File.Exists(Path.Combine(projectData,"P2P","sessions.json")))continue;
-            try{
-                var service=SharingService(projectData);
-                if(!service.SnapshotSessions().Any(s=>!s.Completed&&!s.Discarded||Directory.Exists(service.Folder(s))||s.Lifecycle&&(s.Sender?s.Recipients.Any(peer=>!peer.ReceiptClosed):!s.ReceiptClosed)||!s.Sender&&s.Completed&&!s.ListImported))continue;
-                service.SetPreparationState(store.Load(project));
-                await RecoverSharing(this,service);
-                await Task.Run(()=>{
-                    foreach(var session in service.SnapshotSessions().Where(s=>!s.Sender&&s.Completed&&!s.ListImported))
-                        service.PublishProject(session,true);
-                });
-                if(!IsDisposed)await Task.Run(()=>service.Start(_=>{}));
-            }catch(Exception ex){
-                if(!IsDisposed)GeneralDialog.Message(this,ex.Message,T("Retomada P2P","P2P recovery"),MessageBoxButtons.OK,MessageBoxIcon.Warning);
-            }
+        await RestoreSharing(ReceiveData,null);
+        foreach(var project in store.Read().Projects)
+            await RestoreSharing(store.DataPath(project),project);
+    }
+
+    async Task RestoreSharing(string projectData,GeneralProject project){
+        if(IsDisposed||!File.Exists(Path.Combine(projectData,"P2P","sessions.json")))return;
+        try{
+            var service=SharingService(projectData);
+            if(!service.SnapshotSessions().Any(s=>!s.Completed&&!s.Discarded||Directory.Exists(service.Folder(s))||s.Lifecycle&&(s.Sender?s.Recipients.Any(peer=>!peer.ReceiptClosed):!s.ReceiptClosed)||!s.Sender&&s.Completed&&!s.ListImported))return;
+            if(project!=null)service.SetPreparationState(store.Load(project));
+            await RecoverSharing(this,service);
+            await Task.Run(()=>{
+                foreach(var session in service.SnapshotSessions().Where(s=>!s.Sender&&s.Completed&&!s.ListImported))
+                    service.PublishProject(session,true);
+            });
+            if(!IsDisposed)await Task.Run(()=>service.Start(_=>{}));
+        }catch(Exception ex){
+            if(!IsDisposed)GeneralDialog.Message(this,ex.Message,T("Retomada P2P","P2P recovery"),MessageBoxButtons.OK,MessageBoxIcon.Warning);
         }
     }
 
@@ -211,9 +217,26 @@ internal sealed class GeneralProjectHome : Form {
     }
 
     void ShowHome(){if(IsDisposed)return;Build();Show();Activate();}
-    void Options(){
+    void ToggleHomeMenu(){
+        var anchor=Controls.Find("HomeMenu",true).Single();
+        menus.Toggle(this,anchor,()=>new GeneralActionsMenu(home:true),dialog=>Guard(()=>{
+            if(((GeneralActionsMenu)dialog).ActionId=="share")ShowSharing();
+            else Options(anchor);
+        }));
+    }
+
+    void ShowSharing(){
+        var service=SharingService(ReceiveData);
+        using(var dialog=new GeneralP2PDialog(service,new GeneralModState(),catalog)){
+            sharingDialog=dialog;
+            try{dialog.ShowDialog(this);}
+            finally{sharingDialog=null;}
+        }
+    }
+
+    void Options(Control anchor){
         var preferences=store.Read();using(var dialog=new GeneralOptionsDialog(preferences.Theme,preferences.Language,preferences.DownloadFolder,()=>cache.ClearDownloads())){
-            dialog.AnchorTo(Controls.Find("HomeOptions",true).Single());if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+            dialog.AnchorTo(anchor);if(dialog.ShowDialog(this)!=DialogResult.OK)return;
             store.SavePreferences(dialog.ThemeValue,dialog.LanguageValue,dialog.DownloadFolder);Build();
         }
     }

@@ -46,6 +46,28 @@ internal static class GeneralP2PTests {
             rejectInvite(value => value.ManifestHash = new string('A',64), "Hash fora do formato fixado é recusado.");
             rejectInvite(value => value.Name = "nome\ncom controle", "Nome de convite com controle é recusado.");
 
+            const string sharedFolder=@"D:\SteamLibrary\steamapps\common\Cyberpunk 2077";
+            var folderOffer=Invitation();folderOffer.Mode="installed-zip";folderOffer.Size=1;
+            folderOffer.SuggestHostFolder(sharedFolder);
+            check(P2PInvite.Decode(folderOffer.Encode()).SuggestedFolder==sharedFolder,"O convite sugere a pasta de jogo sem depender do PC receptor.");
+            var localFolder=Path.Combine(root,"suggested");Directory.CreateDirectory(localFolder);
+            folderOffer.SuggestHostFolder(localFolder);
+            check(folderOffer.LocalSuggestedFolder()==localFolder,"O seletor reconhece uma sugestão presente no disco local.");
+            folderOffer.SuggestHostFolder(localFolder+"-missing");
+            check(folderOffer.LocalSuggestedFolder()==null,"A sugestão ausente não vira destino local.");
+            folderOffer.SuggestHostFolder(@"C:\Users\PrivateName\Games\Cyberpunk 2077");
+            string privatePayload=Encoding.UTF8.GetString(Convert.FromBase64String(folderOffer.Encode().Substring(8)));
+            check(P2PInvite.Decode(folderOffer.Encode()).PrivateFolder&&!privatePayload.Contains("PrivateName"),"O convite informa que a pasta é pessoal sem transmitir o caminho.");
+            folderOffer.SuggestHostFolder(@"D:\Games\"+Environment.UserName+@"\Cyberpunk 2077");
+            check(folderOffer.PrivateFolder&&folderOffer.SuggestedFolder==null,"A pasta nomeada pelo usuário também é ocultada fora do perfil padrão.");
+            foreach(string unsafePath in new[]{@"\\server\share\Game",@"\\?\C:\Game",@"D:\Games\..\Game",@"D:\Game:stream",@"D:\Games\CON",@"C:\Users\PrivateName\Game"}){
+                var badFolder=unsafePath;
+                rejectInvite(value=>{value.Mode="installed-zip";value.Size=1;value.SuggestedFolder=badFolder;},
+                    "O convite recusa caminho inseguro ou pessoal: "+badFolder);
+            }
+            rejectInvite(value=>{value.Mode="installed-zip";value.Size=1;value.Kind="accept";value.SuggestedFolder=sharedFolder;},
+                "A resposta do receptor não contém sugestão de pasta.");
+
             var fixture = new Fixture(root);
             string transport = Path.Combine(root,"transport"), privateFolder = Path.Combine(root,"private-copy");
             var manifest = P2PPack.Create(transport,fixture.State,new[]{"custom"},fixture.Catalog,fixture.Cache,Ignore);

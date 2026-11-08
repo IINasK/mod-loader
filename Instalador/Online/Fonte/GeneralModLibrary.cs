@@ -51,6 +51,7 @@ public sealed class GeneralModLibrary {
         "Roupas e acessórios", "Aparência", "Modo Foto", "Áudio", "Importados", "Outros"
     };
     internal const string BodyCategory = "Melhorias do corpo";
+    internal const string EclipseTattooId = "mod-33230";
     internal static bool IsHystBody(string id) { return id == "hyst-ebb-rb" || id == "hyst-ebbp-rb"; }
     internal static bool IsFacialMod(string id) { return id.StartsWith("face-", StringComparison.Ordinal); }
     readonly string statePath;
@@ -146,7 +147,7 @@ public sealed class GeneralModLibrary {
                 ModCategories.Supports(mod.Id,ClothingFit.Masculine)?"Roupas masculinas":null;
             var entry = new GeneralModEntry {
                 Id = mod.Id, Name = mod.Name, Description = mod.Description,
-                Category = IsFacialMod(mod.Id) ? BodyCategory : fit??CyberpunkCategories[(int)ModCategories.CategoryOf(mod.Id, mod.Profile)],
+                Category = IsFacialMod(mod.Id) || mod.Id == EclipseTattooId ? BodyCategory : fit??CyberpunkCategories[(int)ModCategories.CategoryOf(mod.Id, mod.Profile)],
                 DefaultVariant = mod.DensityProfiles == null ? "default" : "low"
             };
             if (mod.DensityProfiles == null) {

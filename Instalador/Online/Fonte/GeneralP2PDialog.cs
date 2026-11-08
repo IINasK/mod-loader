@@ -24,6 +24,8 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     readonly ToolTip tips=new ToolTip{UseAnimation=false,UseFading=false};
     readonly TableLayoutPanel body;
     readonly Panel targetRow;
+    readonly TableLayoutPanel targetLayout;
+    readonly Label folderHint=new Label{Dock=DockStyle.Fill,UseMnemonic=false,AutoEllipsis=true,Margin=Padding.Empty,Name="p2p-folder-hint"};
     readonly Panel cardStack=new Panel{BackColor=GeneralStyle.Surface};
     readonly GeneralScrollView cardScroll;
     readonly Dictionary<P2PSession,TransferCard> cards=new Dictionary<P2PSession,TransferCard>();
@@ -74,13 +76,15 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         body.Controls.Add(Heading(T("Link recebido do amigo","Link received from your friend")),0,3);
         var receive=Field(input);receive.Padding=new Padding(14,16,14,8);body.Controls.Add(receive,0,4);
         targetRow=new Panel{Dock=DockStyle.Fill,Margin=new Padding(0,0,0,Gap)};
-        var target=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=2,Margin=Padding.Empty};
-        target.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));target.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        target.RowStyles.Add(new RowStyle(SizeType.Absolute,LabelHeight));target.RowStyles.Add(new RowStyle(SizeType.Absolute,ControlHeight));
-        var targetLabel=Heading(T("Instalar na pasta local","Install into local folder"));target.Controls.Add(targetLabel,0,0);target.SetColumnSpan(targetLabel,2);
-        var destinationField=Field(destination);destinationField.Margin=Padding.Empty;target.Controls.Add(destinationField,0,1);
-        choose=GeneralStyle.Button(T("Escolher pasta","Choose folder"),ChooseFolder);choose.Margin=new Padding(8,0,0,0);choose.Name="p2p-folder";target.Controls.Add(choose,1,1);
-        targetRow.Controls.Add(target);body.Controls.Add(targetRow,0,5);
+        targetLayout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=3,Margin=Padding.Empty};
+        targetLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));targetLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        targetLayout.RowStyles.Add(new RowStyle(SizeType.Absolute,LabelHeight));targetLayout.RowStyles.Add(new RowStyle(SizeType.Absolute,ControlHeight));
+        targetLayout.RowStyles.Add(new RowStyle(SizeType.Absolute,0));
+        var targetLabel=Heading(T("Instalar na pasta local","Install into local folder"));targetLayout.Controls.Add(targetLabel,0,0);targetLayout.SetColumnSpan(targetLabel,2);
+        var destinationField=Field(destination);destinationField.Margin=Padding.Empty;targetLayout.Controls.Add(destinationField,0,1);
+        choose=GeneralStyle.Button(T("Escolher pasta","Choose folder"),ChooseFolder);choose.Margin=new Padding(8,0,0,0);choose.Name="p2p-folder";targetLayout.Controls.Add(choose,1,1);
+        targetLayout.Controls.Add(folderHint,0,2);targetLayout.SetColumnSpan(folderHint,2);
+        targetRow.Controls.Add(targetLayout);body.Controls.Add(targetRow,0,5);
         var actions=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.RightToLeft,WrapContents=false,Margin=Padding.Empty,Name="p2p-actions"};
         connect=GeneralStyle.Button(T("Conectar","Connect"),()=>Run(Connect),true);connect.Name="p2p-connect";connect.Margin=new Padding(8,0,0,0);actions.Controls.Add(connect);
         generate=GeneralStyle.Button(T("Gerar modpack","Generate modpack"),()=>Run(GenerateModpack));generate.Name="modpack-generate";generate.Margin=Padding.Empty;actions.Controls.Add(generate);
@@ -132,10 +136,16 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         copy.Enabled=output.Text.StartsWith("ML-P2P1:",StringComparison.Ordinal)&&(offer==null||!offer.Completed&&!offer.Discarded);
         connect.Enabled=!busy&&!String.IsNullOrWhiteSpace(input.Text);
         choose.Enabled=!busy;
-        bool receiving=false;
-        try{receiving=P2PInvite.Decode(input.Text).Kind=="offer";}catch(IOException){}
+        var incoming=IncomingInvite();
+        string hint=incoming==null?"":
+            incoming.PrivateFolder?T("O anfitrião usa uma pasta pessoal. Escolha a pasta do jogo neste PC.",
+                "The host uses a personal folder. Choose the game folder on this PC."):
+            incoming.SuggestedFolder==null?"":T("Pasta sugerida pelo anfitrião: ","Folder suggested by the host: ")+incoming.SuggestedFolder;
         body.SuspendLayout();
-        targetRow.Visible=receiving;body.RowStyles[5].Height=receiving?TargetHeight:0;
+        folderHint.Text=hint;tips.SetToolTip(folderHint,hint);
+        folderHint.Visible=hint.Length!=0;
+        targetLayout.RowStyles[2].Height=hint.Length==0?0:LabelHeight;
+        targetRow.Visible=incoming!=null;body.RowStyles[5].Height=incoming==null?0:TargetHeight+(int)targetLayout.RowStyles[2].Height;
         status.Visible=status.Text.Length!=0;body.RowStyles[7].Height=status.Text.Length==0?0:Gap+42;
         body.ResumeLayout(false);
         FitCards();
@@ -194,7 +204,16 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         cardStack.ResumeLayout(false);
         FitCards();
     }
-    void ChooseFolder(){using(var folder=new FolderBrowserDialog{Description=T("Escolha a pasta local de instalação.","Choose the local installation folder."),SelectedPath=Directory.Exists(destination.Text)?destination.Text:""})if(folder.ShowDialog(this)==DialogResult.OK)destination.Text=folder.SelectedPath;}
+    P2PInvite IncomingInvite(){
+        try{var invite=P2PInvite.Decode(input.Text);return invite.Kind=="offer"?invite:null;}
+        catch(IOException){return null;}
+    }
+    void ChooseFolder(){
+        var invite=IncomingInvite();
+        string initial=Directory.Exists(destination.Text)?destination.Text:invite==null?"":invite.LocalSuggestedFolder();
+        using(var folder=new FolderBrowserDialog{Description=T("Escolha a pasta local de instalação.","Choose the local installation folder."),SelectedPath=initial??""})
+            if(folder.ShowDialog(this)==DialogResult.OK)destination.Text=folder.SelectedPath;
+    }
     async Task PrepareLink(){
         var selected=ExportIds;
         string preset=ExportPreset;
