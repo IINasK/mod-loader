@@ -104,7 +104,7 @@ internal class GeneralDialog : Form {
     [DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr window,int message,IntPtr wParam,IntPtr lParam);
     internal GeneralDialog():this(""){}
     internal GeneralDialog(string text){
-        FormBorderStyle=FormBorderStyle.None;StartPosition=FormStartPosition.CenterParent;Font=GeneralStyle.Font(12);BackColor=GeneralStyle.Surface;
+        FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;StartPosition=FormStartPosition.CenterParent;Font=GeneralStyle.Font(12);BackColor=GeneralStyle.Surface;
         Padding=new Padding(2);Content=new Panel{Dock=DockStyle.Fill,BackColor=GeneralStyle.Surface};
         var shell=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=Padding.Empty,Margin=Padding.Empty,BackColor=GeneralStyle.Surface};
         shell.Resize+=(s,e)=>GeneralStyle.ClipCardBody(shell);

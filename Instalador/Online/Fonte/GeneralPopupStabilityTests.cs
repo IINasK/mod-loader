@@ -2,10 +2,13 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
 internal static class GeneralPopupStabilityTests {
+    [DllImport("user32.dll")]static extern int GetWindowLong(IntPtr window,int index);
+    [DllImport("user32.dll")]static extern IntPtr GetWindow(IntPtr window,uint command);
     internal static void Run(string parent){
         string root=OnlineTests.NestedRoot(parent,"popup-stability-");Directory.CreateDirectory(root);
         var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
@@ -51,8 +54,12 @@ internal static class GeneralPopupStabilityTests {
                                 }
                             }
                             GeneralStyle.UseTheme("light-red");GeneralStyle.AnimationsEnabled=true;
-                            using(var quick=new GeneralDialog("Quick toggle"){ClientSize=new Size(320,210),ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)}){
-                                quick.Show(owner);check(HasSmallRegion(quick),"A just-opened dialog is still clipped before the first expansion tick.");
+                            using(var quick=new GeneralDialog("Quick toggle"){ClientSize=new Size(320,210),StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)}){
+                                quick.Show(owner);
+                                const int extendedStyle=-20,appWindow=0x40000;
+                                const uint ownerWindow=4;
+                                check(!quick.ShowInTaskbar&&(GetWindowLong(quick.Handle,extendedStyle)&appWindow)==0&&GetWindow(quick.Handle,ownerWindow)==owner.Handle,"Owned popups have no separate Windows taskbar window.");
+                                check(HasSmallRegion(quick),"A just-opened dialog is still clipped before the first expansion tick.");
                                 quick.Complete(DialogResult.Cancel);check(HasSmallRegion(quick),"Immediate close contracts from current progress without jumping to a full card.");
                                 await Task.Delay(270);check(!quick.Visible,"Immediate open/close finishes normally without applying anything.");
                             }

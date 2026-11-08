@@ -7,12 +7,14 @@ using System.Windows.Forms;
 
 internal sealed class GeneralStorageSize {
     internal long Mods,Total,Cache,Retained;
+    internal string ProjectCacheDirectory;
     internal int ModCount,Identified;
     internal readonly Dictionary<string,long> ModBytes=new Dictionary<string,long>(StringComparer.Ordinal);
     internal int Projects,WithFiles,Unavailable;
     internal static string Format(long bytes){double value=bytes;string[] units={"B","KiB","MiB","GiB","TiB"};int at=0;while(value>=1024&&at<units.Length-1){value/=1024;at++;}return value.ToString(at==0?"0":"0.##")+" "+units[at];}
     internal static string RetainedText(GeneralStorageSize size){return GeneralStyle.T("Pacotes antigos: ","Old packages: ")+Format(size.Retained);}
-    internal static string ProjectText(GeneralStorageSize size){return GeneralStyle.T("Mods: ","Mods: ")+Format(size.Mods)+"   ·   "+GeneralStyle.T("Total do projeto: ","Project total: ")+Format(size.Total)+"   ·   "+GeneralStyle.T("Cache do projeto: ","Project cache: ")+Format(size.Cache)+(size.Retained>0?"   ·   "+RetainedText(size):"")+(size.Unavailable>0?GeneralStyle.T(" (parcial)"," (partial)"):"");}
+    internal static string ProjectCacheText(GeneralStorageSize size){return GeneralStyle.T("Cache do projeto: ","Project cache: ")+Format(size.Cache);}
+    internal static string ProjectText(GeneralStorageSize size){return GeneralStyle.T("Mods: ","Mods: ")+Format(size.Mods)+"   ·   "+GeneralStyle.T("Total do projeto: ","Project total: ")+Format(size.Total)+"   ·   "+ProjectCacheText(size)+(size.Retained>0?"   ·   "+RetainedText(size):"")+(size.Unavailable>0?GeneralStyle.T(" (parcial)"," (partial)"):"");}
     internal static string HomeText(GeneralStorageSize size){return GeneralStyle.T("Medidos: ","Measured: ")+size.Identified+"/"+size.ModCount+"   ·   "+GeneralStyle.T("Projetos com arquivos: ","Projects with files: ")+size.WithFiles+" / "+size.Projects+"   ·   "+GeneralStyle.T("Mods: ","Mods: ")+Format(size.Mods)+"   ·   "+GeneralStyle.T("Total: ","Total: ")+Format(size.Total)+"   ·   "+GeneralStyle.T("Cache: ","Cache: ")+Format(size.Cache)+(size.Retained>0?"   ·   "+RetainedText(size):"")+(size.Unavailable>0?GeneralStyle.T(" (parcial)"," (partial)"):"");}
 }
 internal sealed class GeneralStorageLabel : LinkLabel {
@@ -23,18 +25,24 @@ internal sealed class GeneralStorageLabel : LinkLabel {
         LinkClicked+=(s,e)=>{
             try{
                 string folder=e.Link.LinkData as string;
-                if(String.IsNullOrEmpty(folder)||!Directory.Exists(folder))throw new DirectoryNotFoundException(GeneralStyle.T("A pasta de pacotes antigos não existe mais.","The old packages folder no longer exists."));
+                if(String.IsNullOrEmpty(folder)||!Directory.Exists(folder))throw new DirectoryNotFoundException(GeneralStyle.T("A pasta não existe mais.","The folder no longer exists."));
                 Safe.NoLinks(folder);
                 Process.Start(new ProcessStartInfo(folder){UseShellExecute=true});
-            }catch(Exception ex){GeneralDialog.Message(FindForm(),ex.Message,GeneralStyle.T("Pacotes antigos","Old packages"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+            }catch(Exception ex){GeneralDialog.Message(FindForm(),ex.Message,GeneralStyle.T("Abrir pasta","Open folder"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}
         };
     }
     internal void SetSize(GeneralStorageSize size,bool home){
         Links.Clear();
         Text=size==null?GeneralStyle.T("Espaço indisponível","Size unavailable"):home?GeneralStorageSize.HomeText(size):GeneralStorageSize.ProjectText(size);
-        if(size==null||size.Retained<=0||cache==null||cache.RetainedRoot==null)return;
-        string link=GeneralStorageSize.RetainedText(size);
-        Links.Add(Text.LastIndexOf(link,StringComparison.Ordinal),link.Length,cache.RetainedRoot);
+        if(size==null)return;
+        if(!home&&size.ProjectCacheDirectory!=null){
+            string link=GeneralStorageSize.ProjectCacheText(size);
+            Links.Add(Text.LastIndexOf(link,StringComparison.Ordinal),link.Length,size.ProjectCacheDirectory);
+        }
+        if(size.Retained>0&&cache!=null&&cache.RetainedRoot!=null){
+            string link=GeneralStorageSize.RetainedText(size);
+            Links.Add(Text.LastIndexOf(link,StringComparison.Ordinal),link.Length,cache.RetainedRoot);
+        }
     }
 }
 internal static class GeneralProjectStorage {
@@ -43,6 +51,7 @@ internal static class GeneralProjectStorage {
         var sizes=new Dictionary<string,long>(StringComparer.OrdinalIgnoreCase);var seed=GeneralModLibrary.Seed(catalog,new ModImportItem[0]);
         foreach(var project in store.Read(true).Projects.Where(item=>selected==null||item.Id==selected.Id)){
             result.Projects++;var projectFiles=Paths();string data=store.DataPath(project);
+            if(selected!=null)result.ProjectCacheDirectory=data;
             try{
                 var state=store.Load(project,true);result.ModCount+=state.List.Mods.Count;
                 var perMod=state.List.Mods.ToDictionary(mod=>mod.Id,mod=>Paths(),StringComparer.Ordinal);

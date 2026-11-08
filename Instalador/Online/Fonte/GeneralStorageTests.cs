@@ -54,6 +54,7 @@ internal sealed partial class GeneralModWindow {
                 }
             }
             GeneralStyle.Language="en";form.state.Language="en";form.BuildInterface();form.RefreshStorageSize();await Until(()=>!form.storageReading);check(form.counts.Text.Contains("Measured: 3/4")&&form.storageSize.Text.Contains("Project cache:"),"English uses the same measured ratio and cache semantics.");
+            check((string)form.storageSize.Links.Cast<LinkLabel.Link>().Single().LinkData==data,"The actual project summary links to its cache even without old packages.");
             form.ClientSize=new Size(1000,680);form.PerformLayout();await Task.Delay(35);CaptureUi(form,Path.Combine(root,"sizes-en.png"));
         });
         TestFixedStorage(root,check);
@@ -79,8 +80,8 @@ internal sealed partial class GeneralModWindow {
         check(oldPackage.Retained==archives&&projectCache.Root!=projectCache.RetainedRoot,"Project-local index does not hide the legacy cache measured by the UI.");
         using(var label=new GeneralStorageLabel(projectCache)){
             label.SetSize(oldPackage,false);
-            var link=label.Links.Cast<LinkLabel.Link>().Single();
-            check((string)link.LinkData==cache.Root&&label.Text.Substring(link.Start,link.Length)==GeneralStorageSize.RetainedText(oldPackage),"Only the old packages metric links to the exact directory being measured.");
+            var links=label.Links.Cast<LinkLabel.Link>().ToDictionary(link=>label.Text.Substring(link.Start,link.Length),link=>(string)link.LinkData);
+            check(links.Count==2&&links[GeneralStorageSize.ProjectCacheText(oldPackage)]==store.DataPath(project)&&links[GeneralStorageSize.RetainedText(oldPackage)]==cache.Root,"Project cache and old packages open their own measured folders.");
             label.SetSize(oldPackage,true);
             check((string)label.Links.Cast<LinkLabel.Link>().Single().LinkData==cache.Root,"The home counter opens the same measured directory.");
             label.SetSize(new GeneralStorageSize(),true);
