@@ -19271,6 +19271,46 @@
           "UserData": false
         }
       ]
+    },
+    {
+      "Id": "mod-35667",
+      "Name": "Dual Wield Anything and Everything",
+      "Version": "0.2.0",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "Requer o perk Double Trouble. Armas pesadas de pegar no cenário e algumas combinações de duas armas brancas têm limitações. Evite usar junto com Expanded Dual Wielding. Sincronização no coop ainda sem teste.",
+      "Dependencies": [
+        "CET"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/35667?tab=files&file_id=167854",
+      "NexusModId": 35667,
+      "NexusFileId": 167854,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "DualWieldEverything 0.2.0 35667 2 2026-10-23T15-51Z YfTif773L.zip",
+          "Size": 3217,
+          "Sha256": "eeb162e71daa14d884573756a53b439de56ef4d7a1643b12e690d833306e34bd",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/35667?tab=files&file_id=167854",
+          "ModId": 35667,
+          "FileId": 167854
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "DualWieldEverything-0.1.0/bin/x64/plugins/cyber_engine_tweaks/mods/DualWieldEverything/init.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/DualWieldEverything/init.lua",
+          "Size": 4615,
+          "Sha256": "f749b515956927971d9b21207b8fa673c5ff07c2daafe730d57b23b53fd6bbe1",
+          "UserData": false
+        }
+      ]
     }
   ],
   "Excluded": [
