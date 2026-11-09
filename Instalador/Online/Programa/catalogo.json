@@ -19311,6 +19311,53 @@
           "UserData": false
         }
       ]
+    },
+    {
+      "Id": "mod-12681",
+      "Name": "H10 Megabuilding Unlocked",
+      "Version": "3.0.5",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Description": "Abre áreas antes inacessíveis no H10, incluindo o átrio do mercado, e adiciona dois elevadores funcionais.",
+      "Warning": "Requer Phantom Liberty. Altera os setores do H10. O acesso e a zona de morte do átrio ainda não foram testados no NightCoop.",
+      "Dependencies": [
+        "ArchiveXL"
+      ],
+      "RequiresPL": true,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "required",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/12681?tab=description",
+      "NexusModId": 12681,
+      "NexusFileId": 170850,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "H10 Megabuilding Unlocked 12681 3.0.5 2026-10-30T06-10Z JSKWSQA2c.zip",
+          "Size": 324852,
+          "Sha256": "d7e5360a7438bad0ac965eb165f918bccb09133dd6beb39d598b5e1c5c780b79",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/12681?tab=files&file_id=170850",
+          "ModId": 12681,
+          "FileId": 170850
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/H10MegabuildingUnlocked.archive",
+          "Path": "archive/pc/mod/H10MegabuildingUnlocked.archive",
+          "Size": 385024,
+          "Sha256": "3f35d3214e0e3c3bf8c1fd1151a5e1f9ab9f354c37bbf52dd0129648997f16d2"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/H10MegabuildingUnlocked.xl",
+          "Path": "archive/pc/mod/H10MegabuildingUnlocked.xl",
+          "Size": 74611,
+          "Sha256": "5a66701716c77c70e62408832da96b5b15a610e65deff33eecfad159a64d2f63"
+        }
+      ]
     }
   ],
   "Excluded": [

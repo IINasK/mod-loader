@@ -17,7 +17,7 @@ internal static class ModCategories {
     static ModCategories() {
         Add(ModCategory.Core, "mod-10437 mod-34403 CET redscript ArchiveXL TweakXL Codeware InputLoader ModSettings Audioware Utilities2077 NativeSettings RadioExt mod-5266 mod-6945 mod-2987 mod-28744 mod-7049 mod-9429");
         Add(ModCategory.Essentials, "NightCoop");
-        Add(ModCategory.Gameplay, "mod-36378 mod-35886 mod-17811 mod-3486 mod-30316 mod-30304 mod-7299 mod-36802 mod-36203 mod-35667");
+        Add(ModCategory.Gameplay, "mod-36378 mod-35886 mod-17811 mod-3486 mod-30316 mod-30304 mod-7299 mod-36802 mod-36203 mod-35667 mod-12681");
         Add(ModCategory.Stores, "mod-14210 mod-4454 mod-4805 mod-11964 mod-5114 mod-14299 mod-8704 mod-20058 mod-8183 mod-13870 mod-18890 mod-12637 mod-6505 mod-6985 mod-27357 mod-27599 mod-16645 mod-37000");
         Add(ModCategory.Vehicles, "mod-11659 mod-10702 mod-11331 mod-12556 mod-8827 mod-13569 mod-8795 mod-8912 mod-12652 mod-8730 mod-11180 mod-24076 mod-12669 mod-22340 mod-33954 mod-29619 mod-22155 mod-14162 mod-10445 mod-17158 mod-13847 mod-35848");
         Add(ModCategory.Appearance, "mod-16697-109145 mod-16697-109148 mod-16697-109147 mod-16697-109146 mod-16697-109144 mod-28570 mod-19187 mod-20763 mod-24547 mod-24626 mod-25348 mod-25807 mod-31886");
