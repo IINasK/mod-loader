@@ -50,7 +50,11 @@ internal sealed partial class P2PService {
             Dictionary<string,Task<bool>> decisions;
             if(!connectionDecisions.TryGetValue(session,out decisions))continue;
             var accepted=decisions.FirstOrDefault(item=>item.Value.Status==TaskStatus.RanToCompletion&&item.Value.Result);
-            if(accepted.Key==null)continue;
+            if(accepted.Key==null){
+                if(decisions.Count!=0&&decisions.Values.All(task=>task.IsCompleted))
+                    ConnectionDiagnosticPhase(session.Id,"host_declined");
+                continue;
+            }
             lock(session)lock(startGate){
                 if(session.Completed||session.Discarded||session.Recipients.Length!=0)continue;
                 AddRecipient(session,accepted.Key);
@@ -80,6 +84,7 @@ internal sealed partial class P2PService {
                                 connectionDecisions[s]=decisions=new Dictionary<string,Task<bool>>(StringComparer.Ordinal);
                             if(decisions.ContainsKey(peer.Key)||decisions.Count>=16||
                                 connectionDecisions.Values.Any(group=>group.Values.Any(task=>!task.IsCompleted)))continue;
+                            ConnectionDiagnosticPhase(s.Id,"waiting_for_host_choice");
                             decisions.Add(peer.Key,confirm(s));
                             break;
                         }

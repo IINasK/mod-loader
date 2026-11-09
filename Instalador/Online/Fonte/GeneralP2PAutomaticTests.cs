@@ -46,15 +46,38 @@ internal static class GeneralP2PAutomaticTests {
                     check(Clipboard.GetText()==offer&&sent.Automatic,"Opening fills a copy-only automatic invitation.");
                     await Task.Delay(1300);check(sent.PayloadHash==null&&!Directory.GetFiles(sender.Folder(sent),"*.zip*").Any(),"Leaving the dialog open without a friend creates no ZIP or partial ZIP.");
                     check(dialog.Content.Controls.Find("p2p-card",true).Length==0,"An unaccepted invitation does not create a transfer card.");Capture(dialog,Path.Combine(root,"waiting-black.png"));
+                    sender.ObserveConnectionDiagnostics(DateTime.UtcNow.AddSeconds(31));
+                    var hostReport=sender.GetConnectionDiagnostic(sent.Id);
+                    check(hostReport!=null&&hostReport.Phase=="no_verified_request"&&hostReport.LocalApiResponded==true,
+                        "An unanswered invitation records a local host diagnostic.");
+                    using(var diagnostics=new GeneralP2PDiagnosticDialog(sender)){
+                        diagnostics.Show(host);
+                        var copyReport=(Button)diagnostics.Content.Controls.Find("p2p-diagnostic-copy",true).Single();
+                        copyReport.PerformClick();
+                        check(Clipboard.GetText()==Safe.Json.Serialize(hostReport),"Copy diagnostics copies the sanitized report.");
+                        diagnostics.Close();
+                    }
                     dialog.Hide();
-                    accepted=receiver.Accept(offer,target,true);receiver.Engine.ConfigurePeer(sender.Engine.Device,"tcp://127.0.0.1:"+sender.Engine.ListenPort);
+                    receiver.ArmConnectionDiagnostic(sent.Id,false);
+                    accepted=receiver.Accept(offer,target,true);
+                    receiver.ObserveConnectionDiagnostics(DateTime.UtcNow.AddSeconds(31));
+                    var receiveReport=receiver.GetConnectionDiagnostic(accepted.Id);
+                    string copied=Safe.Json.Serialize(receiveReport);
+                    check(receiveReport.Id==hostReport.Id&&receiveReport.Side=="receiver"&&hostReport.Side=="host"&&
+                        receiveReport.Phase=="peer_unreachable"&&receiveReport.PeerConnected==false,
+                        "Both sides share an ID and a disconnected receiver records the failed stage.");
+                    check(!new[]{offer,sent.Id,sent.Hash,target,sender.Engine.Device,receiver.Engine.Device}.Any(copied.Contains),
+                        "The shareable report excludes the invitation, device IDs and game path.");
+                    receiver.Engine.ConfigurePeer(sender.Engine.Device,"tcp://127.0.0.1:"+sender.Engine.ListenPort);
                     await Wait(()=>Application.OpenForms.Cast<Form>().Any(form=>form.Controls.Find("p2p-accept-request",true).Length!=0),"Host did not receive a connection request.");
                     check(sent.Recipients.Length==0&&sent.PayloadHash==null&&hostChoices==1,"A proven invite plays a single sound and waits for the host.");
                     var approve=Application.OpenForms.Cast<Form>().SelectMany(form=>form.Controls.Find("p2p-accept-request",true)).OfType<Button>().Single();
                     approve.PerformClick();
                     await Wait(()=>sent.Recipients.Length!=0,"Host did not approve the request without a reply code.");
                     check(sent.Recipients.Single().Device==receiver.Engine.Device,"Host approval pins the proven recipient without a reply code.");
+                    await Wait(()=>sender.GetConnectionDiagnostic(sent.Id).Phase=="host_approved","The host diagnostic did not record approval.");
                     await Wait(()=>receiver.HasSyncPreview(accepted)||sent.Error!=null,"Host did not publish the comparison.");
+                    await Wait(()=>receiver.GetConnectionDiagnostic(accepted.Id).Phase=="connected","The receiver diagnostic did not record recovery.");
                     check(sent.Error==null&&sent.PayloadHash==null,"The host waits for the receiver's choice before building the pack.");
                     await receiver.ChooseIncoming(accepted,true);
                     await Wait(()=>sent.PayloadHash!=null||sent.Error!=null,"Preparation did not start after the recipient chose a full pack.");check(sent.PayloadHash!=null&&sent.Error==null,"Background service starts preparation even with its dialog hidden.");

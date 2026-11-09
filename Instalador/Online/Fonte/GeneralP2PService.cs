@@ -72,7 +72,7 @@ internal sealed partial class P2PService : IDisposable {
     readonly object manifestsLock=new object();
     readonly Dictionary<string,P2PManifest> allowedManifests=new Dictionary<string,P2PManifest>();
     internal P2PService(string root,string store,bool localOnly=false,bool offerRecovery=false){
-        Root=Path.GetFullPath(root);Store=Path.GetFullPath(store);Safe.NoLinks(Root);Safe.NoLinks(Store);
+        diagnosticFixture=localOnly;Root=Path.GetFullPath(root);Store=Path.GetFullPath(store);Safe.NoLinks(Root);Safe.NoLinks(Store);
         if(Root.TrimEnd('\\').Equals(Store.TrimEnd('\\'),StringComparison.OrdinalIgnoreCase))throw new IOException("Separe os arquivos privados da pasta de transferência.");
         statePath=Safe.In(Root,"sessions.json");Engine=new SyncthingEngine(Safe.In(Root,"syncthing"),localOnly);
         if(!localOnly){
@@ -184,6 +184,7 @@ internal sealed partial class P2PService : IDisposable {
         if(disposed||Interlocked.Exchange(ref pumping,1)!=0)return;
         try{
             try{DetectAcceptances();}catch(Exception ex){OnlineDiagnostics.Record("p2p.accept.waiting",null,ex.GetType().Name);}
+            try{ObserveConnectionDiagnostics(DateTime.UtcNow);}catch(Exception ex){OnlineDiagnostics.Record("p2p.diagnostic.observe",null,ex.GetType().Name);}
             foreach(var session in installedSessions){
                 if(disposed)break;
                 try{ProcessInstalled(session);}

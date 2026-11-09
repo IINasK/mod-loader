@@ -108,7 +108,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         var sendLabel=Heading(T("Link para enviar ao amigo","Link to send to your friend"));
         body.Controls.Add(sendLabel,0,1);
         var send=Field(output);send.Padding=new Padding(14,16,72,8);
-        copy=GeneralStyle.Button("",()=>Copy(output.Text));IconButton(copy,"copy",T("Copiar link","Copy link"));copy.Name="p2p-copy";
+        copy=GeneralStyle.Button("",CopyInvitation);IconButton(copy,"copy",T("Copiar link","Copy link"));copy.Name="p2p-copy";
         if(state.List.Mods.Count==0){sendLabel.Visible=false;send.Visible=false;body.RowStyles[1].Height=0;body.RowStyles[2].Height=0;}
         send.Controls.Add(copy);send.SizeChanged+=(s,e)=>copy.Location=new Point(send.ClientSize.Width-62,6);body.Controls.Add(send,0,2);
         body.Controls.Add(Heading(T("Link recebido do amigo","Link received from your friend")),0,3);
@@ -126,6 +126,8 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         var actions=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.RightToLeft,WrapContents=false,Margin=Padding.Empty,Name="p2p-actions"};
         connect=GeneralStyle.Button(T("Conectar","Connect"),()=>Run(Connect),true);connect.Name="p2p-connect";connect.Margin=new Padding(8,0,0,0);actions.Controls.Add(connect);
         generate=GeneralStyle.Button(T("Gerar modpack","Generate modpack"),()=>Run(GenerateModpack));generate.Name="modpack-generate";generate.Margin=Padding.Empty;actions.Controls.Add(generate);
+        var diagnostics=GeneralStyle.Button(T("Diagnóstico P2P","P2P diagnostics"),ShowDiagnostics);
+        diagnostics.Name="p2p-diagnostic-options";diagnostics.Margin=new Padding(8,0,0,0);actions.Controls.Add(diagnostics);
         body.Controls.Add(actions,0,6);body.Controls.Add(status,0,7);
         status.Margin=new Padding(0,Gap,0,0);
         body.Controls.Add(cardScroll,0,9);body.SetColumnSpan(cardScroll,2);
@@ -152,6 +154,23 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     }
     static Label Heading(string text){return new Label{Text=text,Dock=DockStyle.Fill,Font=GeneralStyle.Font(11),Margin=Padding.Empty};}
     static GeneralSurface Field(Control control){var field=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(14,9,14,9),Margin=new Padding(0,0,0,Gap)};field.Controls.Add(control);return field;}
+    void CopyInvitation(){
+        Copy(output.Text);
+        if(offer!=null&&output.Text.StartsWith("ML-P2P1:",StringComparison.Ordinal))
+            service.ArmConnectionDiagnostic(offer.Id,true);
+    }
+    void ShowDiagnostics(){
+        using(var dialog=new GeneralP2PDiagnosticDialog(service))dialog.ShowDialog(this);
+    }
+    void CopyDiagnostic(P2PSession session){
+        var report=service.GetConnectionDiagnostic(session.Id);
+        if(report==null)return;
+        try{
+            Clipboard.SetText(Safe.Json.Serialize(report));
+            status.ForeColor=GeneralStyle.Foreground;
+            status.Text=T("Diagnóstico copiado · ","Diagnostics copied · ")+report.Id;
+        }catch(Exception ex){Failed(ex);}
+    }
     void Copy(string text){if(!text.StartsWith("ML-P2P1:",StringComparison.Ordinal))return;try{Clipboard.SetText(text);}catch(Exception ex){Failed(ex);}}
     void Report(string text){if(!IsDisposed&&IsHandleCreated)BeginInvoke((Action)(()=>{if(!IsDisposed)status.Text=text;}));}
     void Failed(Exception ex){
@@ -279,12 +298,19 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             string prompt=invite.Schema==3?T("Comparar os mods do pacote ","Compare mods from the pack "):T("Receber e instalar o pacote ","Receive and install pack ");
             service.Notify();
             if(GeneralDialog.Message(this,prompt+invite.Name+T(" em:\n"," into:\n")+target+T("\n\nMantenha o jogo fechado. Configurações anteriores terão backup.","\n\nKeep the game closed. Previous settings will be backed up."),T("Conectar ao anfitrião","Connect to the host"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-            if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));
-            var session=await Task.Run(()=>{
-                var accepted=service.Accept(code,target,true);
-                if(!accepted.Completed&&(accepted.Held||accepted.Error!=null||!accepted.AutoInstall))service.RetryInstalled(accepted,target);
-                return accepted;
-            });
+            service.ArmConnectionDiagnostic(invite.Folder,false);
+            P2PSession session;
+            try{
+                if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));
+                session=await Task.Run(()=>{
+                    var accepted=service.Accept(code,target,true);
+                    if(!accepted.Completed&&(accepted.Held||accepted.Error!=null||!accepted.AutoInstall))service.RetryInstalled(accepted,target);
+                    return accepted;
+                });
+            }catch(Exception ex){
+                service.ConnectionDiagnosticPhase(invite.Folder,"local_failure",ex);
+                throw;
+            }
             if(session.Completed){
                 input.Clear();
                 status.ForeColor=GeneralStyle.Foreground;
@@ -416,7 +442,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             UseCompatibleTextRendering=false,LinkArea=new LinkArea(0,0)
         };
         readonly FlowLayoutPanel actions=new FlowLayoutPanel{Dock=DockStyle.Fill,Margin=Padding.Empty,WrapContents=false};
-        readonly Button pause,retry,import,reply,dismiss,update,full;
+        readonly Button pause,retry,import,reply,dismiss,update,full,diagnostic;
         P2PTransferStatus last;
         DateTime? waitingSince;
         internal int Order,Height;
@@ -432,13 +458,17 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             layout.RowCount=5;Frame.Controls.Add(layout);
             var title=Heading(session.ToString());title.Font=GeneralStyle.Font(13,true);title.AutoEllipsis=true;title.UseMnemonic=false;
             title.TextAlign=ContentAlignment.MiddleLeft;
-            var header=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};
+            var header=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=Padding.Empty};
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
             header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             header.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            diagnostic=GeneralStyle.Button("",()=>owner.CopyDiagnostic(session));
+            owner.IconButton(diagnostic,"copy",T("Copiar diagnóstico","Copy diagnostics"));
+            diagnostic.Name="p2p-copy-diagnostic";diagnostic.Visible=false;
             dismiss=GeneralStyle.Button("",()=>owner.CloseTransfer(session));
             owner.IconButton(dismiss,"close",T("Cancelar transferência","Cancel transfer"));dismiss.Name="p2p-dismiss";
-            header.Controls.Add(title,0,0);header.Controls.Add(dismiss,1,0);
+            header.Controls.Add(title,0,0);header.Controls.Add(diagnostic,1,0);header.Controls.Add(dismiss,2,0);
             layout.Controls.Add(header,0,0);layout.Controls.Add(preparation,0,1);layout.Controls.Add(bars,0,2);
             layout.Controls.Add(detail,0,3);layout.Controls.Add(actions,0,4);
             bars.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
@@ -470,6 +500,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             if(waitingConnection&&!waitingSince.HasValue)waitingSince=DateTime.UtcNow;
             if(!waitingConnection)waitingSince=null;
             bool delayed=waitingSince.HasValue&&(DateTime.UtcNow-waitingSince.Value).TotalSeconds>=30;
+            diagnostic.Visible=(delayed||view.Unavailable||session.Error!=null)&&owner.service.GetConnectionDiagnostic(session.Id)!=null;
             var scan=session.SyncProgress;
             var issue=session.VerificationIssue;
             bool scanning=scan!=null||session.Sender&&awaiting&&!preview&&session.Stage!=null;

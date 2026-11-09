@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -712,6 +712,7 @@ static class OnlineProgram {
         if(args.Length==3&&args[0]=="--self-test-p2p-engine-owner"){GeneralP2PLifecycleTests.RunEngineOwner(args[1],args[2]);return 0;}
         if(args.Length==3&&args[0]=="--self-test-p2p-lifecycle"){GeneralP2PLifecycleTests.Run(args[1],args[2]);return 0;}
         if(args.Length==3&&args[0]=="--self-test-p2p-automatic"){GeneralP2PAutomaticTests.Run(args[1],args[2]);return 0;}
+        if(args.Length==3&&args[0]=="--self-test-p2p-diagnostics"){GeneralP2PDiagnosticTests.Run(args[1],args[2]);return 0;}
         if(args.Length==3&&args[0]=="--self-test-p2p-deferred"){GeneralP2PDeferredTests.Run(args[1],args[2]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-versions"){ModVersionChoiceTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-updates"){GeneralUpdatesTests.Run(args[1]);GeneralAutomaticUpdateTests.Run(args[1]);return 0;}
