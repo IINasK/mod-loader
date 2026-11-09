@@ -18275,8 +18275,8 @@
         "mod-14210",
         "mod-10437"
       ],
-      "Description": "Calças em três comprimentos e 36 cores por comprimento; cinto em 40 cores para ambos os V.\n\nComo usar: Refits automáticos incluídos. Toggle em Thigh Left esconde bolsos e tiras. Física do cinto é um download opcional e não é recomendada com rig deform. Comprar em clothes – main store.\n\nDependências: ArchiveXL, TweakXL, Equipment-EX, CET, raem's Atelier Store, The Community Palette Project.\n\nInstalação e arquivos conferidos. Aparência no jogo e coop ainda não testados.",
-      "Warning": "Refits automáticos incluídos. Toggle em Thigh Left esconde bolsos e tiras. Física do cinto é um download opcional e não é recomendada com rig deform. Comprar em clothes – main store.",
+      "Description": "Calças em três comprimentos e 36 cores por comprimento; cinto em 40 cores para ambos os V.\n\nComo usar: Refits automáticos incluídos. Toggle em Thigh Left esconde bolsos e tiras. Física do cinto é um download opcional e não é recomendada com rig deform. Comprar em clothes – main store. Em NightCoop, houve crashes recorrentes ao receber um jogador equipado com Ripper Cargo Black. Troque por uma calça original no equipamento e no conjunto ativo do Equipment-EX antes de entrar no mundo.\n\nDependências: ArchiveXL, TweakXL, Equipment-EX, CET, raem's Atelier Store, The Community Palette Project.\n\nInstalação e arquivos conferidos.",
+      "Warning": "Refits automáticos incluídos. Toggle em Thigh Left esconde bolsos e tiras. Física do cinto é um download opcional e não é recomendada com rig deform. Comprar em clothes – main store. Em NightCoop, houve crashes recorrentes ao receber um jogador equipado com Ripper Cargo Black. Troque por uma calça original no equipamento e no conjunto ativo do Equipment-EX antes de entrar no mundo.",
       "PhantomLibertyStatus": "not-required",
       "PhantomLibertyNotes": "Sem exigência explícita de expansão; runtime sem DLC não testado.",
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/18084",
@@ -19221,6 +19221,54 @@
           "Path": "archive/pc/mod/ulegs_tattoo_funsix_ccxl.archive.xl",
           "Sha256": "cb20510020bcd5f572df3d8cd87c6e1e445fe5a72e8b113a5a6cc5e42d6cc0be",
           "Size": 97
+        }
+      ]
+    },
+    {
+      "Id": "mod-36203",
+      "Name": "Kortex - Save Anytime",
+      "Version": "1.1.0",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "Libera salvamento rápido com F5 em situações normalmente bloqueadas. Teste primeiro em um save separado, fora do coop.",
+      "Dependencies": [
+        "NightCoop"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/36203?tab=files&file_id=169527",
+      "NexusModId": 36203,
+      "NexusFileId": 169527,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Kortex - SaveAnytime 1.1.0 36203 1.1.0 2026-10-27T18-46Z Co8doeete.zip",
+          "Size": 11557,
+          "Sha256": "6a431b81f8c1ec64c535aa52fc933dca9d830068e1f39d43169e7ba752cb2fe8",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/36203?tab=files&file_id=169527",
+          "ModId": 36203,
+          "FileId": 169527
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "red4ext/plugins/Kortex_SaveAnytime/Kortex_SaveAnytime.dll",
+          "Path": "red4ext/plugins/Kortex_SaveAnytime/Kortex_SaveAnytime.dll",
+          "Size": 22528,
+          "Sha256": "f2be0c94e9c30d8b7c425decdf419712180de854d050c0b026c6683176b8e306",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "red4ext/plugins/Kortex_SaveAnytime/README.txt",
+          "Path": "red4ext/plugins/Kortex_SaveAnytime/README.txt",
+          "Size": 2797,
+          "Sha256": "68b28d81fe23dbe6e25f58741d5b9759983d8153f1dcd9e04242d92f1d4def8b",
+          "UserData": false
         }
       ]
     }
