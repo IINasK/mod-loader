@@ -15,7 +15,7 @@ public static partial class InstalledSnapshot {
         new[]{"Y_Sneaky_EBBRB_Refits_PhantomLiberty_Clothes.archive","9bd6ddbe9b3170660f551a21197fcb27ec2f30caf3c2c17d8b7cf12f8f1de872"}
     };
     static readonly string[][] PushUpHystFiles={
-        new[]{"EBBPRB.xl","a98f6e880f40b195445d32c28b63debd4c44f8f6f9f97499bc3d424b289dff1"},
+        new[]{"EBBPRB.xl","a98f6e880f40b195445d32c28b63debfd4c44f8f6f9f97499bc3d424b289dff1"},
         new[]{"05_Hyst_Refit_ForcedBigBoobaPUSHUP_Booty.archive","7906fd6f7e956aac8d540a07841ce25ba90fdc6d6aa3a36d135ae40cc4833201"},
         new[]{"u_Vanilla_Clothes_EBB_Push_with_BOOTY.archive","05adc609451158d55a94e392768e2761c47c7a3407dafda1d48502cdc944df12"},
         new[]{"u_Phantom_Liberty_Clothes_PUSH_with_BOOTY_refits.archive","c963ef3ba9b661d9f2993ec1c3c26fd8a67c0a8c0dad680c616f992ae3478b05"}
