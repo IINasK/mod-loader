@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 internal sealed class P2PSession {
-    public string Id, Name, Hash, Peer, Mode, Destination, ReceiptId, Error, Stage;
+    public string Id, Name, Hash, Peer, Mode, Destination, ReceiptId, Error, Stage, RelayDevice;
     public bool Lifecycle, Held, ReceiptClosed, ExportAllPresets, CompareBeforePack;
     public volatile bool Discarded;
     public string Phase, TransactionId, ProjectError, ExportPreset;
@@ -99,6 +99,7 @@ internal sealed partial class P2PService : IDisposable {
     }
     static void Validate(P2PSession s){
         if(s==null||!Regex.IsMatch(s.Id??"","\\Aml-[a-f0-9]{32}\\z")||!P2PPack.HashValid(s.Hash)||String.IsNullOrWhiteSpace(s.Name)||s.Name.Length>300||s.Name.Any(Char.IsControl)||(s.Peer!=null&&!P2PInvite.DeviceValid(s.Peer)))throw new IOException("Registro de compartilhamento inválido.");
+        if(s.RelayDevice!=null&&(s.Sender||!P2PInvite.DeviceValid(s.RelayDevice)))throw new IOException("Identidade de relay inválida na sessão.");
         if(s.Recipients==null||s.Recipients.Length>3||s.Recipients.Any(p=>p==null||!P2PInvite.DeviceValid(p.Device))||s.Recipients.Select(p=>p.Device).Distinct().Count()!=s.Recipients.Length)
             throw new IOException("Destinatários inválidos.");
         if(s.ExportPreset!=null&&!Regex.IsMatch(s.ExportPreset,@"\A[A-Za-z0-9_-]{1,120}\z"))throw new IOException("Preset de compartilhamento inválido.");
@@ -301,10 +302,21 @@ internal sealed partial class P2PService : IDisposable {
             try{P2PPack.DeleteSnapshot(folder);}catch(Exception){}throw;
         }
     }
+    internal bool InvitationOpen(P2PSession session){
+        return session!=null&&session.Sender&&!session.Completed&&!session.Discarded&&
+            session.Peer==null&&session.Recipients.Length<(session.CompareBeforePack?1:3);
+    }
+    internal string OpenInvitation(P2PSession session){
+        if(session==null)return null;
+        lock(session)return Engine.Running&&InvitationOpen(session)&&SnapshotSessions().Contains(session)?Invitation(session):null;
+    }
     internal string Invitation(P2PSession session){
         var invite=new P2PInvite{Schema=session.CompareBeforePack?3:session.Lifecycle?2:1,Kind=session.Sender?"offer":"accept",Device=Engine.Device,
             Folder=session.Id,ManifestHash=session.Hash,Name=session.Name,Mode=session.Mode,Size=session.Deferred?0:session.Size,Deferred=session.Deferred,Automatic=session.Automatic};
-        if(session.Sender&&session.Mode=="installed-zip")invite.SuggestHostFolder(session.Destination);
+        if(session.Sender&&session.Mode=="installed-zip"){
+            invite.SuggestHostFolder(session.Destination);
+            invite.RelayDevice=Engine.InviteRelayDevice;
+        }
         return invite.Encode();
     }
     internal P2PSession Accept(string code,string destination=null,bool autoInstall=false){
@@ -314,8 +326,13 @@ internal sealed partial class P2PService : IDisposable {
         if(existing!=null){
             if(existing.Discarded)throw new IOException("Este recebimento foi descartado. Use um novo convite.");
             if(existing.Hash!=invite.ManifestHash||existing.Sender||existing.Peer!=invite.Device||existing.Deferred!=invite.Deferred||existing.Lifecycle!=(invite.Schema>=2)||existing.CompareBeforePack!=(invite.Schema==3)||existing.Mode!=invite.Mode||(!existing.Deferred&&existing.Size!=invite.Size))throw new IOException("Este convite conflita com outro compartilhamento.");
+            if(existing.Automatic!=invite.Automatic&&(existing.Automatic||!invite.Automatic||existing.Completed))
+                throw new IOException("Use o convite atualizado enviado pelo amigo.");
+            if(invite.RelayDevice!=null&&invite.RelayDevice!=existing.RelayDevice&&!existing.Completed&&!existing.Held&&!existing.Paused){
+                Engine.ConfigurePeerWithRelay(existing.Peer,invite.RelayDevice);
+                existing.RelayDevice=invite.RelayDevice;Save();
+            }
             if(existing.Automatic!=invite.Automatic){
-                if(existing.Automatic||!invite.Automatic||existing.Completed)throw new IOException("Use o convite atualizado enviado pelo amigo.");
                 existing.Automatic=true;AdvertiseAcceptance(existing);Engine.ConfigureFolder(existing.Id,Folder(existing),ReceiveLabel(existing),false,existing.Peer);if(existing.Paused)Engine.Pause(existing.Id,true);Save();RefreshAcceptance(existing);
             }else if(existing.Automatic&&!existing.Completed&&!existing.Held&&!existing.Paused&&existing.PayloadHash==null){
                 AdvertiseAcceptance(existing);
@@ -325,11 +342,11 @@ internal sealed partial class P2PService : IDisposable {
         }
         if(Sessions.Count>=100)throw new IOException("Remova compartilhamentos antigos antes de receber outro.");
         if(invite.Mode=="installed-zip"&&autoInstall){if(String.IsNullOrWhiteSpace(destination)||!Directory.Exists(destination))throw new IOException("Escolha a pasta de instalação antes de receber.");Safe.NoLinks(destination);}
-        var session=new P2PSession{Id=invite.Folder,Name=invite.Name,Hash=invite.ManifestHash,Peer=invite.Device,Mode=invite.Mode,Size=invite.Size,Deferred=invite.Deferred,Automatic=invite.Automatic,Lifecycle=invite.Schema>=2,CompareBeforePack=invite.Schema==3,Destination=destination,AutoInstall=autoInstall};
+        var session=new P2PSession{Id=invite.Folder,Name=invite.Name,Hash=invite.ManifestHash,Peer=invite.Device,Mode=invite.Mode,Size=invite.Size,Deferred=invite.Deferred,Automatic=invite.Automatic,Lifecycle=invite.Schema>=2,CompareBeforePack=invite.Schema==3,Destination=destination,AutoInstall=autoInstall,RelayDevice=invite.RelayDevice};
         string folder=Folder(session);Directory.CreateDirectory(folder);
         // Receive the pinned manifest first. Other remote files are ignored until its allow-list is validated.
         File.WriteAllText(Safe.In(folder,".stignore"),invite.Mode=="installed-zip"?(invite.Deferred?DeferredIgnores(session):"!pack.zip\n*\n"):"!pack.json\n*\n",new UTF8Encoding(false));
-        AdvertiseAcceptance(session);Engine.ConfigurePeer(session.Peer);Engine.ConfigureFolder(session.Id,folder,ReceiveLabel(session),false,session.Peer);
+        AdvertiseAcceptance(session);Engine.ConfigurePeerWithRelay(session.Peer,session.RelayDevice);Engine.ConfigureFolder(session.Id,folder,ReceiveLabel(session),false,session.Peer);
         try{
             if(session.Lifecycle)ConfigureReceipt(session,session.Peer,false);
             AddSession(session);

@@ -44,6 +44,8 @@ internal static class GeneralP2PAutomaticTests {
                     dialog.Show(host);var output=(TextBox)dialog.Content.Controls.Find("p2p-output",true).Single();var copy=(Button)dialog.Content.Controls.Find("p2p-copy",true).Single();
                     await Wait(()=>copy.Enabled,"No automatic invitation appeared.");sent=sender.Sessions.Single();string offer=output.Text;copy.PerformClick();
                     check(Clipboard.GetText()==offer&&sent.Automatic,"Opening fills a copy-only automatic invitation.");
+                    var sendLabel=dialog.Content.Controls.Find("p2p-send-label",true).Single();
+                    check(sendLabel.Text.EndsWith(P2PService.DiagnosticId(sent.Id),StringComparison.Ordinal),"The host sees the ID of the current invitation.");
                     await Task.Delay(1300);check(sent.PayloadHash==null&&!Directory.GetFiles(sender.Folder(sent),"*.zip*").Any(),"Leaving the dialog open without a friend creates no ZIP or partial ZIP.");
                     check(dialog.Content.Controls.Find("p2p-card",true).Length==0,"An unaccepted invitation does not create a transfer card.");Capture(dialog,Path.Combine(root,"waiting-black.png"));
                     sender.ObserveConnectionDiagnostics(DateTime.UtcNow.AddSeconds(31));
@@ -99,8 +101,37 @@ internal static class GeneralP2PAutomaticTests {
                 }catch(Exception ex){failure=ex;}if(!dialog.IsDisposed)dialog.Dispose();if(!host.IsDisposed)host.Close();};Application.Run(host);
             }
             if(failure!=null)throw failure;
-            // The same trusted device still needs a fresh invitation proof for the next pack.
             sender.SetPreparationState(null);
+            var expired=sender.BeginDeferred(state,new[]{"fixture"},true,compareBeforePack:true);
+            string expiredCode=sender.OpenInvitation(expired);
+            check(expiredCode!=null,"A live invitation can be copied.");
+            sender.CancelSend(expired);
+            check(expired.Discarded&&sender.OpenInvitation(expired)==null,"The copy action rejects an invitation already cancelled by the host.");
+            var current=sender.BeginDeferred(state,new[]{"fixture"},true,compareBeforePack:true);
+            string currentCode=sender.OpenInvitation(current);
+            var oldReceive=receiver.Accept(expiredCode,target,true);
+            receiver.Engine.ConfigurePeer(sender.Engine.Device,"tcp://127.0.0.1:"+sender.Engine.ListenPort);
+            Wait(()=>sender.UnmatchedInvitationId==P2PService.DiagnosticId(expired.Id),
+                "An expired invitation from a known device was not reported.").GetAwaiter().GetResult();
+            var staleTransport=receiver.TransferStatus(oldReceive);
+            check(staleTransport.Connected&&!staleTransport.Accepted&&current.Recipients.Length==0&&current.PayloadHash==null,
+                "The old invitation reaches the host without being approved or starting a pack.");
+            int freshChoices=0;
+            sender.ConfirmConnection=session=>{
+                if(session==current)System.Threading.Interlocked.Increment(ref freshChoices);
+                return Task.FromResult(session==current);
+            };
+            var freshReceive=receiver.Accept(currentCode,target,true);
+            receiver.Engine.ConfigurePeer(sender.Engine.Device,"tcp://127.0.0.1:"+sender.Engine.ListenPort);
+            Wait(()=>current.Recipients.Length==1&&sender.UnmatchedInvitationId==null,
+                "The fresh invitation did not clear the warning and reach host approval.").GetAwaiter().GetResult();
+            check(freshChoices==1&&sender.OpenInvitation(current)==null&&current.PayloadHash==null,
+                "The new invitation gets one approval and cannot be copied again after its recipient is assigned.");
+            sender.CancelSend(current);
+            receiver.PreserveInterrupted(freshReceive);
+            receiver.PreserveInterrupted(oldReceive);
+
+            // The same trusted device still needs a fresh invitation proof for the next pack.
             int declined=0;
             sender.ConfirmConnection=session=>{
                 System.Threading.Interlocked.Increment(ref declined);
@@ -120,7 +151,7 @@ internal static class GeneralP2PAutomaticTests {
             sender.Authorize(valid);sender.Authorize(valid);
             check(fallback.Recipients.Length==1&&fallback.Recipients[0].Device==receiver.Engine.Device,"Copy reply authorizes only this recipient and is idempotent.");
             sender.CancelSend(fallback);
-            receiver.DiscardIncoming(fallbackReceive);
+            receiver.PreserveInterrupted(fallbackReceive);
             var second=sender.BeginDeferred(state,new[]{"fixture"});second.Automatic=false;string previous=sender.Invitation(second);var incoming=receiver.Accept(previous,target,true);
             check(sender.UpgradeInvitation(second)&&sender.Invitation(second)!=previous,"Unbound legacy invitations upgrade to automatic acceptance and display an updated code.");
             var upgraded=receiver.Accept(sender.Invitation(second),target,true);check(Object.ReferenceEquals(upgraded,incoming)&&incoming.Automatic,"Receiver upgrades its existing pending session when the updated invitation is pasted, without duplicate files.");

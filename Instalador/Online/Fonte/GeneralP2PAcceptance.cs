@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Text.RegularExpressions;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -41,11 +43,43 @@ internal sealed partial class P2PService {
     readonly Dictionary<P2PSession,Dictionary<string,Task<bool>>> connectionDecisions=
         new Dictionary<P2PSession,Dictionary<string,Task<bool>>>();
 
+    volatile string unmatchedInvitationId;
+    internal string UnmatchedInvitationId {get{return unmatchedInvitationId;}}
+
+    void DetectUnmatchedInvitation(Dictionary<string,object> folders,HashSet<string> verifiedPeers){
+        var recognized=new HashSet<string>(SnapshotSessions().Where(s=>!s.Discarded).Select(s=>s.Id),StringComparer.Ordinal);
+        DateTimeOffset newest=DateTimeOffset.UtcNow.AddMinutes(-2);
+        string mismatch=null;
+        foreach(var entry in folders){
+            if(recognized.Contains(entry.Key)||!Regex.IsMatch(entry.Key,@"\Aml-[a-f0-9]{32}\z"))continue;
+            var folder=entry.Value as Dictionary<string,object>;
+            object raw;
+            var peers=folder!=null&&folder.TryGetValue("offeredBy",out raw)?raw as Dictionary<string,object>:null;
+            if(peers==null)continue;
+            foreach(var peer in peers){
+                if(!P2PInvite.DeviceValid(peer.Key)||peer.Key==Engine.Device||verifiedPeers.Contains(peer.Key))continue;
+                var details=peer.Value as Dictionary<string,object>;
+                object label,time;
+                if(details==null||!details.TryGetValue("label",out label)||!details.TryGetValue("time",out time))continue;
+                string proof=Convert.ToString(label),prefix="MLA1|"+entry.Key+"|";
+                if(!proof.StartsWith(prefix,StringComparison.Ordinal)||!P2PPack.HashValid(proof.Substring(prefix.Length)))continue;
+                DateTimeOffset observed;
+                if(!DateTimeOffset.TryParse(Convert.ToString(time,CultureInfo.InvariantCulture),CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal,out observed)||observed<newest)continue;
+                // An unmatched label is only a hint. It never authorizes a device or a share.
+                newest=observed;mismatch=DiagnosticId(entry.Key);
+            }
+        }
+        if(mismatch!=null&&mismatch!=unmatchedInvitationId)
+            OnlineDiagnostics.Record("p2p.invitation.unmatched",null,"Pedido recebido para um convite ausente neste projeto.",new{Id=mismatch});
+        unmatchedInvitationId=mismatch;
+    }
+
     void DetectAcceptances(){
         var waiting=installedSessions.Where(s=>s.Sender&&s.Automatic&&!s.Completed&&!s.Discarded&&(s.Lifecycle?s.Recipients.Length<(s.CompareBeforePack?1:3):s.Peer==null)).ToArray();
         foreach(var session in connectionDecisions.Keys.Where(session=>!waiting.Contains(session)).ToArray())
             connectionDecisions.Remove(session);
-        if(waiting.Length==0)return;
+        if(waiting.Length==0){unmatchedInvitationId=null;return;}
         foreach(var session in waiting){
             Dictionary<string,Task<bool>> decisions;
             if(!connectionDecisions.TryGetValue(session,out decisions))continue;
@@ -62,6 +96,8 @@ internal sealed partial class P2PService {
             }
         }
         var devices=Engine.Get("cluster/pending/devices");var folders=Engine.Get("cluster/pending/folders");
+        var verifiedPeers=new HashSet<string>(SnapshotSessions().Where(s=>s.Sender&&!s.Completed&&!s.Discarded)
+            .SelectMany(s=>s.Recipients.Select(peer=>peer.Device).Concat(s.Peer==null?new string[0]:new[]{s.Peer})),StringComparer.Ordinal);
         foreach(var s in waiting){
             var candidates=new Dictionary<string,string>(StringComparer.Ordinal);
             foreach(var pair in devices){var details=pair.Value as Dictionary<string,object>;if(details!=null&&details.ContainsKey("name"))candidates[pair.Key]=Convert.ToString(details["name"]);}
@@ -73,6 +109,7 @@ internal sealed partial class P2PService {
             }}
             foreach(var peer in candidates){
                 if(peer.Key==Engine.Device||!AcceptanceMatches(peer.Value,s.Hash,s.Id,peer.Key,s.Lifecycle))continue;
+                verifiedPeers.Add(peer.Key);
                 lock(s)lock(startGate){
                     if(s.Completed||s.Discarded)break;
                     if(s.Lifecycle){
@@ -99,5 +136,6 @@ internal sealed partial class P2PService {
                 break;
             }
         }
+        DetectUnmatchedInvitation(folders,verifiedPeers);
     }
 }

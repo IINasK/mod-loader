@@ -19,6 +19,8 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     readonly TextBox output=new TextBox{ReadOnly=true,WordWrap=false,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,Name="p2p-output"};
     readonly TextBox input=new TextBox{WordWrap=false,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,MaxLength=12000,Name="p2p-input"};
     readonly TextBox destination=new TextBox{ReadOnly=true,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,Name="p2p-destination"};
+    readonly Label sendLabel=new Label{Dock=DockStyle.Fill,Margin=Padding.Empty,Font=GeneralStyle.Font(11),Name="p2p-send-label"};
+    string mismatchMessage;
     readonly Label status=new Label{Dock=DockStyle.Fill,UseMnemonic=false,Name="p2p-status"};
     readonly Timer timer=new Timer{Interval=1000};
     readonly ToolTip tips=new ToolTip{UseAnimation=false,UseFading=false};
@@ -105,7 +107,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         presets.SelectedIndex=state.List.Presets.FindIndex(p=>p.Id==state.SelectedPreset)+1;
         body.Controls.Add(presetRow,0,0);
         presetRow.Visible=state.List.Mods.Count!=0;
-        var sendLabel=Heading(T("Link para enviar ao amigo","Link to send to your friend"));
+        sendLabel.Text=T("Link para enviar ao amigo","Link to send to your friend");
         body.Controls.Add(sendLabel,0,1);
         var send=Field(output);send.Padding=new Padding(14,16,72,8);
         copy=GeneralStyle.Button("",CopyInvitation);IconButton(copy,"copy",T("Copiar link","Copy link"));copy.Name="p2p-copy";
@@ -155,9 +157,17 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     static Label Heading(string text){return new Label{Text=text,Dock=DockStyle.Fill,Font=GeneralStyle.Font(11),Margin=Padding.Empty};}
     static GeneralSurface Field(Control control){var field=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(14,9,14,9),Margin=new Padding(0,0,0,Gap)};field.Controls.Add(control);return field;}
     void CopyInvitation(){
-        Copy(output.Text);
-        if(offer!=null&&output.Text.StartsWith("ML-P2P1:",StringComparison.Ordinal))
+        if(CopyOpenInvitation())return;
+        Run(async()=>{await PrepareLink();CopyOpenInvitation();});
+    }
+    bool CopyOpenInvitation(){
+        string code=service.OpenInvitation(offer);
+        if(code==null)return false;
+        try{
+            Clipboard.SetText(code);
             service.ArmConnectionDiagnostic(offer.Id,true);
+        }catch(System.Runtime.InteropServices.ExternalException ex){Failed(ex);}
+        return true;
     }
     void ShowDiagnostics(){
         using(var dialog=new GeneralP2PDiagnosticDialog(service))dialog.ShowDialog(this);
@@ -190,7 +200,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     void UpdateActions(){
         generate.Enabled=!busy&&!service.Installing&&ExportIds.Length!=0;
         presets.Enabled=!busy;
-        copy.Enabled=output.Text.StartsWith("ML-P2P1:",StringComparison.Ordinal)&&(offer==null||!offer.Completed&&!offer.Discarded);
+        copy.Enabled=!busy&&output.Text.StartsWith("ML-P2P1:",StringComparison.Ordinal)&&service.InvitationOpen(offer);
         connect.Enabled=!busy&&!String.IsNullOrWhiteSpace(input.Text);
         choose.Enabled=!busy;
         var incoming=IncomingInvite();
@@ -274,18 +284,25 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     async Task PrepareLink(){
         var selected=ExportIds;
         string preset=ExportPreset;
+        sendLabel.Text=T("Link para enviar ao amigo","Link to send to your friend");
         if(selected.Length==0){offer=null;output.Clear();return;}
         output.Text=T("Iniciando conexão…","Starting connection…");
         try{if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));}
         catch{output.Clear();throw;}
         var sessions=service.SnapshotSessions();
-        offer=sessions.LastOrDefault(s=>s.Sender&&s.Deferred&&s.CompareBeforePack&&!s.Completed&&!s.Discarded&&s.Recipients.Length==0&&s.ExportPreset==preset&&(preset!=null||s.ExportAllPresets||state.SelectedPreset==null)&&
-            s.SelectedMods!=null&&s.SelectedMods.SequenceEqual(selected)&&(s.Lifecycle||s.Peer==null));
+        offer=sessions.LastOrDefault(s=>service.InvitationOpen(s)&&s.Deferred&&s.CompareBeforePack&&s.ExportPreset==preset&&
+            (preset!=null||s.ExportAllPresets||state.SelectedPreset==null)&&s.SelectedMods!=null&&
+            new HashSet<string>(s.SelectedMods,StringComparer.Ordinal).SetEquals(selected));
         if(offer==null){
             service.SetPreparationState(state);
             offer=await Task.Run(()=>service.BeginDeferred(state,selected,true,preset,preset==null,compareBeforePack:true));
         }else await Task.Run(()=>service.UpgradeInvitation(offer));
-        output.Text=service.Invitation(offer);status.Text="";
+        output.Text=T("Preparando rota P2P…","Preparing P2P route…");
+        await Task.Run(()=>service.Engine.PrepareInviteRoute());
+        string code=service.OpenInvitation(offer);
+        if(code==null){output.Clear();return;}
+        sendLabel.Text+= " · "+P2PService.DiagnosticId(offer.Id);
+        output.Text=code;status.Text="";
     }
     async Task Connect(){
         var invite=P2PInvite.Decode(input.Text.Trim());
@@ -420,6 +437,17 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             });
             if(IsDisposed)return;
             RefreshCards(views);
+            string unmatched=service.UnmatchedInvitationId;
+            if(status.Text.Length==0||status.Text==mismatchMessage){
+                mismatchMessage=unmatched!=null&&service.InvitationOpen(offer)
+                    ?T("Pedido para outro convite (","Request for another invitation (")+unmatched+
+                        T("). Copie e envie o link atual acima.","). Copy and send the current link above.")
+                    :"";
+                if(status.Text!=mismatchMessage){
+                    status.ForeColor=GeneralStyle.Danger;status.Text=mismatchMessage;
+                    tips.SetToolTip(status,mismatchMessage);
+                }
+            }
             UpdateActions();
         }catch(Exception ex){if(!IsDisposed)Failed(ex);}
         finally{polling=false;}
@@ -535,11 +563,12 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             else if(message.Length==0&&scanning&&scan!=null&&scan.Item!=null)message=scan.Item;
             else if(message.Length==0&&waitingConnection){
                 if(view.Unavailable)message=T("Sem resposta do serviço P2P local. Reabra o Mod Loader se persistir.","Local P2P service unavailable. Reopen Mod Loader if this persists.");
-                else if(!session.Sender&&view.Connected)message=T("Conectado. Aguardando o anfitrião autorizar o convite.","Connected. Waiting for the host to authorize the invitation.");
+                else if(!session.Sender&&view.Connected)message=delayed
+                    ?T("Anfitrião online. Confira o ID do convite: ","Host online. Check the invitation ID: ")+P2PService.DiagnosticId(session.Id)
+                    :T("Conectado. Aguardando o anfitrião autorizar o convite.","Connected. Waiting for the host to authorize the invitation.");
                 else if(delayed)message=session.Sender
                     ?T("Conexão ainda indisponível. Confira se o amigo está com o Mod Loader aberto.","Connection still unavailable. Check that your friend has Mod Loader open.")
-                                        :session.Automatic?T("Sem conexão com o anfitrião. Confirme se os dois Mod Loaders estão abertos.",
-                        "Could not reach the host. Check that both Mod Loaders are open.")
+                    :session.Automatic?T("Sem conexão. Confira o link atual com o anfitrião · ","No connection. Check the current link with the host · ")+P2PService.DiagnosticId(session.Id)
                     :T("Conexão ainda indisponível. Copie a resposta e envie ao anfitrião.","Connection still unavailable. Copy the reply and send it to the host.");
                 else message=session.Sender?T("Convite aceito. Conectando ao amigo…","Invitation accepted. Connecting to your friend…")
                     :T("Conectando ao anfitrião…","Connecting to the host…");

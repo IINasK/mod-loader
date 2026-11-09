@@ -82,7 +82,7 @@ internal sealed partial class P2PService {
         Directory.CreateDirectory(Path.GetDirectoryName(path));
         Safe.NoLinks(path);Safe.WriteJson(path,preferences);
     }
-    static string DiagnosticId(string folder){
+    internal static string DiagnosticId(string folder){
         using(var hash=SHA256.Create())return Safe.Hex(hash.ComputeHash(Encoding.UTF8.GetBytes(folder))).Substring(0,16);
     }
     internal void ArmConnectionDiagnostic(string folder,bool sender){

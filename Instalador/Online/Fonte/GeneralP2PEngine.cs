@@ -16,7 +16,7 @@ internal sealed class P2PInvite {
     public string Kind, Device, Folder, ManifestHash, Name, Mode;
     public long Size;
     public bool Deferred, Automatic;
-    public string SuggestedFolder;
+    public string SuggestedFolder, RelayDevice;
     public bool PrivateFolder;
 
     static readonly string[] PersonalParts={
@@ -72,6 +72,8 @@ internal sealed class P2PInvite {
     }
     internal void Validate(){
         if(Mode!=null&&Mode!="installed-zip")throw new IOException("Formato de compartilhamento desconhecido.");
+        if(RelayDevice!=null&&(Kind!="offer"||Mode!="installed-zip"||!DeviceValid(RelayDevice)))
+            throw new IOException("Identidade de relay inválida no convite.");
         if((PrivateFolder||SuggestedFolder!=null)&&(Kind!="offer"||Mode!="installed-zip"||
             SuggestedFolder!=null&&(PrivateFolder||!FolderSyntax(SuggestedFolder)||HasPersonalParts(SuggestedFolder))))
             throw new IOException("Sugestão de pasta inválida no convite.");
@@ -88,7 +90,10 @@ internal sealed class SyncthingEngine : IDisposable {
     internal const string ZipHash="3ce7da770f546a8d02b65b2e7ee31f2a3b8b7c3f990ede045590cca4172ecfe1";
     internal const string ExeHash="cd9aea20afda2b9bdba5aff2e6ac964ed5c2e741ed4ceb48ad9e1be096ca7891";
     internal const string DownloadUrl="https://github.com/syncthing/syncthing/releases/download/v2.1.7/syncthing-windows-amd64-v2.1.7.zip";
+    const string RelayPool="https://relays.syncthing.net/endpoint";
     readonly string home;
+    Stopwatch inviteRouteClock;
+    internal string InviteRelayDevice {get;private set;}
     readonly bool localOnly;
     string address,key;
     Process process;
@@ -126,6 +131,7 @@ internal sealed class SyncthingEngine : IDisposable {
     ProcessStartInfo Launch(string exe,string args){return new ProcessStartInfo(exe,args){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden,WorkingDirectory=Path.GetDirectoryName(exe)};}
     internal void Start(string exe){
         if(Running)return;Dispose();Safe.NoLinks(exe);if(Safe.Hash(exe)!=ExeHash)throw new IOException("Versão do Syncthing não reconhecida.");Executable=Path.GetFullPath(exe);
+        InviteRelayDevice=null;inviteRouteClock=Stopwatch.StartNew();
         Directory.CreateDirectory(home);
         try{lease=new FileStream(Safe.In(home,"engine.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None);}
         catch(IOException ex){
@@ -149,7 +155,7 @@ internal sealed class SyncthingEngine : IDisposable {
             foreach(XmlNode node in options.SelectNodes("listenAddress").Cast<XmlNode>().ToArray())options.RemoveChild(node);
             Action<string,string> set=(name,value)=>{var node=options.SelectSingleNode(name);if(node==null){node=xml.CreateElement(name);options.AppendChild(node);}node.InnerText=value;};
             set("listenAddress",(localOnly?"tcp://127.0.0.1:":"tcp://0.0.0.0:")+ListenPort);
-            if(!localOnly){var relay=xml.CreateElement("listenAddress");relay.InnerText="dynamic+https://relays.syncthing.net/endpoint";options.AppendChild(relay);}
+            if(!localOnly){var relay=xml.CreateElement("listenAddress");relay.InnerText="dynamic+"+RelayPool;options.AppendChild(relay);}
             set("globalAnnounceEnabled",localOnly?"false":"true");set("localAnnounceEnabled",localOnly?"false":"true");set("relaysEnabled",localOnly?"false":"true");set("natEnabled",localOnly?"false":"true");
             set("urAccepted","-1");set("autoUpgradeIntervalH","0");set("startBrowser","false");set("crashReportingEnabled","false");
             xml.Save(config);address="http://127.0.0.1:"+guiPort;key=Guid.NewGuid().ToString("N")+Guid.NewGuid().ToString("N");
@@ -205,10 +211,91 @@ internal sealed class SyncthingEngine : IDisposable {
             string text=reader.ReadToEnd();if(text.Length>8000000)throw new IOException("Resposta do auxiliar muito grande.");return text.Length==0?null:Safe.Json.DeserializeObject(text);
         }
     }
-    internal void ConfigurePeer(string id,string endpoint=null){
+    static string RelayIdentity(string text,out Uri uri){
+        if(!Uri.TryCreate(text,UriKind.Absolute,out uri)||uri.Scheme!="relay"||uri.Port<=0||
+            uri.UserInfo.Length!=0||uri.Fragment.Length!=0)return null;
+        var match=Regex.Match(uri.Query,@"(?:\?|&)id=([A-Z2-7-]+)(?:&|\z)");
+        string id=match.Success?match.Groups[1].Value:null;
+        return P2PInvite.DeviceValid(id)?id:null;
+    }
+    internal void PrepareInviteRoute(){
+        if(localOnly||inviteRouteClock==null)return;
+        do{
+            if(!Running)return;
+            try{
+                var status=Get("system/status");
+                var services=status["connectionServiceStatus"] as Dictionary<string,object>;
+                object raw;
+                if(services!=null&&services.TryGetValue("dynamic+"+RelayPool,out raw)){
+                    var relay=raw as Dictionary<string,object>;
+                    object value;
+                    var addresses=relay!=null&&relay.TryGetValue("wanAddresses",out value)?value as System.Collections.IEnumerable:null;
+                    if(addresses!=null)foreach(string address in addresses.OfType<string>()){
+                        Uri ignored;
+                        string id=RelayIdentity(address,out ignored);
+                        if(id!=null){InviteRelayDevice=id;return;}
+                    }
+                }
+                InviteRelayDevice=null;
+            }catch(WebException){return;}
+            if(inviteRouteClock.ElapsedMilliseconds>=38000)return;
+            Thread.Sleep(750);
+        }while(true);
+    }
+    sealed class PublicRelayEntry { public string url {get;set;} }
+    sealed class PublicRelayPool { public PublicRelayEntry[] relays {get;set;} }
+    internal static string RegisteredRelay(string id,IEnumerable<string> urls){
+        if(!P2PInvite.DeviceValid(id)||urls==null)return null;
+        foreach(string address in urls){
+            Uri uri;
+            if(RelayIdentity(address,out uri)!=id)continue;
+            IPAddress ip;
+            if(!IPAddress.TryParse(uri.DnsSafeHost.Trim('[',']'),out ip)||IPAddress.IsLoopback(ip))continue;
+            byte[] bytes=ip.GetAddressBytes();
+            bool publicAddress=bytes.Length==16?(bytes[0]&0xe0)==0x20:
+                bytes[0]!=0&&bytes[0]!=10&&bytes[0]!=127&&bytes[0]<224&&
+                !(bytes[0]==100&&bytes[1]>=64&&bytes[1]<=127)&&
+                !(bytes[0]==169&&bytes[1]==254)&&
+                !(bytes[0]==172&&bytes[1]>=16&&bytes[1]<=31)&&
+                !(bytes[0]==192&&(bytes[1]==168||bytes[1]==0))&&
+                !(bytes[0]==198&&(bytes[1]==18||bytes[1]==19));
+            if(publicAddress)return "relay://"+uri.GetComponents(UriComponents.HostAndPort,UriFormat.UriEscaped)+"/?id="+id;
+        }
+        return null;
+    }
+    string ResolveRelay(string id){
+        if(localOnly||!P2PInvite.DeviceValid(id))return null;
+        return ReadPublicRelay(id)??ReadPublicRelay(id);
+    }
+    static string ReadPublicRelay(string id){
+        try{
+            // The invitation supplies only a certificate ID. Network addresses come from the official registry.
+            var request=(HttpWebRequest)WebRequest.Create(RelayPool+"/full");
+            request.AllowAutoRedirect=false;request.Timeout=6000;request.ReadWriteTimeout=4500;
+            using(var response=(HttpWebResponse)request.GetResponse())
+            using(var input=response.GetResponseStream())
+            using(var reader=new StreamReader(input,Encoding.UTF8)){
+                if(response.StatusCode!=HttpStatusCode.OK)return null;
+                var chars=new char[1024*1024+1];
+                int length=reader.ReadBlock(chars,0,chars.Length);
+                if(length==chars.Length)return null;
+                var pool=Safe.Json.Deserialize<PublicRelayPool>(new string(chars,0,length));
+                return pool==null||pool.relays==null?null:RegisteredRelay(id,pool.relays.Where(entry=>entry!=null).Select(entry=>entry.url));
+            }
+        }catch(WebException){return null;}
+        catch(IOException){return null;}
+        catch(ArgumentException){return null;}
+        catch(InvalidOperationException){return null;}
+    }
+    internal void ConfigurePeer(string id,string endpoint=null){ConfigurePeerAddresses(id,new[]{endpoint??"dynamic"});}
+    internal void ConfigurePeerWithRelay(string id,string relay){
+        string endpoint=ResolveRelay(relay);
+        ConfigurePeerAddresses(id,endpoint==null?new[]{"dynamic"}:new[]{endpoint,"dynamic"});
+    }
+    void ConfigurePeerAddresses(string id,string[] addresses){
         if(!P2PInvite.DeviceValid(id)||id==Device)throw new IOException("Escolha o convite do outro computador.");
         var device=Get("config/defaults/device");device["deviceID"]=id;device["name"]="Mod Loader peer";device["introducer"]=false;device["autoAcceptFolders"]=false;
-        device["addresses"]=new[]{endpoint??"dynamic"};Request("PUT","config/devices/"+id,device);
+        device["addresses"]=addresses;Request("PUT","config/devices/"+id,device);
     }
     internal void ConfigureFolder(string id,string path,string name,bool sender,string peer=null){
         ConfigureSharedFolder(id,path,name,sender,peer==null?new string[0]:new[]{peer},false);

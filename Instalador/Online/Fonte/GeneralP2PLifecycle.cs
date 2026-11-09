@@ -75,7 +75,7 @@ internal sealed partial class P2PService {
             if(!session.Completed&&!skipPayload)ConfigureOutgoing(session);
             return;
         }
-        if(session.Peer!=null)Engine.ConfigurePeer(session.Peer);
+        if(session.Peer!=null)Engine.ConfigurePeerWithRelay(session.Peer,session.ReceiptClosed?null:session.RelayDevice);
         if(session.Lifecycle&&!session.Sender&&!session.ReceiptClosed)ConfigureReceipt(session,session.Peer,false);
         if(skipPayload||session.Discarded||session.Mode=="installed-zip"&&session.Completed&&(session.Sender||session.Lifecycle||!Directory.Exists(Folder(session))))return;
         Engine.ConfigureSharedFolder(session.Id,Folder(session),session.Sender?session.Name:ReceiveLabel(session),

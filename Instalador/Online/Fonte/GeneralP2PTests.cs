@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -48,6 +48,15 @@ internal static class GeneralP2PTests {
 
             const string sharedFolder=@"D:\SteamLibrary\steamapps\common\Cyberpunk 2077";
             var folderOffer=Invitation();folderOffer.Mode="installed-zip";folderOffer.Size=1;
+            folderOffer.RelayDevice=Device;
+            check(P2PInvite.Decode(folderOffer.Encode()).RelayDevice==Device,"O convite guarda apenas a identidade do relay.");
+            folderOffer.RelayDevice=null;
+            Reject(checks,()=>{folderOffer.RelayDevice="relay://192.168.1.1:22067";try{folderOffer.Encode();}finally{folderOffer.RelayDevice=null;}},
+                "O convite não pode definir um endereço de rede.");
+            check(SyncthingEngine.RegisteredRelay(Device,new[]{"relay://127.0.0.1:22067/?id="+Device,"relay://192.168.1.1:443/?id="+Device})==null,
+                "Entradas de relay com endereços privados não são usadas.");
+            check(SyncthingEngine.RegisteredRelay(Device,new[]{"relay://8.8.8.8:22067/?id="+Device+"&other=value"})=="relay://8.8.8.8:22067/?id="+Device,
+                "O endereço de relay do registro oficial fica vinculado à identidade, sem parâmetros extras.");
             folderOffer.SuggestHostFolder(sharedFolder);
             check(P2PInvite.Decode(folderOffer.Encode()).SuggestedFolder==sharedFolder,"O convite sugere a pasta de jogo sem depender do PC receptor.");
             var localFolder=Path.Combine(root,"suggested");Directory.CreateDirectory(localFolder);
