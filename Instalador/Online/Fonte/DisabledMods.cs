@@ -144,7 +144,7 @@ internal sealed class DisabledMods {
 
     string GamePath(DisabledModFile file) {
         if (!AllowedPath(file.Path)) throw Conflict(file);
-        return Safe.In(game, file.Path);
+        return GeneralInstallRoutes.Resolve(game, file.Path, true);
     }
     string Blob(DisabledModFile file) { return Safe.In(cache, "files/" + file.Hash + ".bin"); }
 

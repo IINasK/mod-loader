@@ -55,6 +55,7 @@ internal sealed partial class P2PService : IDisposable {
     bool installedFixture;
     internal event Action<P2PSession> SnapshotInstalled;
     internal Func<P2PSession,bool> RegisterProject;
+    internal Func<string[],bool> ApproveUserFolders;
     internal Func<ModVersionDifference,bool> ChooseVersion;
     internal Func<P2PSession,Task<bool>> ConfirmConnection;
     internal Action<GeneralModList> ReviewReceived;

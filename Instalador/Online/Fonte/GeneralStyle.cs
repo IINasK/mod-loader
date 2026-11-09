@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.Drawing;
@@ -59,13 +59,24 @@ internal static class GeneralStyle {
         graphics.SmoothingMode=SmoothingMode.AntiAlias;graphics.Clear(Surface);
         PaintRoundedFace(graphics,new RectangleF(0,0,size.Width,size.Height),18,Line,Surface);
     }
+    internal const int RoundedFaceInset=2;
+    internal const int RoundedFaceBorder=2;
+    internal const int RoundedFaceClearance=RoundedFaceInset+RoundedFaceBorder;
     internal static void PaintRoundedFace(Graphics graphics,RectangleF box,float radius,Color border,Color fill){
-        using(var outer=Round(box,radius))using(var brush=new SolidBrush(border))graphics.FillPath(brush,outer);
-        var inner=new RectangleF(box.X+2,box.Y+2,Math.Max(1,box.Width-4),Math.Max(1,box.Height-4));
-        using(var path=Round(inner,Math.Max(0,radius-2)))using(var brush=new SolidBrush(fill))graphics.FillPath(brush,path);
+        box.Inflate(-RoundedFaceInset,-RoundedFaceInset);
+        if(box.Width<=0||box.Height<=0)return;
+        radius=Math.Max(0,radius-RoundedFaceInset);
+        var pixelOffset=graphics.PixelOffsetMode;
+        graphics.PixelOffsetMode=PixelOffsetMode.Half;
+        try {
+            using(var outer=Round(box,radius))using(var brush=new SolidBrush(border))graphics.FillPath(brush,outer);
+            box.Inflate(-RoundedFaceBorder,-RoundedFaceBorder);
+            if(box.Width<=0||box.Height<=0)return;
+            using(var path=Round(box,Math.Max(0,radius-RoundedFaceBorder)))using(var brush=new SolidBrush(fill))graphics.FillPath(brush,path);
+        } finally { graphics.PixelOffsetMode=pixelOffset; }
     }
     internal static void ClipCardBody(Control control){
-        using(var shape=Round(new RectangleF(0,0,Math.Max(1,control.Width),Math.Max(1,control.Height)),16)){
+        using(var shape=Round(new RectangleF(0,0,Math.Max(1,control.Width),Math.Max(1,control.Height)),18-RoundedFaceClearance)){
             var previous=control.Region;control.Region=new Region(shape);if(previous!=null)previous.Dispose();
         }
     }
@@ -136,6 +147,17 @@ internal static class GeneralNativeTheme {
 
 internal sealed class GeneralSurface : Panel {
     internal GeneralSurface(){SetStyle(ControlStyles.UserPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.SupportsTransparentBackColor,true);BackColor=Color.Transparent;}
+    public override Rectangle DisplayRectangle {
+        get {
+            var area=base.DisplayRectangle;
+            int clearance=GeneralStyle.RoundedFaceClearance;
+            int left=area.Left+Math.Max(0,clearance-Padding.Left);
+            int top=area.Top+Math.Max(0,clearance-Padding.Top);
+            int right=area.Right-Math.Max(0,clearance-Padding.Right);
+            int bottom=area.Bottom-Math.Max(0,clearance-Padding.Bottom);
+            return Rectangle.FromLTRB(left,top,Math.Max(left,right),Math.Max(top,bottom));
+        }
+    }
     protected override void OnPaint(PaintEventArgs e){
         e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
         GeneralStyle.PaintRoundedFace(e.Graphics,new RectangleF(0,0,Width,Height),18,GeneralStyle.Line,GeneralStyle.Surface);
@@ -146,6 +168,7 @@ internal sealed class GeneralSurface : Panel {
 internal sealed class GeneralButton : Button {
     internal bool Primary,Destructive,Bare;
     internal string IconKind;
+    internal Color? BareInk,ColorSwatch;
     internal GeneralButton(){SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.Opaque,true);BackColor=GeneralStyle.Background;Cursor=Cursors.Hand;FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;UseVisualStyleBackColor=false;}
     public override Size GetPreferredSize(Size proposedSize){
         var size=base.GetPreferredSize(proposedSize);
@@ -160,9 +183,17 @@ internal sealed class GeneralButton : Button {
         g.Clear(surface==null?GeneralStyle.Background:surface.BackColor);
         Color fill=Primary?(Destructive?GeneralStyle.DangerFill:GeneralStyle.Primary):GeneralStyle.Surface;
         Color ink=Primary?Color.White:Destructive?GeneralStyle.Danger:GeneralStyle.Foreground;
+        if(Bare&&BareInk.HasValue)ink=BareInk.Value;
         if(!Enabled){fill=GeneralStyle.Selection;ink=GeneralStyle.Muted;}
         if(!Bare)GeneralStyle.PaintRoundedFace(g,new RectangleF(0,0,Width,Height),Math.Min(22,Height/2),Focused?GeneralStyle.Accent:Primary?fill:GeneralStyle.Line,fill);
         else if(Focused&&ShowFocusCues){using(var pen=new Pen(GeneralStyle.Accent,2))g.DrawLine(pen,Width/2-10,Height-6,Width/2+10,Height-6);}
+        if(ColorSwatch.HasValue){
+            const int diameter=16;
+            var dot=new Rectangle((Width-diameter)/2,(Height-diameter)/2,diameter,diameter);
+            using(var brush=new SolidBrush(ColorSwatch.Value))g.FillEllipse(brush,dot);
+            using(var pen=new Pen(GeneralStyle.Line))g.DrawEllipse(pen,dot);
+            return;
+        }
         var textRect=new Rectangle(12,0,Width-24,Height);
         if(!String.IsNullOrEmpty(IconKind)){
             int x=String.IsNullOrEmpty(Text)?Width/2-9:14,y=Height/2-9;
@@ -178,7 +209,7 @@ internal sealed class GeneralProgress : Control {
     internal System.Collections.Generic.List<PackCoverageSegment> Segments;
     readonly ToolTip segmentTip=new ToolTip{UseAnimation=false,UseFading=false};
     internal int Value {get{return value;}set{this.value=Math.Max(0,Math.Min(100,value));Invalidate();}}
-    internal bool Indeterminate;
+    internal bool Indeterminate, NotApplicable;
     internal string Caption;
     internal GeneralProgress(){Height=37;SetStyle(ControlStyles.UserPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);}
     protected override void OnMouseMove(MouseEventArgs e){
@@ -190,7 +221,7 @@ internal sealed class GeneralProgress : Control {
     protected override void OnPaint(PaintEventArgs e){
         var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;
         using(var font=GeneralStyle.Font(10.5f))TextRenderer.DrawText(g,Caption??"",font,new Rectangle(0,0,Width-52,23),GeneralStyle.Muted,TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
-        using(var font=GeneralStyle.Font(10.5f,true))TextRenderer.DrawText(g,Indeterminate?"—":Value+"%",font,new Rectangle(Width-52,0,52,23),GeneralStyle.Accent,TextFormatFlags.Right|TextFormatFlags.SingleLine);
+        using(var font=GeneralStyle.Font(10.5f,true))TextRenderer.DrawText(g,Indeterminate||NotApplicable?"—":Value+"%",font,new Rectangle(Width-52,0,52,23),GeneralStyle.Accent,TextFormatFlags.Right|TextFormatFlags.SingleLine);
         var track=new RectangleF(0,27,Math.Max(1,Width-1),6);
         using(var path=GeneralStyle.Round(track,3))using(var brush=new SolidBrush(GeneralStyle.SoftLine))g.FillPath(brush,path);
         if(Segments!=null&&Segments.Count>0){

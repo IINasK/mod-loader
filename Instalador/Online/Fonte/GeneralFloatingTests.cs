@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -66,15 +66,17 @@ internal sealed partial class GeneralModWindow {
             choices.SelectedIndex=Math.Min(choices.Items.Count-1,original+1);
             check(form.preset.SelectedIndex==original,"Navegar no seletor não altera a escolha antes de confirmar.");
             popup.Close(ToolStripDropDownCloseReason.Keyboard);
-            check(popup.Visible,"Fechamento do seletor inicia a contração.");
-            await Until(()=>!popup.Visible);
+            check(!popup.Visible,"O seletor fecha sem aguardar animação.");
+
             check(form.preset.SelectedIndex==original,"Fechar seletor preserva o valor.");
             form.preset.Toggle();await Task.Delay(260);
             popup=form.preset.OpenPopup;
             choices=AllControls(popup.Items.OfType<ToolStripControlHost>().Single().Control).OfType<ListBox>().Single();
             choices.SelectedIndex=Math.Min(choices.Items.Count-1,original+1);
-            typeof(ListBox).GetMethod("OnKeyDown",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(choices,new object[]{new KeyEventArgs(Keys.Enter)});
-            await Until(()=>!popup.Visible);
+            choices.GetType().GetMethod("ProcessCmdKey",BindingFlags.Instance|BindingFlags.NonPublic)
+                .Invoke(choices,new object[]{Message.Create(choices.Handle,0x0100,(IntPtr)Keys.Enter,IntPtr.Zero),Keys.Enter});
+            await Until(()=>form.preset.SelectedIndex==Math.Min(choices.Items.Count-1,original+1));
+
             check(form.preset.SelectedIndex==Math.Min(choices.Items.Count-1,original+1),"Enter confirma a escolha no seletor.");
             form.preset.SelectedIndex=original;
             using(var menu=new GeneralActionsMenu()){

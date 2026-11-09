@@ -83,19 +83,41 @@ internal sealed partial class GeneralModWindow {
             await Task.Delay(60);check(AllControls(panel).OfType<Button>().Where(button=>button.Name=="Projectnew"||button.Name=="Projectimport").All(button=>button.Height==44&&button.Bottom<=button.Parent.Height),"Compact project actions fit their layout without clipping.");check(choices.ClientSize.Width>450,"Project choices use the panel width rather than a native control default.");CaptureUi(panel,Path.Combine(root,"projects-panel.png"));form.projectsButton.PerformClick();Application.DoEvents();check(form.menus.Current==null,"Clicking Projects a second time closes the panel.");
             using(var editor=new GeneralModEditor(NewEntry("",exact),new string[0],"default",true,"",source=>Task.FromResult(GeneralNexusLink.Parse(source).File>0?info:overviewInfo))){
                 editor.Show(form);await Until(()=>EditorField<TextBox>(editor,"modName").Text==info.Name);
-                string fileDetails=EditorField<Label>(editor,"sourceInfo").Text;
+                var fileLabel=EditorField<Label>(editor,"fileDetails");
+                string fileDetails=fileLabel.Text;
+                var install=EditorField<Button>(editor,"install");
+                check(fileLabel.Parent==install.Parent.Parent&&fileLabel.Left<install.Parent.Left&&
+                    !fileDetails.Contains("bytes")&&!fileDetails.Contains(".zip"),"Only version and human-readable size appear to the left of fixed actions.");
                 check(fileDetails.Contains(GeneralStyle.T("Aprox. ","About ")+GeneralStorageSize.Format(info.Bytes))&&fileDetails.Contains(GeneralStyle.T("Versão do arquivo: ","File version: ")+"1.5")&&!fileDetails.Contains("2.0"),"The exact link displays the chosen version and indicates when file size is approximate.");
                 var tags=EditorField<TextBox>(editor,"tags");
                 var chips=EditorField<FlowLayoutPanel>(editor,"tagChips");
-                check(EditorField<CheckBox>(editor,"nsfw").Checked&&chips.Controls.OfType<Button>().Count()==2,"Nexus adult status and tags populate the mod editor.");
+                var addTag=EditorField<Button>(editor,"addTagButton");
+                var tagButtons=chips.Controls.OfType<Button>().ToArray();
+                check(EditorField<GeneralButton>(editor,"nsfw").BareInk==GeneralStyle.Danger&&tagButtons.Length==3&&tagButtons.Last()==addTag&&!tags.Visible,
+                    "Nexus tags precede the Add capsule and the editor stays hidden at rest.");
+                addTag.PerformClick();
+                check(tags.Visible&&!addTag.Visible,"The tag editor replaces the Add capsule.");
+                tags.Text="Canceled";
+                typeof(TextBox).GetMethod("OnKeyDown",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(tags,new object[]{new KeyEventArgs(Keys.Escape)});
+                check(editor.Visible&&addTag.Visible&&!tags.Visible&&!chips.Controls.OfType<Button>().Any(button=>button.Text=="Canceled ×"),
+                    "Escape cancels only the inline entry.");
+                addTag.PerformClick();
                 tags.Text="Custom tag";
                 typeof(TextBox).GetMethod("OnKeyDown",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(tags,new object[]{new KeyEventArgs(Keys.Enter)});
-                check(tags.Text==""&&editor.Result==null&&chips.Controls.OfType<Button>().Any(button=>button.Text=="Custom tag ×"),"Enter adds a removable tag without saving or closing the editor.");
+                check(tags.Text==""&&!tags.Visible&&editor.Result==null&&chips.Controls.OfType<Button>().Reverse().Take(2).Select(button=>button.Text).SequenceEqual(new[]{addTag.Text,"Custom tag ×"}),
+                    "Enter adds the tag and moves Add to the next position.");
                 EditorField<TextBox>(editor,"modName").Text="My custom name";
                 EditorField<TextBox>(editor,"sources").Text="https://www.nexusmods.com/cyberpunk2077/mods/34305";
                 await Task.Delay(800);check(EditorField<TextBox>(editor,"modName").Text=="My custom name","Metadata refresh preserves a user-entered name.");
                 check(EditorField<Label>(editor,"sourceInfo").Text.Contains("Slow download")&&EditorField<Button>(editor,"save").Enabled&&EditorField<Label>(editor,"sourceInfo").RectangleToScreen(EditorField<Label>(editor,"sourceInfo").ClientRectangle).Bottom<=editor.RectangleToScreen(editor.ClientRectangle).Bottom,"Overview page shows simple advice without blocking save.");
-                editor.ClientSize=new Size(700,710);editor.PerformLayout();Application.DoEvents();await Task.Delay(40);check(EditorField<TextBox>(editor,"sources").Height>=EditorField<TextBox>(editor,"sources").Font.Height&&EditorField<Button>(editor,"save").RectangleToScreen(EditorField<Button>(editor,"save").ClientRectangle).Bottom<=editor.RectangleToScreen(editor.ClientRectangle).Bottom,"Source editor stays usable at minimum size with fixed action buttons and a scrollable body.");CaptureUi(editor,Path.Combine(root,"source-overview-warning.png"));
+                editor.ClientSize=new Size(700,710);editor.PerformLayout();Application.DoEvents();await Task.Delay(40);
+                CaptureUi(editor,Path.Combine(root,"source-overview-warning.png"));
+                var sourceBox=EditorField<TextBox>(editor,"sources");
+                var saveButton=EditorField<Button>(editor,"save");
+                check(sourceBox.Height>=sourceBox.Font.Height&&
+                    saveButton.RectangleToScreen(saveButton.ClientRectangle).Bottom<=editor.RectangleToScreen(editor.ClientRectangle).Bottom,
+                    "Source and actions stay usable at narrow width. Source="+sourceBox.Bounds+
+                    ", save="+saveButton.RectangleToScreen(saveButton.ClientRectangle)+", editor="+editor.RectangleToScreen(editor.ClientRectangle));
                 chips.Controls.OfType<Button>().Single(button=>button.Text=="Audio ×").PerformClick();
                 EditorField<Button>(editor,"save").PerformClick();var library=new GeneralModLibrary(Path.Combine(root,"saved.json"));library.Save(new GeneralModState{List=new GeneralModList{Mods=new List<GeneralModEntry>{editor.Result}}});
                 var loaded=library.Load().List.Mods.Single();
@@ -107,14 +129,251 @@ internal sealed partial class GeneralModWindow {
             }
             var pending=new TaskCompletionSource<GeneralSourceInfo>();using(var editor=new GeneralModEditor(NewEntry("",exact),new string[0],"default",true,"",source=>pending.Task)){
                 editor.Show(form);await Task.Delay(800);EditorField<TextBox>(editor,"sources").Text="https://example.com/other.zip";pending.SetResult(info);await Task.Delay(40);
-                check(EditorField<TextBox>(editor,"modName").Text==""&&!EditorField<CheckBox>(editor,"nsfw").Checked&&EditorField<FlowLayoutPanel>(editor,"tagChips").Controls.Count==0,"A late lookup cannot apply a name, adult flag or tags after the source changed.");editor.Close();
+                check(EditorField<TextBox>(editor,"modName").Text==""&&EditorField<GeneralButton>(editor,"nsfw").BareInk==GeneralStyle.Line&&EditorField<FlowLayoutPanel>(editor,"tagChips").Controls.OfType<Button>().Count()==1,"A late lookup cannot apply a name, adult flag or tags after the source changed.");editor.Close();
             }
             using(var editor=new GeneralModEditor(NewEntry("",exact),new string[0],"default",true,"",source=>Task.FromException<GeneralSourceInfo>(new IOException("Unavailable")))){
                 editor.Show(form);await Task.Delay(800);EditorField<TextBox>(editor,"modName").Text="Manual";check(EditorField<Button>(editor,"save").Enabled,"Unavailable Nexus metadata leaves manual editing usable.");editor.Close();
             }
+            await TestCompactModEditor(form,root,check,exact);
+            await TestNexusQuickFill(form,check,exact);
             await Task.Delay(30);
         });
         Safe.WriteJson(Path.Combine(root,"resultado-project-hub.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});
     }
+    static async Task TestNexusQuickFill(Form owner,Action<bool,string> check,string source){
+        var mod=NewEntry("Nome próprio",source);
+        mod.Description="Descrição própria";
+        mod.Tags.Add("Minha tag");
+        mod.NsfwOverride=true;
+        int requests=0;
+        using(var editor=new GeneralModEditor(mod,new string[0],"default",true,"",refreshLookup:url=>{
+            check(url==source,"O preenchimento rápido consulta o link da variante atual.");
+            return Task.FromResult(new GeneralSourceInfo{
+                Name="Nome do Nexus",Tags=new[]{"Nova tag"},NsfwKnown=true,Nsfw=false,Version=(++requests).ToString()
+            });
+        })){
+            editor.Show(owner);
+            editor.ClientSize=new Size(630,710);
+            var quick=EditorField<Button>(editor,"quickFill");
+            var link=EditorField<TextBox>(editor,"sources");
+            var name=EditorField<TextBox>(editor,"modName");
+            var chips=EditorField<FlowLayoutPanel>(editor,"tagChips");
+            check(quick.Visible&&quick.Parent.Controls.OfType<Button>().Any(button=>button.Text=="Cancelar"&&
+                quick.Right<button.Left&&quick.Top==button.Top),"Preenchimento rápido fica no rodapé ao lado de Cancelar.");
+            link.Text="";
+            check(!quick.Visible,"Sem link Nexus, o botão do rodapé fica oculto.");
+            link.Text=source;
+            using(var choose=new Timer{Interval=30}){
+                string choice="Completar";
+                choose.Tick+=(s,e)=>{
+                    var dialog=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(form=>form.Text==quick.Text);
+                    if(dialog==null)return;
+                    AllControls(dialog).OfType<Button>().Single(button=>button.Text==choice).PerformClick();
+                };
+                choose.Start();
+                quick.PerformClick();
+                await Until(()=>requests==1&&quick.Enabled);
+                check(name.Text=="Nome próprio"&&chips.Controls.OfType<Button>().Any(button=>button.Text=="Minha tag ×")&&
+                    chips.Controls.OfType<Button>().Any(button=>button.Text=="Nova tag ×")&&EditorField<GeneralButton>(editor,"nsfw").BareInk==GeneralStyle.Danger,
+                    "Completar mantém nome, tags próprias e escolha manual de NSFW, acrescentando tags novas.");
+                choice="Sobrescrever";
+                quick.PerformClick();
+                await Until(()=>requests==2&&quick.Enabled);
+                check(name.Text=="Nome do Nexus"&&!chips.Controls.OfType<Button>().Any(button=>button.Text=="Minha tag ×")&&
+                    EditorField<GeneralButton>(editor,"nsfw").BareInk==GeneralStyle.Line&&EditorField<TextBox>(editor,"description").Text=="Descrição própria",
+                    "Sobrescrever refaz a consulta e troca apenas os dados recebidos do Nexus.");
+                choose.Stop();
+            }
+        }
+    }
+    static async Task TestCompactModEditor(Form owner,string root,Action<bool,string> check,string source){
+        var mod=NewEntry("Editor compacto",source);
+        mod.Tags.AddRange(new[]{"Cyberpunk Modathon 2026","Gameplay","Overhaul","Quality of Life","Terrain"});
+        mod.Variants[0].Name="Original";
+        var preferred=new GeneralModVariant{Id="second",Name="Preferida",Sources=new List<string>{source.Replace("169285","169286")}};
+        var third=new GeneralModVariant{Id="third",Name="Terceira",Sources=new List<string>{source.Replace("169285","169287")}};
+        mod.Variants.AddRange(new[]{preferred,third});
+        mod.DefaultVariant=preferred.Id;
+        bool animations=GeneralStyle.AnimationsEnabled;
+        GeneralStyle.AnimationsEnabled=true;
+        GeneralStyle.UseTheme("black");
+        try {
+            using(var editor=new GeneralModEditor(mod,new[]{"Roupas"},preferred.Id,true,"")){
+                editor.Show(owner);editor.ClientSize=new Size(630,710);editor.PerformLayout();await Task.Delay(80);
+                var field=EditorField<TextBox>(editor,"sources");
+                var add=EditorField<Button>(editor,"addTagButton");
+                var picker=EditorField<GeneralPicker>(editor,"variants");
+                var input=picker.Controls.OfType<TextBox>().Single();
+                var terrain=EditorField<FlowLayoutPanel>(editor,"tagChips").Controls.OfType<Button>().Single(button=>button.Text=="Terrain ×");
+                check(terrain.Top==add.Top&&terrain.Right<add.Left&&terrain.Height==add.Height&&add.Right<=add.Parent.ClientSize.Width,
+                    "At narrow width Add follows the final tag with the same height and no clipping: "+terrain.Bounds+" / "+add.Bounds);
+                check(field.RectangleToScreen(field.ClientRectangle).Top<input.RectangleToScreen(input.ClientRectangle).Top&&
+                    !AllControls(editor).OfType<Button>().Any(button=>new[]{"Adicionar link","Remover fonte","Adicionar arquivo local"}.Contains(button.Text)),
+                    "The Nexus link is above the compact editor and legacy source actions are gone.");
+                CaptureUi(editor,Path.Combine(root,"compact-editor-tags.png"));
+                add.PerformClick();await Task.Delay(40);
+                var inline=EditorField<TextBox>(editor,"tags");
+                check(inline.Visible&&inline.Parent.Bounds.Height==terrain.Height&&inline.Parent.Top==terrain.Top&&
+                    inline.Parent.Left>terrain.Right&&inline.Parent.Width>=80,"The inline input is sized and positioned after the last tag: "+inline.Parent.Bounds);
+                inline.Text="Tag de exemplo";
+                CaptureUi(editor,Path.Combine(root,"compact-editor-tag-input.png"));
+                typeof(TextBox).GetMethod("OnKeyDown",BindingFlags.Instance|BindingFlags.NonPublic)
+                    .Invoke(inline,new object[]{new KeyEventArgs(Keys.Escape)});
+
+                check(input.Visible&&input.Text=="Preferida"&&picker.Items.Cast<string>().SequenceEqual(new[]{"Preferida","Original","Terceira"}),
+                    "A legacy default moves first and remains the selected editable name.");
+                var routes=EditorField<TextBox>(editor,"installRoutes");
+                var browse=AllControls(editor).OfType<Button>().Single(button=>button.Text=="Escolher pasta");
+                var routeBounds=routes.Parent.RectangleToScreen(routes.Parent.ClientRectangle);
+                var buttonBounds=browse.RectangleToScreen(browse.ClientRectangle);
+                var destination=(TableLayoutPanel)browse.Parent;
+                check(!routes.Multiline&&!routes.ReadOnly&&browse.Enabled&&routeBounds.Top==buttonBounds.Top&&
+                    routeBounds.Bottom==buttonBounds.Bottom&&routeBounds.Right<buttonBounds.Left&&
+                    destination.GetControlFromPosition(0,0).ForeColor==GeneralStyle.Foreground,
+                    "The editable destination and Explorer button share a themed, single aligned row.");
+                var name=EditorField<TextBox>(editor,"modName");
+                var nsfw=EditorField<GeneralButton>(editor,"nsfw");
+                check(nsfw.Parent==name.Parent&&nsfw.Left>=name.Right&&nsfw.BareInk==GeneralStyle.Line,
+                    "The inactive adult marker is gray and sits in the name field.");
+                check(Math.Abs((name.Top+name.Height/2)-(nsfw.Top+nsfw.Height/2))<=1&&
+                    name.Bottom<=name.Parent.ClientSize.Height&&nsfw.Bottom<=nsfw.Parent.ClientSize.Height,
+                    "The editable name and NSFW share a vertical center and fit their row: "+name.Bounds+" / "+nsfw.Bounds);
+                nsfw.PerformClick();
+                check(nsfw.BareInk==GeneralStyle.Danger,"Clicking the adult marker turns it on.");
+                nsfw.PerformClick();
+                check(nsfw.BareInk==GeneralStyle.Line,"Clicking again restores the gray marker.");
+                var description=EditorField<TextBox>(editor,"description");
+                var grip=AllControls(editor).Single(control=>control.Name=="DescriptionResizeGrip");
+                var descriptionView=(GeneralScrollView)description.Parent.Parent;
+                description.Text=String.Join(Environment.NewLine,Enumerable.Repeat("Long description",24));
+                descriptionView.RefreshScroll();
+                int height=grip.Parent.Height;
+                typeof(Control).GetMethod("OnKeyDown",BindingFlags.Instance|BindingFlags.NonPublic)
+                    .Invoke(grip,new object[]{new KeyEventArgs(Keys.Down)});
+                check(descriptionView.Bar.Limit>0&&grip.Parent.Height>height,
+                    "Description keeps its own scrollbar and grows on command from its resize grip.");
+                CaptureUi(editor,Path.Combine(root,"editor-themed-controls.png"));
+                input.Text="Preferida editada";
+                picker.Toggle();
+                var popup=picker.OpenPopup;
+                var view=(GeneralScrollView)popup.Items.OfType<ToolStripControlHost>().Single().Control;
+                var list=(ListBox)view.Content;
+                check(list.Items.Cast<string>().SequenceEqual(new[]{"Preferida editada (padrão)","Original","Terceira","Adicionar"}),
+                    "The version popup shows the default first and Add last.");
+                check(!view.Bar.Visible||view.Bar.Left>=list.Width,"The scrollbar cannot cover the trash hit area.");
+                using(var bitmap=new Bitmap(popup.Width,popup.Height)){
+                    popup.DrawToBitmap(bitmap,new Rectangle(0,0,bitmap.Width,bitmap.Height));
+                    bitmap.Save(Path.Combine(root,"compact-editor-versions.png"));
+                }
+                Point top=new Point(65,list.GetItemRectangle(0).Top+20);
+                Point bottom=new Point(65,list.GetItemRectangle(2).Top+20);
+                VersionMouse(list,"OnMouseDown",bottom);
+                VersionMouse(list,"OnMouseMove",top);
+                VersionMouse(list,"OnMouseUp",top);
+                check(picker.Items.Cast<string>().SequenceEqual(new[]{"Preferida editada","Original","Terceira"}),
+                    "Dragging does not change the order of download versions.");
+                Point trash=new Point(list.ClientSize.Width-20,list.GetItemRectangle(2).Top+20);
+                VersionMouse(list,"OnMouseClick",trash);
+                check(!popup.Visible,"Delete closes its popup before the editor refreshes.");
+                await Until(()=>picker.Items.Count==2);
+                check(picker.Items.Cast<string>().SequenceEqual(new[]{"Preferida editada","Original"}),
+                    "The row trash removes only that version.");
+                picker.Toggle();popup=picker.OpenPopup;
+                list=AllControls(popup.Items.OfType<ToolStripControlHost>().Single().Control).OfType<ListBox>().Single();
+                Point addVersion=new Point(65,list.GetItemRectangle(list.Items.Count-1).Top+20);
+                VersionMouse(list,"OnMouseClick",addVersion);
+                check(!popup.Visible&&picker.Items.Count==2,"Add closes the dropdown synchronously and defers the editor update.");
+                await Until(()=>picker.Items.Count==3);
+                check(input.Text=="Nova versão"&&input.SelectionLength==input.Text.Length,"Add opens a new version with its name selected for editing.");
+                input.Text="Quarta";
+                field.Text=source.Replace("/34305?","/4591?");
+                check(!EditorField<Button>(editor,"save").Enabled,"A file from another Nexus mod is rejected.");
+                field.Text="https://example.com/mod.zip";
+                check(!EditorField<Button>(editor,"save").Enabled,"A new external link is rejected.");
+                field.Text=source.Replace("169285","169288");
+                check(EditorField<Button>(editor,"save").Enabled,"A file version of the same Nexus mod is allowed.");
+                picker.SelectedIndex=0;
+                check(input.Text=="Preferida editada"&&field.Text==preferred.Sources[0],
+                    "Selecting another version keeps both inline names and both URLs intact.");
+                EditorField<Button>(editor,"save").PerformClick();
+                check(editor.Result.DefaultVariant==preferred.Id&&editor.SelectedVariant==preferred.Id&&editor.Result.NsfwOverride==false&&
+                    editor.Result.Variants.Select(version=>version.Name).SequenceEqual(new[]{"Preferida editada","Original","Quarta"}),
+                    "The first version is saved as default and an explicitly selected version stays selected.");
+            }
+            var fixedMod=NewEntry("Destino fixo",source);
+            fixedMod.Variants[0].CyberpunkId="fixed-fixture";
+            using(var locked=new GeneralModEditor(fixedMod,new string[0],"default",true,"")){
+                var browse=EditorField<Button>(locked,"browseDestination");
+                var routes=EditorField<TextBox>(locked,"installRoutes");
+                var label=((TableLayoutPanel)browse.Parent).GetControlFromPosition(0,0);
+                check(!browse.Enabled&&routes.ReadOnly&&label.Enabled&&label.ForeColor==GeneralStyle.Foreground,
+                    "A catalog destination remains read-only while its dark-theme label stays legible.");
+            }
+            using(var editor=new GeneralModEditor(mod,new string[0],preferred.Id,true,"")){
+                editor.Show(owner);
+                var category=EditorField<GeneralPicker>(editor,"category");
+                category.Toggle();
+                var popup=category.OpenPopup;
+                var list=AllControls(popup.Items.OfType<ToolStripControlHost>().Single().Control).OfType<ListBox>().Single();
+                check(list.Items.Cast<string>().SequenceEqual(new[]{"Criar categoria"}),"An empty category list still offers Create category.");
+                category.Toggle();
+                for(int i=0;i<16;i++)category.Items.Add("Categoria "+(i+1));
+                category.Toggle();
+                popup=category.OpenPopup;
+                var view=(GeneralScrollView)popup.Items.OfType<ToolStripControlHost>().Single().Control;
+                list=(ListBox)view.Content;
+                check(list.Items.Count==17&&(string)list.Items[16]=="Criar categoria","Create category follows the final category in a scrollable list.");
+                view.ScrollTo(view.Bar.Limit);
+                using(var timer=new Timer{Interval=30}){
+                    timer.Tick+=(s,e)=>{
+                        var dialog=Application.OpenForms.OfType<GeneralCategoryDetails>().FirstOrDefault();
+                        if(dialog==null)return;
+                        timer.Stop();
+                        var fields=AllControls(dialog).OfType<TextBox>().ToArray();
+                        var categoryName=fields.Single(box=>!box.Multiline);
+                        categoryName.Text="categoria 1";
+                        check(!((Button)dialog.AcceptButton).Enabled,"Duplicate category names are rejected case-insensitively.");
+                        categoryName.Text="Nova categoria";
+                        fields.Single(box=>box.Multiline).Text="Descrição da categoria";
+                        ((Button)dialog.AcceptButton).PerformClick();
+                    };
+                    timer.Start();
+                    VersionMouse(list,"OnMouseClick",new Point(65,list.GetItemRectangle(16).Top+20));
+                    check(!popup.Visible,"Create category closes its menu before opening the form.");
+                    await Until(()=>category.Text=="Nova categoria");
+                }
+                EditorField<Button>(editor,"save").PerformClick();
+                check(editor.Result.Category=="Nova categoria"&&editor.NewCategories["Nova categoria"]=="Descrição da categoria",
+                    "The new category and its description are staged with the mod.");
+                var formOwner=(GeneralModWindow)owner;
+                check(!formOwner.state.List.Categories.Contains("Nova categoria"),"Creating a category in the editor does not mutate the project before Apply.");
+                formOwner.ApplyEdited(mod,editor.Result,editor.SelectedVariant,false,editor.NewCategories);
+                check(formOwner.state.List.Categories.Contains("Nova categoria")&&
+                    formOwner.state.List.CategoryDescriptions["Nova categoria"]=="Descrição da categoria",
+                    "Applying the mod saves the newly created category and its description.");
+                formOwner.state.List.Mods.Remove(editor.Result);
+            }
+        } finally { GeneralStyle.AnimationsEnabled=animations;GeneralStyle.UseTheme("light"); }
+        var form=(GeneralModWindow)owner;
+        form.state.List.Categories.AddRange(new[]{"Roupas","Lojas"});
+        form.state.List.CategoryDescriptions["Roupas"]="Conjuntos";
+        var first=NewEntry("Primeiro",source);form.state.List.Mods.Add(first);
+        first.Category="Roupas";
+        mod.Category="Roupas";form.state.List.Mods.Add(mod);
+        var preset=new GeneralModPreset{Id="roupas",Name="Roupas"};
+        preset.Categories.Add("Roupas");form.state.List.Presets.Add(preset);
+        var edited=NewEntry("Editado",source);edited.Category="Vestuário";
+        form.ApplyCategoryName("Roupas",edited);
+        check(first.Category=="Vestuário"&&mod.Category=="Vestuário"&&preset.Categories.Single()=="Vestuário"&&
+            form.state.List.CategoryDescriptions["Vestuário"]=="Conjuntos","Renaming a category updates every mod, preset and description.");
+        edited.Category="Lojas";form.ApplyCategoryName("Vestuário",edited);
+        check(first.Category=="Vestuário"&&form.state.List.Categories.Contains("Lojas"),"Choosing an existing category does not rename other items.");
+    }
+
+    static void VersionMouse(ListBox list,string method,Point point){
+        list.GetType().GetMethod(method,BindingFlags.Instance|BindingFlags.NonPublic)
+            .Invoke(list,new object[]{new MouseEventArgs(MouseButtons.Left,1,point.X,point.Y,0)});
+    }
+
     static T EditorField<T>(GeneralModEditor editor,string name)where T:class{return typeof(GeneralModEditor).GetField(name,BindingFlags.Instance|BindingFlags.NonPublic).GetValue(editor) as T;}
 }

@@ -115,7 +115,7 @@ internal sealed partial class P2PService {
     internal static GeneralModState ExportState(GeneralModState state,string presetId,string[] ids,bool exportAllPresets=false){
         if(presetId==null&&!exportAllPresets)return state;
         var copy=Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(state));
-        copy.TemplateId=state.TemplateId;
+        copy.TemplateId=state.TemplateId;copy.ProjectName=state.ProjectName;
         if(exportAllPresets){copy.SelectedPreset=null;return copy;}
         copy.TemplateSubset=copy.TemplateId!=null;
         var preset=copy.List.Presets.SingleOrDefault(item=>item.Id==presetId);

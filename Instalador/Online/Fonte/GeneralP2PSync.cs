@@ -166,7 +166,9 @@ internal sealed partial class P2PService {
             if(disposed||session.Discarded)throw new OperationCanceledException();
             if(report!=null)report(done,preview.Files.Count,file.Path);
             done++;
-            string path=Safe.In(destination,file.Path);
+            string path;
+            try{path=GeneralInstallRoutes.Resolve(destination,file.Path);}
+            catch(DirectoryNotFoundException){missing.UnionWith(file.Owners);continue;}
             if(File.Exists(path)){
                 bool matching;
                 try{matching=new FileInfo(path).Length==file.Size&&Safe.Hash(path)==file.Sha256;}

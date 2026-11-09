@@ -77,8 +77,90 @@ public static class InstalledSnapshotInstallerTests {
 
         ConfigTransactions(root);
         ResumeTransactions(root,catalog);
-        if(testOfficialProject)BuiltInProjectReceive(root,catalog);
+        if(testOfficialProject){
+            TestPortableDestinations(root,parent,catalog);
+            BuiltInProjectReceive(root,catalog);
+        }
     }
+    static void TestPortableDestinations(string root,string parent,FixedCatalog catalog){
+        string sender=Safe.In(root,"portable/sender/game"),receiver=Safe.In(root,"portable/receiver/game");
+        string senderData=Safe.In(root,"portable/sender/data"),inbox=Safe.In(root,"portable/receiver/data");
+        string senderProfile=Safe.In(root,"portable/sender/personal"),receiverProfile=Safe.In(root,"portable/receiver/personal");
+        foreach(string folder in new[]{Safe.In(sender,"Addons"),Safe.In(receiver,"Addons"),
+            Safe.In(senderProfile,"ExampleGame/Mods"),Safe.In(senderProfile,"ExampleGame/Optional"),Safe.In(receiverProfile,"ExampleGame/Mods")})
+            Directory.CreateDirectory(folder);
+        string url="https://www.nexusmods.com/cyberpunk2077/mods/123?tab=files&file_id=1";
+        string archive=Safe.In(root,"portable/mod.zip");
+        using(var zip=ZipFile.Open(archive,ZipArchiveMode.Create)){
+            foreach(string name in new[]{"game/core.txt","personal/prefs.txt"})
+                using(var writer=new StreamWriter(zip.CreateEntry(name).Open()))writer.Write(name);
+        }
+        var state=new GeneralModState{Destination=sender,ProjectName="Example Game",SelectedPreset="solo"};
+        GeneralInstallRoutes.FixtureAppData=senderProfile;
+        try{
+            var mixed=RoutedEntry("mixed",url);
+            mixed.Variants[0].InstallRoutes=GeneralInstallRoutes.Parse("game = Addons\npersonal = "+Safe.In(senderProfile,"ExampleGame/Mods"),sender);
+            string displayRoutes=GeneralInstallRoutes.Format(mixed.Variants[0].InstallRoutes);
+            if(displayRoutes.Contains("\n")||!displayRoutes.Contains(" | ")||
+                !GeneralInstallRoutes.Same(mixed.Variants[0].InstallRoutes,GeneralInstallRoutes.Parse(displayRoutes,sender)))
+                throw new IOException("Legacy multiline routes must round-trip through the single-line editor.");
+            Check(mixed.Variants[0].InstallRoutes[1].Destination=="%APPDATA%/ExampleGame/Mods","O destino absoluto do remetente vira uma referência portável.");
+            var missing=RoutedEntry("missing",url);
+            missing.Variants[0].InstallRoutes=GeneralInstallRoutes.Parse("%APPDATA%/ExampleGame/Optional",sender);
+            var plain=RoutedEntry("plain",url);
+            var dependent=RoutedEntry("dependent",url);
+            dependent.Variants[0].RequiredMods.Add(missing.Id);
+            state.List.Mods.AddRange(new[]{mixed,missing,plain,dependent});
+            state.List.Presets.Add(new GeneralModPreset{Id="solo",Name="Solo",ModIds=state.List.Mods.Select(mod=>mod.Id).ToList()});
+            var installer=new GeneralModInstaller(sender,Path.Combine(senderData,"Instalacoes"));
+            foreach(var mod in state.List.Mods)
+                installer.Install(archive,mod.Id+"/default/0/"+url,null,installRoutes:mod.Variants[0].InstallRoutes);
+            Check(File.Exists(Safe.In(sender,"Addons/core.txt"))&&File.Exists(Safe.In(senderProfile,"ExampleGame/Mods/prefs.txt"))&&
+                installer.Status("mixed/default/0/"+url)==GeneralModInstaller.Installed,
+                "Um único arquivo instala em dois destinos e ambos constam no recibo.");
+            Throws(()=>GeneralInstallRoutes.Parse("%APPDATA%/Microsoft/Windows/Start Menu/Programs/Startup",sender),
+                "Destinos de inicialização do Windows são recusados.");
+            string snapshot=Safe.In(root,"portable/pack.zip");
+            var manifest=InstalledSnapshot.Create(snapshot,state,state.List.Mods.Select(mod=>mod.Id),catalog,senderData,false,null);
+            string manifestText=Safe.Json.Serialize(manifest);
+            Check(manifest.Schema==2&&manifest.ProjectName=="Example Game"&&!manifestText.Contains("sender")&&manifestText.Contains("%APPDATA%"),
+                "O manifesto portável contém o nome do projeto e omite os caminhos locais do remetente.");
+            GeneralInstallRoutes.FixtureAppData=receiverProfile;
+            var receiving=new InstalledSnapshotInstaller(receiver,inbox,catalog);
+            string hash=Safe.Hash(snapshot);
+            string approved=null;
+            string receipt=receiving.Install(snapshot,hash,null,approveUserFolders:folders=>{approved=folders.Single();return true;});
+            Check(approved==Safe.In(receiverProfile,"ExampleGame/Mods")&&File.Exists(Safe.In(receiver,"Addons/core.txt"))&&
+                File.Exists(Safe.In(receiverProfile,"ExampleGame/Mods/prefs.txt"))&&File.Exists(Safe.In(receiver,"game/core.txt")),
+                "O receptor confirma a pasta pessoal local e instala as partes pessoal e do jogo.");
+            Check(receiving.ReadSkippedDestinations(receipt).SequenceEqual(new[]{"missing","dependent"})&&
+                receiving.Status(receipt,"missing/default")==GeneralModInstaller.Missing&&
+                !Directory.Exists(Safe.In(receiverProfile,"ExampleGame/Optional")),
+                "Pasta ausente pula o mod inteiro, preserva os outros e não cria o destino.");
+            var store=new GeneralProjectStore(Safe.In(parent,"q"));
+            var project=store.CreateReceived(new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Destination=receiver,ReceiptId=receipt},inbox,catalog);
+            var received=store.Load(project);
+            var pending=received.List.Mods.Single(mod=>mod.Id=="missing");
+            Check(project.Name=="Example Game"&&received.SnapshotReceipts.Count==2&&pending.Category=="Não instalados"&&
+                pending.Variants[0].Sources.Single()==url&&pending.Variants[0].InstallRoutes[0].Destination=="%APPDATA%/ExampleGame/Optional"&&
+                received.List.Presets[0].Categories.Contains("Não instalados")&&
+                received.List.Mods.Single(mod=>mod.Id=="dependent").Variants[0].RequiredMods.SequenceEqual(new[]{pending.Id}),
+                "O projeto recebido guarda dados, links e regras do mod pulado em uma categoria própria.");
+            receiving.Remove(receipt,new[]{"mixed/default"},null);
+            Check(!File.Exists(Safe.In(receiver,"Addons/core.txt"))&&!File.Exists(Safe.In(receiverProfile,"ExampleGame/Mods/prefs.txt"))&&
+                File.Exists(Safe.In(receiver,"game/core.txt")),"A remoção confere e alcança os dois destinos registrados.");
+            receipt=receiving.Install(snapshot,hash,null,approveUserFolders:folders=>false);
+            Check(receiving.ReadSkippedDestinations(receipt).SequenceEqual(new[]{"mixed","missing","dependent"})&&
+                !File.Exists(Safe.In(receiverProfile,"ExampleGame/Mods/prefs.txt")),
+                "Recusar a pasta pessoal também pula o mod completo sem tocar nos demais.");
+        }finally{GeneralInstallRoutes.FixtureAppData=null;}
+    }
+
+    static GeneralModEntry RoutedEntry(string id,string source){
+        return new GeneralModEntry{Id=id,Name=id,DefaultVariant="default",Variants=new List<GeneralModVariant>{
+            new GeneralModVariant{Id="default",Name="Default",Sources=new List<string>{source}}}};
+    }
+
     static void BuiltInProjectReceive(string root,FixedCatalog catalog){
         catalog.GameFileVersion="2.5.0.0";
         string target=Path.Combine(root,"cp"),inbox=Path.Combine(root,"inbox"),archive=Path.Combine(root,"official.zip");

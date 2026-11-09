@@ -122,7 +122,7 @@ internal sealed class GeneralProjectStore {
             if(existing!=null&&!official)return existing;
             if(existing==null&&index.Projects.Count>=200)throw new IOException("Use no máximo 200 projetos nesta biblioteca.");
             var incoming=session.ReviewedProject??manifest.Project??manifest.List;
-            var name=manifest.Name.Trim();
+            var name=(manifest.ProjectName??manifest.Name).Trim();
             var project=existing??new GeneralProject{Id=id,Name=official?"Cyberpunk 2077":ProjectName(name.Substring(0,Math.Min(120,name.Length)).TrimEnd()),
                 TemplateId=official?CyberpunkTemplate:null};
             string data=DataPath(project);
@@ -130,6 +130,14 @@ internal sealed class GeneralProjectStore {
             var list=official&&manifest.TemplateSubset
                 ?MergeReceivedPreset(previous==null?GeneralModLibrary.Seed(catalog,new ModImportItem[0]):Safe.Json.Deserialize<GeneralModList>(Safe.Json.Serialize(previous.List)),incoming)
                 :incoming;
+            var skipped=new HashSet<string>(source.ReadSkippedDestinations(session.ReceiptId),StringComparer.Ordinal);
+            if(skipped.Count>0){
+                string group=index.Language=="en"?"Not installed":"Não instalados";
+                if(!list.Categories.Contains(group,StringComparer.OrdinalIgnoreCase))list.Categories.Add(group);
+                foreach(var mod in list.Mods.Where(mod=>skipped.Contains(mod.Id)))mod.Category=group;
+                foreach(var preset in list.Presets.Where(preset=>preset.ModIds.Any(skipped.Contains)))
+                    if(!preset.Categories.Contains(group,StringComparer.OrdinalIgnoreCase))preset.Categories.Add(group);
+            }
             var state=new GeneralModState{
                 List=list,Theme=index.Theme,Language=index.Language,Destination=session.Destination,
                 DownloadFolder=index.DownloadFolder,SelectedPreset=incoming.Presets.Select(preset=>preset.Id).FirstOrDefault()
@@ -205,7 +213,7 @@ internal sealed class GeneralProjectStore {
             var registered = Registered(Read(inspection), project);
             var state = new GeneralModLibrary(Path.Combine(DataPath(registered), "lista.json")).LoadForInspection(inspection);
             if (state == null) throw new IOException("O arquivo deste projeto não foi encontrado. Nenhum dado foi substituído.");
-            state.TemplateId=registered.TemplateId;
+            state.TemplateId=registered.TemplateId;state.ProjectName=registered.Name;
             return state;
         }
     }

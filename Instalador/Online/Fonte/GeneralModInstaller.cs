@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -15,6 +15,7 @@ public sealed partial class GeneralModInstaller {
     public sealed class Record {
         public string Key,SourceSha256;
         public List<RecordFile> Files;
+        public List<GeneralInstallRoute> InstallRoutes = new List<GeneralInstallRoute>();
     }
 
     public sealed class RecordFile {
@@ -46,13 +47,14 @@ public sealed partial class GeneralModInstaller {
         return Status(key,null,Safe.Hash);
     }
 
-    internal string Status(string key,string source,Func<string,string> readHash) {
+    internal string Status(string key,string source,Func<string,string> readHash,List<GeneralInstallRoute> installRoutes=null) {
         Record record = ReadRecord(RecordPath(key));
         if (record == null) return Missing;
+        if(installRoutes!=null&&!GeneralInstallRoutes.Same(installRoutes,record.InstallRoutes))return "Versão diferente";
         if(record.SourceSha256!=null&&source!=null&&File.Exists(source)&&readHash(source)!=record.SourceSha256)return "Versão diferente";
         int present = 0;
         foreach (RecordFile file in record.Files) {
-            string target = Safe.In(destination, file.Path);
+            string target = Target(file.Path);
             if (Directory.Exists(target)) return Modified;
             if (!File.Exists(target)) continue;
             if (new FileInfo(target).Length!=file.Size||readHash(target)!=file.Sha256) return Modified;
@@ -62,18 +64,21 @@ public sealed partial class GeneralModInstaller {
     }
 
     internal bool SourceMatches(string source,string key){var record=ReadRecord(RecordPath(key));return record!=null&&record.SourceSha256!=null&&File.Exists(source)&&Safe.Hash(source)==record.SourceSha256;}
-    public string Install(string source, string key, Action<string> report, Func<ModVersionDifference,bool> chooseVersion = null) {
+    public string Install(string source, string key, Action<string> report, Func<ModVersionDifference,bool> chooseVersion = null, List<GeneralInstallRoute> installRoutes = null) {
         string receipt = RecordPath(key);
         source = Path.GetFullPath(source);
         Safe.NoLinks(source);
         if (!File.Exists(source)) throw new IOException("O arquivo selecionado não está disponível: " + source);
 
+        installRoutes=installRoutes??new List<GeneralInstallRoute>();
+        GeneralInstallRoutes.Validate(installRoutes);
+        GeneralInstallRoutes.CheckFolders(destination,installRoutes);
         using (AcquireLock()) {
             Record previous = ReadRecord(receipt);
             var previousFiles = previous == null
                 ? new Dictionary<string, RecordFile>(StringComparer.OrdinalIgnoreCase)
                 : previous.Files.ToDictionary(file => file.Path, StringComparer.OrdinalIgnoreCase);
-            var record = new Record { Key = key, SourceSha256=Safe.Hash(source), Files = new List<RecordFile>() };
+            var record = new Record { Key = key, SourceSha256=Safe.Hash(source), InstallRoutes=installRoutes, Files = new List<RecordFile>() };
             var staged = new List<string>();
             var createdFiles = new List<RecordFile>();
             var replacedFiles = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
@@ -83,8 +88,9 @@ public sealed partial class GeneralModInstaller {
             try {
                 using (var reader = BundledArchiveReader.Open(source, new FileInfo(source).Length, record.SourceSha256)) {
                     ReaderArchiveEntry[] entries = reader.Files();
-                    ValidatePaths(entries);
-                    if(previous!=null&&(previousFiles.Count!=entries.Length||entries.Any(entry=>!previousFiles.ContainsKey(entry.Path))))
+                    string[] paths=entries.Select(entry=>GeneralInstallRoutes.Map(entry.Path,installRoutes)).ToArray();
+                    ValidatePaths(paths);
+                    if(previous!=null&&(previousFiles.Count!=paths.Length||paths.Any(path=>!previousFiles.ContainsKey(path))))
                         new ModVersionDifference{Name=Path.GetFileName(source),Current="Pacote registrado",Incoming=Path.GetFileName(source),CanReplace=false,Detail="A lista de arquivos mudou. Remova a versão anterior pelo gerenciador antes de instalar esta versão, evitando misturar arquivos antigos e novos."}.Require(chooseVersion);
                     Directory.CreateDirectory(staging);
                     for (int i = 0; i < entries.Length; i++) {
@@ -96,18 +102,18 @@ public sealed partial class GeneralModInstaller {
                             using (var output = new FileStream(stageFile, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                                 input.CopyTo(output);
                         });
-                        var file = new RecordFile { Path = entry.Path, Size = entry.Size, Sha256 = Safe.Hash(stageFile) };
+                        var file = new RecordFile { Path = paths[i], Size = entry.Size, Sha256 = Safe.Hash(stageFile) };
                         record.Files.Add(file);
                     }
                 }
 
                 var existingOwners = new HashSet<string>(OtherFiles(receipt).Where(file => file.Owned)
                     .Select(file => file.Path + "\n" + file.Sha256), StringComparer.OrdinalIgnoreCase);
-                var conflicts=record.Files.Where(file=>File.Exists(Safe.In(destination,file.Path))&&!Matches(Safe.In(destination,file.Path),file)).ToList();
-                var expected=conflicts.ToDictionary(file=>file.Path,file=>Safe.Hash(Safe.In(destination,file.Path)),StringComparer.OrdinalIgnoreCase);
-                if(conflicts.Count>0)new ModVersionDifference{Name=Path.GetFileName(source),Current=String.Join("; ",conflicts.Select(file=>ModVersionDifference.FileVersion(Safe.In(destination,file.Path))).Distinct()),Incoming=Path.GetFileName(source),Detail=String.Join("\r\n",conflicts.Take(6).Select(file=>file.Path))+"\r\n"+GeneralStyle.T("A troca guarda os arquivos anteriores para restaurar ao remover. Nenhuma troca ocorre sem sua escolha.","Replacement backs up the previous files for restoration on removal. Nothing is replaced without your choice.")}.Require(chooseVersion);
+                var conflicts=record.Files.Where(file=>File.Exists(Target(file.Path))&&!Matches(Target(file.Path),file)).ToList();
+                var expected=conflicts.ToDictionary(file=>file.Path,file=>Safe.Hash(Target(file.Path)),StringComparer.OrdinalIgnoreCase);
+                if(conflicts.Count>0)new ModVersionDifference{Name=Path.GetFileName(source),Current=String.Join("; ",conflicts.Select(file=>ModVersionDifference.FileVersion(Target(file.Path))).Distinct()),Incoming=Path.GetFileName(source),Detail=String.Join("\r\n",conflicts.Take(6).Select(file=>file.Path))+"\r\n"+GeneralStyle.T("A troca guarda os arquivos anteriores para restaurar ao remover. Nenhuma troca ocorre sem sua escolha.","Replacement backs up the previous files for restoration on removal. Nothing is replaced without your choice.")}.Require(chooseVersion);
                 foreach (RecordFile file in record.Files) {
-                    string target = Safe.In(destination, file.Path);RecordFile old;
+                    string target = Target(file.Path);RecordFile old;
                     file.Owned = previousFiles.TryGetValue(file.Path, out old) && old.Owned
                         || existingOwners.Contains(file.Path + "\n" + file.Sha256);
                     if(expected.ContainsKey(file.Path)){
@@ -118,28 +124,31 @@ public sealed partial class GeneralModInstaller {
 
                 for (int i = 0; i < record.Files.Count; i++) {
                     RecordFile file = record.Files[i];
-                    string target = Safe.In(destination, file.Path);
+                    string target = GeneralInstallRoutes.Resolve(destination,file.Path,true);
                     if(expected.ContainsKey(file.Path)&&!File.Exists(target))throw Conflict(file.Path);
                     if (File.Exists(target)) {
                         if (!Matches(target, file)) {
                             string before; if(!expected.TryGetValue(file.Path,out before)||Safe.Hash(target)!=before)throw Conflict(file.Path);
-                            File.Replace(staged[i],target,null);replacedFiles.Add(file.Path,before);
+                            if(GeneralInstallRoutes.External(file.Path))InstalledSnapshotInstaller.ReplaceChecked(staged[i],target,file.Sha256,before);
+                            else File.Replace(staged[i],target,null);
+                            replacedFiles.Add(file.Path,before);
                         }
                         continue;
                     }
-                    CreateParents(file.Path, createdDirectories);
+                    GeneralInstallRoutes.CreateParents(destination,file.Path,createdDirectories);
                     Safe.NoLinks(target);
-                    File.Move(staged[i], target);
+                    if(GeneralInstallRoutes.External(file.Path))InstalledSnapshotInstaller.ReplaceChecked(staged[i],target,file.Sha256,null);
+                    else File.Move(staged[i], target);
                     createdFiles.Add(file);
                     file.Owned = true;
                 }
                 Safe.WriteJson(receipt, record);
                 return "Instalado. " + record.Files.Count + " arquivo(s) conferido(s).";
             } catch {
-                foreach(var pair in replacedFiles.Reverse())TryCleanup(()=>{var file=record.Files.Single(f=>f.Path==pair.Key);string target=Safe.In(destination,pair.Key);if(Matches(target,file))RestoreBackup(pair.Value,target,file.Sha256);});
+                foreach(var pair in replacedFiles.Reverse())TryCleanup(()=>{var file=record.Files.Single(f=>f.Path==pair.Key);string target=Target(pair.Key);if(Matches(target,file))RestoreBackup(pair.Value,target,file.Sha256);});
                 foreach (RecordFile file in createdFiles.AsEnumerable().Reverse()) {
                     TryCleanup(() => {
-                        string target = Safe.In(destination, file.Path);
+                        string target = Target(file.Path);
                         if (Matches(target, file)) File.Delete(target);
                     });
                 }
@@ -152,7 +161,7 @@ public sealed partial class GeneralModInstaller {
         }
     }
 
-    public string Remove(string key, bool forgetOnly=false, Func<string,bool> activeOwner=null) {
+    public string Remove(string key, bool forgetOnly=false, Func<string,bool> activeOwner=null, Func<string,bool> preserveExternal=null) {
         string receipt = RecordPath(key);
         using (AcquireLock()) {
             Record record = ReadRecord(receipt);
@@ -161,9 +170,9 @@ public sealed partial class GeneralModInstaller {
             int removed = 0;
             int preserved = 0;
             foreach (RecordFile file in forgetOnly ? Enumerable.Empty<RecordFile>() : record.Files) {
-                string target = Safe.In(destination, file.Path);
+                string target = Target(file.Path);
                 if (!File.Exists(target)) continue;
-                if (!file.Owned || shared.Contains(file.Path) || !Matches(target, file)) {
+                if (!file.Owned || shared.Contains(file.Path) || !Matches(target, file) || GeneralInstallRoutes.External(file.Path)&&preserveExternal!=null&&preserveExternal(file.Path)) {
                     preserved++;
                     continue;
                 }
@@ -181,28 +190,16 @@ public sealed partial class GeneralModInstaller {
         string backup=BackupPath(hash);Safe.NoLinks(backup);if(!File.Exists(backup)||Safe.Hash(backup)!=hash||Safe.Hash(target)!=expected)throw new IOException("O backup ou o destino mudou; preservado.");
         string temp=target+".restore-"+Guid.NewGuid().ToString("N");try{File.Copy(backup,temp,false);if(Safe.Hash(temp)!=hash||Safe.Hash(target)!=expected)throw new IOException("Destino alterado durante restauração.");File.Replace(temp,target,null);}finally{TryCleanup(()=>File.Delete(temp));}
     }
-    void ValidatePaths(ReaderArchiveEntry[] entries) {
-        if (entries.Length == 0) throw new IOException("O pacote não contém arquivos para instalar.");
-        var paths = new HashSet<string>(entries.Select(entry => entry.Path), StringComparer.OrdinalIgnoreCase);
-        foreach (ReaderArchiveEntry entry in entries) {
-            string target = Safe.In(destination, entry.Path);
-            if (Directory.Exists(target)) throw Conflict(entry.Path);
-            for (int slash = entry.Path.LastIndexOf('/'); slash >= 0; slash = entry.Path.LastIndexOf('/', slash - 1)) {
-                string parent = entry.Path.Substring(0, slash);
-                if (paths.Contains(parent) || File.Exists(Safe.In(destination, parent))) throw Conflict(parent);
-            }
-        }
-    }
+    string Target(string path) { return GeneralInstallRoutes.Resolve(destination,path); }
 
-    void CreateParents(string relative, List<string> created) {
-        int slash = relative.IndexOf('/');
-        while (slash >= 0) {
-            string directory = Safe.In(destination, relative.Substring(0, slash));
-            if (!Directory.Exists(directory)) {
-                Directory.CreateDirectory(directory);
-                created.Add(directory);
-            }
-            slash = relative.IndexOf('/', slash + 1);
+    void ValidatePaths(string[] entries) {
+        if (entries.Length == 0) throw new IOException("O pacote não contém arquivos para instalar.");
+        var physical = new HashSet<string>(entries.Select(Target), StringComparer.OrdinalIgnoreCase);
+        if(physical.Count!=entries.Length)throw new IOException("Dois arquivos do pacote apontam para o mesmo destino.");
+        foreach (string target in physical) {
+            if (Directory.Exists(target)) throw Conflict(target);
+            for (string parent=Path.GetDirectoryName(target); !String.IsNullOrEmpty(parent); parent=Path.GetDirectoryName(parent))
+                if (physical.Contains(parent) || File.Exists(parent)) throw Conflict(parent);
         }
     }
 
@@ -224,9 +221,10 @@ public sealed partial class GeneralModInstaller {
         Record record = serializer.Deserialize<Record>(inspection?GeneralProjectStorage.ReadText(path,16000000):File.ReadAllText(path));
         if (record == null || record.SourceSha256!=null&&!FixedData.HashValid(record.SourceSha256) || record.Files == null || record.Files.Count == 0 || RecordPath(record.Key) != path)
             throw new IOException("Registro de instalação inválido: " + path);
+        GeneralInstallRoutes.Validate(record.InstallRoutes);
         foreach (RecordFile file in record.Files) {
             if (file == null || file.Size < 0 || !FixedData.HashValid(file.Sha256)||file.Before!=null&&!FixedData.HashValid(file.Before)) throw new IOException("Registro de arquivo inválido: " + path);
-            Safe.In(destination, file.Path);
+            Target(file.Path);
         }
         return record;
     }

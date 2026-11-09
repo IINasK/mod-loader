@@ -25,7 +25,8 @@ internal sealed partial class GeneralModWindow {
             if (work.Variant.CyberpunkId == null || !Recipe(work).Immutable) return ModAction.Disable;
             return ModAction.None;
         }
-        if (status == GeneralStatusPresentation.ManualBody) return ModAction.None;
+        if (status == GeneralStatusPresentation.ManualBody||
+            work.Entry.DetectedPaths.Count>0&&work.Variant.Sources.Any(GeneralModDownload.IsInstalledSource)) return ModAction.None;
         var alternative = state.List.Mods.FirstOrDefault(other => other.Id != work.Entry.Id && work.Entry.AlternativeGroup != null
             && other.AlternativeGroup == work.Entry.AlternativeGroup && IsActiveAlternative(other));
         if (alternative != null)
@@ -75,8 +76,24 @@ internal sealed partial class GeneralModWindow {
         return new DisabledMods(root, data, () => EnsureGameClosed(root));
     }
 
+    void KeepLinkedDependencies(List<Work> jobs,string root) {
+        var removing=new HashSet<string>(jobs.Select(work=>work.Entry.Id),StringComparer.Ordinal);
+        var removingVariants=new HashSet<string>(jobs.Select(work=>work.Key),StringComparer.Ordinal);
+        var affected=state.List.Mods.Where(mod=>
+            mod.Variants.Any(variant=>variant.RequiredMods.Any(removing.Contains))).ToList();
+        if(affected.Count==0)return;
+        var reads=new ScanReads(this,root);
+        foreach(var mod in affected)foreach(var variant in mod.Variants.Where(item=>item.RequiredMods.Any(removing.Contains))){
+            if(removingVariants.Contains(Key(mod,variant)))continue;
+            string status=Status(new Work{Entry=mod,Variant=variant},root,reads);
+            if(GeneralStatusPresentation.Kind(status)=="installed"||status==GeneralStatusPresentation.ManualBody)
+                throw new IOException(T("Inclua o mod dependente na mesma operação: ","Include the dependent mod in the same operation: ")+mod.Name);
+        }
+    }
+
     Dictionary<string, List<DisabledModFile>> PlanDisable(List<Work> jobs, string root) {
         EnsureGameClosed(root);
+        KeepLinkedDependencies(jobs,root);
         var result = jobs.ToDictionary(work => work.Key, work => new List<DisabledModFile>(), StringComparer.Ordinal);
         var selected = new HashSet<string>(result.Keys, StringComparer.Ordinal);
         bool cyberpunk = IsCyberpunk(root);
@@ -144,7 +161,9 @@ internal sealed partial class GeneralModWindow {
         }
         var inactive = new HashSet<string>(DisabledAt(root).Read().Keys, StringComparer.Ordinal);
         foreach (var file in allFiles) file.OwnerKeys.RemoveAll(inactive.Contains);
+        var personalPeers=new Lazy<HashSet<string>>(ExternalFilesInOtherProjects);
         foreach (var group in allFiles.Where(file => file.OwnerKeys.Count > 0).GroupBy(file => file.Path, StringComparer.OrdinalIgnoreCase)) {
+            if(GeneralInstallRoutes.External(group.Key)&&personalPeers.Value.Contains(GeneralInstallRoutes.Resolve(root,group.Key)))continue;
             var owners = group.SelectMany(file => file.OwnerKeys ?? new List<string>()).Distinct().ToArray();
             if (!owners.Any(selected.Contains) || owners.Any(owner => !selected.Contains(owner)) || shared.Contains(group.Key)) continue;
             if (group.Any(file => file.ReplacesPrevious))
@@ -205,10 +224,13 @@ internal sealed partial class GeneralModWindow {
 
     string RemoveManagedWorks(List<Work> jobs, string root, HashSet<string> disabled) {
         EnsureGameClosed(root);
+        KeepLinkedDependencies(jobs,root);
         var notes = new List<string>();
+        var personalPeers=new Lazy<HashSet<string>>(ExternalFilesInOtherProjects);
+        Func<string,bool> preserveExternal=path=>personalPeers.Value.Contains(GeneralInstallRoutes.Resolve(root,path));
         var snapshots = jobs.Where(work => state.SnapshotReceipts.ContainsKey(work.Key) && work.Variant.CyberpunkId != "NightCoop").ToList();
         foreach (var group in snapshots.GroupBy(work => new { Receipt = state.SnapshotReceipts[work.Key], Disabled = disabled.Contains(work.Key) })) {
-            notes.Add(Snapshot(root).Remove(group.Key.Receipt, group.Select(work => work.Key), Report, group.Key.Disabled));
+            notes.Add(Snapshot(root).Remove(group.Key.Receipt, group.Select(work => work.Key), Report, group.Key.Disabled,preserveExternal));
             foreach (var work in group) state.SnapshotReceipts.Remove(work.Key);
         }
         var standard = jobs.Except(snapshots).ToList();
@@ -222,7 +244,7 @@ internal sealed partial class GeneralModWindow {
         foreach (var work in standard.Where(item => item.Variant.CyberpunkId == null)) {
             for (int index = work.Variant.Sources.Count - 1; index >= 0; index--) {
                 string key = work.Receipt(index);
-                if (!cyberpunk) notes.Add(Generic(root).Remove(key, disabled.Contains(work.Key), owner => !disabled.Contains(WorkKeyFromReceipt(owner))));
+                if (!cyberpunk) notes.Add(Generic(root).Remove(key, disabled.Contains(work.Key), owner => !disabled.Contains(WorkKeyFromReceipt(owner)),preserveExternal));
                 else {
                     string id = CyberpunkImportId(work, index);
                     if (id == null) continue;
@@ -233,6 +255,22 @@ internal sealed partial class GeneralModWindow {
             }
         }
         return notes.Count == 0 ? T("Mods desinstalados.", "Mods uninstalled.") : String.Join(" ", notes.Distinct());
+    }
+
+    HashSet<string> ExternalFilesInOtherProjects(){
+        var result=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if(projectStore==null||project==null)return result;
+        foreach(var peer in projectStore.Read().Projects.Where(item=>item.Id!=project.Id)){
+            var other=projectStore.Load(peer);
+            if(String.IsNullOrWhiteSpace(other.Destination)||!Directory.Exists(other.Destination))continue;
+            string peerData=projectStore.DataPath(peer);
+            var files=new InstalledSnapshotInstaller(other.Destination,peerData,catalog).ProjectDeletionFiles(true);
+            if(!IsCyberpunk(other.Destination))
+                files=files.Concat(new GeneralModInstaller(other.Destination,Path.Combine(peerData,"Instalacoes")).ProjectDeletionFiles(true));
+            foreach(var file in files.Where(file=>GeneralInstallRoutes.External(file.Path)))
+                result.Add(GeneralInstallRoutes.Resolve(other.Destination,file.Path));
+        }
+        return result;
     }
 
     List<Work> ConflictingAlternatives(Work incoming, string root) {

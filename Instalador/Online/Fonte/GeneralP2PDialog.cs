@@ -43,6 +43,16 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     internal static string InstalledMessage {get{return T("Download concluído e mods instalados. Pode iniciar o jogo.",
         "Download complete and mods installed. You can start the game.");}}
 
+    internal static bool AskUserFolders(Control dispatcher,Func<Control> owner,string[] folders){
+        if(dispatcher.IsDisposed||!dispatcher.IsHandleCreated)return false;
+        return (bool)dispatcher.Invoke((Func<bool>)(()=>{
+            string title=T("Pastas do usuário","User folders");
+            string message=T("Instalar também nestas pastas do seu usuário?","Also install into these folders in your user profile?")
+                +Environment.NewLine+Environment.NewLine+String.Join(Environment.NewLine,folders);
+            return GeneralDialog.Message(owner(),message,title,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)==DialogResult.Yes;
+        }));
+    }
+
     internal static Task<bool> AskConnection(Control dispatch,Func<Control> promptOwner,P2PService service,P2PSession session){
         var decision=new TaskCompletionSource<bool>();
         if(dispatch.IsDisposed||!dispatch.IsHandleCreated)return Task.FromResult(false);
@@ -225,7 +235,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         FitCards();
     }
     void FitCards(){
-        int chrome=56+body.Padding.Vertical+(int)body.RowStyles.Cast<RowStyle>().Take(8).Sum(row=>row.Height);
+        int chrome=HeaderHeight+Padding.Vertical+body.Padding.Vertical+(int)body.RowStyles.Cast<RowStyle>().Take(8).Sum(row=>row.Height);
         int maximum=Screen.FromControl(this).WorkingArea.Height-32;
         int shown=Math.Min(cardStack.MinimumSize.Height,Math.Max(0,maximum-chrome-Gap));
         int gap=shown==0?0:Gap;
@@ -710,6 +720,7 @@ internal sealed partial class GeneralModWindow {
                     p2p.EnableInstalledReceive(catalog,data);
                     p2p.ConfirmConnection=session=>GeneralP2PDialog.AskConnection(this,()=>SharingPromptOwner,p2p,session);
                     p2p.ChooseVersion=difference=>GeneralVersionChoiceDialog.Ask(SharingPromptOwner,difference);
+                    p2p.ApproveUserFolders=folders=>GeneralP2PDialog.AskUserFolders(this,()=>SharingPromptOwner,folders);
                 }
                 p2p.SetPreparationState(CommittedProject());
                 Action<P2PSession> installed=session=>{

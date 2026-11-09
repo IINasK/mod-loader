@@ -31,6 +31,13 @@ public static class GeneralModLibraryV2Tests {
         check(!new[] { "Destination", "DownloadFolder", "ResolvedDownloads", "ChosenVariants", "CyberpunkId", "Theme", "Language", "SelectedPreset", "PrivateGame", "PrivateDownloads" }.Any(portable.Contains), "Exportação exclui preferências e caminhos de máquina fora das referências de mods.");
         var imported = library.Import(export);
         check(imported.Schema == 1 && imported.Mods[0].Nsfw && imported.Mods[0].Tags.SequenceEqual(list.Mods[0].Tags) && imported.Presets[0].Name == "Para amigos" && imported.CategoryDescriptions.Count == 1 && imported.UncategorizedName == "Avulsos", "Metadados novos sobrevivem ao compartilhamento no schema 1.");
+        var linked=loaded.List.Mods[0];
+        linked.Variants[0].RequiredMods.Add("base-mod");
+        linked.NsfwOverride=false;
+        library.Save(loaded);
+        var refreshed=library.Load().List.Mods[0];
+        check(refreshed.Variants[0].RequiredMods.SequenceEqual(new[]{"base-mod"})&&!refreshed.Nsfw&&refreshed.NsfwOverride==false,
+            "Vínculo de dependência e escolha manual de NSFW sobrevivem ao salvamento.");
         check(imported.Mods[0].Variants[0].Sources[0] == @"D:\mods\pacote.zip", "Referência de pacote permanece explícita sem incluir seu conteúdo.");
 
         File.WriteAllText(export, "{\"Schema\":1,\"Categories\":[],\"Mods\":[{\"Id\":\"old\",\"Name\":\"Legado\",\"DefaultVariant\":\"default\",\"Variants\":[{\"Id\":\"default\",\"Name\":\"Principal\",\"Sources\":[\"https://example.com/mod.zip\"]}]}]}");

@@ -16,7 +16,7 @@ internal static class LucideIcons {
     static readonly Dictionary<string,string> glyphs=new Dictionary<string,string>{
         {"menu","\ue118"},{"options","\ue118"},{"list","\ue10b"},{"refresh","\ue148"},{"maximize","\ue116"},{"minimize","\ue11e"},
         {"folder","\ue246"},{"down","\ue071"},{"up","\ue074"},{"left","\ue072"},{"right","\ue073"},{"check","\ue070"},{"close","\ue1b1"},{"settings","\ue157"},{"trash","\ue18d"},{"package","\ue12c"},
-        {"save","\ue150"},{"new","\ue0cd"},{"open","\ue246"},{"export","\ue19d"},{"import","\ue0b6"},{"share","\ue159"},{"copy","\ue0a2"},{"pause","\ue131"},{"play","\ue13f"},{"home","\ue0f8"},{"search","\ue154"}
+        {"save","\ue150"},{"new","\ue0cd"},{"open","\ue246"},{"export","\ue19d"},{"import","\ue0b6"},{"share","\ue159"},{"copy","\ue0a2"},{"pause","\ue131"},{"play","\ue13f"},{"home","\ue0f8"},{"search","\ue154"},{"plus","\ue140"}
     };
     static LucideIcons(){
         using(var stream=typeof(LucideIcons).Assembly.GetManifestResourceStream("ModLoader.Lucide.ttf")){
@@ -76,22 +76,14 @@ internal sealed class GeneralReveal : IDisposable {
 }
 
 internal sealed class GeneralPopupMenu : ContextMenuStrip {
-    readonly GeneralReveal reveal;
-    bool closing,allowClose;
-    internal bool Animating {get{return reveal.Running;}}
-    internal GeneralPopupMenu(){reveal=new GeneralReveal(this);}
-    protected override void OnOpening(System.ComponentModel.CancelEventArgs e){allowClose=closing=false;reveal.PrepareOpen(new Point(Width-28,0));base.OnOpening(e);}
-    protected override void OnOpened(EventArgs e){base.OnOpened(e);if(closing||allowClose)return;reveal.Begin(true,new Point(Width-28,0));}
-    protected override void OnClosing(ToolStripDropDownClosingEventArgs e){
-        base.OnClosing(e);
-        if(e.Cancel||allowClose||!Visible||!GeneralStyle.AnimationsEnabled)return;
-        e.Cancel=true;if(closing)return;closing=true;
-        var reason=e.CloseReason;
-        reveal.Begin(false,new Point(Width-28,0),()=>{allowClose=true;Close(reason);});
+    protected override void OnOpening(System.ComponentModel.CancelEventArgs e){
+        base.OnOpening(e);
+        if(!e.Cancel)GeneralPopupPlacement.RoundMenu(this);
     }
 }
 
 internal class GeneralDialog : Form {
+    protected const int HeaderHeight=52;
     readonly Label title=new Label{Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,AutoEllipsis=true};
     readonly GeneralReveal reveal;
     readonly TableLayoutPanel header;
@@ -105,10 +97,10 @@ internal class GeneralDialog : Form {
     internal GeneralDialog():this(""){}
     internal GeneralDialog(string text){
         FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;StartPosition=FormStartPosition.CenterParent;Font=GeneralStyle.Font(12);BackColor=GeneralStyle.Surface;
-        Padding=new Padding(2);Content=new Panel{Dock=DockStyle.Fill,BackColor=GeneralStyle.Surface};
+        Padding=new Padding(GeneralStyle.RoundedFaceClearance);Content=new Panel{Dock=DockStyle.Fill,BackColor=GeneralStyle.Surface};
         var shell=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=Padding.Empty,Margin=Padding.Empty,BackColor=GeneralStyle.Surface};
         shell.Resize+=(s,e)=>GeneralStyle.ClipCardBody(shell);
-        shell.RowStyles.Add(new RowStyle(SizeType.Absolute,52));shell.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute,HeaderHeight));shell.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         header=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,Margin=Padding.Empty,Padding=new Padding(20,4,8,4)};
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         title.Font=GeneralStyle.Font(14,true);title.ForeColor=GeneralStyle.Foreground;header.Controls.Add(title,0,0);
@@ -171,6 +163,14 @@ internal class GeneralDialog : Form {
 }
 
 internal static class GeneralPopupPlacement {
+    internal static void RoundMenu(ToolStripDropDown popup){
+        using(var shape=GeneralStyle.Round(new RectangleF(0,0,popup.Width,popup.Height),18)){
+            var previous=popup.Region;
+            popup.Region=new Region(shape);
+            if(previous!=null)previous.Dispose();
+        }
+    }
+
     internal const int OwnerGap=24,ScreenGap=16;
     internal static Point Location(Control anchor,Rectangle bounds,Size popup,bool alignRight){
         var owner=anchor.FindForm();var window=owner==null?Rectangle.Empty:owner.RectangleToScreen(owner.ClientRectangle);
@@ -202,6 +202,9 @@ internal sealed class GeneralPicker : UserControl {
     ToolStripDropDown dropdown;
     internal List<object> Items {get{return items;}}
     internal event EventHandler SelectedIndexChanged;
+    internal Action AddChoice;
+    internal Action<int> DeleteChoice;
+    internal string AddChoiceLabel;
     internal int SelectedIndex {
         get{return index;}
         set{
@@ -214,12 +217,18 @@ internal sealed class GeneralPicker : UserControl {
     internal ComboBoxStyle DropDownStyle {get{return style;}set{style=value;input.Visible=value==ComboBoxStyle.DropDown;PerformLayout();Invalidate();}}
     internal int MaxLength {get{return input.MaxLength;}set{input.MaxLength=value;}}
     internal ToolStripDropDown OpenPopup {get{return dropdown;}}
+    internal bool SettingText {get{return writing;}}
     internal bool IconOnly {get;set;}
     internal GeneralPicker(){
         SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.Selectable,true);
         Height=44;MinimumSize=new Size(80,44);MaximumSize=new Size(0,44);Font=GeneralStyle.Font(12);BackColor=GeneralStyle.Surface;ForeColor=GeneralStyle.Foreground;Cursor=Cursors.Hand;
         AccessibleRole=AccessibleRole.ComboBox;Controls.Add(input);input.Visible=false;input.Font=Font;
-        input.TextChanged+=(s,e)=>{if(!writing&&base.Text!=input.Text){base.Text=input.Text;index=items.FindIndex(item=>Convert.ToString(item)==input.Text);Invalidate();}};
+        input.TextChanged+=(s,e)=>{
+            if(writing||base.Text==input.Text)return;
+            base.Text=input.Text;
+            if(DeleteChoice==null)index=items.FindIndex(item=>Convert.ToString(item)==input.Text);
+            Invalidate();
+        };
         input.GotFocus+=(s,e)=>Invalidate();input.LostFocus+=(s,e)=>Invalidate();
     }
     public override string Text {get{return base.Text;}set{SetText(value??"");index=items.FindIndex(item=>Convert.ToString(item)==value);}}
@@ -241,50 +250,94 @@ internal sealed class GeneralPicker : UserControl {
         return base.ProcessCmdKey(ref message,keyData);
     }
     internal void Toggle(){
-        if(!Enabled||items.Count==0)return;
+        if(!Enabled||(items.Count==0&&AddChoice==null))return;
         if(dropdown!=null&&dropdown.Visible){dropdown.Close();return;}
         if(dropdown!=null)dropdown.Dispose();
-        var list=new ChoiceList(index){Font=Font,BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground,BorderStyle=BorderStyle.None,IntegralHeight=false,ItemHeight=42,DrawMode=DrawMode.OwnerDrawFixed};
-        list.Items.AddRange(items.ToArray());list.SelectedIndex=index;
-        int width=Math.Max(Width,300),height=Math.Min(340,items.Count*42)+20;
-        list.Size=new Size(width-20,height-20);
-        dropdown=new ChoicePopup{AutoSize=false,Padding=new Padding(10),BackColor=GeneralStyle.Surface,DropShadowEnabled=false};
-        var scroll=new GeneralScrollView(list){Size=list.Size};
-        var host=new ToolStripControlHost(scroll){Margin=Padding.Empty,Padding=Padding.Empty,AutoSize=false,Size=list.Size};
-        dropdown.Items.Add(host);
-        dropdown.Size=new Size(width,height);
-        Action commit=()=>{if(list.SelectedIndex>=0){SelectedIndex=list.SelectedIndex;dropdown.Close();}};
-        list.MouseClick+=(s,e)=>{if(list.IndexFromPoint(e.Location)>=0)commit();};
-        list.KeyDown+=(s,e)=>{if(e.KeyCode==Keys.Enter){e.Handled=true;commit();}else if(e.KeyCode==Keys.Escape){e.Handled=true;dropdown.Close();}};
-        list.MouseMove+=(s,e)=>{int at=list.IndexFromPoint(e.Location);if(at>=0&&at!=list.SelectedIndex)list.SelectedIndex=at;};
-        dropdown.Closed+=(s,e)=>{Invalidate();if(!IsDisposed&&CanFocus)Focus();};
-        dropdown.Opened+=(s,e)=>{scroll.RefreshScroll();list.Focus();Invalidate();};
-        var point=GeneralPopupPlacement.Location(this,ClientRectangle,dropdown.Size,false);
-        dropdown.Show(this,PointToClient(point));Invalidate();
+        var popup=new ChoicePopup{AutoSize=false,Padding=new Padding(10),BackColor=GeneralStyle.Surface,DropShadowEnabled=false};
+        var list=new ChoiceList(this){
+            Font=Font,BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground,BorderStyle=BorderStyle.None,
+            IntegralHeight=false,ItemHeight=42,DrawMode=DrawMode.OwnerDrawFixed,AccessibleName=AccessibleName
+        };
+        for(int i=0;i<items.Count;i++)
+            list.Items.Add(Convert.ToString(items[i])+(i==0&&DeleteChoice!=null?GeneralStyle.T(" (padrão)"," (default)"):""));
+        if(AddChoice!=null)list.Items.Add(AddChoiceLabel);
+        list.SelectedIndex=index;
+        int width=Math.Max(Width,300);
+        int height=Math.Min(340,list.Items.Count*list.ItemHeight);
+        var scroll=new GeneralScrollView(list,reserveBarSpace:true){Size=new Size(width-20,height)};
+        popup.Items.Add(new ToolStripControlHost(scroll){Margin=Padding.Empty,Padding=Padding.Empty,AutoSize=false,Size=scroll.Size});
+        popup.Size=new Size(width,height+20);
+
+        Action afterClose=null;
+        list.Activate=(at,delete)=>{
+            if(at<0)return;
+            if(delete){
+                if(DeleteChoice==null||at>=items.Count||items.Count<2)return;
+                afterClose=()=>DeleteChoice(at);
+            }else afterClose=at==items.Count?AddChoice:(Action)(()=>SelectedIndex=at);
+            popup.Close();
+        };
+        list.KeyDown+=(s,e)=>{if(e.KeyCode==Keys.Escape){e.Handled=true;popup.Close();}};
+        popup.Closed+=(s,e)=>{
+            Invalidate();
+            if(afterClose==null||!IsHandleCreated||IsDisposed)return;
+            // The action may resize the owner or open another dialog. Let Windows finish closing the dropdown first.
+            BeginInvoke((Action)(()=>{
+                if(IsDisposed||!Enabled||dropdown!=popup)return;
+                if(CanFocus)Focus();
+                afterClose();
+            }));
+        };
+        popup.Opened+=(s,e)=>{scroll.RefreshScroll();list.Focus();Invalidate();};
+        dropdown=popup;
+        var point=GeneralPopupPlacement.Location(this,ClientRectangle,popup.Size,false);
+        popup.Show(this,PointToClient(point));Invalidate();
     }
+    internal void EditText(){input.Focus();input.SelectAll();}
     protected override void Dispose(bool disposing){if(disposing&&dropdown!=null)dropdown.Dispose();base.Dispose(disposing);}
+
     sealed class ChoiceList : ListBox {
-        readonly int chosen;
-        internal ChoiceList(int chosen){this.chosen=chosen;}
+        readonly GeneralPicker picker;
+        internal Action<int,bool> Activate;
+        internal ChoiceList(GeneralPicker picker){this.picker=picker;}
         protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);GeneralNativeTheme.Apply(this);}
         protected override void OnDrawItem(DrawItemEventArgs e){
-            if(e.Index<0)return;e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
-            GeneralStyle.PaintChoice(e.Graphics,e.Bounds,(e.State&DrawItemState.Selected)!=0);
-            if(e.Index==chosen)LucideIcons.Draw(e.Graphics,"check",new Rectangle(e.Bounds.X+10,e.Bounds.Y+12,18,18),GeneralStyle.Accent);
-            TextRenderer.DrawText(e.Graphics,Convert.ToString(Items[e.Index]),Font,new Rectangle(e.Bounds.X+38,e.Bounds.Y,e.Bounds.Width-48,e.Bounds.Height),GeneralStyle.Foreground,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
+            if(e.Index<0||e.Index>=Items.Count)return;
+            e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
+            var box=e.Bounds;
+            bool isAdd=e.Index==picker.items.Count, hasTrash=!isAdd&&picker.DeleteChoice!=null;
+            GeneralStyle.PaintChoice(e.Graphics,box,(e.State&DrawItemState.Selected)!=0);
+            if(isAdd||e.Index==picker.index)
+                LucideIcons.Draw(e.Graphics,isAdd?"plus":"check",new Rectangle(box.Left+10,box.Top+12,18,18),GeneralStyle.Accent);
+            TextRenderer.DrawText(e.Graphics,Convert.ToString(Items[e.Index]),Font,
+                new Rectangle(box.Left+38,box.Top,Math.Max(1,box.Width-(hasTrash?82:48)),box.Height),
+                isAdd?GeneralStyle.Accent:GeneralStyle.Foreground,
+                TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
+            if(hasTrash)
+                LucideIcons.Draw(e.Graphics,"trash",new Rectangle(box.Right-30,box.Top+12,18,18),picker.items.Count>1?GeneralStyle.Foreground:GeneralStyle.Muted);
+        }
+        protected override void OnMouseClick(MouseEventArgs e){
+            base.OnMouseClick(e);
+            if(e.Button!=MouseButtons.Left)return;
+            int at=IndexFromPoint(e.Location);
+            bool trash=picker.DeleteChoice!=null&&at>=0&&at<picker.items.Count&&e.X>=ClientSize.Width-42;
+            Activate(at,trash);
+        }
+        protected override void OnMouseMove(MouseEventArgs e){
+            base.OnMouseMove(e);
+            if(e.Button!=MouseButtons.None)return;
+            int at=IndexFromPoint(e.Location);if(at>=0&&at!=SelectedIndex)SelectedIndex=at;
+        }
+        protected override bool ProcessCmdKey(ref Message message,Keys keyData){
+            if(keyData==Keys.Enter||keyData==Keys.Delete&&picker.DeleteChoice!=null){Activate(SelectedIndex,keyData==Keys.Delete);return true;}
+            return base.ProcessCmdKey(ref message,keyData);
         }
     }
     sealed class ChoicePopup : ToolStripDropDown {
-        readonly GeneralReveal reveal;
-        bool allowClose,closing;
-        internal ChoicePopup(){reveal=new GeneralReveal(this);}
-        protected override void OnOpening(System.ComponentModel.CancelEventArgs e){allowClose=closing=false;reveal.PrepareOpen(new Point(24,0));base.OnOpening(e);}
-        protected override void OnPaintBackground(PaintEventArgs e){GeneralStyle.PaintCard(e.Graphics,ClientSize);}
-        protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);}
-        protected override void OnOpened(EventArgs e){base.OnOpened(e);if(closing||allowClose)return;reveal.Begin(true,new Point(24,0));}
-        protected override void OnClosing(ToolStripDropDownClosingEventArgs e){
-            base.OnClosing(e);if(e.Cancel||allowClose||!Visible||!GeneralStyle.AnimationsEnabled)return;e.Cancel=true;if(closing)return;closing=true;
-            var reason=e.CloseReason;reveal.Begin(false,new Point(24,0),()=>{allowClose=true;Close(reason);});
+        protected override void OnOpening(System.ComponentModel.CancelEventArgs e){
+            base.OnOpening(e);
+            if(!e.Cancel)GeneralPopupPlacement.RoundMenu(this);
         }
+        protected override void OnPaintBackground(PaintEventArgs e){GeneralStyle.PaintCard(e.Graphics,ClientSize);}
     }
 }

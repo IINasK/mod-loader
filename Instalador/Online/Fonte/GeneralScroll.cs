@@ -54,7 +54,7 @@ internal sealed class GeneralScrollView : Panel {
         this.content=content;Dock=DockStyle.Fill;Margin=Padding.Empty;Padding=Padding.Empty;BackColor=GeneralStyle.Surface;
         content.Dock=DockStyle.None;content.Margin=Padding.Empty;viewport.Controls.Add(content);Controls.Add(viewport);Controls.Add(bar);
         var text=content as TextBox;if(text!=null&&text.Multiline){text.ScrollBars=ScrollBars.None;text.WordWrap=true;}
-        var grid=content as DataGridView;if(grid!=null){grid.ScrollBars=ScrollBars.None;grid.Scroll+=(s,e)=>Queue();grid.RowsAdded+=(s,e)=>Queue();grid.RowsRemoved+=(s,e)=>Queue();}
+        var grid=content as DataGridView;if(grid!=null){grid.ScrollBars=ScrollBars.None;grid.Scroll+=(s,e)=>Queue();grid.RowsAdded+=(s,e)=>Queue();grid.RowsRemoved+=(s,e)=>Queue();grid.RowStateChanged+=(s,e)=>{if((e.StateChanged&DataGridViewElementStates.Visible)!=0)Queue();};}
         var list=content as ListBox;if(list!=null){list.HorizontalScrollbar=false;list.IntegralHeight=false;}
         bar.Changed=ScrollTo;content.HandleCreated+=(s,e)=>Attach();content.HandleDestroyed+=(s,e)=>{if(events!=null)events.ReleaseHandle();};content.TextChanged+=(s,e)=>Queue();content.FontChanged+=(s,e)=>Queue();content.Resize+=(s,e)=>Queue();
         if(fitPanelContent)content.Layout+=(s,e)=>{if(!refreshing)Queue();};
@@ -75,12 +75,16 @@ internal sealed class GeneralScrollView : Panel {
                 value = Math.Min(Math.Max(0, -content.Top), Math.Max(0, total - page));
             }
             else if(grid!=null){
-                total=grid.RowCount;value=Math.Max(0,grid.FirstDisplayedScrollingRowIndex);
+                const DataGridViewElementStates visibleRows=DataGridViewElementStates.Visible;
+                total=grid.Rows.GetRowCount(visibleRows);
+                int first=grid.FirstDisplayedScrollingRowIndex;
+                for(int index=grid.Rows.GetFirstRow(visibleRows);index>=0&&index<first;index=grid.Rows.GetNextRow(index,visibleRows))
+                    value++;
                 var horizontal=grid.Controls.OfType<HScrollBar>().FirstOrDefault(control=>control.Visible);
                 int room=grid.ClientSize.Height-grid.ColumnHeadersHeight-(horizontal==null?0:horizontal.Height);
                 // The last page defines the scroll limit even when earlier rows have different heights.
                 page=0;
-                for(int index=total-1;index>=0;index--){
+                for(int index=grid.Rows.GetLastRow(visibleRows);index>=0;index=grid.Rows.GetPreviousRow(index,visibleRows)){
                     int height=grid.Rows[index].Height;
                     if(page>0&&room<height)break;
                     room-=height;
@@ -100,7 +104,16 @@ internal sealed class GeneralScrollView : Panel {
         if(content.IsDisposed)return;
         var grid=content as DataGridView;var list=content as ListBox;var text=content as TextBox;
         if(panelContent)content.Top=-Math.Max(0,value);
-        else if(grid!=null&&grid.RowCount>0)grid.FirstDisplayedScrollingRowIndex=Math.Min(value,grid.RowCount-1);
+        else if(grid!=null&&grid.RowCount>0){
+            const DataGridViewElementStates visibleRows=DataGridViewElementStates.Visible;
+            int row=grid.Rows.GetFirstRow(visibleRows);
+            while(row>=0&&value-->0){
+                int next=grid.Rows.GetNextRow(row,visibleRows);
+                if(next<0)break;
+                row=next;
+            }
+            if(row>=0)grid.FirstDisplayedScrollingRowIndex=row;
+        }
         else if(list!=null&&list.Items.Count>0)list.TopIndex=Math.Min(value,list.Items.Count-1);
         else if(text!=null){int current=(int)SendMessage(text.Handle,0x00ce,IntPtr.Zero,IntPtr.Zero);SendMessage(text.Handle,0x00b6,IntPtr.Zero,(IntPtr)(value-current));}
         RefreshScroll();

@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -12,7 +13,7 @@ internal static class GeneralPopupStabilityTests {
     internal static void Run(string parent){
         string root=OnlineTests.NestedRoot(parent,"popup-stability-");Directory.CreateDirectory(root);
         var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
-        bool dark=GeneralStyle.Dark,red=GeneralStyle.RedTheme,animations=GeneralStyle.AnimationsEnabled;string language=GeneralStyle.Language;
+        bool dark=GeneralStyle.Dark,red=GeneralStyle.RedTheme,black=GeneralStyle.BlackTheme,animations=GeneralStyle.AnimationsEnabled;string language=GeneralStyle.Language;
         Exception failure=null;bool completed=false;
         var thread=new System.Threading.Thread(()=>{
             try{
@@ -39,7 +40,7 @@ internal static class GeneralPopupStabilityTests {
                             var noOwner=new Rectangle(GeneralPopupPlacement.Resolve(new Rectangle(1350,750,1,1),new Size(300,200),Rectangle.Empty,desktop,false),new Size(300,200));
                             check(ScreenContains(desktop,noOwner),"A popup without an owner remains inside the working area.");
 
-                            foreach(string theme in new[]{"light","dark","light-red"}){
+                            foreach(string theme in new[]{"light","dark","light-red","black"}){
                                 GeneralStyle.UseTheme(theme);
                                 foreach(var size in new[]{new Size(120,80),new Size(280,180)})using(var bitmap=new Bitmap(size.Width,size.Height))using(var graphics=Graphics.FromImage(bitmap)){
                                     graphics.Clear(Color.Magenta);GeneralStyle.PaintCard(graphics,size);
@@ -48,7 +49,10 @@ internal static class GeneralPopupStabilityTests {
                                     bitmap.Save(Path.Combine(root,"card-"+theme+"-"+size.Width+".png"),System.Drawing.Imaging.ImageFormat.Png);
                                 }
                                 foreach(int width in new[]{120,280}){
-                                    using(var surface=new GeneralSurface{Size=new Size(width,44),BackColor=GeneralStyle.Surface})CheckControl(surface,theme+" surface "+width,check);
+                                    using(var surface=new GeneralSurface{Size=new Size(width,44),BackColor=GeneralStyle.Surface}){
+                                        surface.Controls.Add(new Panel{Dock=DockStyle.Fill,BackColor=GeneralStyle.Surface});
+                                        CheckControl(surface,theme+" filled surface "+width,check);
+                                    }
                                     using(var button=new GeneralButton{Size=new Size(width,44),Text=""})CheckControl(button,theme+" button "+width,check);
                                     using(var picker=new GeneralPicker{Size=new Size(width,44)})CheckControl(picker,theme+" picker "+width,check);
                                 }
@@ -74,25 +78,25 @@ internal static class GeneralPopupStabilityTests {
                                 await Task.Delay(270);check(!dialog.Visible,"Dialog closing animation finishes without reopening.");
                             }
                             using(var menu=new GeneralPopupMenu{ShowImageMargin=false,DropShadowEnabled=false}){
-                                int openings=0,clicks=0;bool openingPrepared=true,openedPrepared=true;
+                                int openings=0,clicks=0;bool openedPrepared=true;
                                 var item=menu.Items.Add("One");item.Click+=(ss,ee)=>clicks++;
-                                menu.Opening+=(ss,ee)=>{openings++;openingPrepared&=HasSmallRegion(menu);};
-                                menu.Opened+=(ss,ee)=>openedPrepared&=HasSmallRegion(menu);
+                                menu.Opening+=(ss,ee)=>openings++;
+                                menu.Opened+=(ss,ee)=>openedPrepared&=HasFullCenter(menu);
                                 for(int cycle=0;cycle<2;cycle++){
-                                    menu.Show(owner,new Point(20,20));Application.DoEvents();await Task.Delay(270);
-                                    check(HasFullCenter(menu),"Context popup opens completely, cycle"+cycle+".");menu.Close();await Task.Delay(270);
+                                    menu.Show(owner,new Point(20,20));
+                                    check(HasFullCenter(menu),"Context popup opens completely, cycle"+cycle+".");menu.Close();check(!menu.Visible,"Context popup closes in the same turn.");
                                 }
-                                check(openings==2&&openingPrepared&&openedPrepared&&clicks==0,"Reopening a popup starts clipped before Opening/Opened and never invokes an item.");
+                                check(openings==2&&openedPrepared&&clicks==0,"Reopening shows the complete rounded menu and never invokes an item.");
                             }
                             using(var picker=new GeneralPicker{Size=new Size(268,44),Location=new Point(320,126)}){
                                 owner.Controls.Add(picker);picker.Items.AddRange(new object[]{"Português","English"});picker.SelectedIndex=0;
                                 var expected=GeneralPopupPlacement.Location(picker,picker.ClientRectangle,new Size(300,104),false);
-                                picker.Toggle();var popup=picker.OpenPopup;check(popup.Visible&&HasSmallRegion(popup),"Picker popup is clipped on the first display rather than flashing a full card.");
+                                picker.Toggle();var popup=picker.OpenPopup;check(popup.Visible&&HasFullCenter(popup),"Picker shows a complete card from the first frame.");
                                 check(popup.Location==expected,"Picker.Show uses the shared screen placement instead of the old fixed offset.");
-                                await Task.Delay(270);check(HasFullCenter(popup),"Picker expansion reaches the complete card.");
-                                picker.Toggle();await Task.Delay(270);check(!popup.Visible&&picker.SelectedIndex==0,"Closing the picker does not change its selection.");
-                                picker.Toggle();var reopened=picker.OpenPopup;check(reopened!=popup&&HasSmallRegion(reopened),"A reopened picker prepares its region before exposure again.");
-                                await Task.Delay(270);picker.Toggle();await Task.Delay(270);check(picker.SelectedIndex==0,"Repeated picker opening/closing preserves the chosen language.");
+                                check(!popup.Region.IsVisible(0,0),"Picker clips the corners before display.");
+                                picker.Toggle();check(!popup.Visible&&picker.SelectedIndex==0,"Closing the picker does not change its selection.");
+                                picker.Toggle();var reopened=picker.OpenPopup;check(reopened!=popup&&HasFullCenter(reopened),"A reopened picker shows the complete card without a reveal timer.");
+                                picker.Toggle();check(!reopened.Visible&&picker.SelectedIndex==0,"Repeated picker opening/closing preserves the chosen language.");
                             }
                             completed=true;
                         }catch(Exception ex){failure=ex;}finally{Application.ExitThread();}
@@ -103,7 +107,7 @@ internal static class GeneralPopupStabilityTests {
         });
         thread.IsBackground=true;thread.SetApartmentState(System.Threading.ApartmentState.STA);thread.Start();
         try{if(!thread.Join(60000))throw new IOException("Popup stability tests timed out.");if(failure!=null)throw failure;if(!completed)throw new IOException("Popup stability tests did not finish.");}
-        finally{GeneralStyle.Dark=dark;GeneralStyle.RedTheme=red;GeneralStyle.Language=language;GeneralStyle.AnimationsEnabled=animations;}
+        finally{GeneralStyle.Dark=dark;GeneralStyle.RedTheme=red;GeneralStyle.BlackTheme=black;GeneralStyle.Language=language;GeneralStyle.AnimationsEnabled=animations;}
         Safe.WriteJson(Path.Combine(root,"resultado-popup-stability.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});
     }
     static bool ScreenContains(Rectangle screen,Rectangle popup){screen.Inflate(-16,-16);return screen.Contains(popup);}
@@ -113,7 +117,12 @@ internal static class GeneralPopupStabilityTests {
         using(var bitmap=new Bitmap(control.Width,control.Height)){control.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));CheckBand(bitmap,label,check);}
     }
     static void CheckBand(Bitmap bitmap,string label,Action<bool,string> check){
-        check(bitmap.GetPixel(bitmap.Width/2,1).ToArgb()==GeneralStyle.Line.ToArgb()&&bitmap.GetPixel(1,bitmap.Height/2).ToArgb()==GeneralStyle.Line.ToArgb(),label+": border has an opaque second pixel on straight edges.");
-        check(bitmap.GetPixel(bitmap.Width/2,3).ToArgb()==GeneralStyle.Surface.ToArgb()&&bitmap.GetPixel(3,bitmap.Height/2).ToArgb()==GeneralStyle.Surface.ToArgb(),label+": fill starts cleanly after the2px border.");
+        int x=bitmap.Width/2,y=bitmap.Height/2;
+        int inset=GeneralStyle.RoundedFaceInset;
+        Func<int,int[]> edges=depth=>new[]{bitmap.GetPixel(x,depth).ToArgb(),bitmap.GetPixel(x,bitmap.Height-1-depth).ToArgb(),
+            bitmap.GetPixel(depth,y).ToArgb(),bitmap.GetPixel(bitmap.Width-1-depth,y).ToArgb()};
+        check(edges(0).All(pixel=>pixel==bitmap.GetPixel(0,0).ToArgb()),label+": outer pixels leave space on all four edges.");
+        check(edges(inset+1).All(pixel=>pixel==GeneralStyle.Line.ToArgb()),label+": all four edges retain the full border. "+String.Join("/",edges(inset+1).Select(pixel=>pixel.ToString("X8"))));
+        check(edges(inset+3).All(pixel=>pixel==GeneralStyle.Surface.ToArgb()),label+": fill starts cleanly after the border.");
     }
 }

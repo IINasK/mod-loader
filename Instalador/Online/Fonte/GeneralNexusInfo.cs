@@ -10,11 +10,12 @@ using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 
 public sealed class GeneralSourceInfo {
     public string Name,FileName,Version,ModVersion;
     public bool SizeApproximate,NexusChecked;
-    internal bool Nsfw;
+    internal bool Nsfw,NsfwKnown;
     internal string[] Tags;
     public long Bytes;
     internal GeneralSourceInfo SavedCopy(){
@@ -121,7 +122,7 @@ internal static class GeneralNexusInfo {
         foreach(var item in sources){
             GeneralSourceInfo info;
             if(!found.TryGetValue(key(item.Link),out info))continue;
-            item.Mod.Nsfw|=info.Nsfw;
+            if(item.Mod.NsfwOverride==null)item.Mod.Nsfw|=info.Nsfw;
             foreach(var tag in info.Tags??new string[0]){
                 if(item.Mod.Tags.Count>=32)break;
                 if(!item.Mod.Tags.Contains(tag,StringComparer.OrdinalIgnoreCase))item.Mod.Tags.Add(tag);
@@ -244,6 +245,7 @@ internal static class GeneralNexusInfo {
             NexusChecked = true,
             ModVersion = Text(data, "version", 120),
             Nsfw = adult is bool && (bool)adult,
+            NsfwKnown = adult is bool,
             Tags = tags == null ? null : tags.Select(tag => Text(tag as Dictionary<string, object>, "name", 60))
                 .Where(tag => tag != null).Distinct(StringComparer.OrdinalIgnoreCase).Take(32).ToArray()
         };
@@ -300,11 +302,42 @@ internal sealed partial class GeneralModEditor {
         return sourceQuery;
     }
 
-    async Task UpdateSourceInfo(){
+    async Task QuickFillFromNexus(){
+        string source=sources.Text.Trim();
+        if(finishing||current==null||refreshLookup==null||GeneralNexusLink.Parse(source)==null||
+            SourceLinkWarning(source,current).Length>0)return;
+        string caption=quickFill.Text;
+        var choice=GeneralDialog.Message(this,T(
+            "Completar preserva seus dados e adiciona o que falta.\r\nSobrescrever usa o nome, as tags e o status NSFW retornados pelo Nexus.",
+            "Fill gaps keeps your data and adds what is missing.\r\nOverwrite uses the name, tags, and NSFW status returned by Nexus."),
+            caption,MessageBoxButtons.YesNoCancel,yesLabel:T("Completar","Fill gaps"),noLabel:T("Sobrescrever","Overwrite"));
+        if(choice!=DialogResult.Yes&&choice!=DialogResult.No)return;
+        sourceDelay.Stop();
+        int generation=++sourceGeneration;
+        queriedGeneration=generation;
+        finishing=true;
+        ValidateInputs();
+        try{
+            sourceQuery=UpdateSourceInfo(choice==DialogResult.No);
+            await sourceQuery;
+            if(!IsDisposed&&generation==sourceGeneration)await ReadNexusDependencies();
+        }finally{
+            finishing=false;
+            if(!IsDisposed)ValidateInputs();
+        }
+    }
+
+    async Task UpdateSourceInfo(bool? overwrite=null){
         if(current==null||attachment||IsDisposed)return;
+        fileDetails.Text="";
         int generation=sourceGeneration;
         var variant=current;
-        var candidates=new[]{sources.Text.Trim()}
+        string source=sources.Text.Trim();
+        if(source.Length>0){
+            string warning=SourceLinkWarning(source,variant);
+            if(warning.Length>0){sourceInfo.ForeColor=GeneralStyle.Danger;sourceInfo.Text=warning;return;}
+        }
+        var candidates=new[]{source}
             .Select(value=>new {Source=value,Nexus=GeneralNexusLink.Parse(value)})
             .Where(item=>item.Nexus!=null||GeneralModDownload.IsArchivePath(item.Source))
             .GroupBy(item=>item.Nexus==null?item.Source:item.Nexus.Url).Select(group=>group.First()).Take(32).ToList();
@@ -315,7 +348,7 @@ internal sealed partial class GeneralModEditor {
         sourceInfo.Text=advice+T("Lendo informações do arquivo…","Reading file information…");
         GeneralSourceInfo preview=null;
         GeneralNexusLink previewLink=null;
-        bool restricted=false;
+        bool restricted=false,received=false;
         foreach(var item in candidates){
             GeneralSourceInfo known;
             if(variant.SourceInfo==null)variant.SourceInfo=new Dictionary<string,GeneralSourceInfo>();
@@ -324,13 +357,27 @@ internal sealed partial class GeneralModEditor {
             try{
                 if(item.Nexus==null&&known==null&&File.Exists(item.Source))
                     fresh=new GeneralSourceInfo{Name=Path.GetFileNameWithoutExtension(item.Source),FileName=Path.GetFileName(item.Source),Bytes=new FileInfo(item.Source).Length};
-                else if(item.Nexus!=null&&lookup!=null)
-                    fresh=await lookup(item.Source);
+                else if(item.Nexus!=null){
+                    var query=overwrite.HasValue?refreshLookup:lookup;
+                    if(query!=null)fresh=await query(item.Source);
+                }
             }catch(Exception){}
             if(IsDisposed||generation!=sourceGeneration||current!=variant)return;
             if(fresh!=null){
-                if(fresh.Nsfw)nsfw.Checked=true;
-                if(!String.IsNullOrWhiteSpace(fresh.Name)&&(known==null||!known.NexusChecked))MergeSourceTags(fresh.Tags);
+                received|=fresh.Nsfw||!String.IsNullOrWhiteSpace(fresh.Name);
+                if(overwrite==true&&(fresh.NsfwKnown||fresh.Nsfw)){
+                    adultOverride=null;
+                    SetAdult(fresh.Nsfw);
+                }else if(fresh.Nsfw&&adultOverride==null)SetAdult(true);
+                if(fresh.Tags!=null&&(overwrite.HasValue||known==null||!known.NexusChecked)){
+                    if(overwrite==true)ClearTags();
+                    MergeSourceTags(fresh.Tags);
+                }
+                if(overwrite.HasValue&&!String.IsNullOrWhiteSpace(fresh.Name)&&
+                    (overwrite==true||String.IsNullOrWhiteSpace(modName.Text))){
+                    lastAutoName=fresh.Name;
+                    modName.Text=fresh.Name;
+                }
                 restricted|=fresh.Nsfw&&String.IsNullOrWhiteSpace(fresh.Name);
             }
 
@@ -352,20 +399,58 @@ internal sealed partial class GeneralModEditor {
                 T("Dados indisponíveis. Preencha o nome para continuar.","Metadata unavailable. Enter the name to continue."));
             return;
         }
-        if(String.IsNullOrWhiteSpace(modName.Text)||modName.Text==lastAutoName){lastAutoName=preview.Name;modName.Text=preview.Name;}
-        sourceInfo.Text=advice+SourceDetails(preview,previewLink);
+        if(!overwrite.HasValue&&(String.IsNullOrWhiteSpace(modName.Text)||modName.Text==lastAutoName)){
+            lastAutoName=preview.Name;
+            modName.Text=preview.Name;
+        }
+        sourceInfo.Text=overwrite.HasValue&&!received
+            ? advice+T("O Nexus não retornou novos dados.","Nexus returned no new data.")
+            : advice.TrimEnd();
+        fileDetails.Text=SourceDetails(preview,previewLink);
+        editorTips.SetToolTip(fileDetails,fileDetails.Text);
+    }
+
+    async Task ReadNexusDependencies(){
+        const string caption="Nexus Mods";
+        string source=sources.Text.Trim();
+        var link=GeneralNexusLink.Parse(source);
+        if(addDependency==null||link==null||link.File==0||!GeneralNexusInfo.HasTestKey)return;
+        var variant=current;
+        int generation=sourceGeneration;
+        List<GeneralNexusRequirement[]> groups=null;
+        try{groups=await GeneralNexusInfo.ReadRequirements(link);}
+        catch(Exception){}
+        if(IsDisposed||!Visible||generation!=sourceGeneration||current!=variant||groups==null||groups.Count==0)return;
+        var exact=groups.Where(group=>group.Length==1&&group[0].MinFile==group[0].MaxFile).Select(group=>group[0])
+            .Select(target=>{
+                var matches=groupList.Mods.Where(mod=>mod.Variants.Count==1&&mod.Variants[0].Sources.Select(GeneralNexusLink.Parse).Any(item=>
+                    item!=null&&item.Game==target.Source.Game&&item.Mod==target.Source.Mod&&item.File==target.MinFile)).Take(2).ToList();
+                return matches.Count==1?matches[0]:null;
+            }).Where(mod=>mod!=null&&mod.Id!=editingId&&!variant.RequiredMods.Contains(mod.Id)).Distinct().ToList();
+        string summary=String.Join(Environment.NewLine,groups.Select(group=>String.Join(T(" ou "," or "),group.Select(target=>
+            target.Name+" · "+(target.MinVersion??target.MinFile.ToString())+
+            (target.MinFile==target.MaxFile?"":target.MaxFile==0?"+":" – "+(target.MaxVersion??target.MaxFile.ToString()))))));
+        if(exact.Count==0){
+            GeneralDialog.Message(this,summary+"\r\n\r\n"+T(
+                "Use Verificar no projeto para revisar arquivos ausentes ou faixas de versão.",
+                "Use Verify in the project to review missing files or version ranges."),caption);
+            return;
+        }
+        if(GeneralDialog.Message(this,summary+"\r\n\r\n"+T("Vincular os mods com arquivo exato na sua lista?","Link the mods with an exact file in your list?")+"\r\n"+
+            String.Join(", ",exact.Select(mod=>mod.Name)),caption,MessageBoxButtons.YesNo)==DialogResult.Yes)
+            foreach(var mod in exact)AddRequiredMod(mod);
     }
 
     static string SourceDetails(GeneralSourceInfo info,GeneralNexusLink link){
         var details=new List<string>();
-        if(!String.IsNullOrWhiteSpace(info.FileName))details.Add(T("Arquivo: ","File: ")+info.FileName);
+
         if(!String.IsNullOrWhiteSpace(info.Version))details.Add(T("Versão do arquivo: ","File version: ")+info.Version);
         else if(link!=null&&link.File==0&&!String.IsNullOrWhiteSpace(info.ModVersion))
             details.Add(T("Versão na página: ","Version on mod page: ")+info.ModVersion);
         if(info.Bytes>0)details.Add(info.SizeApproximate?T("Aprox. ","About ")+GeneralStorageSize.Format(info.Bytes):
-            GeneralStorageSize.Format(info.Bytes)+" ("+info.Bytes.ToString("N0")+" bytes)");
+            GeneralStorageSize.Format(info.Bytes));
         if(link!=null&&link.File>0&&String.IsNullOrWhiteSpace(info.Version)&&info.Bytes==0)
             details.Add(T("Dados do arquivo indisponíveis.","File details unavailable."));
-        return String.Join("   ·   ",details);
+        return String.Join(Environment.NewLine,details);
     }
 }

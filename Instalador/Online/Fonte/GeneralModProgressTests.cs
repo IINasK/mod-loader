@@ -225,6 +225,20 @@ internal sealed partial class GeneralModWindow {
             try{form.CheckCompatibilityGroups(refit,dropRoot,new List<Work>{form.MakeWork(newBody)});}
             catch(IOException ex){refused=ex.Message.Contains("Corpo ativo");}
             check(refused,"O refit aceita o grupo ativo e recusa uma alternativa que será desativada pela operação.");
+            refit.Variant.CompatibilityGroups.Clear();
+            refit.Variant.RequiredMods.Add(newBody.Id);
+            form.CheckCompatibilityGroups(refit,dropRoot,new List<Work>());
+            refused=false;
+            try{form.CheckCompatibilityGroups(refit,dropRoot,new List<Work>{form.MakeWork(newBody)});}
+            catch(IOException ex){refused=ex.Message.Contains(newBody.Name);}
+            check(refused,"Dependência por vínculo exige que o mod específico esteja ativo.");
+            var alternative=form.MakeWork(activeBody);
+            form.statuses[alternative.Key]="Não iniciado";
+            form.statuses[form.MakeWork(newBody).Key]="Instalado";
+            form.ShowWorkCaption(alternative,"Não iniciado");
+            check(form.currentProgress.Caption.Contains(GeneralStatusPresentation.Label(GeneralStatusPresentation.OtherChoice))&&
+                form.currentProgress.NotApplicable&&!form.currentProgress.Indeterminate,
+                "O rodapé mostra Outra versão escolhida e percentual não aplicável.");
         });
         string editRoot=Path.Combine(root,"edit-target");Directory.CreateDirectory(editRoot);
         var editState=new GeneralModState{Destination=editRoot,DownloadFolder=downloads,List=new GeneralModList()};

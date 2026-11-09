@@ -32,11 +32,15 @@ public sealed class GeneralModEntry {
     public List<string> Tags = new List<string>();
     public List<string> CompatibilityGroups = new List<string>();
     public bool Nsfw;
+    public bool? NsfwOverride;
+    public List<string> DetectedPaths = new List<string>();
     public List<GeneralModVariant> Variants = new List<GeneralModVariant>();
 }
 
 public sealed class GeneralModVariant {
     public string Id, Name, CyberpunkId, CyberpunkVariant;
+    public List<string> RequiredMods = new List<string>();
+    public List<GeneralInstallRoute> InstallRoutes = new List<GeneralInstallRoute>();
     public List<string> CompatibilityGroups = new List<string>();
     public List<string> Sources = new List<string>();
     public Dictionary<string,GeneralSourceInfo> SourceInfo = new Dictionary<string,GeneralSourceInfo>();
@@ -44,7 +48,7 @@ public sealed class GeneralModVariant {
 
 public sealed class GeneralModState {
     public string Destination, DownloadFolder;
-    internal string TemplateId;
+    internal string TemplateId, ProjectName;
     internal bool TemplateSubset;
     public string Theme = "light", Language = "pt", SelectedPreset;
     public GeneralModList List = new GeneralModList();
@@ -101,8 +105,8 @@ public sealed class GeneralModLibrary {
         Write(fullPath, new {
             list.Schema, list.Categories, list.CategoryDescriptions, list.Presets, list.UncategorizedName, list.UncategorizedDescription, list.AlternativeGroups,
             Mods = list.Mods.Select(mod => new {
-                mod.Id, mod.Name, mod.Category, mod.DefaultVariant, mod.Description, mod.Tags, mod.CompatibilityGroups, mod.Nsfw, mod.AlternativeGroup, mod.DependencySource, mod.DependencyFile,
-                Variants = mod.Variants.Select(variant => new { variant.Id, variant.Name, variant.Sources, variant.SourceInfo, variant.CompatibilityGroups }).ToList()
+                mod.Id, mod.Name, mod.Category, mod.DefaultVariant, mod.Description, mod.Tags, mod.CompatibilityGroups, mod.Nsfw, mod.NsfwOverride, mod.AlternativeGroup, mod.DependencySource, mod.DependencyFile,
+                Variants = mod.Variants.Select(variant => new { variant.Id, variant.Name, variant.Sources, variant.SourceInfo, variant.CompatibilityGroups, variant.RequiredMods, variant.InstallRoutes }).ToList()
             }).ToList()
         });
     }
@@ -263,8 +267,8 @@ public sealed class GeneralModLibrary {
     }
 
     static void ApplyAuditedAdultFlags(GeneralModList list) {
-        foreach(var mod in list.Mods.Where(mod=>!mod.Nsfw))
-            mod.Nsfw=mod.Variants.SelectMany(variant=>variant.Sources).Any(GeneralNexusInfo.IsAuditedAdultSource);
+        foreach(var mod in list.Mods)
+            mod.Nsfw=mod.NsfwOverride??(mod.Nsfw||mod.Variants.SelectMany(variant=>variant.Sources).Any(GeneralNexusInfo.IsAuditedAdultSource));
     }
 
     static GeneralModVariant FromFixed(string modId, string variantId, string name, List<FixedAsset> assets, string density) {
@@ -336,6 +340,10 @@ public sealed class GeneralModLibrary {
                 throw new IOException("A lista contém um mod inválido ou repetido.");
             mod.Name = RequiredText(mod.Name, 300, "Nome do mod");
             mod.Description = OptionalDescription(mod.Description);
+            if(!trustRecipes||mod.DetectedPaths==null)mod.DetectedPaths=new List<string>();
+            if(mod.DetectedPaths.Count>2000||mod.DetectedPaths.Any(path=>!FixedInstaller.SyncModPath(path)))
+                throw new IOException("Caminhos detectados inválidos em "+mod.Name+".");
+            mod.DetectedPaths=mod.DetectedPaths.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if(mod.DependencyFile<0||mod.DependencyFile>0&&mod.DependencySource==null)
                 throw new IOException("Versão da dependência inválida.");
             if(mod.DependencySource!=null){
@@ -358,10 +366,15 @@ public sealed class GeneralModLibrary {
             } else mod.Category = null;
             var variantIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (var variant in mod.Variants) {
+                if (variant != null) GeneralInstallRoutes.Validate(variant.InstallRoutes);
                 if (variant == null || !ValidId(variant.Id) || !variantIds.Add(variant.Id) || variant.Sources == null || variant.Sources.Count == 0 || variant.Sources.Count > 32)
                     throw new IOException("Versão inválida ou repetida em " + mod.Name + ".");
                 variant.Name = RequiredText(variant.Name, 300, "Nome da versão");
                 variant.CompatibilityGroups = ValidateCompatibilityGroups(variant.CompatibilityGroups);
+                if(variant.RequiredMods==null)variant.RequiredMods=new List<string>();
+                if(variant.RequiredMods.Count>32||variant.RequiredMods.Any(id=>!ValidId(id)||id==mod.Id)||
+                    variant.RequiredMods.Distinct(StringComparer.Ordinal).Count()!=variant.RequiredMods.Count)
+                    throw new IOException("Vínculos de dependência inválidos em "+mod.Name+".");
                 if(variant.SourceInfo==null)variant.SourceInfo=new Dictionary<string,GeneralSourceInfo>();
                 if(variant.SourceInfo.Count>32||variant.SourceInfo.Any(pair=>!variant.Sources.Contains(pair.Key)||pair.Value==null||pair.Value.Bytes<0||pair.Value.Bytes>128L*1024*1024*1024||String.IsNullOrWhiteSpace(pair.Value.Name)||pair.Value.Name.Length>300||pair.Value.Name.Any(Char.IsControl)||(pair.Value.FileName??"").Length>300||(pair.Value.FileName??"").Any(Char.IsControl)||!ValidSourceVersion(pair.Value.Version)||!ValidSourceVersion(pair.Value.ModVersion)))throw new IOException("Metadados de arquivo inválidos.");
                 NormalizeSources(variant);

@@ -41,23 +41,28 @@ internal sealed class GeneralProjectDeletion {
         if(!Directory.Exists(result.Root))throw new IOException("O destino de instalação está ausente. Use excluir somente do app se quiser manter os arquivos.");
         Closed(result.Root);
 
+        var candidates=Files(state,result.Data,result.Root).Select(file=>Normalize(result.Root,file)).GroupBy(file=>file.Path,StringComparer.OrdinalIgnoreCase).ToList();
+        bool external=candidates.Any(group=>GeneralInstallRoutes.External(group.Key));
         var shared=new HashSet<string>(StringComparer.OrdinalIgnoreCase);result.Peers.Add(result.Data);
         foreach(var peer in index.Projects.Where(item=>item.Id!=project.Id)){
             var other=LoadForProof(peer,store.DataPath(peer),proof);
-            if(String.IsNullOrWhiteSpace(other.Destination)||!String.Equals(Path.GetFullPath(other.Destination).TrimEnd('\\'),result.Root,StringComparison.OrdinalIgnoreCase))continue;
-            string data=store.DataPath(peer);result.Peers.Add(data);
-            foreach(var file in Files(other,data,result.Root))shared.Add(Normalize(result.Root,file).Path);
+            if(String.IsNullOrWhiteSpace(other.Destination))continue;
+            string peerRoot=Path.GetFullPath(other.Destination).TrimEnd('\\');
+            bool same=String.Equals(peerRoot,result.Root,StringComparison.OrdinalIgnoreCase);
+            if(!same&&(!external||!Directory.Exists(peerRoot)))continue;
+            string data=store.DataPath(peer);if(same)result.Peers.Add(data);
+            foreach(var file in Files(other,data,peerRoot).Where(file=>same||GeneralInstallRoutes.External(file.Path)))
+                shared.Add(GeneralInstallRoutes.External(file.Path)?GeneralInstallRoutes.Resolve(peerRoot,file.Path):Normalize(peerRoot,file).Path);
         }
-        var candidates=Files(state,result.Data,result.Root).Select(file=>Normalize(result.Root,file)).GroupBy(file=>file.Path,StringComparer.OrdinalIgnoreCase).ToList();
         var targets=new HashSet<string>(candidates.Select(group=>group.Key),StringComparer.OrdinalIgnoreCase);
-        if(File.Exists(Safe.In(result.Root,"bin/x64/Cyberpunk2077.exe")))foreach(var outside in catalog.Packages.Where(mod=>mod.Files.Any(file=>!file.UserData&&!targets.Contains(file.Path)&&File.Exists(Safe.In(result.Root,file.Path)))))
+        if(File.Exists(Safe.In(result.Root,"bin/x64/Cyberpunk2077.exe")))foreach(var outside in catalog.Packages.Where(mod=>mod.Files.Any(file=>!file.UserData&&!targets.Contains(file.Path)&&File.Exists(GeneralInstallRoutes.Resolve(result.Root,file.Path)))))
             foreach(var dependency in FixedData.Expand(catalog,new[]{outside.Id}).Where(mod=>mod.Id!=outside.Id))foreach(var file in dependency.Files)shared.Add(file.Path);
         var immutable=new HashSet<string>(catalog.Packages.Where(mod=>mod.Immutable).SelectMany(mod=>mod.Files).Select(file=>file.Path),StringComparer.OrdinalIgnoreCase);
         foreach(var group in candidates){
-            var file=group.First();string target=Safe.In(result.Root,file.Path);Safe.NoLinks(target);
+            var file=group.First();string target=GeneralInstallRoutes.Resolve(result.Root,file.Path);Safe.NoLinks(target);
             if(Directory.Exists(target))throw new IOException("Uma pasta ocupa um arquivo de mod: "+file.Path);
             if(!File.Exists(target)){result.Missing++;continue;}
-            file.Reason=shared.Contains(file.Path)?"Usado por outro projeto":immutable.Contains(file.Path)||!InstalledSnapshot.SafeGenericPath(file.Path)||file.Path.Equals("bin/x64/Cyberpunk2077.exe",StringComparison.OrdinalIgnoreCase)?"Base ou arquivo protegido":
+            file.Reason=shared.Contains(GeneralInstallRoutes.External(file.Path)?target:file.Path)?"Usado por outro projeto":immutable.Contains(file.Path)||!InstalledSnapshot.SafeGenericPath(file.Path)||file.Path.Equals("bin/x64/Cyberpunk2077.exe",StringComparison.OrdinalIgnoreCase)?"Base ou arquivo protegido":
                 group.Any(item=>!item.Owned)?"Arquivo preexistente ou configuração preservada":group.Any(item=>item.Hash!=file.Hash||item.Size!=file.Size)?"Registros divergentes":
                 !Matches(target,file)?"Arquivo alterado desde a instalação":null;
             if(file.Reason==null)result.Remove.Add(file);else result.Preserve.Add(file);
@@ -108,13 +113,13 @@ internal sealed class GeneralProjectDeletion {
             }
             var fresh=Inspect(plan.Project);
             if(fresh.Proof!=plan.Proof||!SameFiles(fresh,plan))throw new IOException("O projeto ou os arquivos mudaram após a conferência. Revise novamente; nada foi apagado nesta tentativa.");
-            foreach(var file in plan.Remove){string path=Safe.In(plan.Root,file.Path);if(!Matches(path,file))throw new IOException("Arquivo mudou antes da exclusão: "+file.Path);}
+            foreach(var file in plan.Remove){string path=GeneralInstallRoutes.Resolve(plan.Root,file.Path);if(!Matches(path,file))throw new IOException("Arquivo mudou antes da exclusão: "+file.Path);}
             string journal=Safe.In(plan.Data,"exclusao-permanente-"+Guid.NewGuid().ToString("N")+".json");
             var removed=new List<string>();
             Safe.WriteJson(journal,new{ProjectId=plan.Project.Id,Root=plan.Root,Status="removendo",Planned=plan.Remove.Select(file=>file.Path).ToArray(),Removed=removed});
             try{
                 foreach(var file in plan.Remove){
-                    Closed(plan.Root);string path=Safe.In(plan.Root,file.Path);Safe.NoLinks(path);
+                    Closed(plan.Root);string path=GeneralInstallRoutes.Resolve(plan.Root,file.Path);Safe.NoLinks(path);
                     if(!Matches(path,file))throw new IOException("Arquivo mudou durante a exclusão: "+file.Path);
                     File.Delete(path);removed.Add(file.Path);
                     if(report!=null)report(file.Path);
@@ -134,7 +139,7 @@ internal sealed class GeneralProjectDeletion {
             left.Remove.Select(file=>Tuple.Create(file.Path,file.Hash,file.Size)).SequenceEqual(right.Remove.Select(file=>Tuple.Create(file.Path,file.Hash,file.Size)))&&
             left.Preserve.Select(file=>Tuple.Create(file.Path,file.Reason)).SequenceEqual(right.Preserve.Select(file=>Tuple.Create(file.Path,file.Reason)));
     }
-    static ProjectDeleteFile Normalize(string root,ProjectDeleteFile file){file.Path=Safe.In(root,file.Path).Substring(root.Length+1).Replace('\\','/');return file;}
+    static ProjectDeleteFile Normalize(string root,ProjectDeleteFile file){string full=GeneralInstallRoutes.Resolve(root,file.Path);if(!GeneralInstallRoutes.External(file.Path))file.Path=full.Substring(root.Length+1).Replace('\\','/');return file;}
     static bool Matches(string path,ProjectDeleteFile file){Safe.NoLinks(path);return File.Exists(path)&&new FileInfo(path).Length==file.Size&&Safe.Hash(path)==file.Hash;}
     void Closed(string root){
         if(root==null)return;

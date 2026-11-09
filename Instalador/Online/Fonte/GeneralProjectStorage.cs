@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,7 +10,17 @@ internal sealed class GeneralStorageSize {
     internal string ProjectCacheDirectory;
     internal int ModCount,Identified;
     internal readonly Dictionary<string,long> ModBytes=new Dictionary<string,long>(StringComparer.Ordinal);
+    internal readonly Dictionary<string,HashSet<string>> ModFiles=new Dictionary<string,HashSet<string>>(StringComparer.Ordinal);
+    internal readonly Dictionary<string,long> InstalledFileBytes=new Dictionary<string,long>(StringComparer.OrdinalIgnoreCase);
     internal int Projects,WithFiles,Unavailable;
+    internal long? CategoryBytes(IEnumerable<string> mods){
+        var files=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach(string id in mods){
+            HashSet<string> paths;
+            if(ModFiles.TryGetValue(id,out paths))files.UnionWith(paths);
+        }
+        return files.Count==0?(long?)null:files.Sum(path=>InstalledFileBytes[path]);
+    }
     internal static string Format(long bytes){double value=bytes;string[] units={"B","KiB","MiB","GiB","TiB"};int at=0;while(value>=1024&&at<units.Length-1){value/=1024;at++;}return value.ToString(at==0?"0":"0.##")+" "+units[at];}
     internal static string RetainedText(GeneralStorageSize size){return GeneralStyle.T("Pacotes antigos: ","Old packages: ")+Format(size.Retained);}
     internal static string ProjectCacheText(GeneralStorageSize size){return GeneralStyle.T("Cache do projeto: ","Project cache: ")+Format(size.Cache);}
@@ -64,7 +74,7 @@ internal static class GeneralProjectStorage {
                 if(!String.IsNullOrWhiteSpace(state.Destination)&&Directory.Exists(state.Destination)){
                     string root=Path.GetFullPath(state.Destination).TrimEnd(Path.DirectorySeparatorChar);
                     Action<ProjectDeleteFile> record=file=>{
-                        string path=Safe.In(root,file.Path);paths.Add(path);
+                        string path=GeneralInstallRoutes.Resolve(root,file.Path);paths.Add(path);
                         foreach(string owner in file.OwnerKeys??new List<string>()){
                             string id=owner.Split('/')[0];HashSet<string> own;if(perMod.TryGetValue(id,out own))own.Add(path);
                             HashSet<string> names;if(aliases.TryGetValue(owner,out names))foreach(string name in names)perMod[name].Add(path);
@@ -77,7 +87,7 @@ internal static class GeneralProjectStorage {
                         foreach(var variant in mod.Variants){var trusted=original.Variants.FirstOrDefault(item=>item.Id==variant.Id&&item.Sources.SequenceEqual(variant.Sources));if(trusted==null||trusted.CyberpunkId==null)continue;
                             foreach(var recipe in FixedData.Expand(catalog,new[]{trusted.CyberpunkId})){
                                 var known=recipe.Id==NightCityDensity.ModId?NightCityDensity.KnownFiles(recipe):recipe.Files;
-                                foreach(var file in known){string path=Safe.In(root,file.Path);paths.Add(path);if(recipe.Id==trusted.CyberpunkId)perMod[mod.Id].Add(path);}
+                                foreach(var file in known){string path=GeneralInstallRoutes.Resolve(root,file.Path);paths.Add(path);if(recipe.Id==trusted.CyberpunkId)perMod[mod.Id].Add(path);}
                             }
                         }
                     }
@@ -88,7 +98,13 @@ internal static class GeneralProjectStorage {
                 foreach(string path in paths)if(Add(path,projectFiles,sizes,errors)){Add(path,mods,sizes,errors);Add(path,total,sizes,errors);}
                 foreach(var pair in perMod){
                     var present=Paths();foreach(string path in pair.Value)Add(path,present,sizes,errors);
-                    if(present.Count>0&&!pair.Value.Any(errors.Contains)){result.Identified++;if(selected!=null)result.ModBytes[pair.Key]=Bytes(present,sizes);}
+                    if(present.Count==0||pair.Value.Any(errors.Contains))continue;
+                    result.Identified++;
+                    if(selected!=null){
+                        result.ModBytes[pair.Key]=Bytes(present,sizes);
+                        result.ModFiles[pair.Key]=present;
+                        foreach(string path in present)result.InstalledFileBytes[path]=sizes[path];
+                    }
                 }
                 foreach(string path in state.ResolvedDownloads.Values.Concat(state.List.Mods.SelectMany(mod=>mod.Variants).SelectMany(variant=>variant.Sources)).Where(GeneralModDownload.IsArchivePath)){
                     Add(path,projectFiles,sizes,errors);Add(path,total,sizes,errors);

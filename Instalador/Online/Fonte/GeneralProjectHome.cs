@@ -159,6 +159,7 @@ internal sealed class GeneralProjectHome : Form {
             fixture?Path.Combine(store.Root,"P2P-Transfers"):P2PService.TransferStore,localOnly:fixture,offerRecovery:true);
         service.EnableInstalledReceive(catalog,projectData,fixture);
         service.ConfirmConnection=session=>GeneralP2PDialog.AskConnection(this,()=>SharingPromptOwner,service,session);
+        service.ApproveUserFolders=folders=>GeneralP2PDialog.AskUserFolders(this,()=>SharingPromptOwner,folders);
         service.RegisterProject=session=>{
             if(IsDisposed||!IsHandleCreated)return false;
             return (bool)Invoke((Func<bool>)(()=>{
@@ -260,7 +261,7 @@ internal sealed partial class GeneralModWindow {
     GeneralProject project;
     internal string ProjectAction {get;private set;}
     internal void AttachProject(GeneralProjectStore store,GeneralProject project){
-        projectStore=store;this.project=project;state.TemplateId=project.TemplateId;var preferences=store.Read();
+        projectStore=store;this.project=project;state.TemplateId=project.TemplateId;state.ProjectName=project.Name;var preferences=store.Read();
         bool refreshed=false;
         if(BuiltInProject){
             if(seed.Mods.Any(item=>GeneralModLibrary.IsFacialMod(item.Id))){

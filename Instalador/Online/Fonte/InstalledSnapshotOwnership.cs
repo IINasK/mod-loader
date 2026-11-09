@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -43,12 +43,14 @@ public sealed partial class GeneralModInstaller {
         }
     }
     internal bool HasSnapshotRecord(string key){return ReadRecord(RecordPath(key))!=null;}
-    internal List<InstalledSnapshotFile> ExportSnapshotFiles(string key) {
+    internal List<InstalledSnapshotFile> ExportSnapshotFiles(string key,List<GeneralInstallRoute> installRoutes=null) {
         Record record=ReadRecord(RecordPath(key));
         if(record==null)throw new IOException("O mod não tem recibo de instalação nesta pasta.");
+        if(installRoutes!=null&&!GeneralInstallRoutes.Same(installRoutes,record.InstallRoutes))
+            throw new IOException("O destino registrado é diferente do escolhido para a versão.");
         var result=new List<InstalledSnapshotFile>();
         foreach(var file in record.Files) {
-            string path=Safe.In(destination,file.Path);
+            string path=Target(file.Path);
             if(!Matches(path,file))throw new IOException("O arquivo instalado está ausente ou alterado: "+file.Path);
             result.Add(new InstalledSnapshotFile{Path=file.Path,Sha256=file.Sha256,Size=file.Size,Kind="file"});
         }

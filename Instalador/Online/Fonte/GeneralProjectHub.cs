@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -26,14 +26,15 @@ internal sealed partial class GeneralModWindow {
         return info;
     }
     bool storageReading,storageQueued;
-    Dictionary<string,long> measuredMods=new Dictionary<string,long>(StringComparer.Ordinal);
+    GeneralStorageSize measuredStorage=new GeneralStorageSize();
+    Dictionary<string,long> measuredMods { get { return measuredStorage.ModBytes; } }
     async void RefreshStorageSize(){
         if(projectStore==null||project==null||storageSize==null)return;
         if(storageReading){storageQueued=true;return;}storageReading=true;
         try{do{
             storageQueued=false;int generation=++storageGeneration;var label=storageSize;
-            try{var size=await Task.Run(()=>GeneralProjectStorage.Measure(projectStore,catalog,cache,project));if(!IsDisposed&&generation==storageGeneration&&!label.IsDisposed){label.SetSize(size,false);measuredMods=size.ModBytes;UpdateMeasuredRows();}}
-            catch(Exception){if(!IsDisposed&&generation==storageGeneration&&!label.IsDisposed){label.SetSize(null,false);measuredMods.Clear();UpdateMeasuredRows();}}
+            try{var size=await Task.Run(()=>GeneralProjectStorage.Measure(projectStore,catalog,cache,project));if(!IsDisposed&&generation==storageGeneration&&!label.IsDisposed){label.SetSize(size,false);measuredStorage=size;UpdateMeasuredRows();}}
+            catch(Exception){if(!IsDisposed&&generation==storageGeneration&&!label.IsDisposed){label.SetSize(null,false);measuredStorage=new GeneralStorageSize();UpdateMeasuredRows();}}
         }while(storageQueued&&!IsDisposed);}finally{storageReading=false;}
     }
     GeneralSourceInfo DependencySize(GeneralModEntry mod){
@@ -52,8 +53,21 @@ internal sealed partial class GeneralModWindow {
         foreach(var row in ModRows()){
             var mod=byId[(string)row.Tag];row.Cells["Size"].Value=ModSpace(mod);row.Cells["Size"].ToolTipText=SpaceTip(mod);
         }
+        foreach(DataGridViewRow row in grid.Rows){
+            var section=row.Tag as SectionRow;
+            if(section!=null&&section.Kind=="heading"){
+                section.Size=CategorySize(section.ModIds);
+                grid.InvalidateRow(row.Index);
+            }
+        }
         UpdateCounts();
     }
+    string CategorySize(string[] ids){
+        if(ids.Length==0)return "";
+        long? bytes=measuredStorage.CategoryBytes(ids);
+        return bytes.HasValue?(ids.All(measuredMods.ContainsKey)?"":"≥ ")+GeneralStorageSize.Format(bytes.Value):"—";
+    }
+
     string SpaceTip(GeneralModEntry mod){
         if(GeneralModLibrary.NeedsDependencyVersion(mod,Selected(mod)))return T("Escolha a versão da dependência.","Choose the dependency version.");
         if(!measuredMods.ContainsKey(mod.Id)&&DependencySize(mod)!=null)return T("Tamanho do download informado pelo Nexus.","Download size reported by Nexus.");

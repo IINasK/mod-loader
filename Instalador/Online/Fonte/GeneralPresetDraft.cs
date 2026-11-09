@@ -16,7 +16,7 @@ internal sealed partial class GeneralModWindow {
     }
     GeneralModState CopyProjectState(){
         var copy=Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(state));
-        copy.TemplateId=state.TemplateId;copy.TemplateSubset=state.TemplateSubset;
+        copy.TemplateId=state.TemplateId;copy.TemplateSubset=state.TemplateSubset;copy.ProjectName=state.ProjectName;
         return copy;
     }
     GeneralModState CommittedProject(){

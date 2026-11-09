@@ -14,7 +14,7 @@ internal sealed partial class GeneralModWindow {
             associationChoice.TrySetResult(entry);
     }
 
-    async Task<GeneralModEntry> PickAlternative(string sourceId, GeneralModEntry previous) {
+    async Task<GeneralModEntry> PickAlternative(string sourceId, GeneralModEntry previous, bool dependency = false) {
         var oldEntry = FocusedEntry();
         int oldScroll = grid.FirstDisplayedScrollingRowIndex;
         bool oldExpanded = listExpanded;
@@ -34,7 +34,7 @@ internal sealed partial class GeneralModWindow {
             bar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             bar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             bar.Controls.Add(new Label {
-                Text = T("Selecione o mod alternativo", "Select the alternative mod"), Dock = DockStyle.Fill,
+                Text = dependency?T("Selecione a dependência","Select the required mod"):T("Selecione o mod alternativo", "Select the alternative mod"), Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft, Font = GeneralStyle.Font(13, true), AutoEllipsis = true
             }, 0, 0);
             var cancel = GeneralStyle.Button(T("Cancelar", "Cancel"), () => task.TrySetResult(null));

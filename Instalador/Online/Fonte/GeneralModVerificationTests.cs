@@ -92,6 +92,41 @@ internal sealed partial class GeneralModWindow {
                 File.Exists(dependencyPath)||File.ReadAllText(installedPath)!=owner.Id||File.ReadAllText(manualPath)!="manual")
                 throw new IOException("Cancelar na confirmação deve preservar os arquivos locais e deixar a fila vazia.");
 
+            const string related="r6/scripts/manual-tattoo.reds";
+            string relatedPath=Safe.In(game,related);
+            Directory.CreateDirectory(Path.GetDirectoryName(relatedPath));
+            File.WriteAllText(relatedPath,"manual script");
+            await form.Scan();
+            var inventoryRow=form.grid.Rows.Cast<DataGridViewRow>().Single(item=>item.Tag is P2PSyncDifference);
+            using(var timer=new Timer{Interval=40}){
+                timer.Tick+=(s,e)=>{
+                    var editor=Application.OpenForms.OfType<GeneralModEditor>().FirstOrDefault(item=>item.Visible);
+                    if(editor==null)return;
+                    timer.Stop();
+                    try{
+                        var save=(Button)editor.AcceptButton;
+                        var source=EditorField<TextBox>(editor,"sources");
+                        if(save.Enabled||source.ReadOnly||source.Text!="")
+                            throw new IOException("O item externo deve abrir sem vínculo e permitir informar uma fonte.");
+                        EditorField<TextBox>(editor,"modName").Text="Mod detectado";
+                        if(!save.Enabled||save.Text!="Incluir na lista e salvar")
+                            throw new IOException("A edição de metadados deve liberar Incluir na lista e salvar.");
+                        save.PerformClick();
+                    }catch(Exception ex){dialogFailure=ex;editor.Complete(DialogResult.Cancel);}
+                };
+                timer.Start();
+                form.OpenRowEditor(inventoryRow);
+                await Until(()=>!form.scanning&&!timer.Enabled);
+            }
+            if(dialogFailure!=null)throw dialogFailure;
+            var adopted=form.library.Load().List.Mods.Single(mod=>mod.Name=="Mod detectado");
+            var adoptedWork=form.MakeWork(form.state.List.Mods.Single(mod=>mod.Id==adopted.Id));
+            if(!new HashSet<string>(adopted.DetectedPaths).SetEquals(new[]{extraPath,related})||
+                form.Status(adoptedWork,game)!=GeneralStatusPresentation.DetectedFiles||
+                form.VisibleGameInventory().Any()||form.state.SnapshotReceipts.ContainsKey(adoptedWork.Key)||
+                File.ReadAllText(manualPath)!="manual"||File.ReadAllText(relatedPath)!="manual script")
+                throw new IOException("Incluir o item deve registrar pistas de múltiplas pastas sem assumir instalação ou mexer nos arquivos.");
+
             using(var review=new GeneralDependencyReview("Teste",new[]{
                 new GeneralDependencyIssue{Mod="Mod",Requirement="Arquivo",Url="file:///C:/test.zip"}
             },0,opened.Add)){

@@ -52,7 +52,7 @@ internal sealed partial class GeneralModWindow {
                 var metadata=pages.TryGetValue(Page(link),out request)?request.Value.Result:null;
                 if(metadata==null||!metadata.NexusChecked)UnavailableMetadata++;
                 if(metadata==null)continue;
-                if(metadata.Nsfw)work.Entry.Nsfw=true;
+                if(metadata.Nsfw&&work.Entry.NsfwOverride==null)work.Entry.Nsfw=true;
                 foreach(string tag in metadata.Tags??new string[0]){
                     if(work.Entry.Tags.Count>=32)break;
                     if(!work.Entry.Tags.Contains(tag,StringComparer.OrdinalIgnoreCase))work.Entry.Tags.Add(tag);
@@ -131,7 +131,8 @@ internal sealed partial class GeneralModWindow {
         var engine=Cyberpunk(destination);
         return engine.ReadUnlistedModFiles(known
             .Concat(engine.ProjectDeletionFiles(imported,true).Select(file=>file.Path))
-            .Concat(Snapshot(destination).ProjectDeletionFiles(true).Select(file=>file.Path)));
+            .Concat(Snapshot(destination).ProjectDeletionFiles(true).Select(file=>file.Path))
+            .Concat(state.List.Mods.SelectMany(mod=>mod.DetectedPaths)));
     }
 
     List<GeneralDependencyIssue> ReviewDependencies(ProjectVerification audit,Dictionary<string,Work> install) {

@@ -153,7 +153,7 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
         picker.AccessibleName = label;
     }
 
-    static Control FolderRow(string label,TextBox text,Action browseFolder){
+    internal static TableLayoutPanel FolderRow(string label,TextBox text,Action browseFolder){
         text.Dock=DockStyle.Fill;text.BorderStyle=BorderStyle.None;
         var row = new TableLayoutPanel {
             Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, RowCount = 2,

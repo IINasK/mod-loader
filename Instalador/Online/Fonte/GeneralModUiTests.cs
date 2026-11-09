@@ -39,6 +39,24 @@ internal sealed partial class GeneralModWindow {
             check(!form.grid.Columns.Contains("Category")&&form.grid.Columns["Progress"].Visible==false,"Categoria vira seção e as duas barras ficam no rodapé.");
             check(form.grid.Rows.Cast<DataGridViewRow>().Count(r=>r.Tag is SectionRow&&((SectionRow)r.Tag).Kind=="add")==3,"Cada categoria, inclusive vazia, oferece Adicionar item.");
             check(((SectionRow)form.grid.Rows[form.grid.RowCount-1].Tag).Kind=="new","A lista termina com Criar nova categoria.");
+            var heading=form.grid.Rows.Cast<DataGridViewRow>().Single(row=>row.Tag is SectionRow&&
+                ((SectionRow)row.Tag).Kind=="heading"&&((SectionRow)row.Tag).Category=="Principal");
+            var primaryRows=form.ModRows().Where(row=>Equals(row.Tag,two.Id)||Equals(row.Tag,three.Id)).ToArray();
+            check(form.grid.Columns["CategoryIndent"].DisplayIndex==0&&form.grid.Columns["Mark"].DisplayIndex==1,
+                "A guia de recuo é separada da coluna de seleção.");
+            CaptureUi(form,Path.Combine(root,"category-expanded.png"));
+            var view=(GeneralScrollView)form.grid.Parent.Parent;
+            view.RefreshScroll();
+            int expandedLimit=view.Bar.Limit;
+            var toggle=new Point(form.CategoryContentRight-28,form.grid.GetRowDisplayRectangle(heading.Index,false).Top+22);
+            ClickModCell(form.grid,toggle);
+            check(primaryRows.All(row=>!row.Visible)&&heading.Visible&&form.ModRows().Count()==3&&view.Bar.Limit<expandedLimit,
+                "Recolher esconde os itens e reduz a rolagem, preservando a categoria e o contador.");
+            CaptureUi(form,Path.Combine(root,"category-collapsed.png"));
+            ClickModCell(form.grid,toggle);
+            check(primaryRows.All(row=>row.Visible)&&view.Bar.Limit==expandedLimit,
+                "A mesma seta abre a categoria e recupera seu espaço de rolagem.");
+            form.grid.ClearSelection();
             check(form.preset.Height==44&&form.presetSettings.PointToScreen(Point.Empty).Y==form.preset.PointToScreen(Point.Empty).Y,"Seletor e salvar preset ficam alinhados na mesma linha.");
             check(((GeneralButton)form.optionsButton).Bare&&form.optionsButton.Text==""&&((GeneralButton)form.optionsButton).IconKind=="menu","Opções usa apenas ícone de menu sem moldura.");
             check(form.projectsButton.Right<=form.homeButton.Left&&form.homeButton.Right<=form.optionsButton.Left&&form.optionsButton.Parent.Controls.OfType<Button>().Count()==3,"Projetos, voltar e hamburger aparecem nesta ordem no cabeçalho.");
@@ -66,7 +84,9 @@ internal sealed partial class GeneralModWindow {
             }
             check(form.currentProgress.Top==form.totalProgress.Top&&Math.Abs(form.currentProgress.Width-form.totalProgress.Width)<=1,"As barras do rodapé dividem a mesma linha em partes iguais.");
             var verifyButton=AllControls(form).OfType<Button>().Single(button=>button.Name=="VerifyProject");
-            check(verifyButton.Right<form.primaryAction.Left&&verifyButton.Top==form.primaryAction.Top,
+            check(verifyButton.Right<form.primaryAction.Left&&verifyButton.Top==form.primaryAction.Top&&
+                verifyButton.Text==""&&((GeneralButton)verifyButton).Bare&&((GeneralButton)verifyButton).IconKind=="refresh"&&
+                !AllControls(form).OfType<GeneralButton>().Any(button=>button!=verifyButton&&button.IconKind=="refresh"),
                 "Verificar fica ao lado da ação principal no rodapé.");
             check(!form.grid.Columns["Group"].Visible&&form.grid.AllowUserToResizeColumns,
                 "Grupos ocupam a linha do nome e as divisórias do cabeçalho permitem ajustar a largura.");
@@ -85,11 +105,12 @@ internal sealed partial class GeneralModWindow {
             var glyph=markCell.ContentBounds;
             var markPoint=new Point(markBounds.Left+glyph.Left+glyph.Width/2,markBounds.Top+glyph.Top+glyph.Height/2);
             ClickModCell(form.grid,statusPoint);
-            check(form.marked.SetEquals(new[]{one.Id}),"Um clique na área vazia de Situação marca a linha inteira.");
+            check(form.marked.Count==0,"Um clique em Situação não marca a linha.");
             ClickModCell(form.grid,markMargin);
-            check(form.marked.Count==0,"A margem da célula de marcação também responde ao clique.");
+            check(form.marked.SetEquals(new[]{one.Id}),"A margem da célula de marcação responde ao clique.");
             ClickModCell(form.grid,markPoint);
-            check(form.marked.SetEquals(new[]{one.Id}),"O clique sobre o símbolo marca uma única vez.");
+            check(form.marked.Count==0,"O clique sobre o símbolo alterna a marca uma única vez.");
+            ClickModCell(form.grid,markPoint);
             bool openedByDoubleClick=false;
             using(var timer=new Timer{Interval=25}){
                 timer.Tick+=(s,e)=>{
@@ -125,7 +146,9 @@ internal sealed partial class GeneralModWindow {
                 var name=(TextBox)typeof(GeneralModEditor).GetField("modName",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(editor);
                 var sources=(TextBox)typeof(GeneralModEditor).GetField("sources",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(editor);
                 name.Text="Exemplo válido";sources.Text=archive;
-                check(button.Enabled,"Instalar habilita quando nome e fonte são válidos.");
+                check(!button.Enabled,"O campo de link recusa novos caminhos locais digitados.");
+                sources.Text="https://www.nexusmods.com/cyberpunk2077/mods/13556?tab=files&file_id=1";
+                check(button.Enabled,"Instalar habilita com nome e link do Nexus válidos.");
                 var copySource=AllControls(editor).OfType<Button>().Single(item=>item.Name=="CopyDownloadSource");
                 check(!sources.Multiline&&copySource.Parent==sources.Parent&&copySource.Right<=sources.Parent.ClientSize.Width,
                     "A fonte usa uma linha e o botão de cópia cabe dentro da caixa.");
@@ -144,7 +167,7 @@ internal sealed partial class GeneralModWindow {
                 var field=AllControls(editor).OfType<TextBox>().Single(box=>box.Name=="DownloadSource");
                 var picker=AllControls(editor).OfType<GeneralPicker>().Single(control=>control.Name=="DownloadSourcePicker");
                 picker.SelectedIndex=1;
-                check(field.Text==secondLink&&picker.Visible,"Uma variante com vários arquivos mostra a fonte selecionada em uma única linha.");
+                check(field.Text==secondLink&&field.ReadOnly&&picker.Visible,"Uma variante com vários arquivos mostra a fonte selecionada em uma única linha.");
                 ((Button)editor.AcceptButton).PerformClick();
                 await Until(()=>editor.Result!=null);
                 check(editor.Result.Tags.Contains("Compatibilidade Nexus")&&editor.Result.Variants[0].Sources.SequenceEqual(new[]{firstLink,secondLink}),
@@ -181,10 +204,10 @@ internal sealed partial class GeneralModWindow {
                 bind.Checked=true;
                 var name=(TextBox)typeof(GeneralModEditor).GetField("modName",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(editor);
                 var description=(TextBox)typeof(GeneralModEditor).GetField("description",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(editor);
-                var adult=(CheckBox)typeof(GeneralModEditor).GetField("nsfw",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(editor);
-                check(name.Text==three.Name&&description.Text==three.Description&&adult.Checked,"Vincular arquivo preserva nome, descrição e NSFW do mod de destino.");
+                var adult=EditorField<GeneralButton>(editor,"nsfw");
+                check(name.Text==three.Name&&description.Text==three.Description&&adult.BareInk==GeneralStyle.Danger,"Vincular arquivo preserva nome, descrição e NSFW do mod de destino.");
                 bind.Checked=false;
-                check(name.Text=="nome-do-arquivo"&&!adult.Checked,"Voltar à importação independente restaura os metadados do arquivo.");
+                check(name.Text=="nome-do-arquivo"&&adult.BareInk==GeneralStyle.Line,"Voltar à importação independente restaura os metadados do arquivo.");
             }
             form.categoryFilters=new HashSet<string>{"Principal"};form.DrawRows();
             bool edited=false;
@@ -193,7 +216,7 @@ internal sealed partial class GeneralModWindow {
                     var editor=Application.OpenForms.OfType<GeneralModEditor>().FirstOrDefault();if(editor==null)return;
                     edited=true;timer.Stop();
                     var name=(TextBox)typeof(GeneralModEditor).GetField("modName",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(editor);name.Text="Arquivo categorizado";
-                    ((CheckBox)typeof(GeneralModEditor).GetField("nsfw",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(editor)).Checked=true;
+                    EditorField<GeneralButton>(editor,"nsfw").PerformClick();
                     ((Button)typeof(GeneralModEditor).GetField("save",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(editor)).PerformClick();
                 };
                 timer.Start();form.Drop(new[]{dropped});await Until(()=>edited&&!form.scanning);
@@ -247,19 +270,15 @@ internal sealed partial class GeneralModWindow {
                             var viewport=scroll.RectangleToScreen(scroll.ClientRectangle);
                             var field=archive.RectangleToScreen(archive.ClientRectangle);
                             CaptureUi(editor,Path.Combine(root,"editor-identification.png"));
+                            check(Rectangle.Intersect(field,viewport).Height==field.Height&&!archive.Multiline&&archive.Parent.Parent.Height<=52,
+                                "Um único link tem campo compacto e aparece no topo do editor.");
                             scroll.RefreshScroll();
                             int beforeWheel=scroll.Bar.Value;
                             scroll.Bar.Wheel(-SystemInformation.MouseWheelScrollDelta);
                             check(SystemInformation.MouseWheelScrollLines==0||scroll.Bar.Limit==beforeWheel||
                                 scroll.Bar.Value-beforeWheel>=Math.Min(scroll.Bar.Limit-beforeWheel,scroll.Content.Font.Height),
                                 "A roda percorre uma distância de texto no editor, em vez de poucos pixels.");
-                            field=archive.RectangleToScreen(archive.ClientRectangle);
-                            if(field.Bottom>viewport.Bottom)scroll.ScrollTo(scroll.Bar.Value+field.Bottom-viewport.Bottom+8);
-                            field=archive.RectangleToScreen(archive.ClientRectangle);
-                            Control surface=archive.Parent;
-                            while(!(surface is GeneralSurface))surface=surface.Parent;
-                            check(Rectangle.Intersect(field,viewport).Height==field.Height&&!archive.Multiline&&surface.Height<=52,
-                                "Um único link tem campo compacto e totalmente visível: "+surface.Bounds+" / "+field+" / "+viewport);
+
                             scroll.ScrollTo(9999);
                             Application.DoEvents();
                             CaptureUi(editor,Path.Combine(root,"editor-download-and-link.png"));
@@ -289,6 +308,19 @@ internal sealed partial class GeneralModWindow {
                                 "O modo de escolha restaura busca, preset, caixas e navegação.");
                             var groupName=AllControls(editor).OfType<TextBox>().Single(box=>box.Name=="AlternativeGroupName");
                             check(groupName.Visible&&groupName.MaxLength==18&&editor.GroupStyle.Color.StartsWith("#"),"Escolher outro mod libera o nome curto e a cor do grupo.");
+                            var swatch=AllControls(editor).OfType<GeneralButton>().Single(button=>button.Name=="AlternativeGroupColor");
+                            check(swatch.Parent==groupName.Parent&&swatch.Left==groupName.Right&&swatch.ColorSwatch.HasValue&&
+                                swatch.Bottom<=swatch.Parent.ClientSize.Height,"A amostra de cor fica dentro do campo do grupo.");
+                            editor.AddRequiredMod(presetEntry);
+                            var dependencies=AllControls(editor).OfType<FlowLayoutPanel>().Single(panel=>panel.Name=="DependencyChips");
+                            var chips=dependencies.Controls.OfType<Button>().ToList();
+                            check(chips.Count==2&&chips[0].Text==presetEntry.Name+" ×"&&chips[1].Name=="LinkDependency",
+                                "O vínculo vira um chip removível antes do botão de adicionar.");
+                            var linkedScroll=AllControls(editor).OfType<GeneralScrollView>().Single(control=>control.Name=="ModEditorScroll");
+                            linkedScroll.ScrollTo(9999);Application.DoEvents();
+                            CaptureUi(editor,Path.Combine(root,"editor-dependencies-and-group.png"));
+                            chips[0].PerformClick();
+                            check(dependencies.Controls.OfType<Button>().Count()==1,"Remover um chip desfaz só aquela dependência.");
                             groupName.Text="Corpo leve";
                             stage=3;
                             AllControls(editor).OfType<Button>().Single(button=>button.Name=="AlternativeMod").PerformClick();

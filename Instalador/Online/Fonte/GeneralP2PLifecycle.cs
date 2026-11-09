@@ -42,7 +42,7 @@ internal sealed partial class P2PService {
 
     internal void SetPreparationState(GeneralModState state) {
         var copy=state==null?null:Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(state));
-        if(copy!=null)copy.TemplateId=state.TemplateId;
+        if(copy!=null){copy.TemplateId=state.TemplateId;copy.ProjectName=state.ProjectName;}
         preparationState=copy;
     }
 
@@ -339,7 +339,13 @@ internal sealed partial class P2PService {
                     checkpoint();
                     if(replace)SetPhase(session,"installing");
                     return replace;
-                },id=>{session.TransactionId=id;Save();},checkpoint,value=>session.InstallProgress=value,allowReuse:AllowsLocalReuse(session));
+                },id=>{session.TransactionId=id;Save();},checkpoint,value=>session.InstallProgress=value,allowReuse:AllowsLocalReuse(session),approveUserFolders:folders=>{
+                    SetPhase(session,"review");
+                    bool allowed=ApproveUserFolders!=null&&ApproveUserFolders(folders);
+                    checkpoint();
+                    SetPhase(session,"installing");
+                    return allowed;
+                });
                 var manifest=installer.ReadManifest(session.ReceiptId);
                 ApplyApprovedSyncCleanup(session,manifest);
                 session.ModsOutsidePack=InstalledSnapshot.CountOutsidePack(manifest);

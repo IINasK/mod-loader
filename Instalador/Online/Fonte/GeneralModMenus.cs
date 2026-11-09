@@ -73,17 +73,22 @@ internal sealed partial class GeneralModWindow {
                 if(state.List.Categories.Any(c=>!String.Equals(c,category,StringComparison.OrdinalIgnoreCase)&&String.Equals(c,renamed,StringComparison.OrdinalIgnoreCase)))throw new IOException(T("Já existe uma categoria com esse nome.","A category with this name already exists."));
                 BeginProjectEdit();if(create){state.List.Categories.Add(renamed);state.List.CategoryDescriptions[renamed]=dialog.ResultDescription;if(ActivePreset!=null)ActivePreset.Categories.Add(renamed);}
                 else if(category==null){state.List.UncategorizedName=renamed;state.List.UncategorizedDescription=dialog.ResultDescription;}
-                else{
-                    state.List.Categories[state.List.Categories.IndexOf(category)]=renamed;
-                    foreach(var item in state.List.Presets)for(int i=0;i<item.Categories.Count;i++)if(String.Equals(item.Categories[i],category,StringComparison.OrdinalIgnoreCase))item.Categories[i]=renamed;
-                    foreach(var mod in state.List.Mods.Where(m=>String.Equals(m.Category,category,StringComparison.OrdinalIgnoreCase)))mod.Category=renamed;
-                    state.List.CategoryDescriptions.Remove(category);state.List.CategoryDescriptions[renamed]=dialog.ResultDescription;
-                }
-                if(categoryFilters!=null&&category!=null&&categoryFilters.Remove(category))categoryFilters.Add(renamed);
+                else RenameCategory(category,renamed,dialog.ResultDescription);
                 if(create&&categoryFilters!=null)categoryFilters.Add(renamed);
                 FinishProjectEdit();DrawRows();
             }
         }catch(Exception ex){ShowError(ex);}
+    }
+    void RenameCategory(string category,string renamed,string description){
+        state.List.Categories[state.List.Categories.IndexOf(category)]=renamed;
+        foreach(var preset in state.List.Presets)
+            for(int i=0;i<preset.Categories.Count;i++)
+                if(String.Equals(preset.Categories[i],category,StringComparison.OrdinalIgnoreCase))preset.Categories[i]=renamed;
+        foreach(var mod in state.List.Mods.Where(item=>String.Equals(item.Category,category,StringComparison.OrdinalIgnoreCase)))
+            mod.Category=renamed;
+        state.List.CategoryDescriptions.Remove(category);
+        if(description!=null)state.List.CategoryDescriptions[renamed]=description;
+        if(categoryFilters!=null&&categoryFilters.Remove(category))categoryFilters.Add(renamed);
     }
     void OpenDownloads(){
         if(!Directory.Exists(state.DownloadFolder))throw new IOException(T("A pasta de downloads não está disponível. Escolha outra em Opções.","The download folder is unavailable. Choose another one in Options."));

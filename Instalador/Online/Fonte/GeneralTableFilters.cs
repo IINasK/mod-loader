@@ -56,6 +56,7 @@ internal sealed partial class GeneralModWindow {
         if(value=="Desabilitado"||value=="Disabled")return "disabled";
         if(value==GeneralStatusPresentation.ChooseDependency||value=="Choose version")return "dependency-version";
         if(value=="Encontrado no jogo"||value=="Found in game")return "game-inventory";
+        if(value==GeneralStatusPresentation.DetectedFiles||value=="Files detected")return "detected-files";
         return "error";
     }
     static string GameInventoryStatus {get{return T("Encontrado no jogo","Found in game");}}
@@ -63,7 +64,8 @@ internal sealed partial class GeneralModWindow {
         if(associationChoice!=null||categoryFilters!=null||variantFilters!=null||groupFilters!=null||
             statusFilters!=null&&!statusFilters.Any(value=>StatusFilterKey(value)=="game-inventory"))
             return Enumerable.Empty<P2PSyncDifference>();
-        return gameInventory.Where(file=>
+        var included=new HashSet<string>(state.List.Mods.SelectMany(mod=>mod.DetectedPaths),StringComparer.OrdinalIgnoreCase);
+        return gameInventory.Where(file=>!included.Contains(file.Path)&&
             (String.IsNullOrWhiteSpace(nameFilter)||(file.Mod??file.Path).IndexOf(nameFilter,StringComparison.CurrentCultureIgnoreCase)>=0)&&
             GeneralModSearch.Matches(searchTerms,file.Mod,file.Path,GameInventoryStatus));
     }
@@ -109,6 +111,8 @@ internal sealed partial class GeneralModWindow {
                 GeneralStatusPresentation.Label(GeneralStatusPresentation.ChooseDependency),
                 T("Falha","Failed")}.ToList();
         if(column==3&&gameInventory.Count>0)values.Add(GameInventoryStatus);
+        if(column==3&&statuses.Values.Contains(GeneralStatusPresentation.DetectedFiles))
+            values.Add(GeneralStatusPresentation.Label(GeneralStatusPresentation.DetectedFiles));
         var current=column==1?categoryFilters:column==2?variantFilters:statusFilters;
         IEnumerable<string> selected=current==null?null:column==3?values.Where(value=>current.Any(item=>StatusFilterKey(item)==StatusFilterKey(value))):current.Select(value=>column==1&&value==""?uncat:value);
         using(var dialog=new GeneralColumnFilterDialog(column==1?T("Filtrar mods","Filter mods"):column==2?T("Filtrar variantes","Filter variants"):T("Filtrar situação","Filter status"),values,selected,nameFilter,column==1)){

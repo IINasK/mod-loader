@@ -21,6 +21,9 @@ internal sealed partial class GeneralModWindow {
         string unknown=Safe.In(game,"untracked.txt");File.WriteAllText(unknown,new string('x',9000));var size=GeneralProjectStorage.Measure(store,catalog,cache,project);
         check(size.ModCount==4&&size.Identified==3&&size.ModBytes.Count==3,"Measured ratio counts files on disk, not selected boxes or published download sizes.");
         check(size.ModBytes[first.Id]==5&&size.ModBytes[second.Id]==5&&size.ModBytes[empty.Id]==0&&!size.ModBytes.ContainsKey(absent.Id),"Shared files appear for each owner; zero bytes is identified and a missing mod stays unknown.");
+        check(size.CategoryBytes(new[]{first.Id,second.Id,empty.Id,absent.Id})==5&&
+            size.CategoryBytes(new[]{empty.Id})==0&&size.CategoryBytes(new[]{absent.Id})==null,
+            "Category size counts shared files once, keeps a measured zero and ignores download estimates.");
         check(size.Mods==5&&size.ModBytes.Values.Sum()==10,"Project installed total deduplicates a shared path even when per-mod rows both show it.");
         long support=Directory.GetFiles(data,"*",SearchOption.AllDirectories).Sum(path=>new FileInfo(path).Length);
         check(size.Cache==support&&size.Total==size.Mods+support+new FileInfo(source).Length+new FileInfo(zero).Length,"Project cache includes support files; original Downloads archives stay a separate part of total.");
@@ -37,6 +40,8 @@ internal sealed partial class GeneralModWindow {
         var visibleState=store.Load(project);visibleState.SelectedPreset=null;
         TestForm(catalog,visibleState,data,root,async form=>{
             form.AttachProject(store,project);form.RefreshStorageSize();await Until(()=>!form.storageReading);form.DrawRows();
+            var section=(SectionRow)form.grid.Rows[0].Tag;
+            check(section.Size=="≥ 5 B","The category total distinguishes a partial measurement from a complete one.");
             check(form.counts.Text.Contains("Medidos: 3/4"),"Counter reports identified sizes over all visible mod rows: "+form.counts.Text);
             check(form.grid.Columns["Size"].DisplayIndex==form.grid.Columns["Name"].DisplayIndex+1&&form.grid.Columns["Variant"].Index==2&&form.grid.Columns["Status"].Index==3,"Space sits next to the name without changing the existing column-filter identities.");
             check((string)form.ModRows().Single(row=>(string)row.Tag==first.Id).Cells["Size"].Value=="5 B"&&(string)form.ModRows().Single(row=>(string)row.Tag==empty.Id).Cells["Size"].Value=="0 B","Rows show actual measured values, including zero.");
