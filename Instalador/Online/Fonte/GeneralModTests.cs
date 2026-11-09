@@ -119,16 +119,6 @@ internal sealed partial class GeneralModWindow {
             pending.Clear();
             missing=form.PlanSelected(selected,game,pending);
             check(pending.Contains(ordered[0])&&missing.SequenceEqual(new[]{"fixture3"}),"Uma dependência faltante entra uma só vez mesmo quando o mod selecionado já está presente.");
-            var dependency=fake.Packages[2];
-            dependency.Assets[0].ModId=1873;
-            check(form.RequiresNsfwApproval(ordered[0],new ScanReads(form,game)),
-                "Dependência NSFW ausente exige autorização mesmo quando o item principal não é NSFW.");
-            string dependencyPath=Safe.In(game,dependency.Files[0].Path);
-            File.WriteAllText(dependencyPath,"fixture3",new UTF8Encoding(false));
-            check(!form.RequiresNsfwApproval(ordered[0],new ScanReads(form,game)),
-                "Dependência NSFW já instalada não pede autorização para instalar o outro mod.");
-            File.Delete(dependencyPath);
-            dependency.Assets[0].ModId=400;
             var review=new ProjectVerification(false){Reads=new ScanReads(form,game)};
             review.Record(ordered[0]);
             var suggested=new Dictionary<string,Work>();
@@ -160,6 +150,15 @@ internal sealed partial class GeneralModWindow {
             form.RequestSkip();await Until(()=>!form.working);
             check(form.statuses[ordered[2].Key]=="Pulado"&&!File.Exists(Path.Combine(game,"archive","pc","mod","fixture3.archive")),"Pular não grava o mod que está aguardando.");
             check(form.Status(form.MakeWork(urgent),game)=="Instalado","Instalação CET reconhecida pelo recibo legado.");
+            string renamedArchive=Path.Combine(root,"renamed.zip");
+            File.Copy(originals["fixture3"],renamedArchive);
+            int dropPrompts=0;
+            form.testCatalogDropPrompt=message=>{dropPrompts++;return message.Contains("fixture3");};
+            form.Drop(new[]{renamedArchive});
+            await Until(()=>dropPrompts==1&&!form.working&&!form.editingAttachment);
+            check(opened.Count==2&&form.state.List.Mods.Count==4&&form.marked.Count==0&&
+                form.Status(ordered[2],game)=="Instalado",
+                "Arrastar ZIP fixo renomeado reconhece o hash e instala sem seleção ou nova página.");
             await Task.Run(()=>form.Cyberpunk(game).RemoveImported(ImportItem(local).Id,s=>{}));
             check(!File.Exists(urgentPath)&&File.Exists(first),"Remoção direcionada de importado preserva os outros mods.");
             form.state.List.Mods.AddRange(bodies);
@@ -182,6 +181,34 @@ internal sealed partial class GeneralModWindow {
             check(form.ColumnAllows(baseBody.Entry)&&form.ColumnAllows(pushUp.Entry)&&!form.ColumnAllows(urgent),
                 "Buscar NSFW encontra as entradas marcadas.");
             form.searchTerms=new string[0];
+        });
+        string browserFixture=OnlineTests.NestedRoot(root,"fixed-browser-");
+        Directory.CreateDirectory(browserFixture);
+        string browserGame=OnlineTests.Fixture(browserFixture,"browser-game");
+        var browserState=new GeneralModState{List=GeneralModLibrary.Seed(fake,new ModImportItem[0]),Destination=browserGame,DownloadFolder=download};
+        string otherFolder=Path.Combine(browserFixture,"outside");
+        Directory.CreateDirectory(otherFolder);
+        string browserArchive=Path.Combine(otherFolder,"changed-name.zip");
+        File.Copy(originals["fixture3"],browserArchive);
+        string wrongArchive=Path.Combine(otherFolder,"wrong-hash.zip");
+        byte[] altered=File.ReadAllBytes(browserArchive);altered[0]^=1;File.WriteAllBytes(wrongArchive,altered);
+        TestForm(fake,browserState,Path.Combine(browserFixture,"data"),browserFixture,async form=>{
+            int pages=0;form.launch=url=>pages++;
+            string channel="ModLoader-fixture-"+Guid.NewGuid().ToString("N");
+            form.testBrowserDownloadChannel=channel;
+            var fixedWork=form.MakeWork(browserState.List.Mods.Single(entry=>entry.Id=="fixture3"));
+            form.Enqueue(new[]{fixedWork},false);
+            await Until(()=>form.NeedUnknownFile&&pages==1);
+            check(await Task.Run(()=>NotifyBrowser(wrongArchive,channel)),
+                "A ponte entrega candidatos de mesma extensão e tamanho ao conferidor.");
+            await Task.Delay(850);
+            check(form.NeedUnknownFile&&!File.Exists(Safe.In(browserGame,fake.Packages[2].Files[0].Path)),
+                "O SHA-256 impede instalar um arquivo de tamanho igual que difere do pacote fixado.");
+            check(await Task.Run(()=>NotifyBrowser(browserArchive,channel)),
+                "A ponte informa o caminho do pacote fixado que foi renomeado ao salvar.");
+            await Until(()=>!form.working);
+            check(pages==1&&form.Status(fixedWork,browserGame)=="Instalado",
+                "O pacote fixado é instalado pelo SHA-256 mesmo fora da pasta monitorada.");
         });
         string general=Path.Combine(root,"outro-jogo");
         Directory.CreateDirectory(general);

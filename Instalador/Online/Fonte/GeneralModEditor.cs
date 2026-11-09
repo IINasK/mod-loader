@@ -20,7 +20,12 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
     readonly CheckBox usePending = new CheckBox { AutoSize = true, Visible = false, Dock = DockStyle.Fill, UseMnemonic = false };
     readonly GeneralPicker variants = new GeneralPicker { Name = "DownloadVersion", Dock = DockStyle.Fill };
     readonly TextBox variantName = new TextBox { Dock = DockStyle.Fill, MaxLength = 300 };
-    readonly TextBox sources = new TextBox { Dock = DockStyle.Fill, Multiline = true, ScrollBars = ScrollBars.Vertical, MaxLength = 131104 };
+    readonly TextBox sources = new TextBox { Name = "DownloadSource", Dock = DockStyle.Fill, MaxLength = 4096 };
+    readonly GeneralPicker sourcePicker = new GeneralPicker { Name = "DownloadSourcePicker", Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
+    readonly TextBox modGroups = new TextBox { Name = "CompatibilityGroups", Dock = DockStyle.Fill, MaxLength = 240 };
+    readonly TextBox versionGroups = new TextBox { Name = "RequiredCompatibilityGroups", Dock = DockStyle.Fill, MaxLength = 240 };
+    readonly Button addSource, removeSource, copySource;
+    int sourceIndex;
     readonly Label validation = new Label { AutoSize = true, Dock = DockStyle.Fill, UseMnemonic = false };
     readonly Label installNote;
     readonly Label sourceInfo=new Label{Name="SourceMetadata",AutoSize=true,Dock=DockStyle.Fill,UseMnemonic=false};
@@ -29,7 +34,9 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
     readonly string dependencySource;
     readonly int dependencyFile;
     string lastAutoName;
-    int sourceGeneration;
+    int sourceGeneration, queriedGeneration = -1;
+    Task sourceQuery;
+    bool finishing;
     readonly Button alternative, unlink, groupColor;
     readonly TextBox groupName = new TextBox { Name = "AlternativeGroupName", MaxLength = 18 };
     readonly Control groupFields;
@@ -52,12 +59,12 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
     internal bool InstallRequested { get; private set; }
     internal bool AttachRequested { get; private set; }
 
-    internal GeneralModEditor(GeneralModEntry entry, IEnumerable<string> categories, string selected, bool allowInstall, string installInfo,Func<string,Task<GeneralSourceInfo>> lookup=null, IEnumerable<GeneralModEntry> alternatives=null, GeneralModList groupList=null) {
+    internal GeneralModEditor(GeneralModEntry entry, IEnumerable<string> categories, string selected, bool allowInstall, string installInfo,Func<string,Task<GeneralSourceInfo>> lookup=null, IEnumerable<GeneralModEntry> alternatives=null, GeneralModList groupList=null, bool projectDraft=false) {
         this.lookup=lookup;
         dependencySource=entry.DependencySource;dependencyFile=entry.DependencyFile;
         this.groupList=groupList??new GeneralModList();
         model = entry.Variants.Select(v => new GeneralModVariant {
-            Id = v.Id, Name = v.Name, Sources = v.Sources.ToList(), SourceInfo=v.SourceInfo==null?new Dictionary<string,GeneralSourceInfo>():v.SourceInfo.ToDictionary(pair=>pair.Key,pair=>pair.Value.SavedCopy()), CyberpunkId = v.CyberpunkId, CyberpunkVariant = v.CyberpunkVariant
+            Id = v.Id, Name = v.Name, CompatibilityGroups = v.CompatibilityGroups.ToList(), Sources = v.Sources.ToList(), SourceInfo=v.SourceInfo==null?new Dictionary<string,GeneralSourceInfo>():v.SourceInfo.ToDictionary(pair=>pair.Key,pair=>pair.Value.SavedCopy()), CyberpunkId = v.CyberpunkId, CyberpunkVariant = v.CyberpunkVariant
         }).ToList();
         if (model.Count == 0) model.Add(new GeneralModVariant { Id = Guid.NewGuid().ToString("N"), Name = T("Principal", "Default") });
         principal = model.Any(v => v.Id == entry.DefaultVariant) ? entry.DefaultVariant : model[0].Id;
@@ -144,35 +151,77 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         }
         editorTips.SetToolTip(setDefault, T("Versão usada quando nenhuma outra foi escolhida.", "Version used when no other version is selected."));
         AddEditorRow(layout, variantActions);
-        var sourceField=EditorField(T("Links ou arquivos * (um por linha)", "Links or files * (one per line)"),sources,44);
-        var sourceSurface=(GeneralSurface)sourceField.Controls[1];
-        sources.WordWrap=false;
-        sources.TextChanged+=(s,e)=>{
-            int lines=Math.Max(1,Math.Min(4,sources.Lines.Length));
-            int height=lines==1?44:Math.Max(58,lines*sources.Font.Height+20);
-            sourceSurface.MaximumSize=new Size(0,height);
-            sourceSurface.MinimumSize=new Size(100,height);
-            sourceSurface.Height=height;
+
+        AddEditorRow(layout,sourcePicker);
+        sourcePicker.SelectedIndexChanged+=(s,e)=>{
+            if(changing||sourcePicker.SelectedIndex<0)return;
+            SaveCurrent();
+            LoadSource(sourcePicker.SelectedIndex);
         };
-        sourceSurface.MaximumSize=new Size(0,44);
-        sourceSurface.Height=44;
+        var sourceField=EditorField(T("Link ou arquivo *", "Link or file *"),sources);
+        var sourceSurface=(GeneralSurface)sourceField.Controls[1];
+        sourceSurface.Padding=new Padding(10,4,10,4);
+        var sourceLayout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};
+        sourceLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        sourceLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
+        sourceSurface.Controls.Remove(sources);
+        sources.Margin=new Padding(2,9,4,0);
+        sourceLayout.Controls.Add(sources,0,0);
+        sourceSurface.Controls.Add(sourceLayout);
+        copySource=GeneralStyle.Button("",()=>{
+            if(!String.IsNullOrWhiteSpace(sources.Text))Clipboard.SetText(sources.Text.Trim());
+        });
+        copySource.Name="CopyDownloadSource";
+        copySource.AccessibleName=T("Copiar link ou caminho","Copy link or path");
+        var copyIcon=(GeneralButton)copySource;
+        copyIcon.IconKind="copy";copyIcon.Bare=true;copyIcon.AutoSize=false;
+        copySource.MinimumSize=copySource.Size=new Size(44,44);
+        copySource.Padding=Padding.Empty;
+        sourceSurface.MinimumSize=new Size(100,52);
+        copySource.Margin=Padding.Empty;copySource.Dock=DockStyle.Fill;
+        sourceLayout.Controls.Add(copySource,1,0);
+        editorTips.SetToolTip(copySource,copySource.AccessibleName);
         AddEditorRow(layout,sourceField);
+        addSource=GeneralStyle.Button(T("Adicionar link","Add link"),()=>{
+            SaveCurrent();
+            if(current.Sources.Count>=32)return;
+            if(current.Sources.Any(String.IsNullOrWhiteSpace)){
+                LoadSource(current.Sources.FindIndex(String.IsNullOrWhiteSpace));
+            }else{
+                current.Sources.Add("");
+                LoadSource(current.Sources.Count-1);
+            }
+            sources.Focus();
+        });
+        removeSource=GeneralStyle.Button(T("Remover fonte","Remove source"),()=>{
+            if(current.Sources.Count<=1)return;
+            current.Sources.RemoveAt(sourceIndex);
+            LoadSource(Math.Min(sourceIndex,current.Sources.Count-1));
+        });
         browse = GeneralStyle.Button(T("Adicionar arquivo local", "Add local file"), () => {
             using (var dialog = new OpenFileDialog { Filter = T("Pacotes de mods|*.zip;*.rar;*.7z", "Mod archives|*.zip;*.rar;*.7z"), Multiselect = true }) {
-                if (dialog.ShowDialog(this) == DialogResult.OK)
-                    sources.Lines = sources.Lines.Where(line => !String.IsNullOrWhiteSpace(line)).Concat(dialog.FileNames).Distinct().ToArray();
+                if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                SaveCurrent();
+                var entries=current.Sources.Where(value=>!String.IsNullOrWhiteSpace(value)).ToList();
+                int first=entries.Count;
+                current.Sources=entries.Concat(dialog.FileNames).Distinct(StringComparer.OrdinalIgnoreCase).Take(32).ToList();
+                LoadSource(Math.Min(first,current.Sources.Count-1));
             }
         });
-        browse.Anchor = AnchorStyles.Left;
-        browse.Margin = new Padding(3, 3, 3, 6);
-        AddEditorRow(layout, browse);
+        var sourceActions=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink};
+        foreach(var action in new[]{addSource,removeSource,browse})sourceActions.Controls.Add(action);
+
         sourceInfo.Font = GeneralStyle.Font(10);
         sourceInfo.Dock = DockStyle.Top;
         sourceInfo.Margin = new Padding(3, 4, 3, 8);
         sourceInfo.TextChanged += (s, e) => sourceInfo.Visible = sourceInfo.Text.Length > 0;
         sourceInfo.Visible = false;
         AddEditorRow(layout,sourceInfo);
+        AddEditorRow(layout,sourceActions);
+        AddEditorRow(layout,EditorField(T("Grupos exigidos pela versão (separe com vírgulas)", "Groups required by this version (comma separated)"),versionGroups));
 
+        AddEditorRow(layout,EditorField(T("Grupos de compatibilidade do mod (separe com vírgulas)", "Mod compatibility groups (comma separated)"),modGroups));
+        modGroups.Text=String.Join(", ",entry.CompatibilityGroups);
         if (alternatives != null) {
             var options = alternatives.Where(other => other.Id != entry.Id).ToList();
             AddEditorRow(layout, EditorSection(T("Mods alternativos", "Alternative mods"), true));
@@ -229,7 +278,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         install = GeneralStyle.Button(T("Instalar", "Install"), () => Finish(entry.Id, true), true);
         install.Visible = allowInstall;
         commands.Controls.Add(install);
-        save = GeneralStyle.Button(T("Salvar", "Save"), () => Finish(entry.Id, false), false);
+        save = GeneralStyle.Button(projectDraft?T("Aplicar","Apply"):T("Salvar", "Save"), () => Finish(entry.Id, false), false);
         commands.Controls.Add(save);
         var close = GeneralStyle.Button(T("Cancelar", "Cancel"), () => { DialogResult = DialogResult.Cancel; }, false);
         commands.Controls.Add(close);
@@ -243,14 +292,14 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
             RefreshVariants(next);
         };
         sources.ReadOnlyChanged += (s, e) => browse.Enabled = !sources.ReadOnly && !attachment;
-        foreach (Control field in new Control[] { modName, category, tags, description, variantName, sources })
+        foreach (Control field in new Control[] { modName, category, tags, description, variantName, sources, modGroups, versionGroups })
             field.TextChanged += (s, e) => ValidateInputs();
         GeneralStyle.Apply(this, GeneralStyle.Dark);
         RemoveFieldBorders(this);
         MergeSourceTags(entry.Tags);
         RefreshVariants(selected);
         sources.TextChanged += (s, e) => ScheduleSourceInfo();
-        sourceDelay.Tick += async (s, e) => { sourceDelay.Stop(); await UpdateSourceInfo(); };
+        sourceDelay.Tick += async (s, e) => { sourceDelay.Stop(); await CurrentSourceInfo(); };
         Shown += (s, e) => ScheduleSourceInfo();
         Disposed += (s, e) => { sourceDelay.Dispose(); editorTips.Dispose(); };
     }
@@ -342,6 +391,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         installNote.Text = T("Arquivo recebido: ", "Received file: ") + file;
         variants.Enabled = variantName.Enabled = variantActions.Enabled = browse.Enabled = false;
         sources.ReadOnly = true;
+        addSource.Enabled = removeSource.Enabled = modGroups.Enabled = versionGroups.Enabled = false;
         install.Text = T("Vincular e continuar", "Attach and continue");
         install.Visible = true;
         ValidateInputs();
@@ -436,8 +486,9 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
     void SaveCurrent() {
         if (current == null || attachment) return;
         current.Name = variantName.Text.Trim();
-        if (String.IsNullOrEmpty(current.CyberpunkId))
-            current.Sources = sources.Lines.Select(line => line.Trim()).Where(line => line.Length > 0).Distinct().ToList();
+        current.CompatibilityGroups=SplitGroups(versionGroups.Text);
+        if (String.IsNullOrEmpty(current.CyberpunkId)&&sourceIndex<current.Sources.Count)
+            current.Sources[sourceIndex]=sources.Text.Trim();
         if(current.SourceInfo==null)current.SourceInfo=new Dictionary<string,GeneralSourceInfo>();
         foreach(string key in current.SourceInfo.Keys.Where(key=>!current.Sources.Contains(key)).ToArray())current.SourceInfo.Remove(key);
     }
@@ -450,12 +501,33 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         variants.SelectedIndex = index < 0 ? 0 : index;
         current = model[variants.SelectedIndex];
         variantName.Text = current.Name;
-        sources.Lines = current.Sources.ToArray();
-        sources.ReadOnly = !String.IsNullOrEmpty(current.CyberpunkId);
+        versionGroups.Text=String.Join(", ",current.CompatibilityGroups);
+        LoadSource(0);
         removeVariant.Enabled = model.Count > 1;
         setDefault.Enabled = current.Id != principal;
         changing = false;
         ValidateInputs();ScheduleSourceInfo();
+    }
+
+    void LoadSource(int index){
+        bool previous=changing;changing=true;
+        if(current.Sources.Count==0)current.Sources.Add("");
+        sourceIndex=index;
+        sources.Text=current.Sources[index];
+        sources.ReadOnly=attachment||!String.IsNullOrEmpty(current.CyberpunkId);
+        addSource.Enabled=browse.Enabled=!sources.ReadOnly;
+        removeSource.Enabled=!sources.ReadOnly&&current.Sources.Count>1;
+        sourcePicker.Items.Clear();
+        for(int i=0;i<current.Sources.Count;i++)sourcePicker.Items.Add(T("Fonte ","Source ")+(i+1));
+        sourcePicker.SelectedIndex=index;
+        sourcePicker.Visible=current.Sources.Count>1;
+        changing=previous;
+        ValidateInputs();ScheduleSourceInfo();
+    }
+
+    static List<string> SplitGroups(string value){
+        return value.Split(',').Select(group=>group.Trim()).Where(group=>group.Length!=0)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     string VariantLabel(GeneralModVariant variant) { return variant.Name + (variant.Id == principal ? T(" (padrão)", " (default)") : ""); }
@@ -465,7 +537,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         return new GeneralModEntry {
             Id = id, Name = modName.Text.Trim(), Category = category.Text.Trim(), Description = description.Text.Trim(),
             Tags = selectedTags.Concat(new[] { tags.Text.Trim() }).Where(tag => tag.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
-            Nsfw = nsfw.Checked, DefaultVariant = principal, Variants = model, DependencySource=dependencySource, DependencyFile=dependencyFile
+            Nsfw = nsfw.Checked, CompatibilityGroups=SplitGroups(modGroups.Text), DefaultVariant = principal, Variants = model, DependencySource=dependencySource, DependencyFile=dependencyFile
         };
     }
 
@@ -478,6 +550,12 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
             return T("A descrição aceita até 4.000 caracteres.", "The description can contain up to 4,000 characters.");
         if (entry.Tags != null && (entry.Tags.Count > 32 || entry.Tags.Any(tag => tag.Length > 60 || tag.Any(Char.IsControl))))
             return T("Use até 32 tags de 60 caracteres cada.", "Use up to 32 tags of 60 characters each.");
+        try{
+            GeneralModLibrary.ValidateCompatibilityGroups(entry.CompatibilityGroups);
+            foreach(var version in entry.Variants)GeneralModLibrary.ValidateCompatibilityGroups(version.CompatibilityGroups);
+        }catch(IOException){
+            return T("Use até 12 grupos de 18 caracteres cada.","Use up to 12 groups of 18 characters each.");
+        }
         foreach (var variant in entry.Variants) {
             if (String.IsNullOrWhiteSpace(variant.Name) || variant.Name.Length > 300 || variant.Name.Any(Char.IsControl))
                 return T("Informe o nome de cada variante.", "Enter a name for each variant.");
@@ -497,7 +575,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         string error = CurrentValidation(draft);
         validation.Text = error;
         validation.Visible = error.Length != 0;
-        save.Enabled=error.Length==0;
+        save.Enabled=error.Length==0&&!finishing;
         install.Enabled=save.Enabled&&current!=null&&!GeneralModLibrary.NeedsDependencyVersion(draft,current);
         if (current != null && variants.SelectedIndex >= 0) {
             changing = true;
@@ -508,10 +586,21 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         }
     }
 
-    void Finish(string id, bool requested) {
+    async void Finish(string id, bool requested) {
+        if(finishing)return;
         GeneralModEntry draft = Draft(id);
         string error = CurrentValidation(draft);
         if (error.Length != 0) { validation.Text = error; return; }
+        if(!attachment&&lookup!=null&&GeneralNexusLink.Parse(sources.Text.Trim())!=null){
+            int generation=sourceGeneration;
+            sourceDelay.Stop();finishing=true;ValidateInputs();
+            try{await CurrentSourceInfo();}
+            finally{finishing=false;if(!IsDisposed)ValidateInputs();}
+            if(IsDisposed||DialogResult==DialogResult.Cancel||generation!=sourceGeneration)return;
+            draft=Draft(id);
+            error=CurrentValidation(draft);
+            if(error.Length!=0){validation.Text=error;return;}
+        }
         foreach(var variant in draft.Variants){
             GeneralModLibrary.NormalizeSources(variant);
             if(dependencySource!=null&&(variant.Name=="Indefinida"||variant.Name=="Undefined")&&

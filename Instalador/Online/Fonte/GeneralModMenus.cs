@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -19,7 +19,7 @@ internal sealed partial class GeneralModWindow {
     }
     async void Replace(GeneralModList list){await ReplaceList(list);}
     async Task<bool> ReplaceList(GeneralModList list,bool clearBindings=false,string snapshotReceipt=null,string newDestination=null){
-        if(working||scanning||list==null)return false;
+        if(working||scanning||list==null||!ConfirmProjectNavigation())return false;
         if(state.List.Mods.Count!=0&&GeneralDialog.Message(this,T("Trocar a lista atual? Exporte primeiro se quiser guardar uma cópia. Os arquivos instalados permanecem no lugar.","Replace the current list? Export it first to keep a copy. Installed files will stay in place."),T("Trocar lista","Replace list"),MessageBoxButtons.OKCancel,MessageBoxIcon.Question)!=DialogResult.OK)return false;
         try{
             GeneralModLibrary.RestoreKnownMappings(list,seed);state.List=list;state.SelectedPreset=list.Presets.FirstOrDefault()==null?null:list.Presets[0].Id;state.ChosenVariants.Clear();marked.Clear();statuses.Clear();statusDetails.Clear();progress.Clear();ResetColumnFilters();hasPresetDraft=false;
@@ -49,7 +49,7 @@ internal sealed partial class GeneralModWindow {
     void DeletePreset(){
         if(working||scanning||ProtectedPreset)return;var item=state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);if(item==null)return;
         if(GeneralDialog.Message(this,T("Excluir este preset? Os mods permanecem na lista.","Delete this preset? Mods will remain in the list.")+"\n"+item.Name,T("Excluir preset","Delete preset"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-        state.List.Presets.Remove(item);state.SelectedPreset=null;Persist();RebuildPresets();
+        BeginProjectEdit();state.List.Presets.Remove(item);state.SelectedPreset=null;FinishProjectEdit();RebuildPresets();
     }
     void EditCategory(string category,bool create){
         if(working||scanning)return;
@@ -61,16 +61,17 @@ internal sealed partial class GeneralModWindow {
                 if(dialog.ShowDialog(this)!=DialogResult.OK)return;
                 if(dialog.DeleteRequested){
                     if(GeneralDialog.Message(this,T("Excluir a categoria? Os mods vão para Sem categoria; os arquivos instalados serão preservados.","Delete this category? Mods will move to Uncategorized; installed files will stay in place."),T("Excluir categoria","Delete category"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-                    GeneralModLibrary.DeleteCategory(state.List,category);ResetColumnFilters();Persist();DrawRows();return;
+                    BeginProjectEdit();GeneralModLibrary.DeleteCategory(state.List,category);ResetColumnFilters();FinishProjectEdit();DrawRows();return;
                 }
                 string renamed=dialog.ResultName;
                 string existing=state.List.Categories.FirstOrDefault(c=>String.Equals(c,renamed,StringComparison.OrdinalIgnoreCase));
                 if(create&&existing!=null&&ActivePreset!=null){
+                    BeginProjectEdit();
                     if(!ActivePreset.Categories.Contains(existing,StringComparer.OrdinalIgnoreCase))ActivePreset.Categories.Add(existing);
-                    if(categoryFilters!=null)categoryFilters.Add(existing);Persist();DrawRows();return;
+                    if(categoryFilters!=null)categoryFilters.Add(existing);FinishProjectEdit();DrawRows();return;
                 }
                 if(state.List.Categories.Any(c=>!String.Equals(c,category,StringComparison.OrdinalIgnoreCase)&&String.Equals(c,renamed,StringComparison.OrdinalIgnoreCase)))throw new IOException(T("Já existe uma categoria com esse nome.","A category with this name already exists."));
-                if(create){state.List.Categories.Add(renamed);state.List.CategoryDescriptions[renamed]=dialog.ResultDescription;if(ActivePreset!=null)ActivePreset.Categories.Add(renamed);}
+                BeginProjectEdit();if(create){state.List.Categories.Add(renamed);state.List.CategoryDescriptions[renamed]=dialog.ResultDescription;if(ActivePreset!=null)ActivePreset.Categories.Add(renamed);}
                 else if(category==null){state.List.UncategorizedName=renamed;state.List.UncategorizedDescription=dialog.ResultDescription;}
                 else{
                     state.List.Categories[state.List.Categories.IndexOf(category)]=renamed;
@@ -80,7 +81,7 @@ internal sealed partial class GeneralModWindow {
                 }
                 if(categoryFilters!=null&&category!=null&&categoryFilters.Remove(category))categoryFilters.Add(renamed);
                 if(create&&categoryFilters!=null)categoryFilters.Add(renamed);
-                Persist();DrawRows();
+                FinishProjectEdit();DrawRows();
             }
         }catch(Exception ex){ShowError(ex);}
     }

@@ -689,7 +689,7 @@ internal sealed partial class GeneralModWindow {
     internal Control SharingPromptOwner {
         get{return sharingDialog!=null&&!sharingDialog.IsDisposed&&sharingDialog.Visible?(Control)sharingDialog:this;}
     }
-    internal bool CanApplyReceivedProject {get{return !working&&!scanning&&!hasPresetDraft&&(Enabled||sharingDialog!=null);}}
+    internal bool CanApplyReceivedProject {get{return !working&&!scanning&&projectDraft==null&&!DraftNameChanged&&(Enabled||sharingDialog!=null);}}
     internal void ReloadReceivedProject(GeneralProject received){
         if(project==null||project.Id!=received.Id)return;
         var saved=projectStore.Load(received);
@@ -698,7 +698,7 @@ internal sealed partial class GeneralModWindow {
         state.ChosenVariants=saved.ChosenVariants;state.ResolvedDownloads=saved.ResolvedDownloads;
         state.CyberpunkImports=saved.CyberpunkImports;state.SnapshotReceipts=saved.SnapshotReceipts;
         marked.Clear();statuses.Clear();statusDetails.Clear();progress.Clear();
-        ResetColumnFilters();RebuildPresets();
+        ResetColumnFilters();CapturePresetDraft();RebuildPresets();
         BeginInvoke((Action)(async()=>{if(!IsDisposed&&!working&&!scanning)await Scan();}));
     }
 
@@ -711,7 +711,7 @@ internal sealed partial class GeneralModWindow {
                     p2p.ConfirmConnection=session=>GeneralP2PDialog.AskConnection(this,()=>SharingPromptOwner,p2p,session);
                     p2p.ChooseVersion=difference=>GeneralVersionChoiceDialog.Ask(SharingPromptOwner,difference);
                 }
-                p2p.SetPreparationState(state);
+                p2p.SetPreparationState(CommittedProject());
                 Action<P2PSession> installed=session=>{
                     if(IsDisposed||!IsHandleCreated)return;
                     BeginInvoke((Action)(async()=>{
@@ -747,7 +747,7 @@ internal sealed partial class GeneralModWindow {
     }
 
     async void ShowP2P(){
-        if(working||scanning)return;
+        if(working||scanning||!ConfirmProjectNavigation())return;
         try{
             PrepareP2P();
             using(var dialog=new GeneralP2PDialog(p2p,state,catalog)){

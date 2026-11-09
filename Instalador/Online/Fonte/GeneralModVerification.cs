@@ -71,6 +71,7 @@ internal sealed partial class GeneralModWindow {
     }
 
     async Task VerifyProject() {
+        if(projectDraft!=null&&!ConfirmProjectNavigation())return;
         if(working||scanning)return;
         if(String.IsNullOrWhiteSpace(state.Destination)||!Directory.Exists(state.Destination)){
             detail.Text=T("Selecione a pasta de instalação para verificar.","Select the installation folder to verify.");

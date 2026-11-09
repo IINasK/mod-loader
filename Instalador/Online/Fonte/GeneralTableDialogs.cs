@@ -145,12 +145,9 @@ internal static class GeneralTableDialogLayout {
 }
 
 internal sealed class GeneralInstallConfirmation : GeneralDialog {
-    readonly CheckBox includeNsfw = new CheckBox { AutoSize = true, Name = "IncludeNsfw" };
-    internal bool IncludeNsfw { get { return includeNsfw.Checked; } }
-
-    internal GeneralInstallConfirmation(string destination, int queued, IReadOnlyList<string> downloads, int nsfwCount = 0)
+    internal GeneralInstallConfirmation(string destination, int queued, IReadOnlyList<string> downloads)
         : base(GeneralStyle.T("Confirmar instalação", "Confirm installation")) {
-        ClientSize = new Size(660, (downloads.Count == 0 ? 250 : 310 + Math.Min(6, downloads.Count - 1) * 34) + (nsfwCount > 0 ? 42 : 0));
+        ClientSize = new Size(660, downloads.Count == 0 ? 250 : 310 + Math.Min(6, downloads.Count - 1) * 34);
         var layout = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(20, 8, 20, 20)
         };
@@ -203,17 +200,6 @@ internal sealed class GeneralInstallConfirmation : GeneralDialog {
             layout.Controls.Add(surface, 0, 2);
         }
 
-        if (nsfwCount > 0) {
-            layout.RowCount = 5;
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            includeNsfw.Text = String.Format(GeneralStyle.T(
-                "Incluir conteúdo NSFW (18+) nesta fila ({0} item(ns))",
-                "Include NSFW content (18+) in this queue ({0} item(s))"), nsfwCount);
-            includeNsfw.Font = GeneralStyle.Font(11);
-            includeNsfw.Margin = new Padding(0, 12, 0, 0);
-            layout.Controls.Add(includeNsfw, 0, 3);
-        }
-
         var actions = GeneralTableDialogLayout.Commands();
         var proceed = GeneralStyle.Button(GeneralStyle.T("Continuar", "Continue"), () => Complete(DialogResult.OK), true);
         proceed.Name = "ConfirmPendingInstall";
@@ -221,7 +207,7 @@ internal sealed class GeneralInstallConfirmation : GeneralDialog {
         cancel.Name = "CancelPendingInstall";
         actions.Controls.Add(proceed);
         actions.Controls.Add(cancel);
-        layout.Controls.Add(actions, 0, nsfwCount > 0 ? 4 : 3);
+        layout.Controls.Add(actions, 0, 3);
         Content.Controls.Add(layout);
         AcceptButton = proceed;
         CancelButton = cancel;

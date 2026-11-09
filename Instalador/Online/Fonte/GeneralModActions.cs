@@ -182,6 +182,7 @@ internal sealed partial class GeneralModWindow {
                     foreach (var work in jobs) {
                         if (ConflictingAlternatives(work, root).Count > 0)
                             throw new IOException(T("Use Mudar versão para trocar alternativas.", "Use Change version to switch alternatives."));
+                        CheckCompatibilityGroups(work,root,new List<Work>(),jobs);
                         if (work.Variant.CyberpunkId != GeneralModLibrary.EclipseTattooId || !jobs.Any(item => item.Entry.Id == "hyst-ebb-rb"))
                             CheckHystBody(work, root);
                         if (work.Variant.CyberpunkId != null) {

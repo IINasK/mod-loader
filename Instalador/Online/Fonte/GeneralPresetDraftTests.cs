@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -36,8 +36,24 @@ internal sealed partial class GeneralModWindow {
                 timer.Tick+=(s,e)=>{var dialog=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(item=>item.Text=="Excluir preset");if(dialog==null)return;timer.Stop();((Button)dialog.AcceptButton).PerformClick();};timer.Start();form.deletePreset.PerformClick();
             }
             check(form.state.List.Presets.Count==0&&form.state.List.Mods.Count==2&&!form.deletePreset.Enabled,"Lixeira exclui somente o preset e fica desativada em Todos os itens.");
+            check(form.projectDraft!=null&&form.library.Load().List.Presets.Count==1,"Excluir o preset prepara o rascunho antes de gravar.");
+            form.presetSettings.PerformClick();
             CompleteProjectName("Meu novo preset",()=>form.presetSettings.PerformClick());
             check(form.ActivePreset!=null&&form.ActivePreset.Name=="Meu novo preset"&&form.ActivePreset.ModIds.SequenceEqual(new[]{a.Id}),"Disquete em Todos os itens cria preset a partir da seleção.");
+            form.BeginProjectEdit();form.state.List.Mods.First().Tags.Add("tag rascunho");form.FinishProjectEdit();
+            form.Persist();
+            check(form.projectDraft!=null&&!form.library.Load().List.Mods.First().Tags.Contains("tag rascunho"),
+                "Persistir preferências ou registros operacionais preserva a definição salva do projeto.");
+            form.testProjectSaveChoice=()=>DialogResult.Cancel;
+            check(!form.ConfirmProjectNavigation()&&form.state.List.Mods.First().Tags.Contains("tag rascunho"),
+                "Cancelar fica no projeto com o rascunho intacto.");
+            form.testProjectSaveChoice=()=>DialogResult.No;
+            check(form.ConfirmProjectNavigation()&&!form.state.List.Mods.First().Tags.Contains("tag rascunho"),
+                "Descartar recupera o projeto salvo.");
+            form.BeginProjectEdit();form.state.List.Mods.First().Tags.Add("tag salva");form.FinishProjectEdit();
+            form.testProjectSaveChoice=()=>DialogResult.Yes;
+            check(form.ConfirmProjectNavigation()&&form.projectDraft==null&&form.library.Load().List.Mods.First().Tags.Contains("tag salva"),
+                "Salvar ao sair grava as edições da lista.");
             foreach(string theme in new[]{"light","light-red","dark"}){
                 state.Theme=theme;form.BuildInterface();form.PerformLayout();await Task.Delay(40);
                 var remove=AllControls(form).OfType<Button>().Single(button=>button.Name=="UninstallSelected");var install=AllControls(form).OfType<Button>().Single(button=>button.Name=="DownloadInstall");

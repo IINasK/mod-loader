@@ -104,9 +104,9 @@ internal sealed partial class GeneralModWindow {
             form.statuses[Key(second,form.Selected(second))]="Instalado";
             form.DrawRows();
             var badges=form.ModRows().Where(row=>Equals(row.Tag,first.Id)||Equals(row.Tag,second.Id)).Select(row=>row.Cells["Group"]).ToArray();
-            check(form.grid.Columns["Group"].DisplayIndex==form.grid.Columns["Status"].DisplayIndex+1&&badges.Length==2&&badges.All(cell=>Equals(cell.Value,"Corpo")),"A coluna Grupo vem depois de Situação e mostra o mesmo nome para as alternativas.");
+            check(!form.grid.Columns["Group"].Visible&&badges.Length==2&&badges.All(cell=>Equals(cell.Value,"Corpo")),"O grupo aparece na linha do nome das alternativas.");
             check(form.totalProgress.Caption.EndsWith("1 / 2")&&form.counts.Text.Contains("Instalados: 1"),"Duas alternativas instaladas contam como uma escolha, com outro mod pendente.");
-            check(((Color)badges[0].Tag).GetBrightness()>((Color)badges[1].Tag).GetBrightness(),"A alternativa ativa usa a cor mais clara do grupo.");
+            check(((List<KeyValuePair<string,Color>>)badges[0].Tag)[0].Value.GetBrightness()>((List<KeyValuePair<string,Color>>)badges[1].Tag)[0].Value.GetBrightness(),"A alternativa ativa usa a cor mais clara do grupo.");
             form.statuses[Key(first,form.Selected(first))]="Não instalado";
             form.statuses[Key(second,form.Selected(second))]="Não instalado";
             form.DrawRows();
@@ -114,11 +114,28 @@ internal sealed partial class GeneralModWindow {
             form.statuses[Key(second,form.Selected(second))]="Pronto para instalar";
             form.DrawRows();
             check(form.totalProgress.Caption.EndsWith("1 / 2")&&form.counts.Text.Contains("Instalados: 0"),"Um arquivo pronto completa a cobertura do grupo e ainda não conta como instalado.");
+            first.CompatibilityGroups.AddRange(new[]{"Base EBB","Refit FemV"});
+            first.Variants[0].CompatibilityGroups.Add("Pés padrão");
+            first.Tags.Add("teste exclusivo");
+            form.SetAssociationSearch("teste exclusivo");
+            check(form.VisibleMods().Single()==first&&form.ModRows().Single().Cells["Name"].ToolTipText.Contains("teste exclusivo"),
+                "A busca encontra tags manuais e a linha apresenta as tags.");
+            form.SetAssociationSearch("");
+            form.groupFilters=new HashSet<string>{"Refit FemV"};form.DrawRows();
+            var groupRow=form.ModRows().Single();
+            check(groupRow.Height>form.grid.RowTemplate.Height&&Equals(groupRow.Tag,first.Id)&&
+                ((string)groupRow.Cells["Group"].Value).Contains("Pés padrão"),
+                "O filtro encontra qualquer grupo e os grupos do mod e da variante dividem uma linha abaixo do nome.");
+            form.groupFilters=null;form.DrawRows();
             string groupsExport=Path.Combine(root,"groups.json");
             var groupsLibrary=new GeneralModLibrary(Path.Combine(root,"groups-state.json"));
             groupsLibrary.Export(groupsExport,list);
             var roundTrip=groupsLibrary.Import(groupsExport);
             check(roundTrip.AlternativeGroups[linked].Name=="Corpo"&&roundTrip.AlternativeGroups[linked].Color==style.Color,"O nome e a cor do grupo sobrevivem à exportação.");
+            var exported=roundTrip.Mods.Single(mod=>mod.Id==first.Id);
+            check(exported.CompatibilityGroups.SequenceEqual(first.CompatibilityGroups)&&
+                exported.Variants[0].CompatibilityGroups.SequenceEqual(first.Variants[0].CompatibilityGroups),
+                "Grupos adicionais do mod e da versão sobrevivem à exportação e importação.");
             roundTrip.AlternativeGroups[linked].Name=new string('X',19);
             bool rejected=false;
             try{GeneralModLibrary.ValidateList(roundTrip,true);}catch(IOException){rejected=true;}
@@ -127,7 +144,7 @@ internal sealed partial class GeneralModWindow {
             for(int i=0;i<70;i++){var item=NewEntry("Extra "+i,archive);list.Mods.Add(item);list.Presets[0].ModIds.Add(item.Id);}
             form.DrawRows();await Task.Delay(80);
             var scroll=(GeneralScrollView)form.grid.Parent.Parent;scroll.RefreshScroll();
-            check(form.grid.ScrollBars==ScrollBars.None&&scroll.Bar.Visible&&scroll.Bar.Limit>0,"Tabela usa barra própria, sem rolagem nativa sobreposta.");
+            check(form.grid.ScrollBars==ScrollBars.Horizontal&&scroll.Bar.Visible&&scroll.Bar.Limit>0&&form.grid.Controls.OfType<VScrollBar>().All(bar=>!bar.Visible),"A barra vertical própria permanece e a horizontal fica disponível quando as colunas ocupam mais espaço.");
             scroll.Bar.MoveTo(10);check(form.grid.FirstDisplayedScrollingRowIndex==10,"Mover a barra altera a posição da tabela.");
             var tools=form.Controls.Find("TableTools",true).Single();
             await Task.Delay(60);

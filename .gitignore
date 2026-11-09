@@ -12,6 +12,8 @@
 !/Instalador/Fonte/app.manifest
 !/Instalador/Online/Fonte/*.cs
 !/Instalador/Online/Fonte/*.ps1
+!/Instalador/Online/Fonte/BrowserExtension/manifest.json
+!/Instalador/Online/Fonte/BrowserExtension/downloads.js
 !/Instalador/Setup/*.iss
 !/Instalador/Setup/*.ps1
 !/Instalador/Online/Programa/catalogo.json

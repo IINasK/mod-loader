@@ -30,12 +30,14 @@ public sealed class GeneralModEntry {
     public string Description, DependencySource;
     public int DependencyFile;
     public List<string> Tags = new List<string>();
+    public List<string> CompatibilityGroups = new List<string>();
     public bool Nsfw;
     public List<GeneralModVariant> Variants = new List<GeneralModVariant>();
 }
 
 public sealed class GeneralModVariant {
     public string Id, Name, CyberpunkId, CyberpunkVariant;
+    public List<string> CompatibilityGroups = new List<string>();
     public List<string> Sources = new List<string>();
     public Dictionary<string,GeneralSourceInfo> SourceInfo = new Dictionary<string,GeneralSourceInfo>();
 }
@@ -99,10 +101,18 @@ public sealed class GeneralModLibrary {
         Write(fullPath, new {
             list.Schema, list.Categories, list.CategoryDescriptions, list.Presets, list.UncategorizedName, list.UncategorizedDescription, list.AlternativeGroups,
             Mods = list.Mods.Select(mod => new {
-                mod.Id, mod.Name, mod.Category, mod.DefaultVariant, mod.Description, mod.Tags, mod.Nsfw, mod.AlternativeGroup, mod.DependencySource, mod.DependencyFile,
-                Variants = mod.Variants.Select(variant => new { variant.Id, variant.Name, variant.Sources, variant.SourceInfo }).ToList()
+                mod.Id, mod.Name, mod.Category, mod.DefaultVariant, mod.Description, mod.Tags, mod.CompatibilityGroups, mod.Nsfw, mod.AlternativeGroup, mod.DependencySource, mod.DependencyFile,
+                Variants = mod.Variants.Select(variant => new { variant.Id, variant.Name, variant.Sources, variant.SourceInfo, variant.CompatibilityGroups }).ToList()
             }).ToList()
         });
+    }
+
+    internal static List<string> ValidateCompatibilityGroups(IEnumerable<string> groups) {
+        var valid = (groups ?? Enumerable.Empty<string>()).Select(group => RequiredText(group, 18, "Grupo"))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (valid.Count > 12 || valid.Any(group => group.Contains(",")))
+            throw new IOException("Use até 12 grupos de 18 caracteres, separados por vírgulas.");
+        return valid;
     }
 
     internal static string ChoiceKey(GeneralModEntry mod) {
@@ -333,6 +343,7 @@ public sealed class GeneralModLibrary {
                 if(dependency==null||dependency.File!=0)throw new IOException("Origem de dependência inválida.");
                 mod.DependencySource=dependency.Url;
             }
+            mod.CompatibilityGroups = ValidateCompatibilityGroups(mod.CompatibilityGroups);
             if (mod.Tags == null) mod.Tags = new List<string>();
             if (mod.Tags.Count > 32) throw new IOException("Use no máximo 32 tags por mod.");
             var tags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -350,6 +361,7 @@ public sealed class GeneralModLibrary {
                 if (variant == null || !ValidId(variant.Id) || !variantIds.Add(variant.Id) || variant.Sources == null || variant.Sources.Count == 0 || variant.Sources.Count > 32)
                     throw new IOException("Versão inválida ou repetida em " + mod.Name + ".");
                 variant.Name = RequiredText(variant.Name, 300, "Nome da versão");
+                variant.CompatibilityGroups = ValidateCompatibilityGroups(variant.CompatibilityGroups);
                 if(variant.SourceInfo==null)variant.SourceInfo=new Dictionary<string,GeneralSourceInfo>();
                 if(variant.SourceInfo.Count>32||variant.SourceInfo.Any(pair=>!variant.Sources.Contains(pair.Key)||pair.Value==null||pair.Value.Bytes<0||pair.Value.Bytes>128L*1024*1024*1024||String.IsNullOrWhiteSpace(pair.Value.Name)||pair.Value.Name.Length>300||pair.Value.Name.Any(Char.IsControl)||(pair.Value.FileName??"").Length>300||(pair.Value.FileName??"").Any(Char.IsControl)||!ValidSourceVersion(pair.Value.Version)||!ValidSourceVersion(pair.Value.ModVersion)))throw new IOException("Metadados de arquivo inválidos.");
                 NormalizeSources(variant);

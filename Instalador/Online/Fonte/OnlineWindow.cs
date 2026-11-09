@@ -681,7 +681,12 @@ public sealed class DownloadBarCell:DataGridViewTextBoxCell {
 }
 
 static class OnlineProgram {
-    [STAThread]static int Main(string[] args){try{
+    [STAThread]static int Main(string[] args){
+        if(args.Length>0&&args[0].StartsWith("chrome-extension://",StringComparison.Ordinal)){
+            try{return BrowserDownloadBridge.RunHost(args[0],Console.OpenStandardInput(),Console.OpenStandardOutput());}
+            catch(IOException){return 1;}
+        }
+        try{
 #if VELOPACK
         Velopack.VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
 #endif

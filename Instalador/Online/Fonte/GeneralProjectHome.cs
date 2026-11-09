@@ -305,7 +305,7 @@ internal sealed partial class GeneralModWindow {
         if(working||scanning)return;
         if(BuiltInProject&&(action=="export"||action=="import"||action=="delete-project"))return;
         if(action=="clone"){
-            if(projectStore==null||project==null||!ConfirmPresetNavigation())return;
+            if(projectStore==null||project==null||!ConfirmProjectNavigation())return;
             string initial=T("Cópia de ","Copy of ")+project.Name;initial=initial.Substring(0,Math.Min(120,initial.Length));
             using(var name=new GeneralNameDialog(T("Duplicar projeto","Duplicate project"),initial,T("A cópia usa a mesma pasta do jogo. Os arquivos dos mods não são duplicados.","The copy uses the same game folder. Mod files are not duplicated."))){
                 if(name.ShowDialog(this)!=DialogResult.OK)return;
@@ -319,6 +319,7 @@ internal sealed partial class GeneralModWindow {
             return;
         }
         if(action=="delete-project"){
+            if(!ConfirmProjectNavigation())return;
             if(projectStore==null||project==null)return;
             if(GeneralDialog.Message(this,T("Excluir este projeto da lista de projetos salvos? Mods instalados, registros e backups serão preservados.","Remove this project from saved projects? Installed mods, records and backups will be preserved.")+"\n\n"+project.Name,T("Excluir projeto","Delete project"),MessageBoxButtons.OKCancel,MessageBoxIcon.Warning)!=DialogResult.OK)return;
             projectStore.Delete(project);

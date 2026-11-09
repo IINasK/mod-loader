@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Mod Loader Downloads",
+  "version": "1.0.0",
+  "description": "Sends completed Nexus Mods downloads to a waiting Mod Loader installation.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwY0cVRfoz15hy/cSQMJ/tk3ZDmVDMpDia9ubL75Yvn9AMZTWB6ZurWM8APKIpHMcp3qEvDOqg0tz+Dh36+fzhR4b+T+tre2O74PQvP+47l4XKj5zAuz9T1XrT1PbxNw40aFYxk7TVwglXXBBlBYdJVVDlzd+mpx4M5kvgsJt0My8F3iG7JCGpzVSpZqY8kcvBvMRcfYN4AHe9fbV2jBpXNmTaSRlLk1I7lzoI/3OfMocURhvQMkfWngQZIFEa76l+50/jdYSYzz3yJXs0CDNPvn2b5jHdt8tndopyxBFGiRwF6gp6LNT0xZucsPpWkFEabaTB0H5phFi2HFq6R1dVwIDAQAB",
+  "permissions": [
+    "downloads",
+    "nativeMessaging"
+  ],
+  "background": {
+    "service_worker": "downloads.js"
+  }
+}

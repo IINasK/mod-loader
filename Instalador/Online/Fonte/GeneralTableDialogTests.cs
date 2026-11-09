@@ -42,20 +42,9 @@ internal static class GeneralTableDialogTests {
             using (var dialog = new GeneralInstallConfirmation(Path.Combine(root, "game"), 2, new string[0])) {
                 Open(dialog);
                 check(!Descendants(dialog).OfType<DataGridView>().Any(), "Already downloaded files can be installed without an empty download table.");
+                check(!Descendants(dialog).OfType<CheckBox>().Any(), "Installation confirmation has no separate adult-content opt-in.");
                 Find<Button>(dialog, "ConfirmPendingInstall").PerformClick();
                 check(dialog.DialogResult == DialogResult.OK, "Ready-to-install files can be confirmed.");
-            }
-            using (var dialog = new GeneralInstallConfirmation(Path.Combine(root, "game"), 3, pending, 1)) {
-                Open(dialog);
-                var optIn = Find<CheckBox>(dialog, "IncludeNsfw");
-                check(optIn.Visible && !dialog.IncludeNsfw, "A mixed queue shows an unchecked NSFW opt-in.");
-                optIn.Checked = true;
-                Find<Button>(dialog, "ConfirmPendingInstall").PerformClick();
-                check(dialog.DialogResult == DialogResult.OK && dialog.IncludeNsfw, "Explicit opt-in includes NSFW in the confirmed queue.");
-            }
-            using (var dialog = new GeneralInstallConfirmation(Path.Combine(root, "game"), 1, new string[0], 1)) {
-                Open(dialog); Find<Button>(dialog, "ConfirmPendingInstall").PerformClick();
-                check(dialog.DialogResult == DialogResult.OK && !dialog.IncludeNsfw, "Continuing without opt-in skips NSFW even when its archive is already downloaded.");
             }
             using (var dialog = new GeneralModAlternativeDialog(new[] {
                 new GeneralModEntry { Id = "regular", Name = "Regular", Description = "Less projected" },

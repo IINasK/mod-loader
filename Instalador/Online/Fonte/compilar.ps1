@@ -64,6 +64,10 @@ $extensions += Join-Path $PSScriptRoot 'OnlineRemovedPackageTests.cs'
 $extensions += Join-Path $PSScriptRoot 'RetiredPackEntries.cs'
 $extensions += @('GeneralModLibrary.cs','GeneralModLibraryV2Tests.cs','GeneralModDownload.cs','GeneralModInstaller.cs','GeneralModInstallerTests.cs','GeneralModEditor.cs','GeneralModAssociation.cs','DisabledMods.cs','GeneralModActions.cs','GeneralModWindow.cs','GeneralModRun.cs','GeneralModVerification.cs','GeneralModVerificationTests.cs','GeneralModTests.cs','GeneralModMenus.cs','GeneralModProgressTests.cs','GeneralModUiTests.cs','GeneralStyle.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += '/resource:'+(Join-Path $PSScriptRoot 'Assets\Jost.ttf')+',ModLoader.Jost.ttf'
+$extensions += Join-Path $PSScriptRoot 'BrowserDownloadBridge.cs'
+foreach($file in @('manifest.json','downloads.js')){
+    $extensions += '/resource:'+(Join-Path $PSScriptRoot "BrowserExtension\$file")+',ModLoader.Browser.'+$file
+}
 $extensions += Join-Path $PSScriptRoot 'GeneralButtonPaintTests.cs'
 $extensions += @('GeneralFloating.cs','GeneralOptionsDialog.cs','GeneralStatusPresentation.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += '/resource:'+(Join-Path $PSScriptRoot 'Assets\Lucide.ttf')+',ModLoader.Lucide.ttf'

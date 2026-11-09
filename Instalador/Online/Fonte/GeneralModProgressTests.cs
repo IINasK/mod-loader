@@ -13,6 +13,17 @@ internal sealed partial class GeneralModWindow {
         }
     }
 
+    static bool NotifyBrowser(string path,string channel){
+        using(var input=new MemoryStream())
+        using(var output=new MemoryStream()){
+            BrowserDownloadBridge.WriteFrame(input,new{path=path});
+            input.Position=0;
+            if(BrowserDownloadBridge.RunHost(BrowserDownloadBridge.Origin,input,output,channel)!=0)return false;
+            var reply=Safe.Json.Deserialize<Dictionary<string,bool>>(System.Text.Encoding.UTF8.GetString(output.ToArray(),4,(int)output.Length-4));
+            return reply["delivered"];
+        }
+    }
+
     internal static void RunProgressTests(string parent) {
         string root=OnlineTests.NestedRoot(parent,"online-testes-progress-");
         Directory.CreateDirectory(root);
@@ -143,6 +154,77 @@ internal sealed partial class GeneralModWindow {
             check(pages==1&&form.state.List.Mods.Count==2&&form.state.ResolvedDownloads.Values.Contains(secondZip)&&
                 File.Exists(Path.Combine(recoveredRoot,"mods","second.txt")),
                 "Arrastar o arquivo esperado de outra pasta continua o item atual, sem criar outro mod.");
+        });
+        string browserRoot=Path.Combine(root,"browser-target");Directory.CreateDirectory(browserRoot);
+        var browserState=new GeneralModState{Destination=browserRoot,DownloadFolder=downloads,List=new GeneralModList()};
+        string outside=TestZip(root,"browser-fixture.zip","mods/browser.txt","browser transfer");
+        var browserEntry=NewEntry("Download do navegador","https://www.nexusmods.com/cyberpunk2077/mods/555?tab=files&file_id=666");
+        var browserVariant=browserEntry.Variants.Single();
+        browserVariant.SourceInfo[browserVariant.Sources.Single()]=new GeneralSourceInfo{
+            Name="Browser fixture",FileName=Path.GetFileName(outside),Bytes=new FileInfo(outside).Length};
+        browserState.List.Mods.Add(browserEntry);
+        TestForm(catalog,browserState,Path.Combine(root,"browser-data"),root,async form=>{
+            int pages=0;form.launch=url=>pages++;
+            string channel="ModLoader-fixture-"+Guid.NewGuid().ToString("N");
+            form.testBrowserDownloadChannel=channel;
+            var work=form.MakeWork(browserEntry);
+            form.Enqueue(new[]{work},false);
+            await Until(()=>form.NeedUnknownFile&&pages==1);
+            check(await System.Threading.Tasks.Task.Run(()=>NotifyBrowser(firstZip,channel)),
+                "A ponte aceita a notificação local do navegador.");
+            await System.Threading.Tasks.Task.Delay(850);
+            check(form.NeedUnknownFile&&!File.Exists(Path.Combine(browserRoot,"mods","first.txt")),
+                "Um download que não corresponde ao mod da fila é ignorado.");
+            check(await System.Threading.Tasks.Task.Run(()=>NotifyBrowser(outside,channel)),
+                "A ponte recebe o arquivo salvo fora de Downloads.");
+            await Until(()=>!form.working);
+            check(pages==1&&File.Exists(Path.Combine(browserRoot,"mods","browser.txt"))&&
+                form.state.ResolvedDownloads.Values.Contains(outside)&&!File.Exists(Path.Combine(downloads,Path.GetFileName(outside))),
+                "Download do navegador fora da pasta monitorada instala a partir do original sem arrastar nem copiar para Downloads.");
+            check(!await System.Threading.Tasks.Task.Run(()=>NotifyBrowser(outside,channel)),
+                "Sem download aguardado, a ponte descarta a notificação.");
+        });
+        string dropRoot=Path.Combine(root,"drop-target");Directory.CreateDirectory(dropRoot);
+        File.WriteAllText(Path.Combine(dropRoot,".fixture-only"),"test");
+        var dropState=new GeneralModState{Destination=dropRoot,DownloadFolder=downloads,List=new GeneralModList()};
+        var activeBody=NewEntry("Corpo ativo",firstZip);
+        var newBody=NewEntry("Corpo alternativo",lastZip);
+        var downloadedVariant=dropped.Variants[0];
+        downloadedVariant.Id="downloaded";downloadedVariant.Name="Com refit";
+        downloadedVariant.SourceInfo.Values.Single().Version="2.0";
+        newBody.Variants.Add(downloadedVariant);newBody.Nsfw=true;
+        activeBody.AlternativeGroup=newBody.AlternativeGroup="body";
+        dropState.List.Mods.AddRange(new[]{activeBody,newBody});
+        TestForm(catalog,dropState,Path.Combine(root,"drop-data"),root,async form=>{
+            int pages=0;form.launch=url=>pages++;
+            form.Enqueue(new[]{form.MakeWork(activeBody)},false);
+            await Until(()=>!form.working);
+            var prompts=new List<string>();
+            bool accept=false;
+            form.testCatalogDropPrompt=message=>{prompts.Add(message);return accept;};
+            form.Drop(new[]{secondZip});
+            await Until(()=>prompts.Count==1&&!form.editingAttachment);
+            check(form.marked.Count==0&&File.Exists(Path.Combine(dropRoot,"mods","first.txt"))&&
+                !File.Exists(Path.Combine(dropRoot,"mods","second.txt"))&&form.state.ResolvedDownloads.Count==0,
+                "Cancelar o arraste reconhecido preserva o mod ativo e não associa o arquivo.");
+            accept=true;
+            form.Drop(new[]{secondZip});
+            await Until(()=>prompts.Count==2&&!form.working&&!form.editingAttachment);
+            check(prompts[1].Contains("Corpo alternativo")&&prompts[1].Contains("Corpo ativo")&&
+                prompts[1].Contains("Com refit")&&prompts[1].Contains("2.0")&&form.marked.Count==0,
+                "Sem seleção, a confirmação única identifica o mod, a versão e a alternativa que será desativada.");
+            check(pages==0&&form.state.List.Mods.Count==2&&form.Selected(newBody).Id=="downloaded"&&
+                form.Status(form.MakeWork(newBody),dropRoot)=="Instalado"&&form.Status(form.MakeWork(activeBody),dropRoot)==GeneralStatusPresentation.Disabled&&
+                File.Exists(Path.Combine(dropRoot,"mods","second.txt"))&&!File.Exists(Path.Combine(dropRoot,"mods","first.txt")),
+                "O arquivo reconhecido instala a variante NSFW sem outra confirmação e desativa apenas a alternativa vinculada.");
+            newBody.CompatibilityGroups.Add("Corpo ativo");
+            var refit=form.MakeWork(NewEntry("Refit",lastZip));
+            refit.Variant.CompatibilityGroups.Add("Corpo ativo");
+            form.CheckCompatibilityGroups(refit,dropRoot,new List<Work>());
+            bool refused=false;
+            try{form.CheckCompatibilityGroups(refit,dropRoot,new List<Work>{form.MakeWork(newBody)});}
+            catch(IOException ex){refused=ex.Message.Contains("Corpo ativo");}
+            check(refused,"O refit aceita o grupo ativo e recusa uma alternativa que será desativada pela operação.");
         });
         string editRoot=Path.Combine(root,"edit-target");Directory.CreateDirectory(editRoot);
         var editState=new GeneralModState{Destination=editRoot,DownloadFolder=downloads,List=new GeneralModList()};

@@ -75,8 +75,17 @@ internal sealed class GeneralScrollView : Panel {
                 value = Math.Min(Math.Max(0, -content.Top), Math.Max(0, total - page));
             }
             else if(grid!=null){
-                total=grid.RowCount;page=Math.Max(1,grid.DisplayedRowCount(false));value=Math.Max(0,grid.FirstDisplayedScrollingRowIndex);
-                if(grid.Rows.GetRowsHeight(DataGridViewElementStates.Visible)<=grid.ClientSize.Height-grid.ColumnHeadersHeight)page=Math.Max(1,total);
+                total=grid.RowCount;value=Math.Max(0,grid.FirstDisplayedScrollingRowIndex);
+                var horizontal=grid.Controls.OfType<HScrollBar>().FirstOrDefault(control=>control.Visible);
+                int room=grid.ClientSize.Height-grid.ColumnHeadersHeight-(horizontal==null?0:horizontal.Height);
+                // The last page defines the scroll limit even when earlier rows have different heights.
+                page=0;
+                for(int index=total-1;index>=0;index--){
+                    int height=grid.Rows[index].Height;
+                    if(page>0&&room<height)break;
+                    room-=height;
+                    page++;
+                }
             }
             else if(list!=null){total=list.Items.Count;page=Math.Max(1,list.ClientSize.Height/Math.Max(1,list.ItemHeight));value=list.TopIndex;}
             else if(text!=null&&text.Multiline){total=(int)SendMessage(text.Handle,0x00ba,IntPtr.Zero,IntPtr.Zero);page=Math.Max(1,text.ClientSize.Height/Math.Max(1,text.Font.Height));value=(int)SendMessage(text.Handle,0x00ce,IntPtr.Zero,IntPtr.Zero);}

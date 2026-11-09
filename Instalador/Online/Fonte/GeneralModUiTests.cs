@@ -68,8 +68,12 @@ internal sealed partial class GeneralModWindow {
             var verifyButton=AllControls(form).OfType<Button>().Single(button=>button.Name=="VerifyProject");
             check(verifyButton.Right<form.primaryAction.Left&&verifyButton.Top==form.primaryAction.Top,
                 "Verificar fica ao lado da ação principal no rodapé.");
-            check(form.grid.Columns["Group"].DisplayIndex==form.grid.Columns["Status"].DisplayIndex+1,
-                "Grupo fica depois de Situação.");
+            check(!form.grid.Columns["Group"].Visible&&form.grid.AllowUserToResizeColumns,
+                "Grupos ocupam a linha do nome e as divisórias do cabeçalho permitem ajustar a largura.");
+            int initialStatusWidth=form.grid.Columns["Status"].Width;
+            form.grid.Columns["Status"].Width=initialStatusWidth+28;
+            check(form.grid.Columns["Status"].Width==initialStatusWidth+28,"A coluna aceita a largura ajustada pelo usuário.");
+            form.grid.Columns["Status"].Width=initialStatusWidth;
             check(form.Font.FontFamily.Name.IndexOf("Jost",StringComparison.OrdinalIgnoreCase)>=0,"A fonte Jost está embutida e em uso.");
             var firstRow=form.ModRows().First();
             var statusCell=firstRow.Cells["Status"];
@@ -122,8 +126,29 @@ internal sealed partial class GeneralModWindow {
                 var sources=(TextBox)typeof(GeneralModEditor).GetField("sources",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(editor);
                 name.Text="Exemplo válido";sources.Text=archive;
                 check(button.Enabled,"Instalar habilita quando nome e fonte são válidos.");
+                var copySource=AllControls(editor).OfType<Button>().Single(item=>item.Name=="CopyDownloadSource");
+                check(!sources.Multiline&&copySource.Parent==sources.Parent&&copySource.Right<=sources.Parent.ClientSize.Width,
+                    "A fonte usa uma linha e o botão de cópia cabe dentro da caixa.");
                 check(button.Bottom<=button.Parent.Height&&button.Right<=button.Parent.Width,"Ações do editor ficam dentro do popup.");
                 CaptureUi(editor,Path.Combine(root,"editor-claro.png"));editor.Close();
+            }
+            const string firstLink="https://www.nexusmods.com/cyberpunk2077/mods/13556?tab=files&file_id=1";
+            const string secondLink="https://www.nexusmods.com/cyberpunk2077/mods/13556?tab=files&file_id=2";
+            var linked=NewEntry("Duas fontes",firstLink);
+            linked.Variants[0].Sources.Add(secondLink);
+            using(var editor=new GeneralModEditor(linked,list.Categories,"default",true,"",async source=>{
+                await Task.Delay(40);
+                return new GeneralSourceInfo{Name="Duas fontes",NexusChecked=true,Tags=new[]{"Compatibilidade Nexus","Veículos"}};
+            })){
+                editor.StartPosition=FormStartPosition.Manual;editor.Location=new Point(-30000,-30000);editor.Show(form);Application.DoEvents();
+                var field=AllControls(editor).OfType<TextBox>().Single(box=>box.Name=="DownloadSource");
+                var picker=AllControls(editor).OfType<GeneralPicker>().Single(control=>control.Name=="DownloadSourcePicker");
+                picker.SelectedIndex=1;
+                check(field.Text==secondLink&&picker.Visible,"Uma variante com vários arquivos mostra a fonte selecionada em uma única linha.");
+                ((Button)editor.AcceptButton).PerformClick();
+                await Until(()=>editor.Result!=null);
+                check(editor.Result.Tags.Contains("Compatibilidade Nexus")&&editor.Result.Variants[0].Sources.SequenceEqual(new[]{firstLink,secondLink}),
+                    "Aplicar aguarda as tags do Nexus e preserva todas as fontes da variante.");
             }
             form.marked.Clear();
             var dependency=form.CreateDependency(new GeneralNexusRequirement{Name="Dependência teste",
@@ -218,7 +243,7 @@ internal sealed partial class GeneralModWindow {
                             var draft=AllControls(editor).OfType<TextBox>().Single(box=>box.AccessibleName=="Descrição");
                             draft.Text="Texto ainda não salvo";
                             var scroll=AllControls(editor).OfType<GeneralScrollView>().Single(control=>control.Name=="ModEditorScroll");
-                            var archive=AllControls(editor).OfType<TextBox>().Single(box=>box.AccessibleName!=null&&box.AccessibleName.StartsWith("Links ou arquivos"));
+                            var archive=AllControls(editor).OfType<TextBox>().Single(box=>box.Name=="DownloadSource");
                             var viewport=scroll.RectangleToScreen(scroll.ClientRectangle);
                             var field=archive.RectangleToScreen(archive.ClientRectangle);
                             CaptureUi(editor,Path.Combine(root,"editor-identification.png"));
@@ -233,13 +258,8 @@ internal sealed partial class GeneralModWindow {
                             field=archive.RectangleToScreen(archive.ClientRectangle);
                             Control surface=archive.Parent;
                             while(!(surface is GeneralSurface))surface=surface.Parent;
-                            check(Rectangle.Intersect(field,viewport).Height==field.Height&&surface.Height==44,
+                            check(Rectangle.Intersect(field,viewport).Height==field.Height&&!archive.Multiline&&surface.Height<=52,
                                 "Um único link tem campo compacto e totalmente visível: "+surface.Bounds+" / "+field+" / "+viewport);
-                            string single=archive.Text;
-                            archive.Text=single+"\r\nhttps://example.com/second.zip";
-                            Application.DoEvents();
-                            check(surface.Height>=58,"Duas fontes aumentam a área de edição.");
-                            archive.Text=single;
                             scroll.ScrollTo(9999);
                             Application.DoEvents();
                             CaptureUi(editor,Path.Combine(root,"editor-download-and-link.png"));

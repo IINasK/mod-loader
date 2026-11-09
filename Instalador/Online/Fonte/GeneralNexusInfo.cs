@@ -62,10 +62,6 @@ internal static class GeneralNexusInfo {
         return link!=null&&link.Game=="cyberpunk2077"&&AuditedAdultMods.Contains(link.Mod);
     }
 
-    internal static bool IsAuditedAdultRecipe(FixedMod mod) {
-        return mod.Assets.Any(asset=>AuditedAdultMods.Contains(asset.ModId));
-    }
-
     internal static string Advice {get{return GeneralStyle.T("No Nexus, copie o link da tela Slow download da versão desejada.","On Nexus, copy the link to the Slow download page for the version you want.");}}
 
     internal static bool HasTestKey {get{return TestKey()!=null;}}
@@ -76,14 +72,10 @@ internal static class GeneralNexusInfo {
         return String.IsNullOrWhiteSpace(key) || key.Length > 256 || key.Any(c => Char.IsControl(c) || Char.IsWhiteSpace(c)) ? null : key;
     }
 
-    internal static Task<GeneralSourceInfo> Read(string source) {return Read(source,false);}
-
-    static Task<GeneralSourceInfo> Read(string source,bool allowPublic) {
+    internal static Task<GeneralSourceInfo> Read(string source) {
         var link = GeneralNexusLink.Parse(source);
         string testKey = TestKey();
-        if (link == null || (!allowPublic && !GeneralAppPaths.IsDevelopment && testKey == null &&
-            Environment.GetEnvironmentVariable("MOD_LOADER_NEXUS_API_TEST") != "1"))
-            return Task.FromResult<GeneralSourceInfo>(null);
+        if (link == null) return Task.FromResult<GeneralSourceInfo>(null);
         return Task.Run(() => {
             string key = testKey;
             string resource = "/games/" + link.Game + "/mods/" + link.Mod;
@@ -119,7 +111,7 @@ internal static class GeneralNexusInfo {
                 if(index>=queries.Length)return;
                 var url=queries[index];
                 try{
-                    var info=await (lookup==null?Read(url,true):lookup(url)).ConfigureAwait(false);
+                    var info=await (lookup==null?Read(url):lookup(url)).ConfigureAwait(false);
                     if(info!=null)found[url]=info;
                 }catch(Exception ex){OnlineDiagnostics.Record("p2p.nexus.lookup",null,ex.GetType().Name);}
             }
@@ -300,11 +292,19 @@ internal sealed partial class GeneralModEditor {
     void ScheduleSourceInfo(){
         if(changing||attachment)return;sourceGeneration++;sourceDelay.Stop();sourceDelay.Start();
     }
+    Task CurrentSourceInfo(){
+        if(sourceQuery==null||queriedGeneration!=sourceGeneration){
+            queriedGeneration=sourceGeneration;
+            sourceQuery=UpdateSourceInfo();
+        }
+        return sourceQuery;
+    }
+
     async Task UpdateSourceInfo(){
         if(current==null||attachment||IsDisposed)return;
         int generation=sourceGeneration;
         var variant=current;
-        var candidates=sources.Lines.Select(value=>value.Trim())
+        var candidates=new[]{sources.Text.Trim()}
             .Select(value=>new {Source=value,Nexus=GeneralNexusLink.Parse(value)})
             .Where(item=>item.Nexus!=null||GeneralModDownload.IsArchivePath(item.Source))
             .GroupBy(item=>item.Nexus==null?item.Source:item.Nexus.Url).Select(group=>group.First()).Take(32).ToList();
@@ -324,8 +324,7 @@ internal sealed partial class GeneralModEditor {
             try{
                 if(item.Nexus==null&&known==null&&File.Exists(item.Source))
                     fresh=new GeneralSourceInfo{Name=Path.GetFileNameWithoutExtension(item.Source),FileName=Path.GetFileName(item.Source),Bytes=new FileInfo(item.Source).Length};
-                else if(item.Nexus!=null&&lookup!=null&&(known==null||!known.NexusChecked||
-                    (item.Nexus.File>0&&String.IsNullOrEmpty(known.Version)&&GeneralNexusInfo.HasTestKey)))
+                else if(item.Nexus!=null&&lookup!=null)
                     fresh=await lookup(item.Source);
             }catch(Exception){}
             if(IsDisposed||generation!=sourceGeneration||current!=variant)return;

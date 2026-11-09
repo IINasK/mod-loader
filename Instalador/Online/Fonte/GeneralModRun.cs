@@ -12,7 +12,9 @@ internal sealed partial class GeneralModWindow {
     sealed class Work {
         internal GeneralModEntry Entry;
         internal GeneralModVariant Variant;
-        internal bool Ended,Applied,SwitchAlternatives,NsfwApproved,DependencyQueue;
+        internal bool Ended,Applied,SwitchAlternatives,DependencyQueue;
+        internal HashSet<string> DropConflicts;
+        internal string DropDensity;
         internal double Fraction;
         internal string Key { get{return GeneralModWindow.Key(Entry,Variant);} }
         internal bool Local { get{return Variant.CyberpunkId==null&&Variant.Sources.All(GeneralModDownload.IsArchivePath);} }
@@ -29,6 +31,8 @@ internal sealed partial class GeneralModWindow {
     string association, pendingWebSource;
     GeneralSourceInfo pendingWebInfo;
     FixedAsset pendingFixedAsset;
+    string testBrowserDownloadChannel;
+    string BrowserDownloadChannel { get { return testMode ? testBrowserDownloadChannel : BrowserDownloadBridge.Channel; } }
     Action<string> launch=GeneralModDownload.OpenSource;
     GeneralModInstaller Generic(string root){return new GeneralModInstaller(root,Path.Combine(data,"Instalacoes"));}
     InstalledSnapshotInstaller Snapshot(string root){return new InstalledSnapshotInstaller(root,data,catalog,testMode);}
@@ -290,6 +294,7 @@ internal sealed partial class GeneralModWindow {
         }finally{scanCurrent=null;detail.Text=previous;scanning=false;Busy(false);}
     }
     async void StartSelected(){
+        if(projectDraft!=null&&!ConfirmProjectNavigation())return;
         if(working||scanning)return;
         try{
             if(String.IsNullOrWhiteSpace(state.Destination)){
@@ -424,38 +429,29 @@ internal sealed partial class GeneralModWindow {
         return work.Variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts.TryGetValue(work.Key,out receipt)&&
             Snapshot(root).Status(receipt,work.Key)==GeneralModInstaller.Installed;
     }
-    bool RecipeNsfw(FixedMod recipe){
-        return GeneralNexusInfo.IsAuditedAdultRecipe(recipe)||state.List.Mods.Any(entry=>entry.Nsfw&&
-            entry.Variants.Any(variant=>variant.CyberpunkId==recipe.Id));
-    }
-    bool RequiresNsfwApproval(Work work,ScanReads reads){
-        if(work.Entry.Nsfw)return true;
-        if(work.Variant.CyberpunkId==null||!reads.Cyberpunk)return false;
-        return FixedData.Expand(catalog,new[]{work.Variant.CyberpunkId})
-            .Any(mod=>RecipeNsfw(mod)&&!reads.Fixed(mod).IsCorrect);
-    }
     void ConfirmAndEnqueue(List<Work> jobs,string root,IReadOnlyList<string> downloads,bool urgent){
-        var reads=new ScanReads(this,root);
-        var nsfwJobs=new HashSet<Work>(jobs.Where(work=>RequiresNsfwApproval(work,reads)));
-        int nsfwCount=nsfwJobs.Count;
-        if(!urgent||nsfwCount>0){
-            using(var dialog=new GeneralInstallConfirmation(root,jobs.Count,downloads,nsfwCount)){
+        if(!urgent){
+            using(var dialog=new GeneralInstallConfirmation(root,jobs.Count,downloads)){
                 if(dialog.ShowDialog(this)!=DialogResult.OK){
                     detail.Text=T("Instalação cancelada.","Installation canceled.");
                     return;
                 }
-                if(!dialog.IncludeNsfw)jobs=jobs.Where(work=>!nsfwJobs.Contains(work)).ToList();
-                else foreach(var work in nsfwJobs)work.NsfwApproved=true;
             }
-        }
-        if(jobs.Count==0){
-            detail.Text=T("Conteúdo NSFW pulado.","NSFW content skipped.");
-            return;
         }
         if(IsCyberpunk(root)&&jobs.Any(work=>GeneralModLibrary.IsHystBody(work.Entry.Id)))
             jobs.RemoveAll(work=>work.Variant.CyberpunkId==GeneralModLibrary.VanillaFeetId);
         if(jobs.Any(work=>work.Entry.Id=="hyst-ebb-rb"))
             jobs=jobs.OrderBy(work=>work.Variant.CyberpunkId==GeneralModLibrary.EclipseTattooId).ToList();
+        if(jobs.Any(work=>work.Variant.CompatibilityGroups.Count>0)){
+            var ordered=new List<Work>();
+            while(jobs.Count>0){
+                int index=jobs.FindIndex(work=>!work.Variant.CompatibilityGroups.Any(group=>
+                    jobs.Any(other=>other!=work&&other.Entry.CompatibilityGroups.Contains(group,StringComparer.OrdinalIgnoreCase))));
+                if(index<0)index=0;
+                ordered.Add(jobs[index]);jobs.RemoveAt(index);
+            }
+            jobs=ordered;
+        }
         Enqueue(jobs,urgent);
     }
 
@@ -504,8 +500,11 @@ internal sealed partial class GeneralModWindow {
             OnlineDiagnostics.Record("general.install.begin",work.Entry.Id,"Iniciando item da fila.",new{Variant=work.Variant.Id});
             if(SnapshotInstalled(work,root)){RowStatus(work,"Instalado",100);return;}
             var conflicts=await Task.Run(()=>ConflictingAlternatives(work,root));
-            if(conflicts.Count>0&&!work.SwitchAlternatives)
+            if(conflicts.Count>0&&!work.SwitchAlternatives&&
+                (work.DropConflicts==null||!work.DropConflicts.IsSupersetOf(conflicts.Select(old=>old.Key))))
                 throw new IOException(T("Use Mudar versão para trocar: ","Use Change version to switch: ")+conflicts[0].Entry.Name);
+            if(work.Variant.CompatibilityGroups.Count>0)
+                await Task.Run(()=>CheckCompatibilityGroups(work,root,conflicts));
             var store=DisabledAt(root);
             if(conflicts.Any(old=>GeneralModLibrary.IsHystBody(old.Entry.Id)))
                 await Task.Run(()=>PlanDisable(conflicts,root));
@@ -561,6 +560,11 @@ internal sealed partial class GeneralModWindow {
                 work.Entry.Tags.Add("Instalado pela fila");
                 Persist();
             }
+            if(work.DropConflicts!=null&&!Object.ReferenceEquals(Selected(work.Entry),work.Variant)){
+                if(work.Variant.Id==work.Entry.DefaultVariant)state.ChosenVariants.Remove(work.Entry.Id);
+                else state.ChosenVariants[work.Entry.Id]=work.Variant.Id;
+                Persist();DrawRows();
+            }
             completed=true;
             RowStatus(work,"Instalado",100,work.Entry.Name+T(": instalado e conferido.",": installed and verified."));
             OnlineDiagnostics.Record("general.install.complete",work.Entry.Id,"Instalação conferida.",new{Variant=work.Variant.Id});
@@ -587,6 +591,20 @@ internal sealed partial class GeneralModWindow {
             RefreshStorageSize();work.Ended=true;operationFinished++;UpdateFlow(null,"");skipRequests.Remove(work);Stage(work,"work.end");
         }
     }
+    void CheckCompatibilityGroups(Work work,string root,List<Work> conflicts,IReadOnlyList<Work> enabling=null){
+        if(work.Variant.CompatibilityGroups.Count==0)return;
+        var reads=new ScanReads(this,root);
+        foreach(string group in work.Variant.CompatibilityGroups){
+            if(enabling!=null&&enabling.Any(other=>other!=work&&other.Entry.CompatibilityGroups.Contains(group,StringComparer.OrdinalIgnoreCase)))continue;
+            bool matched=state.List.Mods.Where(mod=>mod.Id!=work.Entry.Id&&mod.CompatibilityGroups.Contains(group,StringComparer.OrdinalIgnoreCase)&&
+                !conflicts.Any(other=>other.Entry.Id==mod.Id)).Any(mod=>mod.Variants.Any(variant=>{
+                    string status=Status(new Work{Entry=mod,Variant=variant},root,reads);
+                    return GeneralStatusPresentation.Kind(status)=="installed"||status==GeneralStatusPresentation.ManualBody;
+                }));
+            if(!matched)throw new IOException(T("A variante precisa de um mod ativo do grupo ","This version requires an active mod in group ")+group+".");
+        }
+    }
+
     static bool HasManualHystBody(Work work,string root){
         if(work.Variant.Id!="default"||!GeneralModLibrary.IsHystBody(work.Entry.Id))return false;
         bool pushUp=work.Entry.Id=="hyst-ebbp-rb";
@@ -634,7 +652,7 @@ internal sealed partial class GeneralModWindow {
                 var density=await Task.Run(()=>NightCityDensity.Read(recipe,root));
                 if(!density.CanApply)throw new IOException(density.Detail);
                 if(density.Id==work.Variant.CyberpunkVariant||density.Id=="legacy-low"&&work.Variant.CyberpunkVariant=="low")continue;
-                if(density.Id!=null&&density.Id!="absent")new ModVersionDifference{Name=mod.Name,Current=density.Name,Incoming=work.Variant.Name,Detail=T("A variante instalada será substituída pela selecionada.","The installed variant will be replaced with the selected one.")}.Require(ChooseVersion);
+                if(density.Id!=null&&density.Id!="absent"&&density.Id!=work.DropDensity)new ModVersionDifference{Name=mod.Name,Current=density.Name,Incoming=work.Variant.Name,Detail=T("A variante instalada será substituída pela selecionada.","The installed variant will be replaced with the selected one.")}.Require(ChooseVersion);
             }else{
                 var scan=await Task.Run(()=>FixedData.Scan(mod,root));
                 if(scan.IsCorrect)continue;
@@ -647,9 +665,6 @@ internal sealed partial class GeneralModWindow {
             pending.Add(mod);
         }
         if(pending.Count==0)return;
-        if(!work.NsfwApproved&&pending.Any(RecipeNsfw))
-            throw new IOException(T("Esta instalação requer autorização para conteúdo NSFW. Selecione o mod e confirme novamente.",
-                "This installation requires approval for NSFW content. Select the mod and confirm again."));
         foreach(var mod in pending)foreach(var asset in mod.Assets){
             CheckSkip(work);
             if(await Task.Run(()=>cache.Contains(asset)))continue;
@@ -700,6 +715,7 @@ internal sealed partial class GeneralModWindow {
         return false;
     }
     async Task AwaitKnown(Work work,FixedAsset asset,string root){
+        using(var browser=BrowserDownloadInbox.Listen(BrowserDownloadChannel))
         using(var watch=new GeneralModDownload(state.DownloadFolder,asset)){
             bool opened=false;
             association=null;pendingFixedAsset=asset;SetWait(true,true);
@@ -713,7 +729,7 @@ internal sealed partial class GeneralModWindow {
                         try{await Task.Run(()=>cache.Import(selected,asset));return;}
                         catch(IOException ex){if(!testMode)GeneralDialog.Message(this,ex.Message,T("Arquivo diferente","Different file"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}
                     }
-                    var file=await Task.Run(()=>watch.Poll());
+                    var file=await Task.Run(()=>(browser==null?null:browser.TakeMatch(null,null,asset))??watch.Poll());
                     while(editingAttachment)await Task.Delay(100);
                     CheckSkip(work);
                     if(file!=null){await Task.Run(()=>cache.Import(file,asset));return;}
@@ -781,6 +797,9 @@ internal sealed partial class GeneralModWindow {
         }
     }
     async Task<string> AwaitAttachment(Work work,string source,string root){
+        if(work==priorityCurrent)
+            throw new IOException(T("O arquivo importado não está mais disponível.","The imported file is no longer available."));
+        var browser=BrowserDownloadInbox.Listen(GeneralNexusLink.Parse(source)==null?null:BrowserDownloadChannel);
         association=null;pendingWebSource=source;
         work.Variant.SourceInfo.TryGetValue(source,out pendingWebInfo);
         SetWait(true,true);
@@ -791,25 +810,29 @@ internal sealed partial class GeneralModWindow {
                 if(editingAttachment){await Task.Delay(100);continue;}
                 await DrainLocalPriority(root);
                 var info=pendingWebInfo;
-                var path=await Task.Run(()=>GeneralModDownload.FindCompleted(state.DownloadFolder,source,info));
+                var path=await Task.Run(()=>(browser==null?null:browser.TakeMatch(source,info,null))??
+                    GeneralModDownload.FindCompleted(state.DownloadFolder,source,info));
                 while(editingAttachment)await Task.Delay(100);
                 CheckSkip(work);
                 if(association!=null)return association;
                 if(path!=null)return path;
                 if(!opened&&!editingAttachment&&association==null){
-                    RowStatus(work,"Aguardando arquivo",null,work.Entry.Name+T(": conclua o download. O app confere a pasta ou aceita o arquivo arrastado.",
-                        ": finish downloading. The app checks the folder or accepts the dropped file."));
+                    RowStatus(work,"Aguardando arquivo",null,work.Entry.Name+T(": conclua o download no navegador ou arraste o arquivo pronto aqui.",
+                        ": finish the download in your browser or drop the completed file here."));
                     launch(source);opened=true;
                 }
                 if(association==null)await Task.Delay(600);
             }
             CheckSkip(work);
             return association;
-        }finally{SetWait(false,false);association=null;pendingWebSource=null;pendingWebInfo=null;}
+        }finally{
+            if(browser!=null)browser.Dispose();
+            SetWait(false,false);association=null;pendingWebSource=null;pendingWebInfo=null;
+        }
     }
     async Task DrainLocalPriority(string root){
         if(current!=null)CheckSkip(current);
-        while(priority.Count>0&&priority[0].Local){
+        while(priority.Count>0&&(priority[0].Local||CatalogDropHasLocalSources(priority[0]))){
             priorityCurrent=priority[0];priority.RemoveAt(0);
             bool couldAttach=NeedUnknownFile;NeedUnknownFile=false;
             try{await RunWork(priorityCurrent,root,true);}
@@ -833,6 +856,7 @@ internal sealed partial class GeneralModWindow {
         if(processes.Length!=0)throw new IOException("Feche o Cyberpunk 2077 antes de instalar ou remover mods.");
     }
     async Task Uninstall(){
+        if(projectDraft!=null&&!ConfirmProjectNavigation())return;
         if(working||scanning)return;
         try{
             var jobs=Marked();

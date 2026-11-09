@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -19,15 +20,16 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
     internal GeneralOptionsDialog(string theme, string language, string folder, Func<DownloadCache.CleanupPlan> previewCleanup = null,string installationFolder=null)
         : base(T("Opções", "Options")) {
         projectOptions=installationFolder!=null;
-        ClientSize = new Size(620, (previewCleanup == null ? 340 : 420)+(projectOptions?86:0));
+        ClientSize = new Size(620, (previewCleanup == null ? 392 : 472)+(projectOptions?86:0));
         Font = GeneralStyle.Font(12);
         AutoScaleMode = AutoScaleMode.Dpi;
 
         var layout = new TableLayoutPanel {
-            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6,
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7,
             Padding = new Padding(24, 16, 24, 20), Margin = Padding.Empty
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -61,25 +63,29 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
         this.folder.ReadOnly=true;
         this.folder.AccessibleName=T("Pasta de downloads","Download folder");
         layout.Controls.Add(FolderRow(T("Procurar downloads em","Look for downloads in"),this.folder,()=>Browse(this.folder,false)),0,1);
+        var browser = GeneralStyle.Button(T("Conectar navegador…", "Connect browser…"), ConnectBrowser);
+        browser.Margin = new Padding(0, 10, 0, 0);
+        browser.Anchor = AnchorStyles.Left;
+        layout.Controls.Add(browser, 0, 2);
         if(projectOptions){
             destination.Text=installationFolder;
             destination.Name="OptionsInstallationFolder";
             destination.AccessibleName=T("Pasta de instalação","Installation folder");
-            layout.Controls.Add(FolderRow(destination.AccessibleName,destination,()=>Browse(destination,true)),0,2);
+            layout.Controls.Add(FolderRow(destination.AccessibleName,destination,()=>Browse(destination,true)),0,3);
         }
         if(previewCleanup!=null){
             var cachePanel=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=new Padding(0,12,0,0)};
             cachePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));cachePanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             cachePanel.Controls.Add(new Label{Text=T("Cópias antigas do cache podem ser removidas. Os downloads originais e os mods instalados serão preservados.","Old cache copies can be removed. Original downloads and installed mods will be preserved."),Dock=DockStyle.Fill,AutoSize=true,MaximumSize=new Size(330,0)},0,0);
             var clean=GeneralStyle.Button(T("Limpar cópias antigas","Clear old copies"),()=>ClearOldCopies(previewCleanup));
-            clean.Margin=Padding.Empty;cachePanel.Controls.Add(clean,1,0);layout.Controls.Add(cachePanel,0,3);
+            clean.Margin=Padding.Empty;cachePanel.Controls.Add(clean,1,0);layout.Controls.Add(cachePanel,0,4);
         }
 
         error.Dock = DockStyle.Fill;
         error.Margin = new Padding(0, 6, 0, 0);
         error.AutoEllipsis = true;
         error.AccessibleName = T("Aviso", "Notice");
-        layout.Controls.Add(error, 0, 4);
+        layout.Controls.Add(error, 0, 5);
 
         var commands = new FlowLayoutPanel {
             Dock = DockStyle.Fill, AutoSize = true, WrapContents = false,
@@ -91,7 +97,7 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
         cancel.Margin = new Padding(0, 0, 10, 0);
         commands.Controls.Add(save);
         commands.Controls.Add(cancel);
-        layout.Controls.Add(commands, 0, 5);
+        layout.Controls.Add(commands, 0, 6);
         AcceptButton = save;
         CancelButton = cancel;
         GeneralStyle.Apply(this, GeneralStyle.Dark);
@@ -100,6 +106,17 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
     }
 
     static string T(string pt, string en) { return GeneralStyle.T(pt, en); }
+
+    void ConnectBrowser() {
+        try {
+            string folder = BrowserDownloadBridge.Prepare(Application.ExecutablePath);
+            using (Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true })) { }
+            string steps = T(
+                "Abra brave://extensions, chrome://extensions ou edge://extensions no seu navegador. Ative o modo do desenvolvedor e escolha Carregar sem compactação. Selecione a pasta aberta no Explorador.",
+                "Open brave://extensions, chrome://extensions or edge://extensions in your browser. Turn on developer mode, choose Load unpacked and select the folder opened in File Explorer.");
+            GeneralDialog.Message(this, steps + "\n\n" + folder, T("Conectar navegador", "Connect browser"));
+        } catch (Exception ex) { ShowNotice(ex.Message, true); }
+    }
 
     void ClearOldCopies(Func<DownloadCache.CleanupPlan> preview){
         try{
