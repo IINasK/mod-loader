@@ -72,9 +72,8 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 57));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 43));
-        var shell = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1, Margin = Padding.Empty };
+        var shell = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1, Margin = Padding.Empty };
         shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        shell.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         shell.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         var scroll = new GeneralScrollView(layout, panelContent: true, reserveBarSpace: true, fitPanelContent: true) { Name = "ModEditorScroll" };
@@ -145,7 +144,19 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         }
         editorTips.SetToolTip(setDefault, T("Versão usada quando nenhuma outra foi escolhida.", "Version used when no other version is selected."));
         AddEditorRow(layout, variantActions);
-        AddEditorRow(layout, EditorField(T("Links ou arquivos * (um por linha)", "Links or files * (one per line)"), sources, 102));
+        var sourceField=EditorField(T("Links ou arquivos * (um por linha)", "Links or files * (one per line)"),sources,44);
+        var sourceSurface=(GeneralSurface)sourceField.Controls[1];
+        sources.WordWrap=false;
+        sources.TextChanged+=(s,e)=>{
+            int lines=Math.Max(1,Math.Min(4,sources.Lines.Length));
+            int height=lines==1?44:Math.Max(58,lines*sources.Font.Height+20);
+            sourceSurface.MaximumSize=new Size(0,height);
+            sourceSurface.MinimumSize=new Size(100,height);
+            sourceSurface.Height=height;
+        };
+        sourceSurface.MaximumSize=new Size(0,44);
+        sourceSurface.Height=44;
+        AddEditorRow(layout,sourceField);
         browse = GeneralStyle.Button(T("Adicionar arquivo local", "Add local file"), () => {
             using (var dialog = new OpenFileDialog { Filter = T("Pacotes de mods|*.zip;*.rar;*.7z", "Mod archives|*.zip;*.rar;*.7z"), Multiselect = true }) {
                 if (dialog.ShowDialog(this) == DialogResult.OK)
@@ -157,10 +168,10 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         AddEditorRow(layout, browse);
         sourceInfo.Font = GeneralStyle.Font(10);
         sourceInfo.Dock = DockStyle.Top;
-        sourceInfo.Margin = new Padding(23, 4, 23, 0);
+        sourceInfo.Margin = new Padding(3, 4, 3, 8);
         sourceInfo.TextChanged += (s, e) => sourceInfo.Visible = sourceInfo.Text.Length > 0;
         sourceInfo.Visible = false;
-        shell.Controls.Add(sourceInfo, 0, 1);
+        AddEditorRow(layout,sourceInfo);
 
         if (alternatives != null) {
             var options = alternatives.Where(other => other.Id != entry.Id).ToList();
@@ -202,7 +213,10 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         AddEditorRow(layout, installNote);
         AddEditorRow(layout, usePending);
         AddEditorRow(layout, validation);
-        layout.SizeChanged += (s, e) => ResizeFeedback(layout.ClientSize.Width - layout.Padding.Horizontal);
+        layout.SizeChanged += (s, e) => {
+            ResizeFeedback(layout.ClientSize.Width-layout.Padding.Horizontal);
+            sourceInfo.MaximumSize=new Size(Math.Max(1,layout.ClientSize.Width-layout.Padding.Horizontal-sourceInfo.Margin.Horizontal),0);
+        };
         foreach (var field in new Control[] { modName, category, tags, description, nsfw, variants, variantName, sources, browse, alternative, unlink, usePending, addVariant, removeVariant, setDefault }) {
             if (field == null) continue;
             field.Enter += (s, e) => {
@@ -219,7 +233,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         commands.Controls.Add(save);
         var close = GeneralStyle.Button(T("Cancelar", "Cancel"), () => { DialogResult = DialogResult.Cancel; }, false);
         commands.Controls.Add(close);
-        shell.Controls.Add(commands, 0, 2);
+        shell.Controls.Add(commands, 0, 1);
         AcceptButton = save;
         CancelButton = close;
         variants.SelectedIndexChanged += (s, e) => {

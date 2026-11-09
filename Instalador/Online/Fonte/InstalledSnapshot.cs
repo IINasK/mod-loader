@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -9,7 +9,8 @@ using System.Text.RegularExpressions;
 
 public sealed class InstalledSnapshotManifest {
     public int Schema=1;
-    public string Name,Game,GameFileVersion;
+    public string Name,Game,GameFileVersion,TemplateId;
+    public bool TemplateSubset;
     public GeneralModList List=new GeneralModList();
     public GeneralModList Project;
     public Dictionary<string,string> SyncGameInventory;
@@ -184,7 +185,13 @@ public static partial class InstalledSnapshot {
             var copy=Clone(original);copy.ModIds=copy.ModIds.Where(included.Contains).ToList();list.Presets.Add(copy);
         }
         if(list.Presets.Count==0)list.Presets.Add(new GeneralModPreset{Id="installed",Name=manifest.Name,ModIds=list.Mods.Select(m=>m.Id).ToList()});
-        if(allowMissing)manifest.Project=ProjectDefinition(state,manifest.List);
+        if(allowMissing){
+            manifest.Project=ProjectDefinition(state,manifest.List);
+            if(cyberpunk&&state.TemplateId==GeneralProjectStore.CyberpunkTemplate){
+                manifest.TemplateId=state.TemplateId;
+                manifest.TemplateSubset=state.TemplateSubset;
+            }
+        }
         Validate(manifest,catalog);
         return manifest;
     }
@@ -227,6 +234,8 @@ public static partial class InstalledSnapshot {
     public static void Validate(InstalledSnapshotManifest manifest,FixedCatalog catalog) {
         if(manifest==null||manifest.Schema!=1||manifest.List==null||manifest.List.Mods==null||manifest.Files==null||manifest.Files.Count==0&&manifest.Project==null||manifest.Files.Count>MaxFiles||String.IsNullOrWhiteSpace(manifest.Name)||manifest.Name.Length>300||!(manifest.Game=="cyberpunk2077"||manifest.Game=="generic")||(manifest.Game=="cyberpunk2077"&&manifest.GameFileVersion!=catalog.GameFileVersion)||(manifest.Game=="generic"&&manifest.GameFileVersion!=null))throw new IOException("Manifesto de arquivos instalados inválido.");
         GeneralModLibrary.ValidateList(manifest.List,true);
+        if(manifest.TemplateId!=null&&manifest.Project==null||manifest.TemplateSubset&&manifest.TemplateId==null)
+            throw new IOException("Identidade do projeto padrão inválida.");
         if(manifest.Project!=null)ValidateProject(manifest,catalog);
         var owners=new Dictionary<string,GeneralModVariant>(StringComparer.Ordinal);
         var recipes=new Dictionary<string,FixedMod>(StringComparer.Ordinal);

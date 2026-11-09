@@ -20,6 +20,7 @@ internal sealed class GeneralProjectIndex {
 
 internal sealed class GeneralProjectStore {
     const int MaxIndexBytes = 1048576;
+    internal const string CyberpunkTemplate = "cyberpunk-2077";
     readonly object gate = new object();
     internal string Root { get; private set; }
     string IndexPath { get { return Path.Combine(Root, "projects.json"); } }
@@ -114,25 +115,72 @@ internal sealed class GeneralProjectStore {
         lock(gate){
             var index=Read();
             var id=session.Id.Substring(3);
-            var existing=index.Projects.FirstOrDefault(item=>item.Id==id);
-            if(existing!=null)return existing;
-            if(index.Projects.Count>=200)throw new IOException("Use no máximo 200 projetos nesta biblioteca.");
             var source=new InstalledSnapshotInstaller(session.Destination,sourceData,catalog);
             var manifest=source.ReadManifest(session.ReceiptId);
-            var list=session.ReviewedProject??manifest.Project??manifest.List;
+            bool official=manifest.TemplateId==CyberpunkTemplate;
+            var existing=index.Projects.FirstOrDefault(item=>official?item.TemplateId==CyberpunkTemplate:item.Id==id);
+            if(existing!=null&&!official)return existing;
+            if(existing==null&&index.Projects.Count>=200)throw new IOException("Use no máximo 200 projetos nesta biblioteca.");
+            var incoming=session.ReviewedProject??manifest.Project??manifest.List;
             var name=manifest.Name.Trim();
-            name=ProjectName(name.Substring(0,Math.Min(120,name.Length)).TrimEnd());
-            var project=new GeneralProject{Id=id,Name=name};
+            var project=existing??new GeneralProject{Id=id,Name=official?"Cyberpunk 2077":ProjectName(name.Substring(0,Math.Min(120,name.Length)).TrimEnd()),
+                TemplateId=official?CyberpunkTemplate:null};
             string data=DataPath(project);
+            var previous=existing==null?null:Load(existing);
+            var list=official&&manifest.TemplateSubset
+                ?MergeReceivedPreset(previous==null?GeneralModLibrary.Seed(catalog,new ModImportItem[0]):Safe.Json.Deserialize<GeneralModList>(Safe.Json.Serialize(previous.List)),incoming)
+                :incoming;
             var state=new GeneralModState{
                 List=list,Theme=index.Theme,Language=index.Language,Destination=session.Destination,
-                DownloadFolder=index.DownloadFolder,SelectedPreset=list.Presets.Count==0?null:list.Presets[0].Id
+                DownloadFolder=index.DownloadFolder,SelectedPreset=incoming.Presets.Select(preset=>preset.Id).FirstOrDefault()
             };
+            if(previous!=null){
+                KeepReceivedBindings(previous,state);
+                if(manifest.TemplateSubset){
+                    var replaced=new HashSet<string>(incoming.Mods.Select(mod=>mod.Id),StringComparer.Ordinal);
+                    foreach(var choice in previous.ChosenVariants.Where(pair=>!replaced.Contains(pair.Key)))
+                        state.ChosenVariants[choice.Key]=choice.Value;
+                }
+            }
             foreach(var mod in manifest.List.Mods)state.SnapshotReceipts[mod.Id+"/"+mod.DefaultVariant]=session.ReceiptId;
-            source.CopyReceivedRecognition(session.ReceiptId,data);
+            if(!String.Equals(Path.GetFullPath(sourceData),data,StringComparison.OrdinalIgnoreCase))
+                source.CopyReceivedRecognition(session.ReceiptId,data);
             new GeneralModLibrary(Path.Combine(data,"lista.json")).Save(state);
-            index.Projects.Add(project);Write(index);
+            if(existing==null){index.Projects.Add(project);Write(index);}
             return project;
+        }
+    }
+
+    static GeneralModList MergeReceivedPreset(GeneralModList baseline,GeneralModList incoming){
+        var mods=incoming.Mods.ToDictionary(mod=>mod.Id,StringComparer.Ordinal);
+        var presets=incoming.Presets.ToDictionary(preset=>preset.Id,StringComparer.Ordinal);
+        baseline.Mods=baseline.Mods.Select(mod=>mods.ContainsKey(mod.Id)?mods[mod.Id]:mod)
+            .Concat(incoming.Mods.Where(mod=>!baseline.Mods.Any(existing=>existing.Id==mod.Id))).ToList();
+        baseline.Presets=baseline.Presets.Where(preset=>!presets.ContainsKey(preset.Id)).Concat(incoming.Presets).ToList();
+        baseline.Categories=baseline.Categories.Concat(incoming.Categories).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        foreach(var description in incoming.CategoryDescriptions)baseline.CategoryDescriptions[description.Key]=description.Value;
+        foreach(var group in incoming.AlternativeGroups){
+            if(GeneralModLibrary.GroupColorAvailable(baseline,group.Key,group.Value.Color))baseline.AlternativeGroups[group.Key]=group.Value;
+        }
+        return baseline;
+    }
+
+    static void KeepReceivedBindings(GeneralModState previous,GeneralModState received){
+        bool sameRoot=String.Equals(previous.Destination,received.Destination,StringComparison.OrdinalIgnoreCase);
+        var original=previous.List.Mods.ToDictionary(mod=>mod.Id,StringComparer.Ordinal);
+        foreach(var mod in received.List.Mods){
+            GeneralModEntry before;
+            if(!original.TryGetValue(mod.Id,out before))continue;
+            foreach(var variant in mod.Variants){
+                if(!before.Variants.Any(item=>item.Id==variant.Id&&item.Sources.SequenceEqual(variant.Sources,StringComparer.Ordinal)))continue;
+                string owner=InstalledSnapshot.Owner(mod,variant),value;
+                if(sameRoot&&previous.SnapshotReceipts.TryGetValue(owner,out value))received.SnapshotReceipts[owner]=value;
+                for(int index=0;index<variant.Sources.Count;index++){
+                    string slot=P2PPack.Slot(mod,variant,index);
+                    if(previous.ResolvedDownloads.TryGetValue(slot,out value))received.ResolvedDownloads[slot]=value;
+                    if(sameRoot&&previous.CyberpunkImports.TryGetValue(slot,out value))received.CyberpunkImports[slot]=value;
+                }
+            }
         }
     }
 
@@ -157,6 +205,7 @@ internal sealed class GeneralProjectStore {
             var registered = Registered(Read(inspection), project);
             var state = new GeneralModLibrary(Path.Combine(DataPath(registered), "lista.json")).LoadForInspection(inspection);
             if (state == null) throw new IOException("O arquivo deste projeto não foi encontrado. Nenhum dado foi substituído.");
+            state.TemplateId=registered.TemplateId;
             return state;
         }
     }
@@ -215,7 +264,7 @@ internal sealed class GeneralProjectStore {
 
     static void ValidateTemplate(string templateId, string name, bool legacy) {
         if (templateId == null) return;
-        if (templateId != "cyberpunk-2077" || name != "Cyberpunk 2077" || legacy)
+        if (templateId != CyberpunkTemplate || name != "Cyberpunk 2077" || legacy)
             throw new IOException("Identidade ou nome do projeto padrão inválido.");
     }
 

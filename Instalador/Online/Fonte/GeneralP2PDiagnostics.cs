@@ -65,7 +65,7 @@ internal sealed class P2PDiagnosticPreferences {
 internal sealed partial class P2PService {
     sealed class ConnectionAttempt {
         internal string Folder;
-        internal bool Sender,TimedOut;
+        internal bool Sender,ReportedDelay;
         internal DateTime Started;
         internal P2PDiagnosticReport Report;
     }
@@ -142,7 +142,8 @@ internal sealed partial class P2PService {
             if(!sessions.TryGetValue(attempt.Folder,out session)||session.Discarded)continue;
             if(session.Paused||session.Held||session.RecoveryPending)continue;
             string phase=attempt.Report.Phase;
-            if(phase=="host_declined"||phase=="connected"||phase=="host_approved"||phase=="local_failure")continue;
+            if(phase=="connected"||phase=="local_failure")continue;
+            if(attempt.Sender&&(phase==HostDeclined||phase==HostApproved))continue;
             if(attempt.Sender&&(session.Peer!=null||session.Recipients.Length!=0)){
                 ConnectionDiagnosticPhase(session.Id,"host_approved");continue;
             }
@@ -150,7 +151,15 @@ internal sealed partial class P2PService {
                 (session.CompareBeforePack&&HasSyncPreview(session)))){
                 ConnectionDiagnosticPhase(session.Id,"connected");continue;
             }
-            if(attempt.TimedOut||(now-attempt.Started).TotalSeconds<30||phase=="waiting_for_host_choice")continue;
+            if(!attempt.Sender){
+                string decision=ReadHostDecision(session,Engine.Device);
+                if(decision!=null){
+                    ConnectionDiagnosticPhase(session.Id,decision);
+                    continue;
+                }
+            }
+            if(attempt.ReportedDelay||(now-attempt.Started).TotalSeconds<30||
+                phase==HostWaiting||phase==HostApproved||phase==HostDeclined)continue;
             bool responded=false;
             bool? connected=null;
             string failure=null;
@@ -164,8 +173,8 @@ internal sealed partial class P2PService {
             lock(diagnosticGate){
                 ConnectionAttempt current;
                 if(!connectionAttempts.TryGetValue(session.Id,out current)||!Object.ReferenceEquals(attempt,current)||
-                    current.Report.Phase!=phase||current.TimedOut)continue;
-                current.TimedOut=true;
+                    current.Report.Phase!=phase||current.ReportedDelay)continue;
+                current.ReportedDelay=true;
                 string result=!responded?"local_service_unavailable":attempt.Sender?"no_verified_request":
                     connected==true?"peer_connected_waiting_for_approval":"peer_unreachable";
                 RecordConnectionDiagnostic(current,result,responded,connected,failure,true);

@@ -160,9 +160,15 @@ internal sealed class GeneralProjectHome : Form {
         service.EnableInstalledReceive(catalog,projectData,fixture);
         service.ConfirmConnection=session=>GeneralP2PDialog.AskConnection(this,()=>SharingPromptOwner,service,session);
         service.RegisterProject=session=>{
-            store.CreateReceived(session,projectData,catalog);
-            if(IsHandleCreated&&!IsDisposed)try{BeginInvoke((Action)(()=>{if(!IsDisposed&&Visible)Build();}));}
-            catch(InvalidOperationException){}
+            if(IsDisposed||!IsHandleCreated)return false;
+            return (bool)Invoke((Func<bool>)(()=>{
+                var window=sharingWindow;
+                if(window!=null&&!window.IsDisposed&&!window.CanApplyReceivedProject)return false;
+                var received=store.CreateReceived(session,projectData,catalog);
+                if(window!=null&&!window.IsDisposed)window.ReloadReceivedProject(received);
+                if(Visible)Build();
+                return true;
+            }));
         };
         service.ChooseVersion=difference=>{
             if(IsDisposed||!IsHandleCreated)return false;
@@ -203,7 +209,7 @@ internal sealed class GeneralProjectHome : Form {
                 dialog.ClientSize=new Size(650,284);
                 var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(24,12,24,20)};
                 layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-                layout.RowStyles.Add(new RowStyle(SizeType.Absolute,52));
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
                 var message=new Label{Dock=DockStyle.Fill,Text=session.Name+"\r\n\r\n"+T(
                     "O download ou a instalação foi interrompido. Preserve o arquivo para retomar pelo mesmo compartilhamento ou descarte o recebimento e reverta as alterações registradas.",
                     "The download or installation was interrupted. Keep the file to resume the same transfer, or discard it and roll back recorded changes.")};
@@ -254,7 +260,7 @@ internal sealed partial class GeneralModWindow {
     GeneralProject project;
     internal string ProjectAction {get;private set;}
     internal void AttachProject(GeneralProjectStore store,GeneralProject project){
-        projectStore=store;this.project=project;var preferences=store.Read();
+        projectStore=store;this.project=project;state.TemplateId=project.TemplateId;var preferences=store.Read();
         bool refreshed=false;
         if(BuiltInProject){
             if(seed.Mods.Any(item=>GeneralModLibrary.IsFacialMod(item.Id))){

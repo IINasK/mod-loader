@@ -26,7 +26,9 @@ internal sealed partial class GeneralModWindow {
     Work scanCurrent;
     int operationTotal,operationFinished;
     Action<string,string> testStage;
-    string association;
+    string association, pendingWebSource;
+    GeneralSourceInfo pendingWebInfo;
+    FixedAsset pendingFixedAsset;
     Action<string> launch=GeneralModDownload.OpenSource;
     GeneralModInstaller Generic(string root){return new GeneralModInstaller(root,Path.Combine(data,"Instalacoes"));}
     InstalledSnapshotInstaller Snapshot(string root){return new InstalledSnapshotInstaller(root,data,catalog,testMode);}
@@ -700,7 +702,7 @@ internal sealed partial class GeneralModWindow {
     async Task AwaitKnown(Work work,FixedAsset asset,string root){
         using(var watch=new GeneralModDownload(state.DownloadFolder,asset)){
             bool opened=false;
-            association=null;SetWait(true,true);
+            association=null;pendingFixedAsset=asset;SetWait(true,true);
             try{
                 while(true){
                     CheckSkip(work);
@@ -726,7 +728,7 @@ internal sealed partial class GeneralModWindow {
                     if(snapshot.Estimated&&snapshot.Active){currentProgress.Caption+=T(" · estimado"," · estimated");currentProgress.Invalidate();}
                     await Task.Delay(600);
                 }
-            }finally{SetWait(false,false);association=null;}
+            }finally{SetWait(false,false);association=null;pendingFixedAsset=null;}
         }
     }
     async Task<string[]> PrepareChangeFiles(Work work,string root){
@@ -779,14 +781,31 @@ internal sealed partial class GeneralModWindow {
         }
     }
     async Task<string> AwaitAttachment(Work work,string source,string root){
-        association=null;SetWait(true,true);
+        association=null;pendingWebSource=source;
+        work.Variant.SourceInfo.TryGetValue(source,out pendingWebInfo);
+        SetWait(true,true);
         try{
-            RowStatus(work,"Aguardando arquivo",null,work.Entry.Name+T(": conclua o download e arraste o arquivo para esta janela.",": finish downloading and drop the file into this window."));
-            launch(source);
-            while(association==null){CheckSkip(work);if(!editingAttachment)await DrainLocalPriority(root);if(association==null)await Task.Delay(400);}
+            bool opened=false;
+            while(association==null){
+                CheckSkip(work);
+                if(editingAttachment){await Task.Delay(100);continue;}
+                await DrainLocalPriority(root);
+                var info=pendingWebInfo;
+                var path=await Task.Run(()=>GeneralModDownload.FindCompleted(state.DownloadFolder,source,info));
+                while(editingAttachment)await Task.Delay(100);
+                CheckSkip(work);
+                if(association!=null)return association;
+                if(path!=null)return path;
+                if(!opened&&!editingAttachment&&association==null){
+                    RowStatus(work,"Aguardando arquivo",null,work.Entry.Name+T(": conclua o download. O app confere a pasta ou aceita o arquivo arrastado.",
+                        ": finish downloading. The app checks the folder or accepts the dropped file."));
+                    launch(source);opened=true;
+                }
+                if(association==null)await Task.Delay(600);
+            }
             CheckSkip(work);
             return association;
-        }finally{SetWait(false,false);association=null;}
+        }finally{SetWait(false,false);association=null;pendingWebSource=null;pendingWebInfo=null;}
     }
     async Task DrainLocalPriority(string root){
         if(current!=null)CheckSkip(current);

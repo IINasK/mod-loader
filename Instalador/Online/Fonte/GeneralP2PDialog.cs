@@ -55,7 +55,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
                         dialog.ClientSize=new Size(560,210);
                         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(24,12,24,16)};
                         layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-                        layout.RowStyles.Add(new RowStyle(SizeType.Absolute,50));
+                        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
                         layout.Controls.Add(new Label{Dock=DockStyle.Fill,Text=session.Name+"\r\n\r\n"+
                             T("Seu amigo quer receber este pacote.","Your friend wants to receive this pack.")},0,0);
                         var actions=GeneralTableDialogLayout.Commands();
@@ -122,7 +122,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         targetLayout.RowStyles.Add(new RowStyle(SizeType.Absolute,0));
         var targetLabel=Heading(T("Instalar na pasta local","Install into local folder"));targetLayout.Controls.Add(targetLabel,0,0);targetLayout.SetColumnSpan(targetLabel,2);
         var destinationField=Field(destination);destinationField.Margin=Padding.Empty;targetLayout.Controls.Add(destinationField,0,1);
-        choose=GeneralStyle.Button(T("Escolher pasta","Choose folder"),ChooseFolder);choose.Margin=new Padding(8,0,0,0);choose.Name="p2p-folder";targetLayout.Controls.Add(choose,1,1);
+        choose=GeneralStyle.Button(T("Escolher pasta","Choose folder"),()=>{try{ChooseFolder();}catch(Exception ex){Failed(ex);}});choose.Margin=new Padding(8,0,0,0);choose.Name="p2p-folder";targetLayout.Controls.Add(choose,1,1);
         targetLayout.Controls.Add(folderHint,0,2);targetLayout.SetColumnSpan(folderHint,2);
         targetRow.Controls.Add(targetLayout);body.Controls.Add(targetRow,0,5);
         var actions=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.RightToLeft,WrapContents=false,Margin=Padding.Empty,Name="p2p-actions"};
@@ -134,8 +134,12 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         status.Margin=new Padding(0,Gap,0,0);
         body.Controls.Add(cardScroll,0,9);body.SetColumnSpan(cardScroll,2);
         cardStack.ClientSizeChanged+=(s,e)=>LayoutCards();
-        destination.Text=state.Destination??"";
-        output.TextChanged+=(s,e)=>UpdateActions();input.TextChanged+=(s,e)=>UpdateActions();status.TextChanged+=(s,e)=>UpdateActions();
+        output.TextChanged+=(s,e)=>UpdateActions();status.TextChanged+=(s,e)=>UpdateActions();
+        input.TextChanged+=(s,e)=>{
+            var incoming=IncomingInvite();
+            destination.Text=incoming==null?"":incoming.LocalSuggestedFolder()??"";
+            UpdateActions();
+        };
         presets.SelectedIndexChanged+=(s,e)=>{if(this.autoStart)Run(PrepareLink);};
         timer.Tick+=async(s,e)=>await Poll();
         FormClosing+=(s,e)=>{if(busy)e.Cancel=true;};
@@ -204,10 +208,13 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         connect.Enabled=!busy&&!String.IsNullOrWhiteSpace(input.Text);
         choose.Enabled=!busy;
         var incoming=IncomingInvite();
-        string hint=incoming==null?"":
-            incoming.PrivateFolder?T("O anfitrião usa uma pasta pessoal. Escolha a pasta do jogo neste PC.",
-                "The host uses a personal folder. Choose the game folder on this PC."):
-            incoming.SuggestedFolder==null?"":T("Pasta sugerida pelo anfitrião: ","Folder suggested by the host: ")+incoming.SuggestedFolder;
+        string hint="";
+        if(incoming!=null&&destination.Text.Length==0){
+            if(incoming.PrivateFolder)hint=T("O anfitrião usa uma pasta pessoal. Escolha a pasta do jogo neste PC.",
+                "The host uses a personal folder. Choose the game folder on this PC.");
+            else if(incoming.SuggestedFolder!=null)hint=T("A pasta sugerida não está disponível neste PC. Escolha a pasta do jogo.",
+                "The suggested folder is not available on this PC. Choose the game folder.");
+        }
         body.SuspendLayout();
         folderHint.Text=hint;tips.SetToolTip(folderHint,hint);
         folderHint.Visible=hint.Length!=0;
@@ -276,10 +283,10 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         catch(IOException){return null;}
     }
     void ChooseFolder(){
-        var invite=IncomingInvite();
-        string initial=Directory.Exists(destination.Text)?destination.Text:invite==null?"":invite.LocalSuggestedFolder();
-        using(var folder=new FolderBrowserDialog{Description=T("Escolha a pasta local de instalação.","Choose the local installation folder."),SelectedPath=initial??""})
-            if(folder.ShowDialog(this)==DialogResult.OK)destination.Text=folder.SelectedPath;
+        string selected=WindowsFolderPicker.Choose(this,T("Pasta de instalação","Installation folder"),destination.Text);
+        if(selected==null)return;
+        destination.Text=WindowsFolderPicker.InstallationPath(selected);
+        UpdateActions();
     }
     async Task PrepareLink(){
         var selected=ExportIds;
@@ -311,7 +318,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         if(invite.Kind=="offer"){
             if(!Directory.Exists(destination.Text))ChooseFolder();
             if(!Directory.Exists(destination.Text))throw new IOException(T("Escolha a pasta de instalação.","Choose the installation folder."));
-            string target=destination.Text;
+            string target=WindowsFolderPicker.InstallationPath(destination.Text);
             string prompt=invite.Schema==3?T("Comparar os mods do pacote ","Compare mods from the pack "):T("Receber e instalar o pacote ","Receive and install pack ");
             service.Notify();
             if(GeneralDialog.Message(this,prompt+invite.Name+T(" em:\n"," into:\n")+target+T("\n\nMantenha o jogo fechado. Configurações anteriores terão backup.","\n\nKeep the game closed. Previous settings will be backed up."),T("Conectar ao anfitrião","Connect to the host"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
@@ -527,7 +534,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
                 (!view.Connected||!view.Accepted);
             if(waitingConnection&&!waitingSince.HasValue)waitingSince=DateTime.UtcNow;
             if(!waitingConnection)waitingSince=null;
-            bool delayed=waitingSince.HasValue&&(DateTime.UtcNow-waitingSince.Value).TotalSeconds>=30;
+            bool delayed=view.HostDecision==null&&waitingSince.HasValue&&(DateTime.UtcNow-waitingSince.Value).TotalSeconds>=30;
             diagnostic.Visible=(delayed||view.Unavailable||session.Error!=null)&&owner.service.GetConnectionDiagnostic(session.Id)!=null;
             var scan=session.SyncProgress;
             var issue=session.VerificationIssue;
@@ -563,13 +570,14 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             else if(message.Length==0&&scanning&&scan!=null&&scan.Item!=null)message=scan.Item;
             else if(message.Length==0&&waitingConnection){
                 if(view.Unavailable)message=T("Sem resposta do serviço P2P local. Reabra o Mod Loader se persistir.","Local P2P service unavailable. Reopen Mod Loader if this persists.");
-                else if(!session.Sender&&view.Connected)message=delayed
-                    ?T("Anfitrião online. Confira o ID do convite: ","Host online. Check the invitation ID: ")+P2PService.DiagnosticId(session.Id)
-                    :T("Conectado. Aguardando o anfitrião autorizar o convite.","Connected. Waiting for the host to authorize the invitation.");
-                else if(delayed)message=session.Sender
-                    ?T("Conexão ainda indisponível. Confira se o amigo está com o Mod Loader aberto.","Connection still unavailable. Check that your friend has Mod Loader open.")
-                    :session.Automatic?T("Sem conexão. Confira o link atual com o anfitrião · ","No connection. Check the current link with the host · ")+P2PService.DiagnosticId(session.Id)
-                    :T("Conexão ainda indisponível. Copie a resposta e envie ao anfitrião.","Connection still unavailable. Copy the reply and send it to the host.");
+                else if(view.HostDecision==P2PService.HostWaiting)message=T("Pedido recebido. Aguardando a decisão do anfitrião…",
+                    "Request received. Waiting for the host to decide…");
+                else if(view.HostDecision==P2PService.HostApproved)message=T("Convite aceito. Finalizando a conexão…",
+                    "Invitation accepted. Finishing the connection…");
+                else if(view.HostDecision==P2PService.HostDeclined)message=T("O anfitrião recusou o convite.","The host declined the invitation.");
+                else if(!session.Sender&&view.Connected)message=T("Conectado ao anfitrião. Aguardando resposta ao convite…",
+                    "Connected to the host. Waiting for a reply to the invitation…");
+                else if(delayed)message=T("A conexão está demorando. Ainda tentando…","Connection is taking longer. Still trying…");
                 else message=session.Sender?T("Convite aceito. Conectando ao amigo…","Invitation accepted. Connecting to your friend…")
                     :T("Conectando ao anfitrião…","Connecting to the host…");
             }
@@ -681,6 +689,19 @@ internal sealed partial class GeneralModWindow {
     internal Control SharingPromptOwner {
         get{return sharingDialog!=null&&!sharingDialog.IsDisposed&&sharingDialog.Visible?(Control)sharingDialog:this;}
     }
+    internal bool CanApplyReceivedProject {get{return !working&&!scanning&&!hasPresetDraft&&(Enabled||sharingDialog!=null);}}
+    internal void ReloadReceivedProject(GeneralProject received){
+        if(project==null||project.Id!=received.Id)return;
+        var saved=projectStore.Load(received);
+        GeneralModLibrary.RestoreKnownMappings(saved.List,seed);
+        state.List=saved.List;state.Destination=saved.Destination;state.SelectedPreset=saved.SelectedPreset;
+        state.ChosenVariants=saved.ChosenVariants;state.ResolvedDownloads=saved.ResolvedDownloads;
+        state.CyberpunkImports=saved.CyberpunkImports;state.SnapshotReceipts=saved.SnapshotReceipts;
+        marked.Clear();statuses.Clear();statusDetails.Clear();progress.Clear();
+        ResetColumnFilters();RebuildPresets();
+        BeginInvoke((Action)(async()=>{if(!IsDisposed&&!working&&!scanning)await Scan();}));
+    }
+
     void PrepareP2P(){
             if(p2p==null){
                 if(sharingHome!=null)p2p=sharingHome.SharingService(data);

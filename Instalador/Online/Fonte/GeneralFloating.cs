@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -112,7 +112,7 @@ internal class GeneralDialog : Form {
         header=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,Margin=Padding.Empty,Padding=new Padding(20,4,8,4)};
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         title.Font=GeneralStyle.Font(14,true);title.ForeColor=GeneralStyle.Foreground;header.Controls.Add(title,0,0);
-        close=new GeneralButton{Text="",IconKind="close",Bare=true,Size=new Size(44,44),Dock=DockStyle.Fill,AccessibleName=GeneralStyle.T("Fechar","Close")};
+        close=new GeneralButton{Text="",IconKind="close",Bare=true,Size=new Size(44,44),Dock=DockStyle.Fill,Margin=Padding.Empty,AccessibleName=GeneralStyle.T("Fechar","Close")};
         close.Click+=(s,e)=>Complete(DialogResult.Cancel);header.Controls.Add(close,1,0);
         title.MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){ReleaseCapture();SendMessage(Handle,0x00A1,(IntPtr)2,IntPtr.Zero);}};
         shell.Controls.Add(header,0,0);shell.Controls.Add(Content,0,1);base.Controls.Add(shell);Text=text;

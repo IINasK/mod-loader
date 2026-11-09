@@ -30,16 +30,23 @@ internal static class GeneralP2PUiTests {
                         var offered=new P2PInvite{Device=String.Join("-",Enumerable.Repeat("AAAAAAA",8)),Folder="ml-"+new string('a',32),ManifestHash=new string('b',64),Kind="offer",Name="Pacote do amigo",Mode="installed-zip",Size=1024};input.Text=offered.Encode();output.Text=offered.Encode();Application.DoEvents();
                         check(destination.Visible&&destination.ReadOnly&&Find<Button>(dialog,"p2p-folder").Enabled,"Colar convite mostra destino local e escolha de pasta antes de conectar: "+theme+locale);
                         var folderHint=Find<Label>(dialog,"p2p-folder-hint");
-                        string localDestination=destination.Text;
-                        offered.SuggestedFolder=@"D:\SteamLibrary\steamapps\common\Cyberpunk 2077";
+                        offered.SuggestedFolder=Directory.CreateDirectory(Path.Combine(root,"suggested")).FullName;
                         input.Text=offered.Encode();Application.DoEvents();
-                        check(folderHint.Visible&&folderHint.Text.Contains(offered.SuggestedFolder)&&Inside(folderHint,dialog.Content)&&destination.Text==localDestination,
-                            "Sugestão de pasta é visível e preserva o destino local: "+theme+locale);
+                        check(destination.Text==offered.SuggestedFolder&&!folderHint.Visible,
+                            "Convite preenche uma pasta válida neste PC: "+theme+locale);
+                        string manual=Directory.CreateDirectory(Path.Combine(root,"manual")).FullName;
+                        destination.Text=manual;
+                        typeof(GeneralP2PDialog).GetMethod("UpdateActions",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(dialog,null);
+                        check(destination.Text==manual,"Atualizar a tela preserva a escolha manual: "+theme+locale);
+                        offered.SuggestedFolder=Path.Combine(root,"missing");
+                        input.Text=offered.Encode();Application.DoEvents();
+                        check(destination.Text.Length==0&&folderHint.Visible&&Inside(folderHint,dialog.Content),
+                            "Novo convite com pasta indisponível deixa o destino vazio: "+theme+locale);
                         offered.SuggestedFolder=null;offered.PrivateFolder=true;input.Text=offered.Encode();Application.DoEvents();
-                        check(folderHint.Visible&&folderHint.Text.Contains(locale=="pt"?"pasta pessoal":"personal folder")&&destination.Text==localDestination,
+                        check(folderHint.Visible&&folderHint.Text.Contains(locale=="pt"?"pasta pessoal":"personal folder")&&destination.Text.Length==0,
                             "Pasta pessoal vira aviso e não preenche o destino: "+theme+locale);
                         offered.PrivateFolder=false;input.Text=offered.Encode();Application.DoEvents();
-                        check(!folderHint.Visible,"Convite legado mantém o seletor local sem sugestão: "+theme+locale);
+                        check(!folderHint.Visible&&destination.Text.Length==0,"Convite legado mantém o seletor local sem sugestão: "+theme+locale);
                         using(var image=new Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(root,"layout-"+theme+"-"+locale+".png"),System.Drawing.Imaging.ImageFormat.Png);}
                         Safe.WriteJson(Path.Combine(root,"layout.json"),Children(dialog.Content).Where(c=>!String.IsNullOrEmpty(c.Name)||c is TableLayoutPanel).Select(c=>new{Name=c.Name,Type=c.GetType().Name,Bounds=c.Bounds.ToString(),Parent=c.Parent.ClientRectangle.ToString()}).ToArray());
                         foreach(Control control in new Control[]{input,output,destination,connect,generate,Find<Button>(dialog,"p2p-folder"),Find<Button>(dialog,"p2p-copy"),Find<Label>(dialog,"p2p-status")})check(!control.Visible||Inside(control,dialog.Content),"Controle sem recorte: "+control.Name+theme+locale);
@@ -150,6 +157,20 @@ internal static class GeneralP2PUiTests {
                         views[incoming].Connected=false;views[incoming].Accepted=false;views[incoming].RemotePaused=false;
                         update();
                         check(!Find<Button>(cards[1],"p2p-update").Enabled&&Find<Label>(cards[1],"p2p-transfer-status").Text.Contains(locale=="pt"?"Conectando":"Connecting"),"Pending connection has an explicit status.");
+                        var cardMap=(System.Collections.IDictionary)typeof(GeneralP2PDialog).GetField("cards",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(dialog);
+                        var receiveCard=cardMap[incoming];
+                        receiveCard.GetType().GetField("waitingSince",BindingFlags.Instance|BindingFlags.NonPublic).SetValue(receiveCard,DateTime.UtcNow.AddSeconds(-31));
+                        var receiveStatus=Find<Label>(cards[1],"p2p-transfer-status");
+                        update();
+                        check(receiveStatus.Text.Contains(locale=="pt"?"Ainda tentando":"Still trying"),"A demora mantém a tentativa aberta: "+theme+locale);
+                        views[incoming].HostDecision=P2PService.HostWaiting;update();
+                        check(receiveStatus.Text.Contains(locale=="pt"?"decisão do anfitrião":"host to decide"),"O receptor vê que o pedido foi recebido: "+theme+locale);
+                        views[incoming].HostDecision=P2PService.HostDeclined;update();
+                        check(receiveStatus.Text.Contains(locale=="pt"?"recusou":"declined")&&!Find<Button>(cards[1],"p2p-full").Enabled,
+                            "Recusa fica explícita sem liberar a transferência: "+theme+locale);
+                        views[incoming].HostDecision=P2PService.HostApproved;update();
+                        check(receiveStatus.Text.Contains(locale=="pt"?"Finalizando":"Finishing")&&!Find<Button>(cards[1],"p2p-full").Enabled,
+                            "Aceite confirmado fica visível enquanto a conexão termina: "+theme+locale);
                         views[incoming].Connected=true;views[incoming].Accepted=true;
                         update();
                         var updateMods=Find<Button>(cards[1],"p2p-update");

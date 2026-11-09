@@ -93,7 +93,7 @@ internal static class GeneralP2PLifecycleTests {
         string thirdData=Path.Combine(root,"third-data");
         var third=Service(root,"third-peer",thirdData,helper);
         var library=new GeneralProjectStore(Path.Combine(root,"lib"));
-        third.RegisterProject=session=>library.CreateReceived(session,thirdData,Catalog);
+        third.RegisterProject=session=>{library.CreateReceived(session,thirdData,Catalog);return true;};
         try{
             first.ChooseVersion=_=>{gate.Wait(40000);return false;};
             host.SetPreparationState(source.Item1);

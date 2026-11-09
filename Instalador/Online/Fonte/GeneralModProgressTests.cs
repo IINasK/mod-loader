@@ -117,6 +117,33 @@ internal sealed partial class GeneralModWindow {
             check(form.Status(normal,priorityRoot)=="Instalado"&&pages==1,"Associação explícita conclui o mod original sem abrir outra página.");
             check(form.operationFinished==2&&form.operationTotal==2&&form.totalProgress.Value==50,"Priority queue finishes while the partially skipped entry remains visible in pack coverage.");
         });
+        string recoveredRoot=Path.Combine(root,"reuse-target");
+        Directory.CreateDirectory(recoveredRoot);
+        var recoveredState=new GeneralModState{Destination=recoveredRoot,DownloadFolder=downloads,List=new GeneralModList()};
+        var cached=NewEntry("Download existente","https://www.nexusmods.com/cyberpunk2077/mods/111?tab=files&file_id=222");
+        var dropped=NewEntry("Download fora da pasta","https://www.nexusmods.com/cyberpunk2077/mods/333?tab=files&file_id=444");
+        cached.Variants[0].SourceInfo[cached.Variants[0].Sources[0]]=new GeneralSourceInfo{
+            Name="First fixture",FileName="published.zip",Bytes=new FileInfo(firstZip).Length};
+        dropped.Variants[0].SourceInfo[dropped.Variants[0].Sources[0]]=new GeneralSourceInfo{
+            Name="Second fixture",FileName=Path.GetFileName(secondZip),Bytes=new FileInfo(secondZip).Length};
+        string saved=Path.Combine(downloads,"published (1).zip");
+        File.Copy(firstZip,saved);
+        recoveredState.List.Mods.AddRange(new[]{cached,dropped});
+        TestForm(catalog,recoveredState,Path.Combine(root,"reuse-data"),root,async form=>{
+            int pages=0;form.launch=url=>pages++;
+            form.Enqueue(new[]{form.MakeWork(cached)},false);
+            await Until(()=>!form.working);
+            check(pages==0&&File.Exists(Path.Combine(recoveredRoot,"mods","first.txt"))&&
+                form.state.ResolvedDownloads.Values.Contains(saved),
+                "O download concluído com sufixo do navegador é reutilizado antes de abrir o site.");
+            form.Enqueue(new[]{form.MakeWork(dropped)},false);
+            await Until(()=>form.NeedUnknownFile&&pages==1);
+            form.Drop(new[]{secondZip});
+            await Until(()=>!form.working);
+            check(pages==1&&form.state.List.Mods.Count==2&&form.state.ResolvedDownloads.Values.Contains(secondZip)&&
+                File.Exists(Path.Combine(recoveredRoot,"mods","second.txt")),
+                "Arrastar o arquivo esperado de outra pasta continua o item atual, sem criar outro mod.");
+        });
         string editRoot=Path.Combine(root,"edit-target");Directory.CreateDirectory(editRoot);
         var editState=new GeneralModState{Destination=editRoot,DownloadFolder=downloads,List=new GeneralModList()};
         var hold=NewEntry("Espera","https://example.com/hold.zip");

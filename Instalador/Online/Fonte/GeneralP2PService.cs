@@ -34,6 +34,7 @@ internal sealed class P2PSession {
 }
 internal sealed class P2PTransferStatus {
     internal int Percent;
+    internal string HostDecision;
     internal bool Connected,RemotePaused,Accepted,Unavailable;
     internal P2PRecipientProgress[] Recipients=new P2PRecipientProgress[0];
 }
@@ -53,7 +54,7 @@ internal sealed partial class P2PService : IDisposable {
     string installedData;
     bool installedFixture;
     internal event Action<P2PSession> SnapshotInstalled;
-    internal Action<P2PSession> RegisterProject;
+    internal Func<P2PSession,bool> RegisterProject;
     internal Func<ModVersionDifference,bool> ChooseVersion;
     internal Func<P2PSession,Task<bool>> ConfirmConnection;
     internal Action<GeneralModList> ReviewReceived;
@@ -166,6 +167,7 @@ internal sealed partial class P2PService : IDisposable {
             Engine.RemoveFolder(session.Id);
             if(session.Stage!=null)return;
             foreach(var recipient in session.Recipients)CloseReceipt(session,recipient.Device);
+            CloseHostDecision(session);
             P2PPack.DeleteSnapshot(Folder(session));
             ForgetSession(session);
         }
@@ -278,6 +280,7 @@ internal sealed partial class P2PService : IDisposable {
     void CleanupTransport(P2PSession s){
         lock(startGate){
         Engine.RemoveFolder(s.Id);
+        CloseHostDecision(s);
         try{P2PPack.DeleteSnapshot(Folder(s));}
         catch(IOException){
             if(SnapshotSessions().Any(other=>other.Id!=s.Id&&!other.Completed&&!other.Discarded&&!other.Paused))throw;
@@ -338,6 +341,7 @@ internal sealed partial class P2PService : IDisposable {
                 AdvertiseAcceptance(existing);
                 RefreshAcceptance(existing);
             }
+            ReceiveHostDecision(existing);
             return existing;
         }
         if(Sessions.Count>=100)throw new IOException("Remova compartilhamentos antigos antes de receber outro.");
@@ -349,8 +353,9 @@ internal sealed partial class P2PService : IDisposable {
         AdvertiseAcceptance(session);Engine.ConfigurePeerWithRelay(session.Peer,session.RelayDevice);Engine.ConfigureFolder(session.Id,folder,ReceiveLabel(session),false,session.Peer);
         try{
             if(session.Lifecycle)ConfigureReceipt(session,session.Peer,false);
+            ReceiveHostDecision(session);
             AddSession(session);
-        }catch{Engine.RemoveFolder(session.Id);throw;}
+        }catch{CloseHostDecision(session);Engine.RemoveFolder(session.Id);throw;}
         return session;
     }
     internal P2PSession Authorize(string code){
@@ -384,6 +389,7 @@ internal sealed partial class P2PService : IDisposable {
     internal void Pause(P2PSession s){lock(s){if(s.Stage!=null&&!s.Sender||s.Completed||s.Discarded||s.Held)throw new IOException("A transferência terminou ou a instalação já começou; aguarde terminar.");Engine.Pause(s.Id,!s.Paused);s.Paused=!s.Paused;Save();}}
     internal P2PTransferStatus TransferStatus(P2PSession s){
         Validate(s);if(s.Lifecycle&&s.Sender)return OutgoingStatus(s);var result=new P2PTransferStatus();if(s.Completed){result.Percent=100;return result;}if(s.Phase!=null&&s.Phase!="discarded")result.Percent=100;if(s.Peer==null)return result;
+        result.HostDecision=ReadHostDecision(s,Engine.Device);
         var connections=Engine.Get("system/connections")["connections"] as Dictionary<string,object>;object raw;
         if(connections!=null&&connections.TryGetValue(s.Peer,out raw))result.Connected=Convert.ToBoolean(((Dictionary<string,object>)raw)["connected"]);
         if(!result.Connected||s.Paused)return result;

@@ -590,8 +590,18 @@ internal sealed partial class GeneralModWindow : Form {
         try{
             var paths=files.Where(f=>GeneralModDownload.IsArchivePath(f)&&File.Exists(f)).Select(GeneralModLibrary.ValidateSource).ToList();
             if(paths.Count==0)throw new IOException(T("Arraste um arquivo ZIP, RAR ou 7z concluído.","Drop a completed ZIP, RAR or 7z file."));
-            if(waiting&&priorityCurrent==null&&current!=null&&paths.Count==1){
+            if(waiting&&priorityCurrent==null&&current!=null&&paths.Count==1&&!editingAttachment){
                 var target=current;string source=paths[0];
+                var expected=pendingFixedAsset;var web=pendingWebSource;var info=pendingWebInfo;
+                editingAttachment=true;
+                try{
+                    if(await Task.Run(()=>GeneralModDownload.MatchesCompleted(source,web,info,expected))&&
+                        Object.ReferenceEquals(current,target)&&waiting&&association==null){
+                        association=source;
+                        return;
+                    }
+                }finally{editingAttachment=false;}
+                if(!Object.ReferenceEquals(current,target)||!waiting)return;
                 var added=NewEntry(Path.GetFileNameWithoutExtension(source),source);added.Category=DefaultCategory;
                 editingAttachment=true;
                 try{using(var editor=new GeneralModEditor(added,PresetCategories(),added.DefaultVariant,true,T("Adicione este mod ou associe o arquivo ao download atual.","Add this mod or attach its file to the current download."))){

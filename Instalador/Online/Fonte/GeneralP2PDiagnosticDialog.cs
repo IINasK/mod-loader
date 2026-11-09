@@ -7,9 +7,10 @@ internal sealed class GeneralP2PDiagnosticDialog : GeneralDialog {
 
     internal GeneralP2PDiagnosticDialog(P2PService service):base(T("Diagnóstico P2P","P2P diagnostics")){
         Name="p2p-diagnostic-dialog";
-        ClientSize=new Size(620,300);
+        ClientSize=new Size(620,340);
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(24,12,24,20),ColumnCount=1,RowCount=6};
-        foreach(int height in new[]{32,26,44,34,40,44})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
+                foreach(int height in new[]{32,26,44,34,40})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.Controls.Add(new Label{Dock=DockStyle.Fill,AutoEllipsis=true,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty},0,0);
         var feedback=(Label)layout.GetControlFromPosition(0,0);
         var report=service.GetConnectionDiagnostic();

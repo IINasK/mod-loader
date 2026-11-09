@@ -41,7 +41,9 @@ internal sealed partial class P2PService {
     int installing;
 
     internal void SetPreparationState(GeneralModState state) {
-        preparationState = state==null?null:Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(state));
+        var copy=state==null?null:Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(state));
+        if(copy!=null)copy.TemplateId=state.TemplateId;
+        preparationState=copy;
     }
 
     string ReceiptFolderId(P2PSession session, string recipient) {
@@ -77,6 +79,7 @@ internal sealed partial class P2PService {
         }
         if(session.Peer!=null)Engine.ConfigurePeerWithRelay(session.Peer,session.ReceiptClosed?null:session.RelayDevice);
         if(session.Lifecycle&&!session.Sender&&!session.ReceiptClosed)ConfigureReceipt(session,session.Peer,false);
+        if(!session.Sender)ReceiveHostDecision(session);
         if(skipPayload||session.Discarded||session.Mode=="installed-zip"&&session.Completed&&(session.Sender||session.Lifecycle||!Directory.Exists(Folder(session))))return;
         Engine.ConfigureSharedFolder(session.Id,Folder(session),session.Sender?session.Name:ReceiveLabel(session),
             session.Sender,session.Peer==null?new string[0]:new[]{session.Peer},session.Paused||session.Held||session.RecoveryPending);
@@ -88,11 +91,15 @@ internal sealed partial class P2PService {
     }
 
     void AddRecipient(P2PSession session,string device) {
-        Engine.ConfigurePeer(device);
+        Engine.EnsurePeer(device);
         ConfigureReceipt(session,device,true);
         var previous=session.Recipients;
         session.Recipients=previous.Concat(new[]{new P2PRecipient{Device=device}}).ToArray();
-        try{Save();ConfigureOutgoing(session);}
+        try{
+            Save();
+            if(session.CompareBeforePack)PublishHostDecision(session,device,HostApproved);
+            ConfigureOutgoing(session);
+        }
         catch{
             session.Recipients=previous;
             Save();
@@ -365,7 +372,7 @@ internal sealed partial class P2PService {
             if(RegisterProject==null||!session.Completed||session.Sender||session.ListImported||session.ReceiptId==null||
                 session.ProjectError!=null&&!retry)return;
             try{
-                RegisterProject(session);
+                if(!RegisterProject(session))return;
                 session.ListImported=true;
                 session.ProjectError=null;
             }catch(Exception ex){
@@ -409,6 +416,7 @@ internal sealed partial class P2PService {
             SetPhase(session,"discarded");
             ForgetSyncDifferences(session);
             if(Engine.Running)Engine.RemoveFolder(session.Id);
+            CloseHostDecision(session);
             P2PPack.DeleteSnapshot(Folder(session));
         }
     }

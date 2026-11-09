@@ -62,9 +62,9 @@ internal sealed partial class P2PService {
         Safe.WriteJson(path,envelope);
     }
 
-    string ReadSyncMessage(P2PSession session,string device,string path,string kind,out string hash) {
+    string ReadSyncMessage(P2PSession session,string device,string path,string kind,out string hash,int maximum=MaxSyncMessage) {
         byte[] raw;
-        using(var input=File.OpenRead(path))raw=InstalledSnapshot.ReadBytes(input,MaxSyncMessage);
+        using(var input=File.OpenRead(path))raw=InstalledSnapshot.ReadBytes(input,maximum);
         var envelope=Safe.Json.Deserialize<SyncMessage>(Encoding.UTF8.GetString(raw));
         if(envelope==null||envelope.Payload==null||!P2PPack.HashValid(envelope.Tag))
             throw new IOException("A mensagem de comparação P2P é inválida.");

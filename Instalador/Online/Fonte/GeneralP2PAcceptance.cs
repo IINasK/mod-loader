@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -42,6 +43,82 @@ internal sealed partial class P2PService {
     }
     readonly Dictionary<P2PSession,Dictionary<string,Task<bool>>> connectionDecisions=
         new Dictionary<P2PSession,Dictionary<string,Task<bool>>>();
+
+    const string HostDecisionFile="host-decision.json";
+    internal const string HostWaiting="waiting_for_host_choice",HostApproved="host_approved",HostDeclined="host_declined";
+
+    string HostDecisionRoot(P2PSession session){
+        return Safe.In(Root,"connection-status/"+session.Id);
+    }
+    string HostDecisionFolder(P2PSession session,string receiver){
+        string id="ml-"+InstalledSnapshot.Hash(Encoding.UTF8.GetBytes("host-decision\n"+session.Id+"\n"+receiver)).Substring(0,32);
+        return Safe.In(HostDecisionRoot(session),id);
+    }
+    void ConfigureHostDecision(P2PSession session,string remote,bool host){
+        string folder=HostDecisionFolder(session,host?remote:Engine.Device);
+        Safe.NoLinks(folder);
+        Directory.CreateDirectory(folder);
+        string ignore=Safe.In(folder,".stignore"),rules="!"+HostDecisionFile+"\n*\n";
+        Safe.NoLinks(ignore);
+        if(!File.Exists(ignore))File.WriteAllText(ignore,rules);
+        else if(new FileInfo(ignore).Length>128||File.ReadAllText(ignore)!=rules)
+            throw new IOException("As regras da pasta de aprovação P2P foram alteradas.");
+        Engine.ConfigureFolder(Path.GetFileName(folder),folder,"Mod Loader connection status",host,remote);
+    }
+    void ReceiveHostDecision(P2PSession session){
+        if(session.CompareBeforePack&&!session.Completed&&!session.Discarded)
+            TryHostDecisionIo(()=>ConfigureHostDecision(session,session.Peer,false));
+    }
+    void PublishHostDecision(P2PSession session,string receiver,string phase){
+        TryHostDecisionIo(()=>{
+            string folder=HostDecisionFolder(session,receiver);
+            string path=Safe.In(folder,HostDecisionFile);
+            Safe.NoLinks(path);
+            if(File.Exists(path)){
+                if(ReadHostDecision(session,receiver)==phase)return;
+            }else{
+                // The verified device gets only this status folder until the host approves the pack.
+                Engine.EnsurePeer(receiver);
+                ConfigureHostDecision(session,receiver,true);
+            }
+            WriteSyncMessage(session,receiver,path,HostDecisionFile,phase);
+            ScanSyncFolder(Path.GetFileName(folder));
+        });
+    }
+    string ReadHostDecision(P2PSession session,string receiver){
+        if(!session.CompareBeforePack||receiver==null)return null;
+        string phase=null;
+        TryHostDecisionIo(()=>{
+            string path=Safe.In(HostDecisionFolder(session,receiver),HostDecisionFile);
+            Safe.NoLinks(path);
+            if(!File.Exists(path))return;
+            string hash;
+            string value=Safe.Json.Deserialize<string>(ReadSyncMessage(session,receiver,path,HostDecisionFile,out hash,1024));
+            if(value==HostWaiting||value==HostApproved||value==HostDeclined)phase=value;
+        });
+        return phase;
+    }
+    void CloseHostDecision(P2PSession session){
+        if(!session.CompareBeforePack)return;
+        TryHostDecisionIo(()=>{
+            string root=HostDecisionRoot(session);
+            Safe.NoLinks(root);
+            if(!Directory.Exists(root))return;
+            foreach(var folder in Directory.GetDirectories(root).Where(path=>Regex.IsMatch(Path.GetFileName(path),@"\Aml-[a-f0-9]{32}\z"))){
+                Safe.NoLinks(folder);
+                if(Engine.Running)Engine.RemoveFolder(Path.GetFileName(folder));
+                P2PPack.DeleteSnapshot(folder);
+            }
+            if(!Directory.EnumerateFileSystemEntries(root).Any())Directory.Delete(root);
+        });
+    }
+    static void TryHostDecisionIo(Action action){
+        try{action();}
+        catch(Exception ex){
+            if(!(ex is WebException||ex is IOException||ex is UnauthorizedAccessException||ex is ArgumentException||ex is InvalidOperationException))throw;
+            OnlineDiagnostics.Record("p2p.approval.status",null,ex.GetType().Name);
+        }
+    }
 
     volatile string unmatchedInvitationId;
     internal string UnmatchedInvitationId {get{return unmatchedInvitationId;}}
@@ -83,6 +160,11 @@ internal sealed partial class P2PService {
         foreach(var session in waiting){
             Dictionary<string,Task<bool>> decisions;
             if(!connectionDecisions.TryGetValue(session,out decisions))continue;
+            foreach(var item in decisions){
+                if(!item.Value.IsCompleted)PublishHostDecision(session,item.Key,HostWaiting);
+                else if(item.Value.Status!=TaskStatus.RanToCompletion||!item.Value.Result)
+                    PublishHostDecision(session,item.Key,HostDeclined);
+            }
             var accepted=decisions.FirstOrDefault(item=>item.Value.Status==TaskStatus.RanToCompletion&&item.Value.Result);
             if(accepted.Key==null){
                 if(decisions.Count!=0&&decisions.Values.All(task=>task.IsCompleted))

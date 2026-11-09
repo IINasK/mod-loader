@@ -33,7 +33,7 @@ internal static class GeneralP2PAutomaticTests {
             sender.Notice=complete=>{if(complete)System.Threading.Interlocked.Increment(ref hostFinished);else System.Threading.Interlocked.Increment(ref hostChoices);};
             receiver.Notice=complete=>{if(complete)System.Threading.Interlocked.Increment(ref receivedSounds);};
             var libraryReceived=new GeneralProjectStore(Path.Combine(root,"p"));
-            receiver.RegisterProject=session=>libraryReceived.CreateReceived(session,receivedData,catalog);
+            receiver.RegisterProject=session=>{libraryReceived.CreateReceived(session,receivedData,catalog);return true;};
             receiver.ReviewReceived=list=>GeneralNexusInfo.ReviewReceivedList(list,url=>Task.FromResult(
                 new GeneralSourceInfo{Name="Mod from Nexus",ModVersion="1.5",NexusChecked=true,Tags=new[]{"From Nexus"}}));
             Exception failure=null;P2PSession sent=null,accepted=null;
@@ -55,6 +55,9 @@ internal static class GeneralP2PAutomaticTests {
                     using(var diagnostics=new GeneralP2PDiagnosticDialog(sender)){
                         diagnostics.Show(host);
                         var copyReport=(Button)diagnostics.Content.Controls.Find("p2p-diagnostic-copy",true).Single();
+                        var saveDiagnostics=(Button)diagnostics.Content.Controls.Find("p2p-diagnostic-save",true).Single();
+                        check(new[]{copyReport,saveDiagnostics}.All(button=>button.Parent.ClientRectangle.Contains(button.Bounds)),
+                            "Diagnostic actions fit their footer.");
                         copyReport.PerformClick();
                         check(Clipboard.GetText()==Safe.Json.Serialize(hostReport),"Copy diagnostics copies the sanitized report.");
                         diagnostics.Close();
@@ -73,11 +76,22 @@ internal static class GeneralP2PAutomaticTests {
                     receiver.Engine.ConfigurePeer(sender.Engine.Device,"tcp://127.0.0.1:"+sender.Engine.ListenPort);
                     await Wait(()=>Application.OpenForms.Cast<Form>().Any(form=>form.Controls.Find("p2p-accept-request",true).Length!=0),"Host did not receive a connection request.");
                     check(sent.Recipients.Length==0&&sent.PayloadHash==null&&hostChoices==1,"A proven invite plays a single sound and waits for the host.");
+                    await Wait(()=>receiver.TransferStatus(accepted).HostDecision==P2PService.HostWaiting,
+                        "The receiver did not see the pending host decision.");
+                    check(!receiver.TransferStatus(accepted).Accepted&&!receiver.HasSyncPreview(accepted)&&sent.Recipients.Length==0,
+                        "A verified receiver sees the host decision stage before the host authorizes any package.");
+                    receiver.ObserveConnectionDiagnostics(DateTime.UtcNow.AddSeconds(60));
+                    check(receiver.GetConnectionDiagnostic(accepted.Id).Phase==P2PService.HostWaiting,
+                        "The decision stage supersedes a previous delay report.");
                     var approve=Application.OpenForms.Cast<Form>().SelectMany(form=>form.Controls.Find("p2p-accept-request",true)).OfType<Button>().Single();
+                    check(approve.Parent.Controls.OfType<Button>().All(button=>button.Parent.ClientRectangle.Contains(button.Bounds)),
+                        "Approval actions fit their footer.");
                     approve.PerformClick();
                     await Wait(()=>sent.Recipients.Length!=0,"Host did not approve the request without a reply code.");
                     check(sent.Recipients.Single().Device==receiver.Engine.Device,"Host approval pins the proven recipient without a reply code.");
                     await Wait(()=>sender.GetConnectionDiagnostic(sent.Id).Phase=="host_approved","The host diagnostic did not record approval.");
+                    await Wait(()=>receiver.TransferStatus(accepted).HostDecision==P2PService.HostApproved,
+                        "The receiver did not receive the explicit host approval.");
                     await Wait(()=>receiver.HasSyncPreview(accepted)||sent.Error!=null,"Host did not publish the comparison.");
                     await Wait(()=>receiver.GetConnectionDiagnostic(accepted.Id).Phase=="connected","The receiver diagnostic did not record recovery.");
                     check(sent.Error==null&&sent.PayloadHash==null,"The host waits for the receiver's choice before building the pack.");
@@ -92,6 +106,9 @@ internal static class GeneralP2PAutomaticTests {
                     dialog.Show();Capture(dialog,Path.Combine(root,"connected-black.png"));
                     await Wait(()=>accepted.Completed||accepted.Error!=null,"Automatic receive did not complete.");check(accepted.Completed&&accepted.Error==null&&File.ReadAllText(Path.Combine(target,"mods/test.txt"))=="automatic acceptance","Receiver installs verified files automatically after one-sided acceptance.");
                     await Wait(()=>sent.Completed&&accepted.ListImported&&!Directory.Exists(sender.Folder(sent))&&!Directory.Exists(receiver.Folder(accepted)),"Automatic transfer temporary cleanup did not finish.");
+                    check(!Directory.Exists(Path.Combine(sender.Root,"connection-status",sent.Id))&&
+                        !Directory.Exists(Path.Combine(receiver.Root,"connection-status",accepted.Id)),
+                        "The per-invite approval folders are cleaned after the transfer.");
                     check(receivedSounds==2&&hostFinished==1,"Download, installation and confirmed send signal completion once per milestone.");
                     var imported=libraryReceived.Load(libraryReceived.Read().Projects.Single());
                     var mod=imported.List.Mods.Single();
@@ -140,7 +157,8 @@ internal static class GeneralP2PAutomaticTests {
             var fallback=sender.BeginDeferred(state,new[]{"fixture"},true,compareBeforePack:true);
             var fallbackReceive=receiver.Accept(sender.Invitation(fallback),target,true);
             Wait(()=>declined==1,"A known friend did not request approval for the new invitation.").GetAwaiter().GetResult();
-            System.Threading.Thread.Sleep(2100);
+            Wait(()=>receiver.TransferStatus(fallbackReceive).HostDecision==P2PService.HostDeclined,
+                "The receiver did not receive the explicit host rejection.").GetAwaiter().GetResult();
             check(declined==1&&fallback.Recipients.Length==0&&fallback.PayloadHash==null,"Declining stops transfer and does not repeat the request.");
             var reply=P2PInvite.Decode(receiver.Invitation(fallbackReceive));
             string valid=reply.Encode();

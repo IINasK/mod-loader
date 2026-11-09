@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -7,11 +7,11 @@ using System.Text;
 
 public static class InstalledSnapshotInstallerTests {
     static List<string> tests;
-    public static int Run(string parent) {
+    public static int Run(string parent,bool testOfficialProject=false) {
         tests = new List<string>();
         string report = Path.Combine(parent, "resultado-snapshot-installer.json");
         try {
-            RunChecks(parent);
+            RunChecks(parent,testOfficialProject);
             Safe.WriteJson(report, new { Passed = true, Tests = tests });
             return tests.Count;
         } catch (Exception exception) {
@@ -19,7 +19,7 @@ public static class InstalledSnapshotInstallerTests {
             throw;
         }
     }
-    static void RunChecks(string parent) {
+    static void RunChecks(string parent,bool testOfficialProject) {
         string root = OnlineTests.NestedRoot(parent,"online-testes-");
         string target = Path.Combine(root, "game"), data = Path.Combine(root, "data");
         Directory.CreateDirectory(target); File.WriteAllText(Path.Combine(target, ".fixture-only"), "fixture");
@@ -77,7 +77,56 @@ public static class InstalledSnapshotInstallerTests {
 
         ConfigTransactions(root);
         ResumeTransactions(root,catalog);
+        if(testOfficialProject)BuiltInProjectReceive(root,catalog);
     }
+    static void BuiltInProjectReceive(string root,FixedCatalog catalog){
+        catalog.GameFileVersion="2.5.0.0";
+        string target=Path.Combine(root,"cp"),inbox=Path.Combine(root,"inbox"),archive=Path.Combine(root,"official.zip");
+        Directory.CreateDirectory(Safe.In(target,"bin/x64"));
+        File.WriteAllText(Safe.In(target,"bin/x64/Cyberpunk2077.exe"),"fixture");
+        File.WriteAllText(Safe.In(target,".fixture-only"),"fixture");
+        var store=new GeneralProjectStore(Path.Combine(root,"l"));
+        var mod=new GeneralModEntry{Id="received",Name="Incoming",DefaultVariant="default",
+            Variants=new List<GeneralModVariant>{new GeneralModVariant{Id="default",Name="Default",Sources=new List<string>{"https://example.org/mod.zip"}}}};
+        var list=new GeneralModList{Mods=new List<GeneralModEntry>{mod},Presets=new List<GeneralModPreset>{
+            new GeneralModPreset{Id="all",Name="Com DLC",ModIds=new List<string>{mod.Id}},
+            new GeneralModPreset{Id="no-pl",Name="Sem DLC",ModIds=new List<string>{mod.Id}}}};
+        var official=store.Create("Cyberpunk 2077",list,"light","pt",target,GeneralProjectStore.CyberpunkTemplate);
+        var state=store.Load(official);
+        var local=store.Create("Cyberpunk 2077",list,"light","pt",target);
+        var partial=P2PService.ExportState(state,"no-pl",new[]{mod.Id});
+        var inspected=InstalledSnapshot.Inspect(partial,new[]{mod.Id},catalog,inbox,false,true);
+        Check(inspected.TemplateId==GeneralProjectStore.CyberpunkTemplate&&inspected.TemplateSubset,
+            "A identidade do pacote oficial atravessa a preparação do preset.");
+        var custom=InstalledSnapshot.Inspect(store.Load(local),new[]{mod.Id},catalog,inbox,false,true);
+        Check(custom.TemplateId==null,"Um projeto personalizado do mesmo jogo e nome não ganha identidade oficial.");
+
+        var manifest=new InstalledSnapshotManifest{Name="Sem DLC",Game="cyberpunk2077",GameFileVersion=catalog.GameFileVersion,
+            TemplateId=inspected.TemplateId,TemplateSubset=true,Project=partial.List};
+        manifest.List.Mods.Add(mod);
+        byte[] bytes=Encoding.UTF8.GetBytes("official fixture");
+        string hash=InstalledSnapshot.Hash(bytes);
+        manifest.Files.Add(new InstalledSnapshotFile{Path="archive/pc/mod/official.archive",Kind="file",Sha256=hash,Size=bytes.Length,
+            Owners=new List<string>{mod.Id+"/default"}});
+        WritePack(archive,manifest,new Dictionary<string,byte[]>{{hash,bytes}});
+        var engine=new InstalledSnapshotInstaller(target,inbox,catalog,true);
+        string receipt=engine.Install(archive,Safe.Hash(archive),null);
+        var session=new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Destination=target,ReceiptId=receipt};
+        var result=store.CreateReceived(session,inbox,catalog);
+        var refreshed=store.Load(result);
+        Check(result.Id==official.Id&&store.Read().Projects.Count==2&&Directory.GetDirectories(Safe.In(store.Root,"Projetos")).Length==2,
+            "Receber o pacote oficial reutiliza o projeto e a pasta existentes, preservando o projeto personalizado.");
+        Check(refreshed.SelectedPreset=="no-pl"&&refreshed.List.Presets.Any(item=>item.Id=="all")&&
+            refreshed.SnapshotReceipts[mod.Id+"/default"]==receipt,
+            "O preset recebido fica ativo, o outro é preservado e o recibo é reconhecido no projeto oficial.");
+        var freshStore=new GeneralProjectStore(Path.Combine(root,"n"));
+        var first=freshStore.CreateReceived(session,inbox,catalog);
+        session.Id="ml-"+Guid.NewGuid().ToString("N");
+        var again=freshStore.CreateReceived(session,inbox,catalog);
+        Check(first.TemplateId==GeneralProjectStore.CyberpunkTemplate&&again.Id==first.Id&&freshStore.Read().Projects.Count==1,
+            "No primeiro recebimento é criado somente o projeto pronto, reutilizado nos próximos convites.");
+    }
+
     static void ResumeTransactions(string parent,FixedCatalog catalog){
         string target=Path.Combine(parent,"resume-game"),data=Path.Combine(parent,"resume-data");Directory.CreateDirectory(target);File.WriteAllText(Safe.In(target,".fixture-only"),"fixture");
         string zip=Pack(parent,"resume",catalog,new Dictionary<string,string>{{"mods/a.txt","aaa"},{"mods/b.txt","bbb"}});var engine=new InstalledSnapshotInstaller(target,data,catalog,true);

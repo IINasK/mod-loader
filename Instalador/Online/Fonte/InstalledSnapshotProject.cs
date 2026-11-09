@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -43,6 +43,8 @@ public static partial class InstalledSnapshot {
     }
     static void ValidateProject(InstalledSnapshotManifest manifest,FixedCatalog catalog){
         var project=manifest.Project;GeneralModLibrary.ValidateList(project,false);
+        if(manifest.TemplateId!=null&&(manifest.TemplateId!=GeneralProjectStore.CyberpunkTemplate||manifest.Game!="cyberpunk2077"))
+            throw new IOException("Identidade do projeto padrão inválida.");
         foreach(var mod in project.Mods)foreach(var variant in mod.Variants)
             if(!variant.Sources.All(s=>GeneralModDownload.IsWebSource(s)||s=="installed://"+mod.Id+"/"+variant.Id))throw new IOException("Projeto contém caminhos privados de origem.");
         GeneralModLibrary.RestoreKnownMappings(project,GeneralModLibrary.Seed(catalog,new ModImportItem[0]));

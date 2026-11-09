@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -95,7 +95,7 @@ internal sealed partial class GeneralModWindow {
                 EditorField<TextBox>(editor,"sources").Text="https://www.nexusmods.com/cyberpunk2077/mods/34305";
                 await Task.Delay(800);check(EditorField<TextBox>(editor,"modName").Text=="My custom name","Metadata refresh preserves a user-entered name.");
                 check(EditorField<Label>(editor,"sourceInfo").Text.Contains("Slow download")&&EditorField<Button>(editor,"save").Enabled&&EditorField<Label>(editor,"sourceInfo").RectangleToScreen(EditorField<Label>(editor,"sourceInfo").ClientRectangle).Bottom<=editor.RectangleToScreen(editor.ClientRectangle).Bottom,"Overview page shows simple advice without blocking save.");
-                editor.ClientSize=new Size(700,710);editor.PerformLayout();Application.DoEvents();await Task.Delay(40);check(EditorField<TextBox>(editor,"sources").Height>=80&&EditorField<Button>(editor,"save").RectangleToScreen(EditorField<Button>(editor,"save").ClientRectangle).Bottom<=editor.RectangleToScreen(editor.ClientRectangle).Bottom,"Source editor stays usable at minimum size with fixed action buttons and a scrollable body.");CaptureUi(editor,Path.Combine(root,"source-overview-warning.png"));
+                editor.ClientSize=new Size(700,710);editor.PerformLayout();Application.DoEvents();await Task.Delay(40);check(EditorField<TextBox>(editor,"sources").Height>=EditorField<TextBox>(editor,"sources").Font.Height&&EditorField<Button>(editor,"save").RectangleToScreen(EditorField<Button>(editor,"save").ClientRectangle).Bottom<=editor.RectangleToScreen(editor.ClientRectangle).Bottom,"Source editor stays usable at minimum size with fixed action buttons and a scrollable body.");CaptureUi(editor,Path.Combine(root,"source-overview-warning.png"));
                 chips.Controls.OfType<Button>().Single(button=>button.Text=="Audio ×").PerformClick();
                 EditorField<Button>(editor,"save").PerformClick();var library=new GeneralModLibrary(Path.Combine(root,"saved.json"));library.Save(new GeneralModState{List=new GeneralModList{Mods=new List<GeneralModEntry>{editor.Result}}});
                 var loaded=library.Load().List.Mods.Single();

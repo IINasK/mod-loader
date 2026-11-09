@@ -42,6 +42,8 @@ public sealed class GeneralModVariant {
 
 public sealed class GeneralModState {
     public string Destination, DownloadFolder;
+    internal string TemplateId;
+    internal bool TemplateSubset;
     public string Theme = "light", Language = "pt", SelectedPreset;
     public GeneralModList List = new GeneralModList();
     public Dictionary<string, string> ChosenVariants = new Dictionary<string, string>();

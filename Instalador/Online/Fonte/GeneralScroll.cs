@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -7,6 +7,7 @@ using System.Windows.Forms;
 internal sealed class GeneralScrollBar : Control {
     int total,page,value,drag=-1,remainder;
     internal Action<int> Changed;
+    internal int WheelUnit=1;
     internal int Value {get{return value;}}
     internal int Limit {get{return Math.Max(0,total-page);}}
     internal GeneralScrollBar(){Width=14;TabStop=true;Cursor=Cursors.Hand;AccessibleRole=AccessibleRole.ScrollBar;AccessibleName=GeneralStyle.T("Rolagem","Scroll");SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);}
@@ -18,7 +19,7 @@ internal sealed class GeneralScrollBar : Control {
         get{int height=Math.Max(0,Height-8),length=Limit==0?height:Math.Min(height,Math.Max(28,(int)(height*(double)page/Math.Max(1,total))));return new Rectangle(4,4+(Limit==0?0:(int)((height-length)*(double)value/Limit)),Math.Max(3,Width-8),length);}
     }
     internal void MoveTo(int next){next=Math.Max(0,Math.Min(Limit,next));if(next==value)return;value=next;Invalidate();if(Changed!=null)Changed(next);}
-    internal void Wheel(int delta){if(SystemInformation.MouseWheelScrollLines==0)return;remainder+=delta;int steps=remainder/SystemInformation.MouseWheelScrollDelta;remainder-=steps*SystemInformation.MouseWheelScrollDelta;MoveTo(value-steps*(SystemInformation.MouseWheelScrollLines<0?page:SystemInformation.MouseWheelScrollLines));}
+    internal void Wheel(int delta){if(SystemInformation.MouseWheelScrollLines==0)return;remainder+=delta;int steps=remainder/SystemInformation.MouseWheelScrollDelta;remainder-=steps*SystemInformation.MouseWheelScrollDelta;MoveTo(value-steps*(SystemInformation.MouseWheelScrollLines<0?page:SystemInformation.MouseWheelScrollLines*WheelUnit));}
     protected override void OnPaint(PaintEventArgs e){e.Graphics.Clear(GeneralStyle.Surface);e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;if(Limit==0)return;using(var path=GeneralStyle.Round(Thumb,4))using(var brush=new SolidBrush(Capture||Focused?GeneralStyle.Accent:GeneralStyle.Muted))e.Graphics.FillPath(brush,path);}
     protected override void OnMouseDown(MouseEventArgs e){base.OnMouseDown(e);if(e.Button!=MouseButtons.Left)return;Focus();if(Thumb.Contains(e.Location)){drag=e.Y-Thumb.Top;Capture=true;}else MoveTo(value+(e.Y<Thumb.Top?-page:page));}
     protected override void OnMouseMove(MouseEventArgs e){base.OnMouseMove(e);if(drag<0||!Capture)return;int travel=Math.Max(1,Height-8-Thumb.Height);MoveTo((int)Math.Round((e.Y-drag-4)*(double)Limit/travel));}
@@ -69,6 +70,7 @@ internal sealed class GeneralScrollView : Panel {
             if(panelContent){
                 int measureWidth = reserveBarSpace ? ClientSize.Width - bar.Width : viewport.ClientSize.Width;
                 total = fitPanelContent ? content.GetPreferredSize(new Size(Math.Max(1, measureWidth), 0)).Height : content.MinimumSize.Height;
+                bar.WheelUnit=Math.Max(1,content.Font.Height);
                 page = Math.Max(1, viewport.ClientSize.Height);
                 value = Math.Min(Math.Max(0, -content.Top), Math.Max(0, total - page));
             }
@@ -99,7 +101,10 @@ internal sealed class GeneralScrollView : Panel {
         readonly GeneralScrollView view;
         internal NativeEvents(GeneralScrollView view,IntPtr handle){this.view=view;AssignHandle(handle);}
         protected override void WndProc(ref Message message){
-            if(message.Msg==0x020a){view.RefreshScroll();view.bar.Wheel((short)((long)message.WParam>>16));message.Result=IntPtr.Zero;return;}
+            if(message.Msg==0x020a){
+                view.RefreshScroll();
+                if(view.bar.Limit>0){view.bar.Wheel((short)((long)message.WParam>>16));message.Result=IntPtr.Zero;return;}
+            }
             base.WndProc(ref message);
             if(message.Msg==0x0115||message.Msg==0x0005||message.Msg==0x0102||message.Msg==0x000c||message.Msg==0x0101||message.Msg==0x0180||message.Msg==0x0181||message.Msg==0x0182||message.Msg==0x0184)view.Queue();
         }

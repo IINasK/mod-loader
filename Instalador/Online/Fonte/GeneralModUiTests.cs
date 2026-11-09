@@ -222,10 +222,24 @@ internal sealed partial class GeneralModWindow {
                             var viewport=scroll.RectangleToScreen(scroll.ClientRectangle);
                             var field=archive.RectangleToScreen(archive.ClientRectangle);
                             CaptureUi(editor,Path.Combine(root,"editor-identification.png"));
-                            if(field.Bottom>viewport.Bottom)scroll.ScrollTo(field.Bottom-viewport.Bottom+8);
+                            scroll.RefreshScroll();
+                            int beforeWheel=scroll.Bar.Value;
+                            scroll.Bar.Wheel(-SystemInformation.MouseWheelScrollDelta);
+                            check(SystemInformation.MouseWheelScrollLines==0||scroll.Bar.Limit==beforeWheel||
+                                scroll.Bar.Value-beforeWheel>=Math.Min(scroll.Bar.Limit-beforeWheel,scroll.Content.Font.Height),
+                                "A roda percorre uma distância de texto no editor, em vez de poucos pixels.");
                             field=archive.RectangleToScreen(archive.ClientRectangle);
-                            check(Rectangle.Intersect(field,viewport).Height==field.Height&&archive.Height>=58,
-                                "A rolagem revela toda a fonte de download com altura legível.");
+                            if(field.Bottom>viewport.Bottom)scroll.ScrollTo(scroll.Bar.Value+field.Bottom-viewport.Bottom+8);
+                            field=archive.RectangleToScreen(archive.ClientRectangle);
+                            Control surface=archive.Parent;
+                            while(!(surface is GeneralSurface))surface=surface.Parent;
+                            check(Rectangle.Intersect(field,viewport).Height==field.Height&&surface.Height==44,
+                                "Um único link tem campo compacto e totalmente visível: "+surface.Bounds+" / "+field+" / "+viewport);
+                            string single=archive.Text;
+                            archive.Text=single+"\r\nhttps://example.com/second.zip";
+                            Application.DoEvents();
+                            check(surface.Height>=58,"Duas fontes aumentam a área de edição.");
+                            archive.Text=single;
                             scroll.ScrollTo(9999);
                             Application.DoEvents();
                             CaptureUi(editor,Path.Combine(root,"editor-download-and-link.png"));

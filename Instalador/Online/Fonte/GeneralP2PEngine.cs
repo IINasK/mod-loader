@@ -288,6 +288,15 @@ internal sealed class SyncthingEngine : IDisposable {
         catch(InvalidOperationException){return null;}
     }
     internal void ConfigurePeer(string id,string endpoint=null){ConfigurePeerAddresses(id,new[]{endpoint??"dynamic"});}
+    internal void EnsurePeer(string id){
+        try{Get("config/devices/"+id);}
+        catch(WebException ex){
+            var response=ex.Response as HttpWebResponse;
+            if(response==null||response.StatusCode!=HttpStatusCode.NotFound)throw;
+            response.Dispose();
+            ConfigurePeer(id);
+        }
+    }
     internal void ConfigurePeerWithRelay(string id,string relay){
         string endpoint=ResolveRelay(relay);
         ConfigurePeerAddresses(id,endpoint==null?new[]{"dynamic"}:new[]{endpoint,"dynamic"});
