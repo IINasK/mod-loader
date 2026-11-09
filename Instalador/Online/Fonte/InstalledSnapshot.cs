@@ -115,6 +115,13 @@ public static partial class InstalledSnapshot {
                     string content=config.Format=="json"?InstalledSnapshotConfig.Json(InstalledSnapshotConfig.Read(path)):InstalledSnapshotConfig.Section(InstalledSnapshotConfig.Read(path),config.Section);
                     if(content!=null)files.Add(Config(config.Path,config.Format,config.Section,content));
                 }
+            }else if(cyberpunk&&HasManualHystFiles(mod.Id,root)&&
+                (state.CyberpunkImports==null||!originalSources.Select((source,sourceIndex)=>work+"/"+sourceIndex+"/"+source).Any(state.CyberpunkImports.ContainsKey))) {
+                var knownBody=seed.Mods.FirstOrDefault(item=>item.Id==mod.Id);
+                variant=ReadManualHyst(root,mod,knownBody,state.SelectedPreset!="no-pl",files);
+                work=Owner(mod,variant);
+                originalSources=variant.Sources.ToList();
+                if(disabled.ContainsKey(work))throw new IOException("Este mod está desabilitado.");
             }else {
                 for(int i=0;i<originalSources.Count;i++) {
                     string key=work+"/"+i+"/"+originalSources[i];

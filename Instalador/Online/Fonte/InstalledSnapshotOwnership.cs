@@ -3,6 +3,57 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
+public static partial class InstalledSnapshot {
+    // SHA-256 dos arquivos das versões 5.0.0 e dos refits fixados no catálogo Hyst.
+    const string HystScript="r6/scripts/VTK_Hyst_CC_Edit/VTK_Hyst_CC_Edit.reds";
+    const string HystScriptHash="659169a46016336a92ab7bdb93540e30f3d8837fc1a1347351bb8f12c61403f4";
+    const string HystArchiveRoot="archive/pc/mod/";
+    static readonly string[][] NaturalHystFiles={
+        new[]{"EBBRB.xl","3058cacde4fda371dad232352b2ba9b401f8806bab1c4eadd069d0dff1a862a8"},
+        new[]{"05_Hyst_Refit_ForcedBigBreastsBooty.archive","b05cd56a5cad772b52a12c3dcd652612753225cd006e3c85de29113da8c1932d"},
+        new[]{"Y_BOOBA_BOOTYFIT_Sneaky_Hyst_VanillaClothes.archive","9d585ec4dcc4b9c7c5e2f0eb6b78bf5601aecb92639660ca369a902db66c449c"},
+        new[]{"Y_Sneaky_EBBRB_Refits_PhantomLiberty_Clothes.archive","9bd6ddbe9b3170660f551a21197fcb27ec2f30caf3c2c17d8b7cf12f8f1de872"}
+    };
+    static readonly string[][] PushUpHystFiles={
+        new[]{"EBBPRB.xl","a98f6e880f40b195445d32c28b63debd4c44f8f6f9f97499bc3d424b289dff1"},
+        new[]{"05_Hyst_Refit_ForcedBigBoobaPUSHUP_Booty.archive","7906fd6f7e956aac8d540a07841ce25ba90fdc6d6aa3a36d135ae40cc4833201"},
+        new[]{"u_Vanilla_Clothes_EBB_Push_with_BOOTY.archive","05adc609451158d55a94e392768e2761c47c7a3407dafda1d48502cdc944df12"},
+        new[]{"u_Phantom_Liberty_Clothes_PUSH_with_BOOTY_refits.archive","c963ef3ba9b661d9f2993ec1c3c26fd8a67c0a8c0dad680c616f992ae3478b05"}
+    };
+    static bool HasManualHystFiles(string id,string root) {
+        if(!GeneralModLibrary.IsHystBody(id))return false;
+        var paths=id=="hyst-ebb-rb"?NaturalHystFiles:PushUpHystFiles;
+        return paths.Take(2).Any(file=>File.Exists(Safe.In(root,HystArchiveRoot+file[0])));
+    }
+
+    static GeneralModVariant ReadManualHyst(string root,GeneralModEntry mod,GeneralModEntry knownBody,bool includeDlc,List<InstalledSnapshotFile> files) {
+        bool natural=mod.Id=="hyst-ebb-rb";
+        if(HasManualHystFiles(natural?"hyst-ebbp-rb":"hyst-ebb-rb",root)||
+            File.Exists(Safe.In(root,HystArchiveRoot+"Vanilla_ArchiveXL_FeetComponentsFV.archive")))
+            throw new IOException("O corpo Hyst está junto de uma alternativa incompatível. Desative a outra opção antes de compartilhar.");
+        var paths=natural?NaturalHystFiles:PushUpHystFiles;
+        bool baseRefit=File.Exists(Safe.In(root,HystArchiveRoot+paths[2][0]));
+        bool dlcRefit=includeDlc&&File.Exists(Safe.In(root,HystArchiveRoot+paths[3][0]));
+        string id=dlcRefit?"with-refit-dlc":baseRefit?"with-refit-base":"default";
+        var variant=mod.Variants.FirstOrDefault(item=>item.Id==id);
+        var known=knownBody==null?null:knownBody.Variants.FirstOrDefault(item=>item.Id==id);
+        if(variant==null||known==null||variant.CyberpunkId!=null||!variant.Sources.SequenceEqual(known.Sources,StringComparer.Ordinal))
+            throw new IOException("A variante Hyst instalada manualmente não corresponde às fontes da versão no catálogo.");
+        foreach(var file in paths.Take(dlcRefit?4:baseRefit?3:2))
+            files.Add(VerifiedManualHystFile(root,HystArchiveRoot+file[0],file[1]));
+        files.Add(VerifiedManualHystFile(root,HystScript,HystScriptHash));
+        return variant;
+    }
+
+    static InstalledSnapshotFile VerifiedManualHystFile(string root,string relativePath,string expectedHash) {
+        string path=Safe.In(root,relativePath);Safe.NoLinks(path);
+        var info=new FileInfo(path);
+        if(!info.Exists||Safe.Hash(path)!=expectedHash)
+            throw new IOException("Arquivo do Hyst ausente ou diferente da versão conhecida: "+relativePath);
+        return new InstalledSnapshotFile{Path=relativePath,Sha256=expectedHash,Size=info.Length,Kind="file"};
+    }
+}
+
 public sealed partial class FixedInstaller {
     internal FixedInstaller(FixedCatalog sourceCatalog,string installedRoot,bool isFixture=false) {
         game=Path.GetFullPath(installedRoot).TrimEnd('\\');Safe.NoLinks(game);

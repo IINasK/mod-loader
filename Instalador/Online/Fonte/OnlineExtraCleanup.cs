@@ -142,6 +142,8 @@ public sealed partial class FixedInstaller {
         var available=new HashSet<string>(host.List.Mods.Select(mod=>mod.Id),StringComparer.Ordinal);
         var unavailable=new HashSet<string>((host.Project??host.List).Mods.Where(mod=>!available.Contains(mod.Id))
             .SelectMany(mod=>mod.Variants).Select(variant=>variant.CyberpunkId).Where(id=>id!=null),StringComparer.Ordinal);
+        if(available.Any(GeneralModLibrary.IsHystBody))
+            unavailable.Remove(GeneralModLibrary.VanillaFeetId);
         var protectedPaths=host.Files.Select(file=>file.Path).Concat(host.SyncGameInventory.Keys);
         return new HashSet<string>(protectedPaths.Concat(catalog.Packages.Where(mod=>mod.Immutable||unavailable.Contains(mod.Id))
             .SelectMany(NightCityDensity.KnownFiles).Select(file=>file.Path)),StringComparer.OrdinalIgnoreCase);

@@ -75,6 +75,28 @@ internal static class InstalledSnapshotTests {
         check(InstalledSnapshot.Read(customZip,Safe.Hash(customZip),catalog).Files.Count==1,"Custom recebido passa política de caminhos do jogo.");
         var badReceipt=Copy(receipt);badReceipt.Files[0].After=new string('c',64);WriteProtectedReceipt(customGame,badReceipt);
         refuse(()=>InstalledSnapshot.Create(Path.Combine(root,"receipt-changed.zip"),customState,new[]{"fixture"},catalog,customData,false,s=>{}),"Recibo custom com bytes divergentes bloqueia exportação.");
+        var manualBody=State(customGame,"https://www.nexusmods.com/cyberpunk2077/mods/4654?tab=files&file_id=170224");
+        var hyst=manualBody.List.Mods.Single();hyst.Id="hyst-ebb-rb";
+        const string hystMarker="archive/pc/mod/EBBRB.xl";
+        check(InstalledSnapshot.Uninstalled(manualBody,hyst,hyst.Variants.Single(),catalog,customGame,customData),
+            "Corpo Hyst ausente fica fora do envio normalmente.");
+        Write(customGame,hystMarker,"incomplete manual installation");
+        bool reviewedHyst=false;
+        InstalledSnapshot.Inspect(manualBody,new[]{hyst.Id},catalog,customData,false,true,
+            skipProblem:(id,name,error)=>{reviewedHyst=id==hyst.Id;return true;});
+        check(reviewedHyst,"Hyst presente sem recibo passa pela revisão em vez de desaparecer silenciosamente.");
+        var fixedFeet=Fixed(GeneralModLibrary.VanillaFeetId,"archive/pc/mod/Vanilla_ArchiveXL_FeetComponentsFV.archive","feet",new string[0]);
+        catalog.Packages.Add(fixedFeet);
+        var sync=new InstalledSnapshotManifest{SyncGameInventory=new Dictionary<string,string>()};
+        sync.List.Mods.Add(hyst);
+        var feet=State(customGame,original).List.Mods.Single();feet.Variants.Single().CyberpunkId=fixedFeet.Id;
+        sync.Project=new GeneralModList();sync.Project.Mods.Add(feet);
+        string syncGame=OnlineTests.Fixture(root,"hyst-sync");
+        Write(syncGame,fixedFeet.Files[0].Path,"feet");
+        var extras=new FixedInstaller(catalog,syncGame).PlanSyncExtras(sync);
+        check(extras.Any(candidate=>candidate.Files.Any(file=>file.Path==fixedFeet.Files[0].Path)),
+            "Sincronização com Hyst oferece os pés vanilla do receptor para revisão.");
+        catalog.Packages.Remove(fixedFeet);
         string secretGame=Path.Combine(root,"s"),secretData=Path.Combine(root,"sd");Directory.CreateDirectory(secretGame);Directory.CreateDirectory(secretData);
         Write(secretGame,"mods/config.json","{\"access_token\":\"private\"}");WriteGenericRecord(secretGame,secretData,work+"/0/"+original,new[]{"mods/config.json"});
         refuse(()=>InstalledSnapshot.Create(Path.Combine(root,"secret.zip"),State(secretGame,original),new[]{"fixture"},catalog,secretData,true,s=>{}),"JSON personalizado não vaza credenciais apesar de recibo válido.");

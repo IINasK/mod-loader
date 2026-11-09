@@ -54,6 +54,7 @@ public static partial class InstalledSnapshot {
             var paths=recipe.Id==NightCityDensity.ModId?NightCityDensity.KnownFiles(recipe):recipe.Files;
             return paths.Where(f=>!f.UserData).All(f=>!File.Exists(Safe.In(root,f.Path))&&!Directory.Exists(Safe.In(root,f.Path)));
         }
+        if(IsCyberpunk(root)&&HasManualHystFiles(mod.Id,root))return false;
         for(int i=0;i<variant.Sources.Count;i++){
             string key=work+"/"+i+"/"+variant.Sources[i];
             if(IsCyberpunk(root)){
