@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 
 internal sealed partial class P2PService {
     internal static string AcceptanceProof(string key,string folder,string device,bool lifecycle=false){
@@ -37,8 +38,25 @@ internal sealed partial class P2PService {
     internal bool UpgradeInvitation(P2PSession s){
         lock(s)lock(startGate){if(!s.Sender||!s.Deferred||s.Automatic||s.Completed||s.Discarded||s.Peer!=null)return false;s.Automatic=true;Save();return true;}
     }
+    readonly Dictionary<P2PSession,Dictionary<string,Task<bool>>> connectionDecisions=
+        new Dictionary<P2PSession,Dictionary<string,Task<bool>>>();
+
     void DetectAcceptances(){
-        var waiting=installedSessions.Where(s=>s.Sender&&s.Automatic&&!s.Completed&&!s.Discarded&&(s.Lifecycle?s.Recipients.Length<(s.CompareBeforePack?1:3):s.Peer==null)).ToArray();if(waiting.Length==0)return;
+        var waiting=installedSessions.Where(s=>s.Sender&&s.Automatic&&!s.Completed&&!s.Discarded&&(s.Lifecycle?s.Recipients.Length<(s.CompareBeforePack?1:3):s.Peer==null)).ToArray();
+        foreach(var session in connectionDecisions.Keys.Where(session=>!waiting.Contains(session)).ToArray())
+            connectionDecisions.Remove(session);
+        if(waiting.Length==0)return;
+        foreach(var session in waiting){
+            Dictionary<string,Task<bool>> decisions;
+            if(!connectionDecisions.TryGetValue(session,out decisions))continue;
+            var accepted=decisions.FirstOrDefault(item=>item.Value.Status==TaskStatus.RanToCompletion&&item.Value.Result);
+            if(accepted.Key==null)continue;
+            lock(session)lock(startGate){
+                if(session.Completed||session.Discarded||session.Recipients.Length!=0)continue;
+                AddRecipient(session,accepted.Key);
+                connectionDecisions.Remove(session);
+            }
+        }
         var devices=Engine.Get("cluster/pending/devices");var folders=Engine.Get("cluster/pending/folders");
         foreach(var s in waiting){
             var candidates=new Dictionary<string,string>(StringComparer.Ordinal);
@@ -55,6 +73,16 @@ internal sealed partial class P2PService {
                     if(s.Completed||s.Discarded)break;
                     if(s.Lifecycle){
                         if(s.Recipients.Length>=(s.CompareBeforePack?1:3)||s.Recipients.Any(p=>p.Device==peer.Key))continue;
+                        var confirm=ConfirmConnection;
+                        if(s.CompareBeforePack&&confirm!=null){
+                            Dictionary<string,Task<bool>> decisions;
+                            if(!connectionDecisions.TryGetValue(s,out decisions))
+                                connectionDecisions[s]=decisions=new Dictionary<string,Task<bool>>(StringComparer.Ordinal);
+                            if(decisions.ContainsKey(peer.Key)||decisions.Count>=16||
+                                connectionDecisions.Values.Any(group=>group.Values.Any(task=>!task.IsCompleted)))continue;
+                            decisions.Add(peer.Key,confirm(s));
+                            break;
+                        }
                         AddRecipient(s,peer.Key);
                         continue;
                     }

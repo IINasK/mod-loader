@@ -38,6 +38,44 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     internal string InstalledDestination {get;private set;}
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
 
+    internal static string InstalledMessage {get{return T("Download concluído e mods instalados. Pode iniciar o jogo.",
+        "Download complete and mods installed. You can start the game.");}}
+
+    internal static Task<bool> AskConnection(Control dispatch,Func<Control> promptOwner,P2PService service,P2PSession session){
+        var decision=new TaskCompletionSource<bool>();
+        if(dispatch.IsDisposed||!dispatch.IsHandleCreated)return Task.FromResult(false);
+        try{
+            dispatch.BeginInvoke((Action)(()=>{
+                var owner=promptOwner();
+                if(owner==null||owner.IsDisposed||session.Discarded||session.Completed){decision.TrySetResult(false);return;}
+                try{
+                    using(var dialog=new GeneralDialog(T("Conexão solicitada","Connection requested"))){
+                        dialog.ClientSize=new Size(560,210);
+                        var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(24,12,24,16)};
+                        layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+                        layout.RowStyles.Add(new RowStyle(SizeType.Absolute,50));
+                        layout.Controls.Add(new Label{Dock=DockStyle.Fill,Text=session.Name+"\r\n\r\n"+
+                            T("Seu amigo quer receber este pacote.","Your friend wants to receive this pack.")},0,0);
+                        var actions=GeneralTableDialogLayout.Commands();
+                        var decline=GeneralStyle.Button(T("Recusar","Decline"),()=>dialog.Complete(DialogResult.No));
+                        var accept=GeneralStyle.Button(T("Aceitar","Accept"),()=>dialog.Complete(DialogResult.Yes),true);
+                        decline.Name="p2p-decline-request";accept.Name="p2p-accept-request";
+                        actions.Controls.Add(decline);actions.Controls.Add(accept);
+                        layout.Controls.Add(actions,0,1);dialog.Content.Controls.Add(layout);
+                        dialog.CancelButton=decline;
+                        GeneralStyle.Apply(dialog,GeneralStyle.Dark);
+                        service.Notify();
+                        decision.TrySetResult(dialog.ShowDialog(owner)==DialogResult.Yes);
+                    }
+                }catch(Exception ex){
+                    OnlineDiagnostics.Record("p2p.approval",null,ex.GetType().Name);
+                    decision.TrySetResult(false);
+                }
+            }));
+        }catch(InvalidOperationException){decision.TrySetResult(false);}
+        return decision.Task;
+    }
+
     internal GeneralP2PDialog(P2PService service,GeneralModState state,FixedCatalog catalog,bool autoStart=true):base(T("Modpack e compartilhamento","Modpack and sharing")){
         this.service=service;this.state=state;this.autoStart=autoStart;this.catalog=catalog;
         var previousChoice=service.ChooseVersion;
@@ -239,6 +277,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             if(!Directory.Exists(destination.Text))throw new IOException(T("Escolha a pasta de instalação.","Choose the installation folder."));
             string target=destination.Text;
             string prompt=invite.Schema==3?T("Comparar os mods do pacote ","Compare mods from the pack "):T("Receber e instalar o pacote ","Receive and install pack ");
+            service.Notify();
             if(GeneralDialog.Message(this,prompt+invite.Name+T(" em:\n"," into:\n")+target+T("\n\nMantenha o jogo fechado. Configurações anteriores terão backup.","\n\nKeep the game closed. Previous settings will be backed up."),T("Conectar ao anfitrião","Connect to the host"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
             if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));
             var session=await Task.Run(()=>{
@@ -271,6 +310,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     }
     int[] ReviewSyncExtras(P2PSyncComparison comparison){
         if(IsDisposed||comparison.Session.Discarded)return null;
+        service.Notify();
         using(var dialog=new GeneralSyncReviewDialog(comparison)){
             var answer=dialog.ShowDialog(this);
             return answer==DialogResult.Yes?dialog.SelectedExtras:answer==DialogResult.No?new int[0]:null;
@@ -329,6 +369,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             .FirstOrDefault(pending=>pending!=null&&!pending.Decision.Task.IsCompleted);
         if(issue==null)return;
         reviewingVerification=true;
+        service.Notify();
         try{
             var answer=GeneralDialog.Message(this,T("Erro ao verificar o mod ","Error verifying mod ")+issue.ModName+"\n\n"+issue.Message+"\n\n"+
                 T("Deseja pular este mod e continuar? Mods que dependem dele também ficarão fora.","Skip this mod and continue? Mods that depend on it will also be left out."),
@@ -451,10 +492,11 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             string message=session.Error??"";
             if(session.Held||session.RecoveryPending)message=T("Arquivo preservado. Clique em Retomar quando quiser continuar.","File preserved. Click Resume when you are ready.");
             else if(session.Completed&&message.Length==0)message=session.Sender?T("Envio concluído","Send complete")
-                :session.ProjectError??(ready?T("Tudo pronto para jogar","Ready to play")
+                :session.ProjectError??(ready?InstalledMessage
                     :session.ListImported&&syncDifferences?T("Projeto salvo · ","Project saved · ")+differencesLink
                     :session.ListImported&&session.ModsOutsidePack>0?T("Projeto salvo. Mods fora do pacote: ","Project saved. Mods outside the pack: ")+session.ModsOutsidePack
                     :session.ListImported?T("Instalação concluída. Projeto salvo.","Installation complete. Project saved."):T("Instalação concluída","Installation complete"));
+            else if(message.Length==0&&session.NexusReviewing)message=T("Conferindo a lista no Nexus…","Checking the list on Nexus…");
             else if(message.Length==0&&session.Phase!=null)message=P2PService.PhaseLabel(session.Phase);
             else if(message.Length==0&&session.Paused)message=T("Pausado por você","Paused by you");
             else if(message.Length==0&&issue!=null)
@@ -465,6 +507,8 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
                 else if(!session.Sender&&view.Connected)message=T("Conectado. Aguardando o anfitrião autorizar o convite.","Connected. Waiting for the host to authorize the invitation.");
                 else if(delayed)message=session.Sender
                     ?T("Conexão ainda indisponível. Confira se o amigo está com o Mod Loader aberto.","Connection still unavailable. Check that your friend has Mod Loader open.")
+                                        :session.Automatic?T("Sem conexão com o anfitrião. Confirme se os dois Mod Loaders estão abertos.",
+                        "Could not reach the host. Check that both Mod Loaders are open.")
                     :T("Conexão ainda indisponível. Copie a resposta e envie ao anfitrião.","Connection still unavailable. Copy the reply and send it to the host.");
                 else message=session.Sender?T("Convite aceito. Conectando ao amigo…","Invitation accepted. Connecting to your friend…")
                     :T("Conectando ao anfitrião…","Connecting to the host…");
@@ -540,12 +584,13 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             bool showImport=!session.Sender&&session.Completed&&!session.ListImported&&session.ReceiptId!=null&&
                 (owner.service.RegisterProject==null||session.ProjectError!=null);
             if(owner.service.RegisterProject!=null)import.Text=T("Salvar projeto","Save project");
-            bool showReply=!session.Sender&&!session.Completed&&session.Phase==null&&(!session.Automatic||waitingConnection)&&P2PInvite.DeviceValid(owner.service.Engine.Device);
+            bool showReply=!session.Sender&&!session.Completed&&session.Phase==null&&!session.Automatic&&P2PInvite.DeviceValid(owner.service.Engine.Device);
             bool showChoices=!session.Sender&&awaiting&&!session.Held&&!session.RecoveryPending&&session.Error==null;
             update.Visible=full.Visible=showChoices;
             retry.Visible=showRetry;import.Visible=showImport;reply.Visible=showReply;
             foreach(Control action in actions.Controls)action.Enabled=!owner.busy;
             update.Enabled=full.Enabled=showChoices&&!owner.busy&&session.SyncMode==0&&(view.Accepted||preview);
+            if(update.Enabled)owner.service.NotifyChoice(session);
             dismiss.Visible=true;
             dismiss.Enabled=!owner.busy&&(session.Sender||session.Completed||showDiscard);
             dismiss.AccessibleName=session.Completed?T("Remover transferência concluída","Remove completed transfer")
@@ -582,6 +627,7 @@ internal sealed partial class GeneralModWindow {
                 else{
                     p2p=new P2PService(Path.Combine(data,"P2P"),P2PService.TransferStore,offerRecovery:true);
                     p2p.EnableInstalledReceive(catalog,data);
+                    p2p.ConfirmConnection=session=>GeneralP2PDialog.AskConnection(this,()=>SharingPromptOwner,p2p,session);
                     p2p.ChooseVersion=difference=>GeneralVersionChoiceDialog.Ask(SharingPromptOwner,difference);
                 }
                 p2p.SetPreparationState(state);
@@ -594,7 +640,9 @@ internal sealed partial class GeneralModWindow {
                                 foreach(var mod in received.List.Mods)if(state.List.Mods.Any(m=>m.Id==mod.Id&&m.Variants.Any(v=>v.Id==mod.DefaultVariant)))state.SnapshotReceipts[mod.Id+"/"+mod.DefaultVariant]=session.ReceiptId;
                                 Persist();if(!working&&!scanning)await Scan();
                             }
-                            detail.Text=T("Pacote recebido, instalado e conferido em: ","Pack received, installed and verified in: ")+session.Destination;
+                            detail.Text=session.ModsOutsidePack==0&&session.SyncLocalExtrasKept==0&&session.SyncHostFilesDifferent==0
+                                ?GeneralP2PDialog.InstalledMessage
+                                :T("Pacote instalado. Confira as diferenças no compartilhamento.","Pack installed. Review differences in sharing.");
                         }catch(Exception ex){ShowError(ex);}
                     }));
                 };

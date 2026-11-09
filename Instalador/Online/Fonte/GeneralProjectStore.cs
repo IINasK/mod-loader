@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -119,7 +119,7 @@ internal sealed class GeneralProjectStore {
             if(index.Projects.Count>=200)throw new IOException("Use no máximo 200 projetos nesta biblioteca.");
             var source=new InstalledSnapshotInstaller(session.Destination,sourceData,catalog);
             var manifest=source.ReadManifest(session.ReceiptId);
-            var list=manifest.Project??manifest.List;
+            var list=session.ReviewedProject??manifest.Project??manifest.List;
             var name=manifest.Name.Trim();
             name=ProjectName(name.Substring(0,Math.Min(120,name.Length)).TrimEnd());
             var project=new GeneralProject{Id=id,Name=name};

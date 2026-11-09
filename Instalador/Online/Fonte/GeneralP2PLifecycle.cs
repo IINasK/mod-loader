@@ -169,6 +169,7 @@ internal sealed partial class P2PService {
             if(recipient.Phase!=notice.Phase){
                 recipient.Phase=notice.Phase;
                 Save();
+                if(notice.Phase=="installed")Notify(true);
             }
         }
         if(session.Recipients.Length!=0&&session.Recipients.All(peer=>Terminal(peer.Phase))){
@@ -320,11 +321,13 @@ internal sealed partial class P2PService {
                 Action checkpoint=()=>{if(disposed)throw new OperationCanceledException();};
                 checkpoint();
                 session.InstallProgress=null;
+                if(session.Phase==null)Notify(true);
                 SetPhase(session,"installing");
                 var installer=new InstalledSnapshotInstaller(session.Destination,installedData,installedCatalog,installedFixture);
                 session.ReceiptId=installer.Install(zip,session.Deferred?session.PayloadHash:session.Hash,message=>session.Stage=message,-1,difference=>{
                     SetPhase(session,"review");
                     var choice=ChooseVersion;
+                    if(choice!=null)Notify();
                     bool replace=choice!=null&&choice(difference);
                     checkpoint();
                     if(replace)SetPhase(session,"installing");
@@ -333,9 +336,18 @@ internal sealed partial class P2PService {
                 var manifest=installer.ReadManifest(session.ReceiptId);
                 ApplyApprovedSyncCleanup(session,manifest);
                 session.ModsOutsidePack=InstalledSnapshot.CountOutsidePack(manifest);
+                var review=ReviewReceived;
+                if(review!=null){
+                    session.NexusReviewing=true;
+                    var project=manifest.Project??manifest.List;
+                    try{review(project);session.ReviewedProject=project;}
+                    catch(Exception ex){OnlineDiagnostics.Record("p2p.nexus.review",null,ex.GetType().Name);}
+                    finally{session.NexusReviewing=false;}
+                }
                 session.Completed=true;
                 session.Error=null;
                 SetPhase(session,"installed");
+                Notify(true);
                 var handler=SnapshotInstalled;
                 if(handler!=null)handler(session);
             }catch(OperationCanceledException){/* The transport and any committed installation journal are kept. */}

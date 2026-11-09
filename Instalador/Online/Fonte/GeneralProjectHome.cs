@@ -144,12 +144,21 @@ internal sealed class GeneralProjectHome : Form {
         if(sharingWindow==window)sharingWindow=null;
     }
 
+    Control SharingPromptOwner {
+        get{
+            if(sharingDialog!=null&&!sharingDialog.IsDisposed&&sharingDialog.Visible)return sharingDialog;
+            var window=sharingWindow;
+            return window!=null&&!window.IsDisposed?window.SharingPromptOwner:this;
+        }
+    }
+
     internal P2PService SharingService(string projectData){
         P2PService service;
         if(sharing.TryGetValue(projectData,out service))return service;
         service=new P2PService(Path.Combine(projectData,"P2P"),
             fixture?Path.Combine(store.Root,"P2P-Transfers"):P2PService.TransferStore,localOnly:fixture,offerRecovery:true);
         service.EnableInstalledReceive(catalog,projectData,fixture);
+        service.ConfirmConnection=session=>GeneralP2PDialog.AskConnection(this,()=>SharingPromptOwner,service,session);
         service.RegisterProject=session=>{
             store.CreateReceived(session,projectData,catalog);
             if(IsHandleCreated&&!IsDisposed)try{BeginInvoke((Action)(()=>{if(!IsDisposed&&Visible)Build();}));}
@@ -157,12 +166,7 @@ internal sealed class GeneralProjectHome : Form {
         };
         service.ChooseVersion=difference=>{
             if(IsDisposed||!IsHandleCreated)return false;
-            return (bool)Invoke((Func<bool>)(()=>{
-                var window=sharingWindow;
-                var owner=sharingDialog!=null&&!sharingDialog.IsDisposed&&sharingDialog.Visible?(Control)sharingDialog:
-                    window!=null&&!window.IsDisposed?window.SharingPromptOwner:this;
-                return GeneralVersionChoiceDialog.Ask(owner,difference);
-            }));
+            return (bool)Invoke((Func<bool>)(()=>GeneralVersionChoiceDialog.Ask(SharingPromptOwner,difference)));
         };
         sharing.Add(projectData,service);
         return service;
@@ -194,6 +198,7 @@ internal sealed class GeneralProjectHome : Form {
     internal static async Task RecoverSharing(Control owner,P2PService service){
         foreach(var session in service.SnapshotSessions().Where(s=>s.RecoveryPending)){
             if(owner.IsDisposed)return;
+            service.Notify();
             using(var dialog=new GeneralDialog(T("Recebimento interrompido","Interrupted download"))){
                 dialog.ClientSize=new Size(650,284);
                 var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(24,12,24,20)};

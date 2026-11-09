@@ -86,7 +86,7 @@ internal static class GeneralP2PUiTests {
                             "An incomplete pack identifies the missing count: "+theme+locale);
                         incoming.ModsOutsidePack=0;
                         update();
-                        check(status.Text==(locale=="pt"?"Tudo pronto para jogar":"Ready to play"),"Verified install and saved project show readiness: "+theme+locale);
+                        check(status.Text==GeneralP2PDialog.InstalledMessage,"Verified install and saved project show readiness: "+theme+locale);
                         incoming.ListImported=false;incoming.ModsOutsidePack=null;
                         update();
                         var viewport=Find<GeneralScrollView>(dialog,"p2p-cards");

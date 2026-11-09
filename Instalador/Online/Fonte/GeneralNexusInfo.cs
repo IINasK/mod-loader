@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Threading;
 using System.IO;
 using System.Globalization;
 using System.Linq;
@@ -73,10 +76,12 @@ internal static class GeneralNexusInfo {
         return String.IsNullOrWhiteSpace(key) || key.Length > 256 || key.Any(c => Char.IsControl(c) || Char.IsWhiteSpace(c)) ? null : key;
     }
 
-    internal static Task<GeneralSourceInfo> Read(string source) {
+    internal static Task<GeneralSourceInfo> Read(string source) {return Read(source,false);}
+
+    static Task<GeneralSourceInfo> Read(string source,bool allowPublic) {
         var link = GeneralNexusLink.Parse(source);
         string testKey = TestKey();
-        if (link == null || (!GeneralAppPaths.IsDevelopment && testKey == null &&
+        if (link == null || (!allowPublic && !GeneralAppPaths.IsDevelopment && testKey == null &&
             Environment.GetEnvironmentVariable("MOD_LOADER_NEXUS_API_TEST") != "1"))
             return Task.FromResult<GeneralSourceInfo>(null);
         return Task.Run(() => {
@@ -93,6 +98,56 @@ internal static class GeneralNexusInfo {
             if (info != null && link.File > 0 && key != null)
                 ApplyFile(ReadJson("/v1" + resource + "/files/" + link.File + ".json", key, out status), link, info);
             return info;
+        });
+    }
+
+    internal static void ReviewReceivedList(GeneralModList list,Func<string,Task<GeneralSourceInfo>> lookup=null) {
+        bool exact=HasTestKey;
+        var sources=list.Mods.SelectMany(mod=>mod.Variants.SelectMany(variant=>variant.Sources
+            .Select(source=>new{Mod=mod,Variant=variant,Source=source,Link=GeneralNexusLink.Parse(source)})))
+            .Where(item=>item.Link!=null).ToArray();
+        Func<GeneralNexusLink,string> key=link=>exact?link.Url:new GeneralNexusLink{Game=link.Game,Mod=link.Mod}.Url;
+        var queries=sources.Select(item=>key(item.Link)).Distinct(StringComparer.Ordinal).ToArray();
+        if(queries.Length==0)return;
+        var found=new ConcurrentDictionary<string,GeneralSourceInfo>(StringComparer.Ordinal);
+        var deadline=Stopwatch.StartNew();
+        var limit=TimeSpan.FromSeconds(45);
+        int next=-1;
+        Func<Task> work=async()=>{
+            while(deadline.Elapsed<limit){
+                int index=Interlocked.Increment(ref next);
+                if(index>=queries.Length)return;
+                var url=queries[index];
+                try{
+                    var info=await (lookup==null?Read(url,true):lookup(url)).ConfigureAwait(false);
+                    if(info!=null)found[url]=info;
+                }catch(Exception ex){OnlineDiagnostics.Record("p2p.nexus.lookup",null,ex.GetType().Name);}
+            }
+        };
+        var workers=Task.WhenAll(Enumerable.Range(0,Math.Min(4,queries.Length)).Select(i=>Task.Run(work)));
+        Task.WhenAny(workers,Task.Delay(limit)).GetAwaiter().GetResult();
+        foreach(var item in sources){
+            GeneralSourceInfo info;
+            if(!found.TryGetValue(key(item.Link),out info))continue;
+            item.Mod.Nsfw|=info.Nsfw;
+            foreach(var tag in info.Tags??new string[0]){
+                if(item.Mod.Tags.Count>=32)break;
+                if(!item.Mod.Tags.Contains(tag,StringComparer.OrdinalIgnoreCase))item.Mod.Tags.Add(tag);
+            }
+            if(!info.NexusChecked||String.IsNullOrWhiteSpace(info.Name))continue;
+            GeneralSourceInfo previous;
+            item.Variant.SourceInfo.TryGetValue(item.Source,out previous);
+            var saved=info.SavedCopy();
+            if(previous!=null&&String.IsNullOrEmpty(saved.Version)){
+                saved.Version=previous.Version;
+                saved.FileName=previous.FileName;
+                saved.Bytes=previous.Bytes;
+                saved.SizeApproximate=previous.SizeApproximate;
+            }
+            item.Variant.SourceInfo[item.Source]=saved;
+        }
+        OnlineDiagnostics.Record("p2p.nexus.review",null,"Consulta da lista recebida.",new{
+            Links=sources.Length,Queries=queries.Length,Verified=found.Values.Count(info=>info.NexusChecked),ExactFileLookup=exact
         });
     }
 

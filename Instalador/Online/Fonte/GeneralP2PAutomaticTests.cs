@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -23,13 +23,23 @@ internal static class GeneralP2PAutomaticTests {
         string game=Path.Combine(root,"game"),target=Path.Combine(root,"target"),data=Path.Combine(root,"data"),receivedData=Path.Combine(root,"received"),archive=Path.Combine(root,"original.zip");Directory.CreateDirectory(game);Directory.CreateDirectory(target);File.WriteAllText(Path.Combine(target,".fixture-only"),"test");
         using(var zip=ZipFile.Open(archive,ZipArchiveMode.Create))using(var output=new StreamWriter(zip.CreateEntry("mods/test.txt").Open()))output.Write("automatic acceptance");
         var state=new GeneralModState{Destination=game,Theme="black"};state.List.Mods.Add(new GeneralModEntry{Id="fixture",Name="Fixture",DefaultVariant="default",Variants=new List<GeneralModVariant>{new GeneralModVariant{Id="default",Name="Main",Sources=new List<string>{archive}}}});
+        const string alternate="https://www.nexusmods.com/cyberpunk2077/mods/33230?tab=files&file_id=162991";
+        state.List.Mods[0].Variants.Add(new GeneralModVariant{Id="alternate",Name="Alternate",Sources=new List<string>{alternate}});
         new GeneralModInstaller(game,Path.Combine(data,"Instalacoes")).Install(archive,"fixture/default/0/"+archive,_=>{});File.Delete(archive);
         var library=new GeneralModLibrary(Path.Combine(root,"state.json"));library.Save(state);check(library.Load().Theme=="black","Black theme persists in project state.");var projects=new GeneralProjectStore(Path.Combine(root,"projects"));projects.SavePreferences("black","pt",null);check(projects.Read().Theme=="black","Black theme persists in the home preferences.");
         using(var sender=new P2PService(Path.Combine(root,"sender"),Path.Combine(root,"send-files"),true))using(var receiver=new P2PService(Path.Combine(root,"receiver"),Path.Combine(root,"receive-files"),true)){
             sender.EnableInstalledReceive(catalog,data,true);receiver.EnableInstalledReceive(catalog,receivedData,true);sender.Start(_=>{},helper);receiver.Start(_=>{},helper);
+            int hostChoices=0,receivedSounds=0,hostFinished=0;
+            sender.Notice=complete=>{if(complete)System.Threading.Interlocked.Increment(ref hostFinished);else System.Threading.Interlocked.Increment(ref hostChoices);};
+            receiver.Notice=complete=>{if(complete)System.Threading.Interlocked.Increment(ref receivedSounds);};
+            var libraryReceived=new GeneralProjectStore(Path.Combine(root,"p"));
+            receiver.RegisterProject=session=>libraryReceived.CreateReceived(session,receivedData,catalog);
+            receiver.ReviewReceived=list=>GeneralNexusInfo.ReviewReceivedList(list,url=>Task.FromResult(
+                new GeneralSourceInfo{Name="Mod from Nexus",ModVersion="1.5",NexusChecked=true,Tags=new[]{"From Nexus"}}));
             Exception failure=null;P2PSession sent=null,accepted=null;
             using(var host=new Form{ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)})using(var dialog=new GeneralP2PDialog(sender,state,catalog)){
                 dialog.ShowInTaskbar=false;dialog.StartPosition=FormStartPosition.Manual;dialog.Location=new Point(-30000,-30000);
+                sender.ConfirmConnection=session=>GeneralP2PDialog.AskConnection(host,()=>dialog.Visible?(Control)dialog:host,sender,session);
                 host.Shown+=async(s,e)=>{try{
                     dialog.Show(host);var output=(TextBox)dialog.Content.Controls.Find("p2p-output",true).Single();var copy=(Button)dialog.Content.Controls.Find("p2p-copy",true).Single();
                     await Wait(()=>copy.Enabled,"No automatic invitation appeared.");sent=sender.Sessions.Single();string offer=output.Text;copy.PerformClick();
@@ -38,7 +48,12 @@ internal static class GeneralP2PAutomaticTests {
                     check(dialog.Content.Controls.Find("p2p-card",true).Length==0,"An unaccepted invitation does not create a transfer card.");Capture(dialog,Path.Combine(root,"waiting-black.png"));
                     dialog.Hide();
                     accepted=receiver.Accept(offer,target,true);receiver.Engine.ConfigurePeer(sender.Engine.Device,"tcp://127.0.0.1:"+sender.Engine.ListenPort);
-                    await Wait(()=>sent.Recipients.Length!=0,"Host did not detect acceptance without a reply code.");check(sent.Recipients.Single().Device==receiver.Engine.Device,"Host pins the proven recipient automatically without manual Authorize or reply paste.");
+                    await Wait(()=>Application.OpenForms.Cast<Form>().Any(form=>form.Controls.Find("p2p-accept-request",true).Length!=0),"Host did not receive a connection request.");
+                    check(sent.Recipients.Length==0&&sent.PayloadHash==null&&hostChoices==1,"A proven invite plays a single sound and waits for the host.");
+                    var approve=Application.OpenForms.Cast<Form>().SelectMany(form=>form.Controls.Find("p2p-accept-request",true)).OfType<Button>().Single();
+                    approve.PerformClick();
+                    await Wait(()=>sent.Recipients.Length!=0,"Host did not approve the request without a reply code.");
+                    check(sent.Recipients.Single().Device==receiver.Engine.Device,"Host approval pins the proven recipient without a reply code.");
                     await Wait(()=>receiver.HasSyncPreview(accepted)||sent.Error!=null,"Host did not publish the comparison.");
                     check(sent.Error==null&&sent.PayloadHash==null,"The host waits for the receiver's choice before building the pack.");
                     await receiver.ChooseIncoming(accepted,true);
@@ -51,14 +66,28 @@ internal static class GeneralP2PAutomaticTests {
                     }
                     dialog.Show();Capture(dialog,Path.Combine(root,"connected-black.png"));
                     await Wait(()=>accepted.Completed||accepted.Error!=null,"Automatic receive did not complete.");check(accepted.Completed&&accepted.Error==null&&File.ReadAllText(Path.Combine(target,"mods/test.txt"))=="automatic acceptance","Receiver installs verified files automatically after one-sided acceptance.");
-                    await Wait(()=>sent.Completed&&!Directory.Exists(sender.Folder(sent))&&!Directory.Exists(receiver.Folder(accepted)),"Automatic transfer temporary cleanup did not finish.");check(true,"Both sides remove temporary transfer files after confirmation.");
+                    await Wait(()=>sent.Completed&&accepted.ListImported&&!Directory.Exists(sender.Folder(sent))&&!Directory.Exists(receiver.Folder(accepted)),"Automatic transfer temporary cleanup did not finish.");
+                    check(receivedSounds==2&&hostFinished==1,"Download, installation and confirmed send signal completion once per milestone.");
+                    var imported=libraryReceived.Load(libraryReceived.Read().Projects.Single());
+                    var mod=imported.List.Mods.Single();
+                    check(mod.Tags.Contains("From Nexus")&&mod.Variants.Single(v=>v.Id=="alternate").SourceInfo[alternate].NexusChecked&&
+                        imported.SnapshotReceipts.ContainsKey(mod.Id+"/"+mod.DefaultVariant),
+                        "The whole imported list is reviewed, including alternate Nexus sources, and installed mods retain Mod Loader recognition.");
                 }catch(Exception ex){failure=ex;}if(!dialog.IsDisposed)dialog.Dispose();if(!host.IsDisposed)host.Close();};Application.Run(host);
             }
             if(failure!=null)throw failure;
             // The same trusted device still needs a fresh invitation proof for the next pack.
             sender.SetPreparationState(null);
+            int declined=0;
+            sender.ConfirmConnection=session=>{
+                System.Threading.Interlocked.Increment(ref declined);
+                return Task.FromResult(false);
+            };
             var fallback=sender.BeginDeferred(state,new[]{"fixture"},true,compareBeforePack:true);
             var fallbackReceive=receiver.Accept(sender.Invitation(fallback),target,true);
+            Wait(()=>declined==1,"A known friend did not request approval for the new invitation.").GetAwaiter().GetResult();
+            System.Threading.Thread.Sleep(2100);
+            check(declined==1&&fallback.Recipients.Length==0&&fallback.PayloadHash==null,"Declining stops transfer and does not repeat the request.");
             var reply=P2PInvite.Decode(receiver.Invitation(fallbackReceive));
             string valid=reply.Encode();
             reply.ManifestHash=new string('d',64);

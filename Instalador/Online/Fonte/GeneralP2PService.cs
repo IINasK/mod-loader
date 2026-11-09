@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 
 internal sealed class P2PSession {
     public string Id, Name, Hash, Peer, Mode, Destination, ReceiptId, Error, Stage;
@@ -25,6 +26,9 @@ internal sealed class P2PSession {
     public string PayloadHash;
     public string[] SelectedMods, SkippedVerificationMods;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PVerificationIssue VerificationIssue;
+    [System.Web.Script.Serialization.ScriptIgnore] public GeneralModList ReviewedProject;
+    [System.Web.Script.Serialization.ScriptIgnore] public bool ChoiceNotified;
+    [System.Web.Script.Serialization.ScriptIgnore] public volatile bool NexusReviewing;
     public bool Sender, Paused, AutoInstall, Completed, ListImported, HistoryDismissed;
     public override string ToString(){return GeneralStyle.T(Sender?"Enviando · ":"Recebendo · ",Sender?"Sending · ":"Receiving · ")+Name;}
 }
@@ -51,6 +55,18 @@ internal sealed partial class P2PService : IDisposable {
     internal event Action<P2PSession> SnapshotInstalled;
     internal Action<P2PSession> RegisterProject;
     internal Func<ModVersionDifference,bool> ChooseVersion;
+    internal Func<P2PSession,Task<bool>> ConfirmConnection;
+    internal Action<GeneralModList> ReviewReceived;
+    internal Action<bool> Notice;
+    internal void Notify(bool completed=false){
+        var notice=Notice;
+        if(notice!=null)try{notice(completed);}catch(Exception ex){OnlineDiagnostics.Record("p2p.sound",null,ex.GetType().Name);}
+    }
+    internal void NotifyChoice(P2PSession session){
+        if(session.ChoiceNotified)return;
+        session.ChoiceNotified=true;
+        Notify();
+    }
     internal string ApplicationData {get{return installedData;}}
     internal bool Installing {get{return installedSessions.Any(s=>s.Stage!=null&&!s.Completed&&String.IsNullOrEmpty(s.Error));}}
     readonly object manifestsLock=new object();
@@ -59,6 +75,10 @@ internal sealed partial class P2PService : IDisposable {
         Root=Path.GetFullPath(root);Store=Path.GetFullPath(store);Safe.NoLinks(Root);Safe.NoLinks(Store);
         if(Root.TrimEnd('\\').Equals(Store.TrimEnd('\\'),StringComparison.OrdinalIgnoreCase))throw new IOException("Separe os arquivos privados da pasta de transferência.");
         statePath=Safe.In(Root,"sessions.json");Engine=new SyncthingEngine(Safe.In(Root,"syncthing"),localOnly);
+        if(!localOnly){
+            Notice=completed=>{if(completed)System.Media.SystemSounds.Asterisk.Play();else System.Media.SystemSounds.Exclamation.Play();};
+            ReviewReceived=list=>GeneralNexusInfo.ReviewReceivedList(list);
+        }
         if(File.Exists(statePath)){
             if(new FileInfo(statePath).Length>1000000)throw new IOException("Registro de compartilhamentos inválido.");
             Sessions=Safe.Json.Deserialize<List<P2PSession>>(File.ReadAllText(statePath));
