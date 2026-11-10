@@ -206,23 +206,62 @@ internal sealed class GeneralButton : Button {
 
 internal sealed class GeneralProgress : Control {
     int value;
-    internal System.Collections.Generic.List<PackCoverageSegment> Segments;
+    internal List<PackCoverageSegment> Segments;
+    internal event Action<PackCoverageSegment> SegmentActivated;
     readonly ToolTip segmentTip=new ToolTip{UseAnimation=false,UseFading=false};
     internal int Value {get{return value;}set{this.value=Math.Max(0,Math.Min(100,value));Invalidate();}}
     internal bool Indeterminate, NotApplicable;
     internal string Caption;
     internal GeneralProgress(){Height=37;SetStyle(ControlStyles.UserPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);}
+    RectangleF Track {get{return new RectangleF(0,27,Math.Max(1,Width-1),6);}}
+
+    PackCoverageSegment SegmentAt(Point point){
+        if(Segments==null||Segments.Count==0)return null;
+        var track=Track;
+        const float tolerance=5;
+        if(point.X<0||point.X>=Width||point.Y<track.Top-tolerance||point.Y>=track.Bottom+tolerance)return null;
+
+        float x=Math.Min(point.X+.5f,track.Right-.01f);
+        float start=track.Left;
+        int total=Segments.Sum(segment=>segment.Count);
+        PackCoverageSegment exact=null,nearby=null;
+        float exactWidth=0,nearest=tolerance;
+        foreach(var segment in Segments){
+            float width=track.Width*segment.Count/total;
+            float end=start+width;
+            if(x>=start&&x<end){exact=segment;exactWidth=width;}
+            if(segment.Category!=null&&width<2*tolerance){
+                float distance=Math.Max(start-x,x-end);
+                if(distance<nearest){nearby=segment;nearest=distance;}
+            }
+            start=end;
+        }
+        // Thin segments keep their proportions but get a wider target beside a wider segment.
+        return exactWidth<2*tolerance?exact:nearby??exact;
+    }
+
     protected override void OnMouseMove(MouseEventArgs e){
-        base.OnMouseMove(e);string text="";
-        if(Segments!=null){double at=0,total=Segments.Sum(s=>(double)s.Count);foreach(var segment in Segments){at+=Width*segment.Count/Math.Max(1,total);if(e.X<at){text=segment.Label+": "+segment.Count+" ("+(100.0*segment.Count/Math.Max(1,total)).ToString("0.#")+"%)";break;}}}
+        base.OnMouseMove(e);
+        var segment=SegmentAt(e.Location);
+        Cursor=segment!=null&&SegmentActivated!=null?Cursors.Hand:Cursors.Default;
+        string text=segment==null?"":segment.Label+": "+segment.Count+" ("+
+            (100.0*segment.Count/Segments.Sum(item=>item.Count)).ToString("0.#")+"%)";
+        if(segment!=null&&SegmentActivated!=null)text+=GeneralStyle.T(" · Clique para filtrar"," · Click to filter");
         if(segmentTip.GetToolTip(this)!=text)segmentTip.SetToolTip(this,text);
+    }
+
+    protected override void OnMouseClick(MouseEventArgs e){
+        base.OnMouseClick(e);
+        if(e.Button!=MouseButtons.Left||SegmentActivated==null)return;
+        var segment=SegmentAt(e.Location);
+        if(segment!=null)SegmentActivated(segment);
     }
     protected override void Dispose(bool disposing){if(disposing)segmentTip.Dispose();base.Dispose(disposing);}
     protected override void OnPaint(PaintEventArgs e){
         var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;
         using(var font=GeneralStyle.Font(10.5f))TextRenderer.DrawText(g,Caption??"",font,new Rectangle(0,0,Width-52,23),GeneralStyle.Muted,TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
         using(var font=GeneralStyle.Font(10.5f,true))TextRenderer.DrawText(g,Indeterminate||NotApplicable?"—":Value+"%",font,new Rectangle(Width-52,0,52,23),GeneralStyle.Accent,TextFormatFlags.Right|TextFormatFlags.SingleLine);
-        var track=new RectangleF(0,27,Math.Max(1,Width-1),6);
+        var track=Track;
         using(var path=GeneralStyle.Round(track,3))using(var brush=new SolidBrush(GeneralStyle.SoftLine))g.FillPath(brush,path);
         if(Segments!=null&&Segments.Count>0){
             var saved=g.Save();using(var shape=GeneralStyle.Round(track,3))g.SetClip(shape);

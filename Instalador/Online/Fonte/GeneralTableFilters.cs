@@ -9,6 +9,9 @@ using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
     HashSet<string> categoryFilters,variantFilters,statusFilters,groupFilters;
+    Button clearFilters;
+    bool HasListFilters {get{return coverageFilter!=null||categoryFilters!=null||variantFilters!=null||
+        statusFilters!=null||groupFilters!=null||nameFilter.Length!=0||searchQuery.Length!=0;}}
     string nameFilter="";
     TextBox searchBox;
     string searchQuery="";
@@ -44,7 +47,24 @@ internal sealed partial class GeneralModWindow {
         return categories.OrderBy(category=>discovered.Contains(category));
     }
     string DefaultCategory {get{return categoryFilters!=null&&categoryFilters.Count==1?categoryFilters.Single():null;}}
-    void ResetColumnFilters(){categoryFilters=variantFilters=statusFilters=groupFilters=null;nameFilter="";searchQuery="";searchTerms=new string[0];if(searchBox!=null&&!searchBox.IsDisposed)searchBox.Clear();}
+    void ResetColumnFilters(){
+        categoryFilters=variantFilters=statusFilters=groupFilters=null;
+        coverageFilter=null;
+        nameFilter=searchQuery="";
+        searchTerms=new string[0];
+        if(searchBox!=null&&!searchBox.IsDisposed)searchBox.Clear();
+    }
+
+    void ClearListFilters(){
+        ResetColumnFilters();
+        RedrawFromTop();
+    }
+
+    void RedrawFromTop(){
+        DrawRows();
+        if(grid.Rows.Count>0)grid.FirstDisplayedScrollingRowIndex=0;
+        SetTableToolsVisible(true);
+    }
     static string StatusFilterKey(string value){
         if(value=="Pendente"||value=="Pending")return "pending";
         if(value=="Baixando"||value=="Downloading")return "active";
@@ -61,7 +81,7 @@ internal sealed partial class GeneralModWindow {
     }
     static string GameInventoryStatus {get{return T("Encontrado no jogo","Found in game");}}
     IEnumerable<P2PSyncDifference> VisibleGameInventory(){
-        if(associationChoice!=null||categoryFilters!=null||variantFilters!=null||groupFilters!=null||
+        if(associationChoice!=null||coverageFilter!=null||categoryFilters!=null||variantFilters!=null||groupFilters!=null||
             statusFilters!=null&&!statusFilters.Any(value=>StatusFilterKey(value)=="game-inventory"))
             return Enumerable.Empty<P2PSyncDifference>();
         var included=new HashSet<string>(state.List.Mods.SelectMany(mod=>mod.DetectedPaths),StringComparer.OrdinalIgnoreCase);

@@ -81,6 +81,55 @@ internal sealed partial class GeneralModWindow {
             form.ResetColumnFilters();form.DrawRows();check(form.VisibleMods().Count==3,"Limpar filtros restaura todos os itens do preset.");
             form.categoryFilters=new HashSet<string>();form.DrawRows();check(form.VisibleMods().Count==0,"Nenhuma categoria marcada é diferente de selecionar todas.");
             form.ResetColumnFilters();form.DrawRows();
+            var fillers=Enumerable.Range(0,157).Select(index=>NewEntry("Componente "+index,archive)).ToList();
+            foreach(var item in fillers){
+                list.Mods.Add(item);
+                list.Presets[0].ModIds.Add(item.Id);
+                form.statuses[Key(item,form.Selected(item))]="Instalado";
+            }
+            form.statuses[Key(second,form.Selected(second))]="Instalado";
+            form.marked.Add(second.Id);
+            form.collapsedCategories.Add("Principal");
+            form.statusFilters=new HashSet<string>{"Instalado"};
+            form.SetAssociationSearch("Beta");
+            check(form.totalProgress.Value==99&&form.totalProgress.Caption.EndsWith("159 / 160"),
+                "A barra mantém a cobertura do preset mesmo com filtros na tabela.");
+            var coverageBar=form.totalProgress;
+            var clickSegment=typeof(GeneralProgress).GetMethod("OnMouseClick",BindingFlags.Instance|BindingFlags.NonPublic);
+            clickSegment.Invoke(coverageBar,new object[]{new MouseEventArgs(MouseButtons.Left,1,coverageBar.Width-7,24,0)});
+            check(form.ModRows().Single().Visible&&Equals(form.ModRows().Single().Tag,third.Id)&&
+                form.totalProgress.Value==99&&form.searchBox.Text=="",
+                "Um clique perto de 1% revela só o mod restante mesmo numa categoria recolhida e com filtros anteriores.");
+            form.ClearListFilters();
+            var coverageView=(GeneralScrollView)form.grid.Parent.Parent;
+            coverageView.ScrollTo(30);
+            await Task.Delay(30);
+            check(!form.clearFilters.Visible,"Rolar para baixo recolhe as ferramentas antes do clique na barra.");
+            clickSegment.Invoke(coverageBar,new object[]{new MouseEventArgs(MouseButtons.Left,1,coverageBar.Width-7,24,0)});
+            await Task.Delay(30);
+            check(form.clearFilters.Visible&&form.grid.FirstDisplayedScrollingRowIndex==0&&coverageView.Bar.Limit==0,
+                "A barra volta ao topo, restaura a seta e oculta a rolagem quando o resultado cabe na tabela.");
+            CaptureUi(form,Path.Combine(root,"coverage-filter.png"));
+            form.categoryFilters=new HashSet<string>{"Principal"};
+            form.groupFilters=new HashSet<string>{"Outro grupo"};
+            form.variantFilters=new HashSet<string>{"Alternativa"};
+            form.statusFilters=new HashSet<string>{"Instalado"};
+            form.nameFilter="Beta";
+            form.SetAssociationSearch("Beta");
+            check(form.clearFilters.Enabled&&form.clearFilters.Left==form.deletePreset.Right,"A seta de limpar filtros fica ao lado da lixeira.");
+            form.clearFilters.PerformClick();
+            check(!form.HasListFilters&&!form.clearFilters.Enabled&&form.searchBox.Text==""&&
+                form.VisibleMods().Count==160&&form.marked.SetEquals(new[]{second.Id})&&form.state.SelectedPreset=="kit",
+                "Limpar filtros restaura o preset e preserva os mods marcados.");
+            form.marked.Clear();
+            form.collapsedCategories.Clear();
+            foreach(var item in fillers){
+                list.Mods.Remove(item);
+                list.Presets[0].ModIds.Remove(item.Id);
+                form.statuses.Remove(Key(item,form.Selected(item)));
+            }
+            form.statuses[Key(second,form.Selected(second))]="Baixando";
+            form.DrawRows();
             var origin=form.grid.Columns["Origin"];
             check(origin.DisplayIndex==form.grid.Columns["Mark"].DisplayIndex+1&&form.grid.Columns["Name"].DisplayIndex==origin.DisplayIndex+1&&
                 form.ModRows().All(row=>Equals(row.Cells["Origin"].Value,"Mod Loader")&&!String.IsNullOrWhiteSpace(row.Cells["Origin"].ToolTipText)),

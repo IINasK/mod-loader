@@ -92,6 +92,7 @@ internal sealed partial class GeneralModWindow {
         bool valid=ActivePreset==null||!String.IsNullOrWhiteSpace(draftName)&&draftName.Length<=120&&!draftName.Any(Char.IsControl);
         presetSettings.Enabled=available&&valid&&(projectDraft!=null||(ActivePreset==null?marked.Any():DraftNameChanged||DraftSelectionChanged));
         if(deletePreset!=null)deletePreset.Enabled=available&&ActivePreset!=null&&!ProtectedPreset;
+        if(clearFilters!=null)clearFilters.Enabled=available&&associationChoice==null&&HasListFilters;
     }
     bool ConfirmPresetNavigation(){
         return !DraftNameChanged||ConfirmProjectNavigation();
