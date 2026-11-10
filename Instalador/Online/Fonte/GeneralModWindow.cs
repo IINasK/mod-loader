@@ -208,6 +208,9 @@ internal sealed partial class GeneralModWindow : Form {
             CellBorderStyle=DataGridViewCellBorderStyle.None,ColumnHeadersBorderStyle=DataGridViewHeaderBorderStyle.None,AutoGenerateColumns=false,EnableHeadersVisualStyles=false,
             ScrollBars=ScrollBars.Vertical,Margin=Padding.Empty,ColumnHeadersHeight=44,ColumnHeadersHeightSizeMode=DataGridViewColumnHeadersHeightSizeMode.DisableResizing};
         grid.DefaultCellStyle=new DataGridViewCellStyle{BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground,SelectionBackColor=GeneralStyle.Selection,SelectionForeColor=GeneralStyle.Foreground,Font=GeneralStyle.Font(12),Padding=new Padding(10,0,8,0)};
+        optionSelectedFont=GeneralStyle.Font(12,true);
+        var selectedFont=optionSelectedFont;
+        grid.Disposed+=(s,e)=>selectedFont.Dispose();
         grid.ColumnHeadersDefaultCellStyle=new DataGridViewCellStyle{BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Muted,Font=GeneralStyle.Font(10.5f,true),Padding=new Padding(10,0,8,0),SelectionBackColor=GeneralStyle.Surface};
         grid.Columns.Add(new DataGridViewCheckBoxColumn{Name="Mark",HeaderText="",Width=44,SortMode=DataGridViewColumnSortMode.NotSortable});
         grid.Columns.Add(new DataGridViewTextBoxColumn{Name="Name",HeaderText="Mods",MinimumWidth=160,FillWeight=85,AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill,ReadOnly=true,SortMode=DataGridViewColumnSortMode.NotSortable});
@@ -483,7 +486,7 @@ internal sealed partial class GeneralModWindow : Form {
             bool collapsed=CategoryCollapsed(section);
             foreach(var m in members){
                 var v=Selected(m);string key=Key(m,v),status=ListStatus(m);int pct;bool hasProgress=progress.TryGetValue(key,out pct);
-                int i=grid.Rows.Add(marked.Contains(m.Id),picking?m.Name:ModDisplayName(m),NexusVariantName(m),GeneralStatusPresentation.Label(status),hasProgress?(object)pct:null,ModSpace(m));var row=grid.Rows[i];row.Tag=m.Id;row.Cells["Status"].ToolTipText=StatusDetail(key,status);
+                int i=grid.Rows.Add(marked.Contains(m.Id),picking?m.Name:ModDisplayName(m),NexusVariantName(m),GeneralStatusPresentation.Label(InstallationStatus(m,status)),hasProgress?(object)pct:null,ModSpace(m));var row=grid.Rows[i];row.Tag=m.Id;row.Cells["Status"].ToolTipText=TableStatusDetail(m,key,status);
                 row.Cells["Size"].ToolTipText=SpaceTip(m);
                 row.Cells["Name"].ToolTipText=v.Description??m.Description;
                 var origin=row.Cells["Origin"];
@@ -579,14 +582,20 @@ internal sealed partial class GeneralModWindow : Form {
             row.Height=36;
             row.ReadOnly=true;
             row.Cells["Mark"].Tag=index==versions.Count-1?CategoryBranch.Last:CategoryBranch.Middle;
-            row.Cells["Name"].Style.ForeColor=row.Cells["Name"].Style.SelectionForeColor=chosen?GeneralStyle.Foreground:GeneralStyle.Muted;
+            var textColor=chosen?GeneralStyle.Foreground:GeneralStyle.Muted;
+            foreach(string column in new[]{"Name","Variant","Size"}){
+                var style=row.Cells[column].Style;
+                style.ForeColor=style.SelectionForeColor=textColor;
+                if(chosen)style.Font=optionSelectedFont;
+            }
             row.Cells["Name"].ToolTipText=String.Join("\r\n",new[]{work.Variant.Description??work.Entry.Description,
                 T("Dê dois cliques para escolher esta opção. F2 abre os detalhes.","Double-click to select this option. F2 opens details.")}.Where(value=>!String.IsNullOrWhiteSpace(value)));
             {
                 row.Cells["Status"].Tag=chosen;
                 row.Cells["Status"].ToolTipText=GeneralStatusPresentation.Label(ListStatus(work.Entry));
                 row.Cells["Size"].ToolTipText=row.Cells["Size"].Value.ToString().StartsWith("≈",StringComparison.Ordinal)
-                    ?T("Tamanho do download. O espaço instalado ainda não foi medido.","Download size. Installed size has not been measured."):SpaceTip(work.Entry);
+                    ?T("Tamanho do download. O espaço instalado ainda não foi medido.","Download size. Installed size has not been measured.")
+                    :VerifiedBodyBytes(work.Entry,work.Variant).HasValue?T("Tamanho dos arquivos instalados e verificados.","Size of the verified installed files."):SpaceTip(work.Entry);
                 row.Cells["Origin"].Value=parent.Cells["Origin"].Value;
                 row.Cells["Origin"].ToolTipText=parent.Cells["Origin"].ToolTipText;
             }
@@ -594,7 +603,28 @@ internal sealed partial class GeneralModWindow : Form {
         }
     }
 
+    Font optionSelectedFont;
+
+    string InstallationStatus(GeneralModEntry entry,string status){
+        if(!IsBigBody(entry))return status;
+        if(status==GeneralStatusPresentation.OtherChoice)return "Não iniciado";
+        if(status!=GeneralStatusPresentation.ManualBody)return status;
+        return VerifiedBodyBytes(entry,GeneralModLibrary.BodyOption(state.BodyChoice,entry,Selected(entry))).HasValue
+            ?"Instalado":"Não conferido";
+    }
+
+    long? VerifiedBodyBytes(GeneralModEntry entry,GeneralModVariant variant){
+        if(!IsBigBody(entry))return null;
+        var standard=entry.Variants.FirstOrDefault(item=>item.Id==variant.Id);
+        if(standard==null||!standard.Sources.SequenceEqual(variant.Sources,StringComparer.Ordinal)||
+            !GeneralInstallRoutes.Same(standard.InstallRoutes,variant.InstallRoutes))return null;
+        var match=gameInventory.FirstOrDefault(file=>file.Kind=="verified-variant"&&file.ModId==entry.Id&&file.VariantId==variant.Id);
+        return match==null?null:match.VerifiedBytes;
+    }
+
     string BodyOptionSpace(Work work){
+        var verified=VerifiedBodyBytes(work.Entry,work.Variant);
+        if(verified.HasValue)return GeneralStorageSize.Format(verified.Value);
         long installed;
         var selected=GeneralModLibrary.BodyOption(work.BodyChoice,work.Entry,Selected(work.Entry));
         if(work.Variant==selected&&IsActiveAlternative(work.Entry)&&measuredMods.TryGetValue(work.Entry.Id,out installed))return GeneralStorageSize.Format(installed);
@@ -735,7 +765,7 @@ internal sealed partial class GeneralModWindow : Form {
         }
         if(e.RowIndex>=0&&e.ColumnIndex==grid.Columns["Status"].Index&&grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Tag is bool){
             bool selected=(bool)grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Tag;
-            PaintBadge(e,Convert.ToString(e.FormattedValue),selected?Color.FromArgb(11,116,75):GeneralStyle.Line,selected?Color.White:GeneralStyle.Foreground);
+            PaintBadge(e,Convert.ToString(e.FormattedValue),selected?Color.FromArgb(11,116,75):Color.FromArgb(58,58,62),selected?Color.White:Color.FromArgb(210,210,214));
             return;
         }
         if(e.RowIndex>=0&&e.ColumnIndex==grid.Columns["Variant"].Index&&grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Tag is List<Work>){
@@ -806,7 +836,7 @@ internal sealed partial class GeneralModWindow : Form {
     }
     void PaintStatus(DataGridViewCellPaintingEventArgs e){
         string id=(string)grid.Rows[e.RowIndex].Tag;var item=state.List.Mods.Single(m=>m.Id==id);
-        string raw=ListStatus(item);
+        string raw=InstallationStatus(item,ListStatus(item));
         PaintBadge(e,GeneralStatusPresentation.Label(raw),GeneralStatusPresentation.ColorFor(raw),Color.White);
     }
     static void PaintBadge(DataGridViewCellPaintingEventArgs e,string label,Color fill,Color textColor){
@@ -925,6 +955,7 @@ internal sealed partial class GeneralModWindow : Form {
         if(!moved.HasValue)return false;
         BeginProjectEdit();
         state.BodyChoice=selected.BodyChoice;
+        state.List.AlternativeGroups[GeneralModLibrary.BodyGroup].DisplayName=dialog.Result.Name;
         foreach(var pair in changed){
             string profile=pair.Key==selected.Entry?selected.Variant.Id:Selected(pair.Key).Id;
             ApplyEdited(pair.Key,pair.Value,profile,true,dialog.NewCategories);
@@ -967,7 +998,10 @@ internal sealed partial class GeneralModWindow : Form {
                     if(!editingBody)return LocalSource(new Work{Entry=item,Variant=variant},index);
                     var work=bodyVersions.Single(choice=>choice.BodyChoice==variant.Id);
                     return LocalSource(work,index);
-                },fixedChoices:editingBody)){
+                },fixedChoices:editingBody,archivePreview:testMode
+                    ?(Func<GeneralNexusLink,NexusFilePreview[]>)(link=>testNexusPreviews==null?null:testNexusPreviews(link,()=>!IsDisposed))
+                    :nexusScan.PreviewSession(GeneralNexusInfo.ReadFilePreviews),
+                cyberpunkLayout:IsCyberpunk(state.Destination))){
                 DialogResult answer;
                 while((answer=dialog.ShowDialog(this))==DialogResult.Retry){
                     var linked=await PickAlternative(item.Id,null,true);

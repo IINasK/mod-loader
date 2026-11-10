@@ -107,5 +107,36 @@ internal sealed partial class GeneralModWindow {
             "{\"version\":1,\"files\":[{\"file_path\":\"Assets/item.asset\",\"file_size\":8},{\"file_path\":\"Scripts/start.lua\",\"file_size\":3}]}")};
         check(NexusManualScan.Find(generic,false,page,link=>new[]{routed}).Variant==page.Variants[0],
             "Recognition reuses explicit installation routes across multiple directories in another game.");
+
+        string exact=modUrl+"?tab=files&file_id=2";
+        var preview=GeneralArchivePreview.Load(exact,null,null,true,link=>fetch(link,()=>true));
+        check(preview.Origin==GeneralArchivePreviewOrigin.Nexus&&preview.Paths.Contains("Release/"+archive)&&
+            preview.SuggestedPaths["Release/"+archive]==archive&&preview.SuggestedPaths["Release/"+script]==script&&
+            !preview.SuggestedPaths.ContainsKey("README.md"),
+            "The exact Nexus preview keeps raw branches and suggests the recognized installation paths.");
+        var unknown=GeneralArchivePreview.Load(modUrl,null,null,true,link=>{throw new InvalidOperationException("Unpinned page queried.");});
+        check(unknown.NeedsFileSelection&&unknown.Origin==GeneralArchivePreviewOrigin.Unavailable&&unknown.Paths.Length==0,
+            "The editor does not guess a file version for an unpinned Nexus page.");
+        var trusted=GeneralArchivePreview.Load(exact,null,new[]{archive},true,link=>{throw new InvalidOperationException("Catalog queried.");});
+        check(trusted.Origin==GeneralArchivePreviewOrigin.Catalog&&trusted.Paths.SequenceEqual(new[]{archive})&&
+            trusted.SuggestedPaths[archive]==archive,"A pinned recipe preserves the paths used by the installer.");
+
+        var conflicting=GeneralArchivePreview.Load(null,null,new[]{"Release/"+archive,"nativeOnly/asset.bin"},true);
+        var combined=GeneralArchivePreview.Combine(new[]{preview,conflicting});
+        check(combined.Origin==GeneralArchivePreviewOrigin.Mixed&&combined.Paths.Contains("nativeOnly/asset.bin")&&
+            combined.Paths.Count(path=>path=="Release/"+archive)==1&&!combined.SuggestedPaths.ContainsKey("Release/"+archive)&&
+            combined.SuggestedPaths["Release/"+script]==script,
+            "Multiple archives preserve their unique branches and omit conflicting hints for a shared raw path.");
+
+        string local=Safe.In(root,"editor-tree.zip");
+        using(var output=File.Create(local))
+        using(var zip=new System.IO.Compression.ZipArchive(output,System.IO.Compression.ZipArchiveMode.Create))
+        using(var payload=zip.CreateEntry("local/branches/example.archive").Open())payload.WriteByte(1);
+        var listing=GeneralArchivePreview.Load(local,null,null,true);
+        check(listing.Origin==GeneralArchivePreviewOrigin.Local&&listing.Paths.SequenceEqual(new[]{"local/branches/example.archive"})&&
+            listing.SuggestedPaths.Count==0,"A local archive supplies branches without a guessed destination.");
+        var fallback=GeneralArchivePreview.Load(exact,local,null,true,link=>new[]{sample});
+        check(fallback.Origin==GeneralArchivePreviewOrigin.Local&&fallback.Paths.SequenceEqual(listing.Paths)&&
+            fallback.SuggestedPaths.Count==0,"A preview for a different Nexus file is never used as the current layout.");
     }
 }

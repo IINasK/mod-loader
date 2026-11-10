@@ -165,9 +165,9 @@ internal sealed partial class GeneralModWindow {
             })){
                 editor.StartPosition=FormStartPosition.Manual;editor.Location=new Point(-30000,-30000);editor.Show(form);Application.DoEvents();
                 var field=AllControls(editor).OfType<TextBox>().Single(box=>box.Name=="DownloadSource");
-                var picker=AllControls(editor).OfType<GeneralPicker>().Single(control=>control.Name=="DownloadSourcePicker");
-                picker.SelectedIndex=1;
-                check(field.Text==secondLink&&field.ReadOnly&&picker.Visible,"Uma variante com vários arquivos mostra a fonte selecionada em uma única linha.");
+                check(field.Text==firstLink&&!field.Multiline&&
+                    !AllControls(editor).Any(control=>control.Name=="DownloadSourcePicker"),
+                    "A variante mostra só o link principal e mantém seus arquivos adicionais sem seletor.");
                 ((Button)editor.AcceptButton).PerformClick();
                 await Until(()=>editor.Result!=null);
                 check(editor.Result.Tags.Contains("Compatibilidade Nexus")&&editor.Result.Variants[0].Sources.SequenceEqual(new[]{firstLink,secondLink}),
@@ -250,6 +250,7 @@ internal sealed partial class GeneralModWindow {
         int stage=0;
         Exception failure=null;
         GeneralModEditor opened=null;
+        DateTime selectionStarted=DateTime.MaxValue;
         bool previousAnimation=GeneralStyle.AnimationsEnabled;
         GeneralStyle.AnimationsEnabled=true;
         try {
@@ -283,7 +284,13 @@ internal sealed partial class GeneralModWindow {
                             Application.DoEvents();
                             CaptureUi(editor,Path.Combine(root,"editor-download-and-link.png"));
                             stage=1;
-                            AllControls(editor).OfType<Button>().Single(button=>button.Name=="LinkDependency").PerformClick();
+                            var link=AllControls(editor).OfType<Button>().Single(button=>button.Name=="LinkDependency");
+                            check(link.CanSelect,"O botão de dependência está disponível ao final da rolagem.");
+                            selectionStarted=DateTime.UtcNow;
+                            link.PerformClick();
+                        }else if(stage==1&&form.associationChoice==null&&editor!=null&&
+                            DateTime.UtcNow-selectionStarted>TimeSpan.FromSeconds(3)){
+                            throw new IOException("O editor permaneceu aberto após clicar para vincular a dependência.");
                         }else if(stage==1&&form.associationChoice!=null){
                             check(form.listExpanded&&!form.optionsButton.Visible&&!form.expandList.Visible&&form.grid.ReadOnly&&
                                 !form.grid.Columns["Mark"].Visible&&form.grid.ContextMenuStrip==null,"A lista real expande e bloqueia as ações durante o vínculo.");

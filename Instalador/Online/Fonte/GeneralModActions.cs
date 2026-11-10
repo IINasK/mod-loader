@@ -14,8 +14,11 @@ internal sealed partial class GeneralModWindow {
         return mod.AlternativeGroup==GeneralModLibrary.BodyGroup&&GeneralModLibrary.IsHystBody(mod.Id);
     }
 
-    static string ModDisplayName(GeneralModEntry mod) {
-        return IsBigBody(mod)?"Big Body":mod.Name;
+    string ModDisplayName(GeneralModEntry mod) {
+        if(!IsBigBody(mod))return mod.Name;
+        GeneralAlternativeGroup group;
+        return state.List.AlternativeGroups.TryGetValue(GeneralModLibrary.BodyGroup,out group)
+            ?group.DisplayName??"Big Body":"Big Body";
     }
 
     GeneralModEntry BigBodyRepresentative(IEnumerable<GeneralModEntry> entries) {

@@ -33,11 +33,23 @@ public sealed class BundledArchiveReader : IDisposable {
         var reader=new BundledArchiveReader();
         try{reader.Initialize(file,expectedSize,expectedSha256);return reader;}catch{reader.Dispose();throw;}
     }
-    void Initialize(string file,long expectedSize,string expectedSha256) {
-        if(expectedSize<0||expectedSize>MaxEntryBytes||!FixedData.HashValid(expectedSha256))throw new IOException("Identidade do pacote compactado inválida.");
+    internal static ReaderArchiveEntry[] ReadEntries(string file) {
+        using(var reader=new BundledArchiveReader()) {
+            reader.Initialize(file,null,null);
+            return reader.Files();
+        }
+    }
+    void Initialize(string file,long? expectedSize,string expectedSha256) {
+        if(expectedSize.HasValue&&(expectedSize<0||expectedSize>MaxEntryBytes||!FixedData.HashValid(expectedSha256)))
+            throw new IOException("Identidade do pacote compactado inválida.");
         source=System.IO.Path.GetFullPath(file);Safe.NoLinks(source);
         sourceLock=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read);
-        using(var sha=SHA256.Create())if(sourceLock.Length!=expectedSize||Safe.Hex(sha.ComputeHash(sourceLock))!=expectedSha256)throw new IOException("O pacote compactado mudou ou não corresponde ao download aprovado.");
+        if(sourceLock.Length>MaxEntryBytes)throw new IOException("O pacote compactado ultrapassa o limite de tamanho.");
+        if(expectedSize.HasValue) {
+            using(var sha=SHA256.Create())
+                if(sourceLock.Length!=expectedSize||Safe.Hex(sha.ComputeHash(sourceLock))!=expectedSha256)
+                    throw new IOException("O pacote compactado mudou ou não corresponde ao download aprovado.");
+        }
         string temp=System.IO.Path.GetFullPath(System.IO.Path.GetTempPath());Safe.NoLinks(temp);
         folder=System.IO.Path.Combine(temp,"CyberpunkCoop-reader-"+Guid.NewGuid().ToString("N"));
         if(System.IO.Directory.Exists(folder)||File.Exists(folder))throw new IOException("A pasta temporária do leitor já existe.");
@@ -49,7 +61,7 @@ public sealed class BundledArchiveReader : IDisposable {
         exeLock=Materialize("CyberpunkCoop.Reader.7z.exe",executable,ArchiveReaderIdentity.ExeSize,ArchiveReaderIdentity.ExeHash);
         dllLock=Materialize("CyberpunkCoop.Reader.7z.dll",dll,ArchiveReaderIdentity.DllSize,ArchiveReaderIdentity.DllHash);
         entries=ParseListing(List());
-        OnlineDiagnostics.Record("archive.reader.ready",null,"Pacote conferido e listado pelo leitor incluído no aplicativo.",new{ReaderVersion=ArchiveReaderIdentity.Version,Entries=entries.Count,SourceSha256=expectedSha256});
+        if(expectedSize.HasValue)OnlineDiagnostics.Record("archive.reader.ready",null,"Pacote conferido e listado pelo leitor incluído no aplicativo.",new{ReaderVersion=ArchiveReaderIdentity.Version,Entries=entries.Count,SourceSha256=expectedSha256});
     }
     static FileStream Materialize(string resource,string path,long expectedSize,string expectedHash) {
         using(var input=typeof(BundledArchiveReader).Assembly.GetManifestResourceStream(resource)){

@@ -82,7 +82,7 @@ internal sealed class NexusManualScan {
         return match!=null&&uncertain?new NexusManualMatch():match;
     }
 
-    internal static Dictionary<string,long?> Destinations(GeneralModVariant variant,NexusFilePreview[] previews,bool cyberpunk) {
+    internal static Dictionary<string,long?> Destinations(GeneralModVariant variant,NexusFilePreview[] previews,bool cyberpunk,Dictionary<string,string> projected=null) {
         var result=new Dictionary<string,long?>(Paths);
         try {
             foreach(var preview in previews) {
@@ -105,6 +105,7 @@ internal sealed class NexusManualScan {
                     }else path=GeneralInstallRoutes.Map(file.Key,variant.InstallRoutes);
                     if(!InstalledSnapshot.SafeGenericPath(path)||result.ContainsKey(path))return null;
                     result.Add(path,file.Value);
+                    if(projected!=null)projected.Add(file.Key,path);
                     count++;
                 }
                 if(count==0)return null;

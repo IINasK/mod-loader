@@ -20,6 +20,8 @@ public static class OnlineArchiveReaderTests {
         string entry="archive/pc/mod/literal[1].archive";byte[] literal=Encoding.UTF8.GetBytes("fixed literal target");
         for(int i=0;i<Codecs.Length;i++){
             byte[] bytes=Convert.FromBase64String(Fixtures[i]);string source=Path.Combine(root,Codecs[i]+".7z");File.WriteAllBytes(source,bytes);
+            check(BundledArchiveReader.ReadEntries(source).Any(file=>file.Path==entry&&file.Size==literal.Length),
+                Codecs[i]+" pode ser listado na prévia sem extrair o pacote");
             using(var reader=BundledArchiveReader.Open(source,bytes.Length,Hash(bytes))){
                 using(var output=new MemoryStream()){reader.CopyEntry(entry,s=>s.CopyTo(output));check(output.ToArray().SequenceEqual(literal),Codecs[i]+" é lido pelo componente incorporado e o nome com colchetes é literal");}
                 refuse(()=>{using(var stream=new FileStream(source,FileMode.Open,FileAccess.Write,FileShare.Read)){}},"Arquivo compactado fica protegido contra alterações durante a leitura "+Codecs[i]);

@@ -115,7 +115,7 @@ internal sealed partial class GeneralModWindow {
         var listed=state.List.Mods.FirstOrDefault(m=>m.Id==work.Entry.Id);
         if(visible!=null&&listed!=null&&Object.ReferenceEquals(Selected(listed),work.Variant)){
             string shown=ListStatus(listed);
-            visible.Cells["Status"].Value=GeneralStatusPresentation.Label(shown);visible.Cells["Status"].ToolTipText=StatusDetail(work.Key,shown);
+            visible.Cells["Status"].Value=GeneralStatusPresentation.Label(InstallationStatus(listed,shown));visible.Cells["Status"].ToolTipText=TableStatusDetail(listed,work.Key,shown);
             visible.Cells["Progress"].Value=pct.HasValue?(object)pct.Value:"—";grid.InvalidateCell(visible.Cells["Status"]);UpdateCounts();
         }
         if(message!=null)detail.Text=message;
@@ -134,6 +134,9 @@ internal sealed partial class GeneralModWindow {
             }))
             return GeneralStatusPresentation.OtherChoice;
         return raw;
+    }
+    string TableStatusDetail(GeneralModEntry entry,string key,string status){
+        return StatusDetail(key,IsBigBody(entry)&&status==GeneralStatusPresentation.OtherChoice?"Não iniciado":status);
     }
     string StatusDetail(string key,string status){
         if(status==GeneralStatusPresentation.NexusManual)
@@ -346,8 +349,8 @@ internal sealed partial class GeneralModWindow {
                 statusDetails.Remove(work.Key);statuses[work.Key]=result;progress.Remove(work.Key);
                 DataGridViewRow row;
                 if(visibleRows.TryGetValue(work.Entry.Id,out row)&&row.DataGridView==grid){
-                    row.Cells["Status"].Value=GeneralStatusPresentation.Label(result);
-                    row.Cells["Status"].ToolTipText=GeneralStyle.Status(result);
+                    row.Cells["Status"].Value=GeneralStatusPresentation.Label(InstallationStatus(work.Entry,result));
+                    row.Cells["Status"].ToolTipText=TableStatusDetail(work.Entry,work.Key,result);
                     grid.InvalidateCell(row.Cells["Status"]);
                 }
                 operationFinished++;work.Ended=true;Stage(work,"scan.end");

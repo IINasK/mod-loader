@@ -22,7 +22,7 @@ public sealed class GeneralModPreset {
 }
 
 public sealed class GeneralAlternativeGroup {
-    public string Name, Color;
+    public string Name, Color, DisplayName;
 }
 
 public sealed class GeneralModEntry {
@@ -186,7 +186,8 @@ public sealed class GeneralModLibrary {
             if(group==null||!Regex.IsMatch(group.Color??"",@"\A#[0-9a-fA-F]{6}\z")||!GroupColorAvailable(list,id,group.Color))
                 throw new IOException("Use uma cor diferente para cada grupo.");
             string name=String.IsNullOrWhiteSpace(group.Name)?null:RequiredText(group.Name,18,"Grupo");
-            list.AlternativeGroups.Add(id,new GeneralAlternativeGroup{Name=name,Color=group.Color.ToUpperInvariant()});
+            string displayName=String.IsNullOrWhiteSpace(group.DisplayName)?null:RequiredText(group.DisplayName,300,"Nome do grupo");
+            list.AlternativeGroups.Add(id,new GeneralAlternativeGroup{Name=name,Color=group.Color.ToUpperInvariant(),DisplayName=displayName});
         }
         foreach(string id in ids.Where(id=>!list.AlternativeGroups.ContainsKey(id)))
             list.AlternativeGroups.Add(id,new GeneralAlternativeGroup{Color=DefaultGroupColor(list,id)});

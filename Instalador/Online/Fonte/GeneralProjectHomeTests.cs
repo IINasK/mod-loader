@@ -231,7 +231,7 @@ internal sealed partial class GeneralModWindow {
                 storedBody.Variants.Single(variant => variant.Id == "with-refit-base").Name == "Meu refit",
                 "A opção Natural aparece em um projeto oficial antigo sem alterar nomes personalizados.");
             var bodyRows=form.VisibleMods().Where(IsBigBody).ToList();
-            check(bodyRows.Count==1&&ModDisplayName(bodyRows[0])=="Big Body",
+            check(bodyRows.Count==1&&form.ModDisplayName(bodyRows[0])=="Big Body",
                 "A tabela mostra o Big Body em uma única linha.");
             var bodyRow=form.ModRows().Single(row=>(string)row.Cells["Name"].Value=="Big Body");
             check(form.grid.Columns["Origin"].DisplayIndex==form.grid.Columns.Count-1,
@@ -242,8 +242,18 @@ internal sealed partial class GeneralModWindow {
                 "A gaveta mostra três escolhas de corpo e mantém Togglable Feet fora dela.");
             var optionRows=form.grid.Rows.Cast<DataGridViewRow>().Where(row=>row.Tag is Work).ToList();
             check(optionRows.All(row=>Equals(row.Cells["Origin"].Value,"Mod Loader")&&row.Cells["Size"].Value.ToString()!="—")&&
-                optionRows.Count(row=>Equals(row.Cells["Status"].Tag,true))==1,
+                optionRows.Count(row=>Equals(row.Cells["Status"].Tag,true))==1&&
+                new[]{"Name","Variant","Size"}.All(column=>optionRows.Single(row=>Equals(row.Cells["Status"].Tag,true)).Cells[column].Style.Font.Bold)&&
+                !optionRows.Single(row=>Equals(row.Cells["Status"].Tag,true)).Cells["Status"].InheritedStyle.Font.Bold,
                 "Cada opção tem origem e tamanho, com uma única seleção ativa.");
+            var activeBody=((Work)optionRows.Single(row=>Equals(row.Cells["Status"].Tag,true)).Tag);
+            var inventory=form.gameInventory;
+            form.gameInventory=new[]{new P2PSyncDifference{Kind="verified-variant",ModId=activeBody.Entry.Id,
+                VariantId=activeBody.Variant.Id,VerifiedBytes=135000000}};
+            check(form.BodyOptionSpace(activeBody)==GeneralStorageSize.Format(135000000)&&
+                form.InstallationStatus(activeBody.Entry,GeneralStatusPresentation.ManualBody)=="Instalado",
+                "Arquivos verificados manualmente mostram o tamanho medido e a situação de instalação.");
+            form.gameInventory=inventory;
             var naturalRow=optionRows.Single(row=>((Work)row.Tag).BodyChoice==GeneralModLibrary.NaturalBody);
             form.OpenRowEditor(naturalRow);
             check(new GeneralModLibrary(Path.Combine(form.data,"lista.json")).Load().BodyChoice==GeneralModLibrary.NaturalBody&&
@@ -287,9 +297,9 @@ internal sealed partial class GeneralModWindow {
             var source=EditorField<TextBox>(editor,"sources");
             var chips=EditorField<FlowLayoutPanel>(editor,"tagChips");
             var dependencies=EditorField<FlowLayoutPanel>(editor,"dependencyChips");
-            var title=EditorField<FlowLayoutPanel>(editor,"groupTitle");
+            var title=EditorField<TableLayoutPanel>(editor,"groupTitle");
             check(picker.Items.Cast<string>().SequenceEqual(new[]{"EBB + RB","EBBP + RB","EBBN + RB"})&&title.Visible&&
-                title.Controls.Cast<Control>().First().Text=="Big Body"&&((TableLayoutPanel)title.Parent).GetRow(title)<((TableLayoutPanel)title.Parent).GetRow(picker.Parent),
+                EditorField<TextBox>(editor,"groupName").Text=="Big Body"&&((TableLayoutPanel)title.Parent).GetRow(title)<((TableLayoutPanel)title.Parent).GetRow(picker.Parent),
                 "O título Big Body aparece acima do seletor, com as três escolhas da gaveta.");
             check(source.Text==current.Variant.Sources[0],"EBB apresenta o link do próprio perfil.");
             description.Text="Descrição exclusiva EBB";
@@ -312,8 +322,18 @@ internal sealed partial class GeneralModWindow {
                 !dependencies.Controls.OfType<Button>().Any(button=>button.Text.StartsWith("Codeware")),
                 "Trocar a escolha preserva os rascunhos independentes.");
             picker.SelectedIndex=2;
+            var groupName=EditorField<TextBox>(editor,"groupName");
+            typeof(Control).GetMethod("OnDoubleClick",BindingFlags.Instance|BindingFlags.NonPublic)
+                .Invoke(groupName,new object[]{EventArgs.Empty});
+            check(!groupName.ReadOnly,"O nome compartilhado pode ser editado na variante Natural.");
+            groupName.Text="Corpo personalizado";
+            picker.SelectedIndex=1;
+            check(groupName.Text=="Corpo personalizado"&&source.Text==push.Variant.Sources[0],
+                "O nome do grupo é compartilhado sem modificar os links das versões.");
+            picker.SelectedIndex=2;
             EditorField<Button>(editor,"save").PerformClick();
-            check(editor.Result!=null&&await form.ApplyBodyEditor(editor,choices),"A opção Natural é aplicada no projeto.");
+            check(editor.Result!=null&&await form.ApplyBodyEditor(editor,choices)&&
+                form.ModDisplayName(current.Entry)=="Corpo personalizado","A opção Natural e o título do grupo são aplicados no projeto.");
         }
         form.SaveProjectEdits();
         var saved=form.library.Load();

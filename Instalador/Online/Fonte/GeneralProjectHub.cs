@@ -77,6 +77,13 @@ internal sealed partial class GeneralModWindow {
 
     string SpaceTip(GeneralModEntry mod){
         if(GeneralModLibrary.NeedsDependencyVersion(mod,Selected(mod)))return T("Escolha a versão da dependência.","Choose the dependency version.");
+        if(IsBigBody(mod)){
+            string size=ModSpace(mod);
+            if(size.StartsWith("≈",StringComparison.Ordinal))
+                return T("Tamanho do download. O espaço instalado ainda não foi medido.","Download size. Installed size has not been measured.");
+            if(VerifiedBodyBytes(mod,GeneralModLibrary.BodyOption(state.BodyChoice,mod,Selected(mod))).HasValue)
+                return T("Tamanho dos arquivos instalados e verificados.","Size of the verified installed files.");
+        }
         if(!measuredMods.ContainsKey(mod.Id)&&DependencySize(mod)!=null)return T("Tamanho do download informado pelo Nexus.","Download size reported by Nexus.");
         return measuredMods.ContainsKey(mod.Id)?T("Arquivos instalados deste mod. Arquivos compartilhados aparecem em cada mod; o total do projeto os conta uma vez.","Installed files for this mod. Shared files appear for each mod; the project total counts them once."):T("Tamanho não identificado: nenhum arquivo instalado foi localizado ou a leitura não foi concluída. O tamanho do download não é usado como tamanho instalado.","Size not identified: no installed files were found or measurement is incomplete. Download size is not used as installed size.");}
     void ToggleProjectsPanel(){

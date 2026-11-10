@@ -172,7 +172,8 @@ internal sealed partial class GeneralModWindow {
                 var installed=InstalledSnapshot.DetectManualHyst(destination,mod,seed.Mods.FirstOrDefault(item=>item.Id==mod.Id),files,reads==null?null:(Func<string,string>)reads.Hash);
                 if(installed==null)continue;
                 foreach(var file in files)registered.Add(new ModFileAnchor{Owner=mod.Id,Path=file.Path,Hash=file.Sha256});
-                extras.Add(new P2PSyncDifference{Kind="verified-variant",Mod=mod.Name,ModId=mod.Id,VariantId=installed.Id});
+                extras.Add(new P2PSyncDifference{Kind="verified-variant",Mod=mod.Name,ModId=mod.Id,
+                    VariantId=installed.Id,VerifiedBytes=files.Sum(file=>file.Size)});
             }
             var listed=exact.Concat(registered.Where(file=>names.ContainsKey(file.Owner)).Select(file=>file.Path));
             extras.AddRange(engine.ReadUnlistedModFiles(listed));

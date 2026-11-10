@@ -72,7 +72,7 @@ internal sealed partial class GeneralModWindow {
         if(value=="Instalando"||value=="Installing")return "installing";
         if(value=="Instalado"||value=="Installed")return "installed";
         if(value=="Outra versão escolhida"||value=="Other version selected")return "other-choice";
-        if(value=="Corpo detectado"||value=="Body detected")return "manual-body";
+
         if(value=="Desabilitado"||value=="Disabled")return "disabled";
         if(value==GeneralStatusPresentation.ChooseDependency||value=="Choose version")return "dependency-version";
         if(value=="Encontrado no jogo"||value=="Found in game")return "game-inventory";
@@ -90,7 +90,7 @@ internal sealed partial class GeneralModWindow {
             GeneralModSearch.Matches(searchTerms,file.Mod,file.Path,GameInventoryStatus));
     }
     bool ColumnAllows(GeneralModEntry mod){
-        string raw=ListStatus(mod);
+        string raw=InstallationStatus(mod,ListStatus(mod));
         var variant=Selected(mod);
         var searchable=IsBigBody(mod)?BodyVersionsForPreset().SelectMany(work=>
             (work.Variant.Tags??work.Entry.Tags).Concat(new[]{VersionDisplayName(work),BodyChoiceLabel(work.BodyChoice)})):
@@ -108,7 +108,7 @@ internal sealed partial class GeneralModWindow {
         var values=column==1?new[]{uncat}.Concat(PresetCategories()).ToList():column==2?state.List.Mods.Select(NexusVariantName).Distinct().OrderBy(value=>value).ToList():
             new[]{T("Pendente","Pending"),T("Baixando","Downloading"),T("Download concluído","Download complete"),
                 T("Instalando","Installing"),T("Instalado","Installed"),
-                GeneralStatusPresentation.Label(GeneralStatusPresentation.OtherChoice),GeneralStatusPresentation.Label(GeneralStatusPresentation.ManualBody),
+                GeneralStatusPresentation.Label(GeneralStatusPresentation.OtherChoice),
                 GeneralStatusPresentation.Label(GeneralStatusPresentation.Disabled),
                 GeneralStatusPresentation.Label(GeneralStatusPresentation.ChooseDependency),
                 T("Falha","Failed")}.ToList();
