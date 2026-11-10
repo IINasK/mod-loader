@@ -285,6 +285,9 @@ public static partial class InstalledSnapshot {
     }
     static InstalledSnapshotFile Config(string path,string kind,string section,string content){byte[] bytes=Utf8.GetBytes(content);return new InstalledSnapshotFile{Path=path,Kind=kind,Section=section,Content=content,Size=bytes.Length,Sha256=Hash(bytes)};}
     public static void Validate(InstalledSnapshotManifest manifest,FixedCatalog catalog) {
+        Validate(manifest,catalog,false);
+    }
+    internal static void Validate(InstalledSnapshotManifest manifest,FixedCatalog catalog,bool localReceipt) {
         if(manifest==null||(manifest.Schema!=1&&manifest.Schema!=2)||manifest.Schema==2&&manifest.Project==null||manifest.List==null||manifest.List.Mods==null||manifest.Files==null||manifest.Files.Count==0&&manifest.Project==null||manifest.Files.Count>MaxFiles||String.IsNullOrWhiteSpace(manifest.Name)||manifest.Name.Length>300||!(manifest.Game=="cyberpunk2077"||manifest.Game=="generic")||(manifest.Game=="cyberpunk2077"&&manifest.GameFileVersion!=catalog.GameFileVersion)||(manifest.Game=="generic"&&manifest.GameFileVersion!=null))throw new IOException("Manifesto de arquivos instalados inválido.");
         if(manifest.ProjectName!=null&&(String.IsNullOrWhiteSpace(manifest.ProjectName)||manifest.ProjectName.Length>120||manifest.ProjectName.Any(Char.IsControl)))
             throw new IOException("Nome do projeto recebido inválido.");
@@ -293,7 +296,7 @@ public static partial class InstalledSnapshot {
             throw new IOException("Opção de corpo inválida no pacote.");
         if(manifest.TemplateId!=null&&manifest.Project==null||manifest.TemplateSubset&&manifest.TemplateId==null)
             throw new IOException("Identidade do projeto padrão inválida.");
-        if(manifest.Project!=null)ValidateProject(manifest,catalog);
+        if(manifest.Project!=null)ValidateProject(manifest,catalog,localReceipt);
         if(manifest.Schema==1&&HasInstallRoutes(manifest))throw new IOException("Destinos personalizados exigem um pacote atualizado.");
         var owners=new Dictionary<string,GeneralModVariant>(StringComparer.Ordinal);
         var recipes=new Dictionary<string,FixedMod>(StringComparer.Ordinal);

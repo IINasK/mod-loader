@@ -75,12 +75,58 @@ public static class InstalledSnapshotInstallerTests {
         string bad = Pack(root, "bad", catalog, new Dictionary<string,string> { { "bad.txt", "bad" } });
         Throws(() => engine.Install(bad, new string('0', 64), null), "Hash incorreto do pacote é recusado antes de instalar.");
 
+        HistoricalSnapshot(root);
         ConfigTransactions(root);
         ResumeTransactions(root,catalog);
         if(testOfficialProject){
             TestPortableDestinations(root,parent,catalog);
             BuiltInProjectReceive(root,catalog);
         }
+    }
+    static void HistoricalSnapshot(string root) {
+        string target=Directory.CreateDirectory(Safe.In(root,"old-game")).FullName;
+        string data=Directory.CreateDirectory(Safe.In(root,"old-data")).FullName;
+        var catalog=FixedData.Load();
+        var engine=new InstalledSnapshotInstaller(target,data,catalog);
+        var manifest=new InstalledSnapshotManifest{Schema=2,Name="Legacy P2P",Game="cyberpunk2077",GameFileVersion=catalog.GameFileVersion};
+        var receipt=new InstalledSnapshotInstaller.Receipt{Id=Guid.NewGuid().ToString("N"),Root=target,Status="installed",Manifest=manifest};
+        var removed=new GeneralModEntry{Id=RetiredPackEntries.Map8KId,Name="Realistic Map 8K",DefaultVariant="default"};
+        removed.Variants.Add(new GeneralModVariant{
+            Id="default",Name="Principal",CyberpunkId=removed.Id,
+            Sources=new List<string>{"https://www.nexusmods.com/cyberpunk2077/mods/17811?tab=files&file_id=111746"}
+        });
+        var legacy=HistoricalReceipts.Expand(catalog,new[]{removed.Id}).Single().Files.Single();
+        manifest.List.Mods.Add(removed);
+        AddHistoricalFile(receipt,removed.Id,legacy.Path,legacy.Size,legacy.Sha256);
+        foreach(string id in new[]{"first","second"}){
+            var mod=new GeneralModEntry{Id=id,Name=id,DefaultVariant="default"};
+            mod.Variants.Add(new GeneralModVariant{Id="default",Name="Principal",Sources=new List<string>{"installed://"+id+"/default"}});
+            manifest.List.Mods.Add(mod);
+            string relative="archive/pc/mod/"+id+".archive";
+            string path=Safe.In(target,relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllBytes(path,Encoding.UTF8.GetBytes(id));
+            AddHistoricalFile(receipt,id,relative,new FileInfo(path).Length,Safe.Hash(path));
+        }
+        manifest.Project=Safe.Json.Deserialize<GeneralModList>(Safe.Json.Serialize(manifest.List));
+        var flags=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
+        typeof(InstalledSnapshotInstaller).GetMethod("Save",flags).Invoke(engine,new object[]{receipt});
+        var scan=new InstalledSnapshotInstaller.StatusScan(engine,Safe.Hash);
+        Check(scan.Status(receipt.Id,"first/default")==GeneralModInstaller.Installed&&
+            scan.Status(receipt.Id,"second/default")==GeneralModInstaller.Installed&&
+            scan.Status(receipt.Id,removed.Id+"/default")==GeneralModInstaller.Missing,
+            "O recibo P2P antigo reconhece os mods presentes mesmo quando o mapa removido do catálogo está ausente.");
+        File.WriteAllText(Safe.In(target,"archive/pc/mod/first.archive"),"other");
+        Check(scan.Status(receipt.Id,"first/default")==GeneralModInstaller.Modified,
+            "A leitura do recibo histórico ainda confere o conteúdo dos arquivos instalados.");
+        Throws(()=>InstalledSnapshot.Validate(manifest,catalog),
+            "O histórico local não autoriza importar novamente um pacote com um mod retirado.");
+    }
+    static void AddHistoricalFile(InstalledSnapshotInstaller.Receipt receipt,string id,string path,long size,string hash) {
+        string owner=id+"/default";
+        receipt.ActiveOwners.Add(owner);
+        receipt.Manifest.Files.Add(new InstalledSnapshotFile{Path=path,Size=size,Sha256=hash,Kind="file",Owners=new List<string>{owner}});
+        receipt.Files.Add(new InstalledSnapshotInstaller.Change{Path=path,Size=size,After=hash,Applied=true,Owned=true});
     }
     static void TestPortableDestinations(string root,string parent,FixedCatalog catalog){
         string sender=Safe.In(root,"portable/sender/game"),receiver=Safe.In(root,"portable/receiver/game");
@@ -191,6 +237,8 @@ public static class InstalledSnapshotInstallerTests {
             TemplateId=inspected.TemplateId,TemplateSubset=true,Project=partial.List};
         var alternate=new GeneralModVariant{Id="alternate",Name="Variant sent",Sources=new List<string>{"https://example.org/alternate.zip"}};
         manifest.Project.Mods.Single().Variants.Add(alternate);
+        var reviewedProject=Safe.Json.Deserialize<GeneralModList>(Safe.Json.Serialize(manifest.Project));
+        manifest.Project.Mods.Single().DefaultVariant=alternate.Id;
         var transferred=new GeneralModEntry{Id=mod.Id,Name=mod.Name,DefaultVariant=alternate.Id,
             Variants=new List<GeneralModVariant>{alternate}};
         manifest.List.Mods.Add(transferred);
@@ -201,7 +249,7 @@ public static class InstalledSnapshotInstallerTests {
         WritePack(archive,manifest,new Dictionary<string,byte[]>{{hash,bytes}});
         var engine=new InstalledSnapshotInstaller(target,inbox,catalog,true);
         string receipt=engine.Install(archive,Safe.Hash(archive),null);
-        var session=new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Destination=target,ReceiptId=receipt};
+        var session=new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Destination=target,ReceiptId=receipt,ReviewedProject=reviewedProject};
         var result=store.CreateReceived(session,inbox,catalog);
         var refreshed=store.Load(result);
         Check(result.Id==official.Id&&store.Read().Projects.Count==2&&Directory.GetDirectories(Safe.In(store.Root,"Projetos")).Length==2,

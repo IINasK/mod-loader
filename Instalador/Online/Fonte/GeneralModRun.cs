@@ -14,7 +14,7 @@ internal sealed partial class GeneralModWindow {
         internal GeneralModVariant Variant;
         internal bool Ended,Applied,SwitchAlternatives,DependencyQueue,SaveVariant;
         internal HashSet<string> DropConflicts;
-        internal string DropDensity, BodyChoice;
+        internal string DropDensity, BodyChoice, ScanError;
         internal double Fraction;
         internal string Key { get{return GeneralModWindow.Key(Entry,Variant);} }
         internal bool Local { get{return Variant.CyberpunkId==null&&Variant.Sources.All(GeneralModDownload.IsArchivePath);} }
@@ -332,7 +332,7 @@ internal sealed partial class GeneralModWindow {
             Func<Work,Task<string>> verify=work=>Task.Run(async()=>{
                 if(audit!=null)await audit.ReadSources(work);
                 try{return Status(work,root,reads,false);}
-                catch(Exception){return "Não verificável";}
+                catch(Exception ex){work.ScanError=ex.Message;return "Não verificável";}
             });
             int scheduled=0;
             while(scheduled<Math.Min(works.Count,workers))pending.Enqueue(verify(works[scheduled++]));
@@ -348,7 +348,9 @@ internal sealed partial class GeneralModWindow {
                 bool skipped=skipRequests.Contains(work);
                 string result=skipped?"Verificação pulada":found;
                 if(!skipped&&audit!=null)audit.Record(work);
-                statusDetails.Remove(work.Key);statuses[work.Key]=result;progress.Remove(work.Key);
+                statusDetails.Remove(work.Key);
+                if(!skipped&&!String.IsNullOrWhiteSpace(work.ScanError))statusDetails[work.Key]=work.ScanError;
+                statuses[work.Key]=result;progress.Remove(work.Key);
                 DataGridViewRow row;
                 if(visibleRows.TryGetValue(work.Entry.Id,out row)&&row.DataGridView==grid){
                     string raw=InstallationStatus(work.Entry,result);

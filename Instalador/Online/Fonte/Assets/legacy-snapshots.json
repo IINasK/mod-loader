@@ -1,0 +1,289 @@
+{
+  "Packages": [
+    {
+      "Id": "15-NCPDHotline",
+      "Name": "Immersive NCPD Hotline",
+      "Profile": "Kit inicial",
+      "Version": "3.1.11",
+      "Immutable": false,
+      "Dependencies": [
+        "CET",
+        "redscript"
+      ],
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Immersive NCPD Hotline 8557 3.1.11 2026-10-11T13-14Z xNHtNXVaL.zip",
+          "Sha256": "d493b3db9c77fe5895f7eb6b697f70a02ec3dbb0db90b038181ed825c0a16658",
+          "Size": 89760,
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/8557",
+          "ModId": 8557,
+          "FileId": 165425
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/common_base_game_data.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/common_base_game_data.lua",
+          "Sha256": "24d353fc5a6ee9fbae4d72600bf351eb300aee98b402500416cada89898e90df",
+          "Size": 35148
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/init.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/init.lua",
+          "Sha256": "6dbbdd49c622cc8e0184f00f8824b660d193aa04f993d1e1e3fdb38529d93adc",
+          "Size": 302774
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/interactionUI_ncpd_hotline.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/interactionUI_ncpd_hotline.lua",
+          "Sha256": "eb77362631f02955cc27bb758adb5cdad7967fb8612a6ef2bf186a5004dc1824",
+          "Size": 12216
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/LICENSE",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/LICENSE",
+          "Sha256": "ebfd5f05db59b0d8d233c10967a546a3ee7635ff339be7a6688154cbf6215855",
+          "Size": 1069
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/Ref.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/Ref.lua",
+          "Sha256": "6ae5a3c3e470ad970c0de72d0a82e39a644ce65fc257701a958cc781e2dd9627",
+          "Size": 1278
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/sms.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/sms.lua",
+          "Sha256": "3740b242a322b73dddca9046383f66cc24ca443a2214b7ca056f573d8308c4fd",
+          "Size": 7252
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/game_base_relic/language/lang_pl_text.json",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/game_base_relic/language/lang_pl_text.json",
+          "Sha256": "3af66efd28c2292990b6b47fbac5d6035d04b4af023c8f7dbf3f0e149ffca094",
+          "Size": 31973
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/game_base_relic/language/Readme.txt",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/game_base_relic/language/Readme.txt",
+          "Sha256": "fd6f8ddbceffe9f5118eaba397282847684d9b0625ca965d8b6fb6d5cfd84e61",
+          "Size": 13090
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/game_base_relic/language/template_lang_en_text.json",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/game_base_relic/language/template_lang_en_text.json",
+          "Sha256": "7e5d25e46ed6ea7e0560019c6a2498c2827bba115c0ea3fa6fea42a61f4b595b",
+          "Size": 22163
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/stopNCPD/init.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/stopNCPD/init.lua",
+          "Sha256": "60d9071cf992e819827df2ff5a91e6886990ca119089d8972c4b467e739df7fb",
+          "Size": 467
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/stopNCPD/mod_user_settings.json",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/stopNCPD/mod_user_settings.json",
+          "Sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "Size": 2
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/stopNCPD/Stop NCPD End of Life.txt",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/stopNCPD/Stop NCPD End of Life.txt",
+          "Sha256": "a76e0a0c0d9f13b261ebff25e2db71709994c950bc5a31b7f5e161294b6050cc",
+          "Size": 453
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/NCPD_Hotline/ncpd_hotline_mod_reds_helper.reds",
+          "Path": "r6/scripts/NCPD_Hotline/ncpd_hotline_mod_reds_helper.reds",
+          "Sha256": "2aa8ed99cd85102802550ccbc67d3271b47edc815ca64f9d99b57f84b7b32fdd",
+          "Size": 2977
+        }
+      ]
+    },
+    {
+      "Id": "mod-17811",
+      "Name": "Realistic Map · 8K",
+      "Profile": "Complementos",
+      "Version": "1.0.0",
+      "Immutable": false,
+      "Dependencies": [],
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Realistic Map 8K-17811-1-0-0-1750282678.zip",
+          "Sha256": "95602fb43a0ae73bf0c78f102258dcdea0f2c377729d4ac95d4d3b60eaefa0c5",
+          "Size": 64108949,
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/17811?tab=files&file_id=111746",
+          "ModId": 17811,
+          "FileId": 111746
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/RealisticMap8K.archive",
+          "Path": "archive/pc/mod/RealisticMap8K.archive",
+          "Size": 64110592,
+          "Sha256": "78e2d9015912c99be8e7b354ba4365c45b4cf47bb8c1ac0e420a260be5fc9aba",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-18084",
+      "Name": "Ripper Pants and Belt",
+      "Profile": "Complementos",
+      "Version": "1.2",
+      "Immutable": false,
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "mod-6945",
+        "CET",
+        "mod-14210",
+        "mod-10437"
+      ],
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Ripper pants - Main File 18084 1.2 2026-07-09T20-08Z OCk3C5LI5.zip",
+          "Size": 47944944,
+          "Sha256": "1b777f045286f9914a7888324438709aa7e4fa890ff00dbc5ba1c514c503750e",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/18084?tab=files&file_id=151532",
+          "ModId": 18084,
+          "FileId": 151532
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_legs_ripper.archive",
+          "Path": "archive/pc/mod/rm_legs_ripper.archive",
+          "Size": 48381952,
+          "Sha256": "c24bacb008671c0c5abe66acb71362519c754fa3e07298f3f0ec72f818e76bf6"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/rm_legs_ripper.xl",
+          "Path": "archive/pc/mod/rm_legs_ripper.xl",
+          "Size": 9200,
+          "Sha256": "3f5afa9125de45965af5db1be5a273a8139e62fbca7ef9be77dea406d9fa2613"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_legs_ripper.yaml",
+          "Path": "r6/tweaks/raem/rm_legs_ripper.yaml",
+          "Size": 3939,
+          "Sha256": "728c3c291e3be8179a09e5b7d6bf7bd586b14b72d7467372b728e0ad3bf84357"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/raem/rm_legs_ripper_belt.yaml",
+          "Path": "r6/tweaks/raem/rm_legs_ripper_belt.yaml",
+          "Size": 2205,
+          "Sha256": "773afc2313304d9f9c762f8676af5bd8ca516769e92eba6180e66962b3add3f6"
+        }
+      ]
+    },
+    {
+      "Id": "mod-6945",
+      "Name": "Equipment-EX",
+      "Profile": "Complementos",
+      "Version": "1.2.10",
+      "Immutable": false,
+      "Dependencies": [
+        "NightCoop",
+        "redscript",
+        "ArchiveXL",
+        "Codeware",
+        "TweakXL"
+      ],
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Equipment-EX 6945 1.2.10 2026-10-25T21-07Z k8Iw8mmPd.zip",
+          "Sha256": "bd3628af0851af4cc5083e40f890e9e7423305cb7e3017f48f9e06a8bc6b6e17",
+          "Size": 89560,
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/6945?tab=files&file_id=168539",
+          "ModId": 6945,
+          "FileId": 168539
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/EquipmentEx.archive",
+          "Path": "archive/pc/mod/EquipmentEx.archive",
+          "Size": 61440,
+          "Sha256": "55a438e9315ca227f12f90aacec0711914bd9241e60307242c204410f45ecf8e"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/EquipmentEx.archive.xl",
+          "Path": "archive/pc/mod/EquipmentEx.archive.xl",
+          "Size": 666,
+          "Sha256": "1c74bd3100080dd71441a719d2923eb6ff1861390f07de1e2258b821744887df"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/config/redsUserHints/EquipmentEx.toml",
+          "Path": "r6/config/redsUserHints/EquipmentEx.toml",
+          "Size": 1043,
+          "Sha256": "51d08e4e7afcda6138a4e41b67f1aea0210094fb64d52698a961af91ef17901f"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/EquipmentEx/EquipmentEx.Global.reds",
+          "Path": "r6/scripts/EquipmentEx/EquipmentEx.Global.reds",
+          "Size": 39708,
+          "Sha256": "a597634a692368ed012d9c17c5028380098845442638b84aa334257018fc66b4"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/EquipmentEx/EquipmentEx.reds",
+          "Path": "r6/scripts/EquipmentEx/EquipmentEx.reds",
+          "Size": 171731,
+          "Sha256": "71ec975363def6b9296ffdd65ec6e9d2c4f5bc5ab06a461a9cde93f6f7f6a398"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/EquipmentEx/LICENSE",
+          "Path": "r6/scripts/EquipmentEx/LICENSE",
+          "Size": 1090,
+          "Sha256": "abbe8d2050ded0d446f3a8b3b8efe3a35b0f392392f61d75f49fe59bd56d84e1"
+        }
+      ]
+    }
+  ],
+  "Defaults": [
+    {
+      "Id": "defaults-hotline",
+      "ModId": "15-NCPDHotline",
+      "Version": "3.1.11",
+      "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/mod_user_settings.json",
+      "Format": "json",
+      "Section": null,
+      "Content": "{\"enableAutoMode\":false,\"useOpenHubCallTrigger\":true,\"lastLanguageSelected\":\"pt-br\",\"fileName\":\"mod_user_settings.json\",\"showWelcomeShard\":true}",
+      "Sha256": "80f7354d581cc754b76aa580eb0affe0b9b9f93e4ce7a5b53e4b7dfdbf509b68"
+    }
+  ]
+}

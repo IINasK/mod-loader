@@ -222,8 +222,11 @@ public sealed class GeneralModLibrary {
     }
 
     public static void RestoreKnownMappings(GeneralModList list, GeneralModList trustedSeed) {
+        RestoreKnownMappings(list,trustedSeed,false);
+    }
+    internal static void RestoreKnownMappings(GeneralModList list, GeneralModList trustedSeed, bool keepHistoricalEntries) {
         ValidateList(list, false);
-        RetiredPackEntries.Remove(list);
+        if(!keepHistoricalEntries)RetiredPackEntries.Remove(list);
         var byId = trustedSeed.Mods.ToDictionary(mod => mod.Id, StringComparer.Ordinal);
         foreach (var entry in list.Mods) {
             GeneralModEntry trusted;
