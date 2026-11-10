@@ -11,7 +11,7 @@ internal sealed partial class GeneralModWindow {
     enum ModAction { None, Disable, ChooseDependency, Enable, Change, Install, Download }
 
     static bool IsBigBody(GeneralModEntry mod) {
-        return mod.AlternativeGroup==GeneralModLibrary.BodyGroup&&GeneralModLibrary.IsHystBody(mod.Id);
+        return mod.AlternativeGroup==GeneralModLibrary.BodyGroup&&mod.Id!=GeneralModLibrary.VanillaFeetId;
     }
 
     string ModDisplayName(GeneralModEntry mod) {
@@ -43,8 +43,12 @@ internal sealed partial class GeneralModWindow {
         return versions.OrderBy(work=>work.BodyChoice==GeneralModLibrary.NaturalBody?2:work.BodyChoice==GeneralModLibrary.PushBody?1:0).ToList();
     }
 
+        static string BodyChoiceLabel(Work work){
+        return BodyChoiceLabel(work.BodyChoice)??work.Variant.Name;
+    }
+
     static string BodyChoiceLabel(string choice){
-        return choice==GeneralModLibrary.NaturalBody?"EBBN + RB":choice==GeneralModLibrary.PushBody?"EBBP + RB":"EBB + RB";
+        return choice==GeneralModLibrary.NaturalBody?"EBBN + RB":choice==GeneralModLibrary.PushBody?"EBBP + RB":choice==GeneralModLibrary.EbbBody?"EBB + RB":null;
     }
 
     string ActiveBodyChoice(GeneralModEntry entry){
@@ -55,8 +59,8 @@ internal sealed partial class GeneralModWindow {
     void SelectBodyChoice(Work choice){
         if(working||scanning||state.BodyChoice==choice.BodyChoice)return;
         state.BodyChoice=choice.BodyChoice;
-        if(projectDraft!=null)projectDraft.BodyChoice=state.BodyChoice;
-        Persist();
+        if(projectDraft==null)Persist();
+        else FinishProjectEdit();
         DrawRows();
         var row=grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(candidate=>candidate.Visible&&
             candidate.Tag is Work&&((Work)candidate.Tag).BodyChoice==choice.BodyChoice);

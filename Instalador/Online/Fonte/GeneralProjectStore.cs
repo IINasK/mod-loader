@@ -9,6 +9,7 @@ internal sealed class GeneralProject {
     public string Id, Name;
     public string TemplateId;
     public bool Legacy;
+    public int WindowWidth, WindowHeight;
 }
 
 internal sealed class GeneralProjectIndex {
@@ -199,16 +200,35 @@ internal sealed class GeneralProjectStore {
         }
     }
 
-    internal GeneralProject Duplicate(GeneralProject source,string name,FixedCatalog catalog){
+    internal void SaveWindowSize(GeneralProject project,int width,int height){
         lock(gate){
-            name=ProjectName(name);var original=Load(source);var index=Read();
+            var index=Read();
+            var saved=Registered(index,project);
+            if(saved.WindowWidth==width&&saved.WindowHeight==height)return;
+            saved.WindowWidth=width;saved.WindowHeight=height;
+            Write(index);
+            project.WindowWidth=width;project.WindowHeight=height;
+        }
+    }
+
+    internal GeneralProject Duplicate(GeneralProject source,string name,FixedCatalog catalog,GeneralModState edited=null){
+        lock(gate){
+            name=ProjectName(name);var index=Read();var registered=Registered(index,source);
             if(index.Projects.Count>=200)throw new IOException("Use no máximo 200 projetos nesta biblioteca.");
-            var state=Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(original));
-            var copy=new GeneralProject{Id=Guid.NewGuid().ToString("N"),Name=name};string target=DataPath(copy),from=DataPath(source);
+            if(edited!=null){
+                string baseName=name.Substring(0,Math.Min(114,name.Length));
+                for(int suffix=2;index.Projects.Any(item=>String.Equals(item.Name,name,StringComparison.OrdinalIgnoreCase));suffix++)
+                    name=baseName+" ("+suffix+")";
+            }
+            var state=Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(edited??Load(source)));
+            var copy=new GeneralProject{Id=Guid.NewGuid().ToString("N"),Name=name,WindowWidth=registered.WindowWidth,WindowHeight=registered.WindowHeight};
+            string target=DataPath(copy),from=DataPath(source);
             DownloadCache.DuplicateSources(Path.Combine(from,"Cache"),Path.Combine(target,"Cache"));
             if(!String.IsNullOrWhiteSpace(state.Destination)&&Directory.Exists(state.Destination)){
                 new GeneralModInstaller(state.Destination,Path.Combine(from,"Instalacoes")).DuplicateRecognition(Path.Combine(target,"Instalacoes"));
                 new InstalledSnapshotInstaller(state.Destination,from,catalog).DuplicateRecognition(target);
+                var links=new InventoryLinkStore(from,state.Destination).Load();
+                if(links.Groups.Count>0||links.Ignored.Count>0)new InventoryLinkStore(target,state.Destination).Save(links);
             }else state.SnapshotReceipts.Clear();
             new GeneralModLibrary(Path.Combine(target,"lista.json")).Save(state);
             index.Projects.Add(copy);Write(index);return copy;

@@ -17,7 +17,7 @@ internal sealed partial class GeneralModWindow {
 
     string NexusVariantName(GeneralModEntry mod) {
         var variant=Selected(mod);
-        if(IsBigBody(mod))return BodyChoiceLabel(ActiveBodyChoice(mod));
+        if(IsBigBody(mod))return BodyChoiceLabel(ActiveBodyChoice(mod))??Selected(mod).Name;
         NexusManualMatch match;
         return nexusManual.TryGetValue(mod.Id,out match)&&Object.ReferenceEquals(match.Variant,variant)&&
             !String.IsNullOrEmpty(match.Version)&&!variant.Name.Contains(match.Version)?variant.Name+" · "+match.Version:variant.Name;
@@ -291,8 +291,9 @@ internal sealed partial class GeneralModWindow {
     void AddReviewedDependency(GeneralNexusRequirement target) {
         var preset=ActivePreset;
         if(!CanAddDependency(preset)||state.List.Mods.Any(entry=>entry.DependencySource==target.Source.Url))return;
+        BeginProjectEdit();
         CreateDependency(target,preset);
-        Persist();DrawRows();
+        FinishProjectEdit();DrawRows();
     }
 
     GeneralModEntry CreateDependency(GeneralNexusRequirement target,GeneralModPreset preset) {

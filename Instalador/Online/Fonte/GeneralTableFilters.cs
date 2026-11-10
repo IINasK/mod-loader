@@ -93,7 +93,7 @@ internal sealed partial class GeneralModWindow {
         string raw=InstallationStatus(mod,ListStatus(mod));
         var variant=Selected(mod);
         var searchable=IsBigBody(mod)?BodyVersionsForPreset().SelectMany(work=>
-            (work.Variant.Tags??work.Entry.Tags).Concat(new[]{VersionDisplayName(work),BodyChoiceLabel(work.BodyChoice)})):
+            (work.Variant.Tags??work.Entry.Tags).Concat(new[]{VersionDisplayName(work),BodyChoiceLabel(work)})):
             variant.Tags??mod.Tags;
         return (categoryFilters==null||categoryFilters.Contains(mod.Category??""))&&
             (variantFilters==null||variantFilters.Contains(NexusVariantName(mod)))&&
@@ -132,13 +132,13 @@ internal sealed partial class GeneralModWindow {
     void UpdateTableTitle(){
         if(tableName==null)return;
         if(!hasPresetDraft||draftPresetId!=state.SelectedPreset)CapturePresetDraft();
-        var selected=ActivePreset;tableName.ReadOnly=selected==null||ProtectedPreset;settingDraftName=true;
+        var selected=ActivePreset;tableName.ReadOnly=selected==null;settingDraftName=true;
         try{tableName.Text=selected==null?T("Todos os itens","All items"):draftName;}finally{settingDraftName=false;}
         tableName.AccessibleName=T("Nome do preset","Preset name");
         UpdatePresetCommands();
     }
     void SaveTableTitle(){
-        var selected=ActivePreset;if(selected==null||ProtectedPreset||tableName==null||tableName.Text==selected.Name)return;
+        var selected=ActivePreset;if(selected==null||tableName==null||tableName.Text==selected.Name)return;
         string name=tableName.Text.Trim();
         if(name.Length==0||name.Length>120||name.Any(Char.IsControl)){tableName.Text=selected.Name;return;}
         selected.Name=name;Persist();CapturePresetDraft();RebuildPresets();
@@ -151,13 +151,18 @@ internal sealed partial class GeneralModWindow {
     }
     void SavePresetSelection(bool create){
         if(working||scanning)return;
-        var selected=ActivePreset;if(selected==null||ProtectedPreset)create=true;
+        var selected=ActivePreset;if(selected==null)create=true;
         using(var name=new GeneralNameDialog(T(create?"Novo preset":"Atualizar preset",create?"New preset":"Update preset"),create?"":selected.Name)){
             if(name.ShowDialog(this)!=DialogResult.OK)return;
             var ids=PresetCheckedIds();
-            if(create){selected=new GeneralModPreset{Id="preset-"+Guid.NewGuid().ToString("N")};state.List.Presets.Add(selected);}
+            if(create)selected=new GeneralModPreset{Id="preset-"+Guid.NewGuid().ToString("N")};
             else if(GeneralDialog.Message(this,T("Substituir os itens deste preset pelos mods marcados?","Replace this preset's items with the checked mods?"),T("Atualizar preset","Update preset"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-            selected.Name=name.ResultName;selected.ModIds=ids;state.SelectedPreset=selected.Id;Persist();CapturePresetDraft();RebuildPresets();
+            BeginProjectEdit();
+            if(create)state.List.Presets.Add(selected);
+            selected.Name=name.ResultName;selected.ModIds=ids;state.SelectedPreset=selected.Id;
+            FinishProjectEdit();
+            if(projectDraft!=null)SaveProjectEdits();
+            CapturePresetDraft();RebuildPresets();
         }
     }
     void ClearPreset(){
@@ -165,7 +170,8 @@ internal sealed partial class GeneralModWindow {
         var selected=ActivePreset;
         if(selected==null){ResetColumnFilters();marked.Clear();DrawRows();return;}
         if(GeneralDialog.Message(this,T("Esvaziar este preset? Isso não desinstala mods nem apaga seus arquivos.","Empty this preset? This does not uninstall mods or delete their files."),T("Limpar preset","Clear preset"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-        selected.ModIds.Clear();selected.Categories.Clear();marked.Clear();ResetColumnFilters();Persist();DrawRows();
+        BeginProjectEdit();
+        selected.ModIds.Clear();selected.Categories.Clear();marked.Clear();ResetColumnFilters();FinishProjectEdit();DrawRows();
     }
 }
 

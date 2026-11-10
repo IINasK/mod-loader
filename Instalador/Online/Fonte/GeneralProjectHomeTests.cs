@@ -189,8 +189,10 @@ internal sealed partial class GeneralModWindow {
                                 home.OpenRequested(remaining);
                                 answerTransfer.Stop();
                                 if(failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+                                var edited=store.Read().Projects.Single(item=>item.TemplateId==null);
                                 check(home.IsDisposed&&transferPrompts==2&&draftPrompts==1&&
-                                    store.Load(remaining).List.Mods.First().Tags.Contains("salvar ao fechar"),
+                                    store.Load(edited).List.Mods.First().Tags.Contains("salvar ao fechar")&&
+                                    before==Safe.Hash(Path.Combine(store.DataPath(remaining),"lista.json")),
                                     "Confirmar o X salva o rascunho e encerra o aplicativo sem voltar à Home ou perguntar novamente.");
                             }
                             completed=true;
@@ -218,7 +220,9 @@ internal sealed partial class GeneralModWindow {
             const string eclipse=GeneralModLibrary.EclipseTattooId;
             foreach(var preset in oldPack.Presets)preset.ModIds.Remove(eclipse);
             oldPack.Presets.Add(new GeneralModPreset{Id="custom",Name="Meu preset"});
-            var ready=store.Create("Cyberpunk 2077",oldPack,"dark","en",root,"cyberpunk-2077");
+            string bodyGame=Path.Combine(root,"body-game");
+            Directory.CreateDirectory(bodyGame);
+            var ready=store.Create("Cyberpunk 2077",oldPack,"dark","en",bodyGame,"cyberpunk-2077");
             form.state=store.Load(ready);
             form.AttachProject(store,ready);
             var stored=new GeneralModLibrary(Path.Combine(form.data,"lista.json")).Load().List;
@@ -341,9 +345,7 @@ internal sealed partial class GeneralModWindow {
                 "Trocar a escolha preserva os rascunhos independentes.");
             picker.SelectedIndex=2;
             var groupName=EditorField<TextBox>(editor,"groupName");
-            typeof(Control).GetMethod("OnDoubleClick",BindingFlags.Instance|BindingFlags.NonPublic)
-                .Invoke(groupName,new object[]{EventArgs.Empty});
-            check(!groupName.ReadOnly,"O nome compartilhado pode ser editado na variante Natural.");
+            check(groupName.Focus()&&!groupName.ReadOnly,"O nome compartilhado aceita digitação ao receber o foco.");
             groupName.Text="Corpo personalizado";
             picker.SelectedIndex=1;
             check(groupName.Text=="Corpo personalizado"&&source.Text==push.Variant.Sources[0],
@@ -360,6 +362,29 @@ internal sealed partial class GeneralModWindow {
         check(saved.BodyChoice==GeneralModLibrary.NaturalBody&&selected.RequiredMods.Contains("ArchiveXL")&&
             selected.NaturalOption.RequiredMods.Contains("Codeware")&&!selected.NaturalOption.RequiredMods.Contains("ArchiveXL"),
             "A seleção e as dependências independentes sobrevivem ao salvamento.");
+        choices=form.BodyVersionsForPreset();
+        entry=form.BodyEditorEntry(choices[0].Entry,choices);
+        using(var editor=new GeneralModEditor(entry,new[]{GeneralModLibrary.BodyCategory},choices[0].BodyChoice,true,"",
+            alternatives:form.state.List.Mods,groupList:form.state.List,fixedChoices:true)){
+            editor.Show(form);
+            var picker=EditorField<GeneralPicker>(editor,"variants");
+            check(picker.AccessibleName==T("Versão","Version")+" *"&&picker.AddChoiceLabel==T("Adicionar nova versão","Add new version"),
+                "O seletor usa um rótulo genérico e oferece nova versão.");
+            picker.AddChoice();
+            picker.Text="Quarta variante";
+            EditorField<TextBox>(editor,"modName").Text="Mod alternativo";
+            EditorField<TextBox>(editor,"sources").Text="https://www.nexusmods.com/cyberpunk2077/mods/99999?tab=files&file_id=123456";
+            editor.AddRequiredMod(form.state.List.Mods.Single(mod=>mod.Id=="Codeware"));
+            EditorField<Button>(editor,"save").PerformClick();
+            check(editor.Result!=null&&await form.ApplyBodyEditor(editor,choices),"O editor aceita uma quarta opção com fonte e dependência próprias.");
+        }
+        form.SaveProjectEdits();
+        saved=form.library.Load();
+        var extra=saved.List.Mods.Single(mod=>mod.Id==saved.BodyChoice);
+        check(extra.Name=="Mod alternativo"&&extra.Variants.Single().Name=="Quarta variante"&&
+            extra.Variants.Single().RequiredMods.SequenceEqual(new[]{"Codeware"})&&
+            form.BodyVersionsForPreset().Any(work=>work.Entry.Id==extra.Id&&BodyChoiceLabel(work)=="Quarta variante"),
+            "A quarta opção é persistida e reaparece na mesma gaveta.");
     }
 
     static void ClickSavedProject(ListBox list,Point point){typeof(ListBox).GetMethod("OnMouseClick",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(list,new object[]{new MouseEventArgs(MouseButtons.Left,1,point.X,point.Y,0)});}

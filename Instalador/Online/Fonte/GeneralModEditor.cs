@@ -48,8 +48,8 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
     readonly Func<string,Task<GeneralSourceInfo>> refreshLookup;
     readonly Button copySource;
     readonly HashSet<string> originalSources;
-    readonly GeneralNexusLink sourceMod;
-    readonly TextBox groupName = new TextBox { Name="VariantGroupName", ReadOnly=true, MaxLength=300 };
+
+    readonly TextBox groupName = new TextBox { Name="VariantGroupName", MaxLength=300 };
     readonly Label validation = new Label { AutoSize = true, Dock = DockStyle.Fill, UseMnemonic = false };
     readonly Label installNote;
     readonly Label fileDetails=new Label{Name="DownloadFileDetails",Dock=DockStyle.Fill,AutoEllipsis=true,UseMnemonic=false,TextAlign=ContentAlignment.MiddleLeft};
@@ -107,7 +107,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         }).ToList();
         if (model.Count == 0) model.Add(new GeneralModVariant { Id = Guid.NewGuid().ToString("N"), Name = T("Principal", "Default") });
         originalSources = new HashSet<string>(model.SelectMany(variant => variant.Sources), StringComparer.Ordinal);
-        sourceMod = model.Select(variant => GeneralNexusLink.Parse(variant.Sources.FirstOrDefault())).FirstOrDefault(link => link != null);
+
         choiceLinks=model.ToDictionary(version=>version.Id,version=>GeneralNexusLink.Parse(version.Sources.FirstOrDefault()),StringComparer.Ordinal);
         int savedDefault = model.FindIndex(variant => variant.Id == entry.DefaultVariant);
         if (savedDefault > 0&&!fixedChoices) {
@@ -154,33 +154,29 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         groupTitle.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         groupName.Text=initialEntry.Name;
         groupName.AccessibleName=T("Nome do grupo","Group name");
-        editorTips.SetToolTip(groupName,T("Dê dois cliques para editar o nome do grupo.","Double-click to edit the group name."));
-        groupName.DoubleClick+=(s,e)=>{groupName.ReadOnly=false;groupName.SelectAll();};
-        groupName.KeyDown+=(s,e)=>{
-            if(e.KeyCode==Keys.F2){groupName.ReadOnly=false;groupName.SelectAll();e.SuppressKeyPress=true;}
-            if(e.KeyCode==Keys.Enter&&!groupName.ReadOnly){groupName.ReadOnly=true;e.SuppressKeyPress=true;}
-        };
-        groupName.Leave+=(s,e)=>groupName.ReadOnly=true;
+
         groupName.TextChanged+=(s,e)=>ValidateInputs();
         var groupField=FieldFor(groupName,false);
         groupField.Margin=Padding.Empty;
         groupTitle.Controls.Add(groupField,0,0);
 
         AddEditorRow(layout,groupTitle);
-        variants.AccessibleName = fixedChoices?T("Versão do corpo","Body version"):T("Fonte · nome da versão", "Source · version name");
+        variants.AccessibleName = T("Versão", "Version");
         variants.Margin = new Padding(3, 0, 3, 8);
-        if(fixedChoices)variants.DropDownStyle=ComboBoxStyle.DropDownList;
-        else{
-            variants.AddChoiceLabel = T("Adicionar fonte", "Add source");
-            variants.AddChoice = () => {
-                if (model.Count >= 50) return;
-                SaveCurrent();
-                var variant = new GeneralModVariant { Id = Guid.NewGuid().ToString("N"), Name = T("Nova versão", "New version") };
-                model.Add(variant);
-                pickedVersion = true;
-                RefreshVariants(variant.Id);
-                variants.EditText();
+        variants.AddChoiceLabel = T("Adicionar nova versão", "Add new version");
+        variants.AddChoice = () => {
+            if (model.Count >= 50) return;
+            SaveCurrent();
+            var variant = new GeneralModVariant {
+                Id = Guid.NewGuid().ToString("N"), Name = T("Nova versão", "New version"),
+                Category = current.Category, DisplayName = "", Description = "", Tags = new List<string>(), Nsfw = false
             };
+            model.Add(variant);
+            pickedVersion = true;
+            RefreshVariants(variant.Id);
+            variants.EditText();
+        };
+        if(!fixedChoices){
             variants.DeleteChoice = at => {
                 SaveCurrent();
                 var removed = model[at];
@@ -223,7 +219,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         AddEditorRow(layout,sourceInfo);
 
 
-        AddEditorRow(layout, EditorSection(T("Identificação", "Identification"), false));
+        AddEditorRow(layout, EditorSection(T("Identificação", "Identification"), true));
         var nameField=EditorField(T("Nome do mod *", "Mod name *"),modName);
         var nameSurface=(GeneralSurface)nameField.Controls[1];
         var nameRow=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};
@@ -310,7 +306,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
 
         installNote = LabelFor(installInfo ?? "");
         installNote.Font = validation.Font = usePending.Font = GeneralStyle.Font(10);
-        AddEditorRow(layout, installNote);
+        if(!String.IsNullOrEmpty(installInfo))AddEditorRow(layout, installNote);
         AddEditorRow(layout, usePending);
         AddEditorRow(layout, validation);
         layout.RowCount++;
@@ -529,10 +525,10 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
     static Control EditorSection(string title, bool divider) {
         var heading = new TableLayoutPanel {
             Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1,
-            Margin = new Padding(3, divider ? 16 : 0, 3, 3)
+            Margin = new Padding(3, divider ? 24 : 0, 3, 3)
         };
         if (divider) {
-            var line = new Panel { Dock = DockStyle.Top, Height = 1, Margin = new Padding(0, 0, 0, 9) };
+            var line = new Panel { Dock = DockStyle.Top, Height = 1, Margin = new Padding(0, 0, 0, 16) };
             line.Paint += (s, e) => e.Graphics.Clear(GeneralStyle.Line);
             heading.Controls.Add(line);
         }
@@ -715,7 +711,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
 
     void SaveCurrent(bool saveVersionName=true) {
         if (current == null || attachment) return;
-        if(saveVersionName&&!fixedChoices)current.Name = variants.Text.Trim();
+        if(saveVersionName&&CanRenameVersion(current))current.Name = variants.Text.Trim();
         current.DisplayName=modName.Text.Trim();
         current.Category=category.Text.Trim();
         current.Description=description.Text.Trim();
@@ -735,12 +731,17 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         foreach(string key in current.SourceInfo.Keys.Where(key=>!current.Sources.Contains(key)).ToArray())current.SourceInfo.Remove(key);
     }
 
+    bool CanRenameVersion(GeneralModVariant version) {
+        return !fixedChoices||String.IsNullOrEmpty(version.CyberpunkId);
+    }
+
     void SyncVariantPicker() {
         bool previous = changing;
         changing = true;
         variants.Items.Clear();
         variants.Items.AddRange(model.Select(variant => (object)variant.Name));
-        groupTitle.Visible=model.Count>2;
+        groupTitle.Visible=fixedChoices||model.Count>2;
+        variants.DropDownStyle=CanRenameVersion(current)?ComboBoxStyle.DropDown:ComboBoxStyle.DropDownList;
 
         variants.SelectedIndex = model.IndexOf(current);
         changing = previous;
@@ -786,9 +787,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         if(link==null)return T("Cole um link do Nexus Mods.","Paste a Nexus Mods link.");
         if(link.File==0)return T("No Nexus, escolha o arquivo e cole o link da tela Slow Download ou Premium Download.",
             "On Nexus, choose the file and paste the link to the Slow Download or Premium Download screen.");
-        GeneralNexusLink choiceLink;choiceLinks.TryGetValue(version.Id,out choiceLink);
-        var origin=(fixedChoices?choiceLink:sourceMod)??model.Where(other=>other!=version)
-            .Select(other=>GeneralNexusLink.Parse(other.Sources.FirstOrDefault())).FirstOrDefault(candidate=>candidate!=null);
+        GeneralNexusLink origin;choiceLinks.TryGetValue(version.Id,out origin);
         if(origin!=null&&(link.Mod!=origin.Mod||link.Game!=origin.Game))
             return T("Use um link do mesmo mod no Nexus.","Use a link to the same Nexus mod.");
         return "";
@@ -798,7 +797,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         SaveCurrent();
         var primary=fixedChoices?current:model[0];
         return new GeneralModEntry {
-            Id=id, Name=attachment?modName.Text.Trim():model.Count>2?groupName.Text.Trim():primary.DisplayName??initialEntry.Name,
+            Id=id, Name=attachment?modName.Text.Trim():(fixedChoices||model.Count>2)?groupName.Text.Trim():primary.DisplayName??initialEntry.Name,
             Category=attachment?category.Text.Trim():primary.Category??initialEntry.Category??"",
             Description=attachment?description.Text.Trim():primary.Description??initialEntry.Description??"",
             Tags=attachment?selectedTags.ToList():primary.Tags??initialEntry.Tags.ToList(),
@@ -854,7 +853,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         save.Enabled=error.Length==0&&!finishing&&changed;
         install.Enabled=save.Enabled&&current!=null&&!GeneralModLibrary.NeedsDependencyVersion(draft,current)&&
             !(draft.DetectedPaths.Count>0&&current.Sources.Any(GeneralModDownload.IsInstalledSource));
-        if (!fixedChoices && current != null && variants.SelectedIndex >= 0)
+        if (current != null && CanRenameVersion(current) && variants.SelectedIndex >= 0)
             variants.Items[variants.SelectedIndex] = current.Name;
     }
 

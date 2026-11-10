@@ -10,10 +10,10 @@ using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow : Form {
     readonly FixedCatalog catalog;
-    readonly DownloadCache cache;
-    readonly GeneralModLibrary library;
+    DownloadCache cache;
+    GeneralModLibrary library;
     readonly GeneralModList seed;
-    readonly string data;
+    string data;
     readonly bool testMode;
     GeneralModState state;
     readonly HashSet<string> marked=new HashSet<string>();
@@ -87,6 +87,7 @@ internal sealed partial class GeneralModWindow : Form {
         Text=GeneralAppPaths.WindowTitle;Icon=ModLoaderBrand.AppIcon;ClientSize=new Size(1240,820);MinimumSize=new Size(1000,680);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
         BuildInterface();
         FormClosing+=CloseModWindow;
+        FormClosed+=(s,e)=>ReleaseProjectSharing();
         Disposed+=(s,e)=>menus.Dispose();
         Shown+=(s,e)=>RefreshStorageSize();
         if(fixture==null)Shown+=async(s,e)=>{
@@ -576,7 +577,7 @@ internal sealed partial class GeneralModWindow : Form {
         for(int index=0;index<versions.Count;index++){
             var work=versions[index];
             string name=VersionDisplayName(work);
-            string label=body?BodyChoiceLabel(work.BodyChoice):work.Variant.Name;
+            string label=body?BodyChoiceLabel(work):work.Variant.Name;
             bool chosen=body?work.BodyChoice==ActiveBodyChoice(entry):work.Variant==active;
             string status=chosen?T("Selecionado","Selected"):T("Não selecionado","Not selected");
             var row=grid.Rows[grid.Rows.Add(null,name,label,status,null,BodyOptionSpace(work))];
@@ -910,7 +911,7 @@ internal sealed partial class GeneralModWindow : Form {
         foreach(var choice in choices){
             var version=CloneVariant(choice.Variant);
             version.Id=choice.BodyChoice;
-            version.Name=BodyChoiceLabel(choice.BodyChoice);
+            version.Name=BodyChoiceLabel(choice);
             version.NaturalOption=null;
             version.DisplayName=VersionDisplayName(choice);
             version.Category=version.Category??choice.Entry.Category??"";
@@ -934,7 +935,7 @@ internal sealed partial class GeneralModWindow : Form {
                 var replacement=CloneVariant(dialog.Result.Variants.Single(version=>version.Id==work.BodyChoice));
                 var target=edited.Variants.Single(version=>version.Id==work.Variant.Id);
                 replacement.Id=target.Id;
-                replacement.Name=target.Name;
+                if(GeneralModLibrary.IsHystBody(original.Id))replacement.Name=target.Name;
                 if(work.BodyChoice==GeneralModLibrary.NaturalBody)target.NaturalOption=replacement;
                 else{
                     replacement.NaturalOption=target.NaturalOption;
@@ -943,21 +944,36 @@ internal sealed partial class GeneralModWindow : Form {
             }
             changed.Add(new KeyValuePair<GeneralModEntry,GeneralModEntry>(original,edited));
         }
-        var selected=choices.Single(work=>work.BodyChoice==dialog.SelectedVariant);
+        var selected=choices.FirstOrDefault(work=>work.BodyChoice==dialog.SelectedVariant);
+        var added=dialog.Result.Variants.Where(version=>!choices.Any(work=>work.BodyChoice==version.Id))
+            .Select(version=>new GeneralModEntry{
+                Id=version.Id, Name=version.DisplayName, Category=version.Category, Description=version.Description,
+                Tags=version.Tags, Nsfw=version.Nsfw??false, NsfwOverride=version.NsfwOverride,
+                AlternativeGroup=GeneralModLibrary.BodyGroup, DefaultVariant=version.Id,
+                Variants=new List<GeneralModVariant>{version}
+            }).ToList();
         var routes=changed.Where(pair=>pair.Key.Variants.Zip(pair.Value.Variants,(before,after)=>
             !GeneralInstallRoutes.Same(before.InstallRoutes,after.InstallRoutes)).Any(value=>value)).ToList();
         if(routes.Count>1)throw new IOException(T("Altere o destino de um corpo por vez.","Change the destination of one body at a time."));
-        bool? moved=routes.Count==0?false:await ChangeInstalledDestinations(routes[0].Key,routes[0].Value);
+        bool? moved=routes.Count==0||BuiltInProject?false:await ChangeInstalledDestinations(routes[0].Key,routes[0].Value);
         if(!moved.HasValue)return false;
         BeginProjectEdit();
-        state.BodyChoice=selected.BodyChoice;
+        state.BodyChoice=dialog.SelectedVariant;
         state.List.AlternativeGroups[GeneralModLibrary.BodyGroup].DisplayName=dialog.Result.Name;
         foreach(var pair in changed){
-            string profile=pair.Key==selected.Entry?selected.Variant.Id:Selected(pair.Key).Id;
-            ApplyEdited(pair.Key,pair.Value,profile,true,dialog.NewCategories);
+            string profile=selected!=null&&pair.Key==selected.Entry?selected.Variant.Id:Selected(pair.Key).Id;
+            ApplyEdited(pair.Key,pair.Value,profile,true,dialog.NewCategories,finish:false);
         }
+        foreach(var entry in added){
+            var presetIds=state.List.Presets.Where(preset=>choices.All(work=>preset.ModIds.Contains(work.Entry.Id))).ToList();
+            ApplyEdited(entry,entry,entry.DefaultVariant,false,dialog.NewCategories,finish:false);
+            foreach(var preset in presetIds)
+                if(!preset.ModIds.Contains(entry.Id))preset.ModIds.Add(entry.Id);
+        }
+        FinishProjectEdit();
+        DrawRows();
         if(dialog.InstallRequested||moved.Value)SaveProjectEdits();
-        if(dialog.InstallRequested)ConfirmUrgentInstall(changed.Single(pair=>pair.Key==selected.Entry).Value);
+        if(dialog.InstallRequested)ConfirmUrgentInstall(state.List.Mods.Single(entry=>entry.Id==(selected==null?dialog.SelectedVariant:selected.Entry.Id)));
         else await Scan();
         return true;
     }
@@ -968,15 +984,12 @@ internal sealed partial class GeneralModWindow : Form {
         try{
             bool existing=state.List.Mods.Contains(item);var selected=initialVariant??Selected(item);
             bool editingBody=IsBigBody(item);
-            if(editingBody&&working)return;
+            if(working&&(editingBody||BuiltInProject))return;
             var bodyVersions=editingBody?BodyVersionsForPreset():null;
             var editorEntry=editingBody?BodyEditorEntry(item,bodyVersions):item;
             string editorSelection=editingBody?bodyChoice??ActiveBodyChoice(item):selected.Id;
-            string info=T("Destino: ","Destination: ")+(state.Destination??T("Escolha uma pasta na tela principal.","Choose a folder on the main screen."));
-            var recipe=catalog.Packages.FirstOrDefault(m=>m.Id==selected.CyberpunkId);if(recipe!=null)info=T("Versão do pacote: ","Package version: ")+recipe.Version+"   ·   "+info;
-            string pack=ActivePreset!=null?ActivePreset.Name:project==null?null:project.Name;
-            if(!String.IsNullOrWhiteSpace(pack))info=T("Pacote: ","Pack: ")+pack+"   ·   "+info;
-            if(item.DetectedPaths.Count>0)info+="\r\n"+T(
+            string info="";
+            if(item.DetectedPaths.Count>0)info=T(
                 "Arquivos detectados. Confira o pacote de origem para confirmar o mod completo.",
                 "Detected files. Check the original archive to confirm the complete mod.")+"\r\n"+
                 String.Join("\r\n",item.DetectedPaths.Take(8));
@@ -992,7 +1005,8 @@ internal sealed partial class GeneralModWindow : Form {
                     return ProfileRecipe(new Work{Entry=item,Variant=variant}).Files.Select(file=>file.Path);
                 }, downloadedSource:(variant,index)=>{
                     if(!editingBody)return LocalSource(new Work{Entry=item,Variant=variant},index);
-                    var work=bodyVersions.Single(choice=>choice.BodyChoice==variant.Id);
+                                        var work=bodyVersions.FirstOrDefault(choice=>choice.BodyChoice==variant.Id);
+                    if(work==null)return null;
                     return LocalSource(work,index);
                 },fixedChoices:editingBody,archivePreview:testMode
                     ?(Func<GeneralNexusLink,NexusFilePreview[]>)(link=>testNexusPreviews==null?null:testNexusPreviews(link,()=>!IsDisposed))
@@ -1006,7 +1020,7 @@ internal sealed partial class GeneralModWindow : Form {
                 }
                 if(answer!=DialogResult.OK)return;
                 if(editingBody){await ApplyBodyEditor(dialog,bodyVersions);return;}
-                bool? moved=existing?await ChangeInstalledDestinations(item,dialog.Result):false;
+                bool? moved=existing&&!BuiltInProject?await ChangeInstalledDestinations(item,dialog.Result):false;
                 if(!moved.HasValue)return;
                 BeginProjectEdit();
                 dialog.Result.AlternativeGroup=item.AlternativeGroup;
@@ -1032,7 +1046,7 @@ internal sealed partial class GeneralModWindow : Form {
             RenameCategory(previous,name,description);
         }else if(known!=null)entry.Category=known;
     }
-    void ApplyEdited(GeneralModEntry before,GeneralModEntry after,string variant,bool existing,Dictionary<string,string> newCategories=null){
+    void ApplyEdited(GeneralModEntry before,GeneralModEntry after,string variant,bool existing,Dictionary<string,string> newCategories=null,bool finish=true){
         if(existing){
             foreach(var pendingList in new[]{normal,priority})foreach(var queued in pendingList.Where(w=>w.Entry.Id==before.Id).ToList()){
                 var nextVariant=after.Variants.FirstOrDefault(v=>v.Id==variant);
@@ -1062,7 +1076,7 @@ internal sealed partial class GeneralModWindow : Form {
         }
         if(variant==after.DefaultVariant&&!GeneralModLibrary.IsHystBody(after.Id))state.ChosenVariants.Remove(after.Id);
         else state.ChosenVariants[after.Id]=variant;
-        FinishProjectEdit();DrawRows();
+        if(finish){FinishProjectEdit();DrawRows();}
     }
     sealed class CatalogDrop {
         internal Work Work;
@@ -1203,7 +1217,7 @@ internal sealed partial class GeneralModWindow : Form {
 
                 var added = NewEntry(Path.GetFileNameWithoutExtension(file), file);
                 added.Category = DefaultCategory;
-                if (paths.Count != 1 || target == null || !Object.ReferenceEquals(current, target) || !waiting || association != null) {
+                if (paths.Count != 1 || target == null || !Object.ReferenceEquals(current, target) || !waiting || association != null || BuiltInProject) {
                     await EditMod(added);
                     continue;
                 }

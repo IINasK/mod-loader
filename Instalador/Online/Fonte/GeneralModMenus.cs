@@ -41,13 +41,14 @@ internal sealed partial class GeneralModWindow {
             var item=currentPreset??new GeneralModPreset{Id="preset-"+Guid.NewGuid().ToString("N"),Name=T("Novo preset","New preset")};
             using(var dialog=new GeneralPresetEditor(item,state.List.Mods,item.ModIds)){
                 if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+                BeginProjectEdit();
                 if(create)state.List.Presets.Add(dialog.Result);else state.List.Presets[state.List.Presets.IndexOf(item)]=dialog.Result;
-                state.SelectedPreset=dialog.Result.Id;Persist();RebuildPresets();
+                state.SelectedPreset=dialog.Result.Id;FinishProjectEdit();RebuildPresets();
             }
         }catch(Exception ex){ShowError(ex);}
     }
     void DeletePreset(){
-        if(working||scanning||ProtectedPreset)return;var item=state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);if(item==null)return;
+        if(working||scanning)return;var item=state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);if(item==null)return;
         if(GeneralDialog.Message(this,T("Excluir este preset? Os mods permanecem na lista.","Delete this preset? Mods will remain in the list.")+"\n"+item.Name,T("Excluir preset","Delete preset"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
         BeginProjectEdit();state.List.Presets.Remove(item);state.SelectedPreset=null;FinishProjectEdit();RebuildPresets();
     }

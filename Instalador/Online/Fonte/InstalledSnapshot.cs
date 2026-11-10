@@ -33,8 +33,9 @@ public static partial class InstalledSnapshot {
     static string Selected(GeneralModState state,GeneralModEntry mod){string id;return state.ChosenVariants.TryGetValue(mod.Id,out id)?id:mod.DefaultVariant;}
     static bool IsCyberpunk(string root){return File.Exists(Safe.In(root,"bin/x64/Cyberpunk2077.exe"));}
     static bool IncludesBodyChoice(GeneralModList list,string choice) {
-        return (GeneralModLibrary.IsHystBody(choice)||choice==GeneralModLibrary.NaturalBody)&&
-            list.Mods.Any(mod=>mod.Id==(choice==GeneralModLibrary.NaturalBody?GeneralModLibrary.EbbBody:choice));
+        return list.Mods.Any(mod=>(GeneralModLibrary.IsHystBody(mod.Id)||
+            mod.AlternativeGroup==GeneralModLibrary.BodyGroup&&mod.Id!=GeneralModLibrary.VanillaFeetId)&&
+            mod.Id==(choice==GeneralModLibrary.NaturalBody?GeneralModLibrary.EbbBody:choice));
     }
     internal static bool SafeGenericPath(string path) {
         Safe.In(System.IO.Path.GetTempPath(),path);

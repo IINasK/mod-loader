@@ -351,7 +351,7 @@ internal sealed partial class GeneralModWindow {
                 var popup=picker.OpenPopup;
                 var view=(GeneralScrollView)popup.Items.OfType<ToolStripControlHost>().Single().Control;
                 var list=(ListBox)view.Content;
-                check(list.Items.Cast<string>().SequenceEqual(new[]{"Preferida editada (padrão)","Original","Terceira","Adicionar fonte"}),
+                check(list.Items.Cast<string>().SequenceEqual(new[]{"Preferida editada (padrão)","Original","Terceira","Adicionar nova versão"}),
                     "The version popup shows the default first and Add last.");
                 check(!view.Bar.Visible||view.Bar.Left>=list.Width,"The scrollbar cannot cover the trash hit area.");
                 using(var bitmap=new Bitmap(popup.Width,popup.Height)){
@@ -379,8 +379,9 @@ internal sealed partial class GeneralModWindow {
                 await Until(()=>picker.Items.Count==3);
                 check(input.Text=="Nova versão"&&input.SelectionLength==input.Text.Length,"Add opens a new version with its name selected for editing.");
                 input.Text="Quarta";
+                EditorField<TextBox>(editor,"modName").Text="Novo arquivo";
                 field.Text=source.Replace("/34305?","/4591?");
-                check(!EditorField<Button>(editor,"save").Enabled,"A file from another Nexus mod is rejected.");
+                check(EditorField<Button>(editor,"save").Enabled,"A newly added version can use a different Nexus mod.");
                 field.Text="https://example.com/mod.zip";
                 check(!EditorField<Button>(editor,"save").Enabled,"A new external link is rejected.");
                 field.Text=source.Replace("169285","169288");

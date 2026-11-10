@@ -301,6 +301,41 @@ internal sealed partial class GeneralModWindow {
     GeneralProjectStore projectStore;
     GeneralProject project;
     internal string ProjectAction {get;private set;}
+    Size projectWindowSize;
+
+    protected override void OnLoad(EventArgs e){
+        if(project!=null){
+            float scale=DeviceDpi/96f;
+            var area=Screen.FromControl(this).WorkingArea;
+            bool saved=project.WindowWidth>0&&project.WindowHeight>0;
+            var preferred=saved?new Size(project.WindowWidth,project.WindowHeight):new Size(1240,1240);
+            Size target=FitProjectWindow(preferred,area.Size,scale,saved);
+            MinimumSize=new Size(Math.Min(MinimumSize.Width,target.Width),Math.Min(MinimumSize.Height,target.Height));
+            Size=projectWindowSize=target;
+            Location=new Point(area.Left+(area.Width-Width)/2,area.Top+(area.Height-Height)/2);
+        }
+        base.OnLoad(e);
+    }
+
+    internal static Size FitProjectWindow(Size preferred,Size available,float scale,bool saved){
+        double width=preferred.Width*scale,height=preferred.Height*scale;
+        if(!saved){
+            double fit=Math.Min(1,Math.Min(available.Width/width,available.Height/height));
+            width*=fit;height*=fit;
+        }
+        return new Size((int)Math.Min(width,available.Width),(int)Math.Min(height,available.Height));
+    }
+
+    protected override void OnResizeEnd(EventArgs e){
+        base.OnResizeEnd(e);
+        if(project==null||WindowState!=FormWindowState.Normal||Size==projectWindowSize)return;
+        try{
+            float scale=96f/DeviceDpi;
+            projectStore.SaveWindowSize(project,(int)Math.Round(Width*scale),(int)Math.Round(Height*scale));
+            projectWindowSize=Size;
+        }catch(IOException ex){detail.Text=ex.Message;}
+        catch(UnauthorizedAccessException ex){detail.Text=ex.Message;}
+    }
     internal void AttachProject(GeneralProjectStore store,GeneralProject project){
         projectStore=store;this.project=project;state.TemplateId=project.TemplateId;state.ProjectName=project.Name;var preferences=store.Read();
         bool refreshed=false;

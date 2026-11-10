@@ -727,6 +727,12 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
 
 internal sealed partial class GeneralModWindow {
     P2PService p2p;
+    Action releaseProjectSharing;
+    void ReleaseProjectSharing(){
+        if(releaseProjectSharing!=null)releaseProjectSharing();
+        releaseProjectSharing=null;
+        p2p=null;
+    }
     GeneralProjectHome sharingHome;
     GeneralP2PDialog sharingDialog;
 
@@ -762,10 +768,12 @@ internal sealed partial class GeneralModWindow {
                     p2p.ApproveUserFolders=folders=>GeneralP2PDialog.AskUserFolders(this,()=>SharingPromptOwner,folders);
                 }
                 p2p.SetPreparationState(CommittedProject());
+                var service=p2p;
                 Action<P2PSession> installed=session=>{
                     if(IsDisposed||!IsHandleCreated)return;
                     BeginInvoke((Action)(async()=>{
                         try{
+                            if(p2p!=service)return;
                             if(sharingHome==null&&String.Equals(state.Destination,session.Destination,StringComparison.OrdinalIgnoreCase)){
                                 var received=p2p.InstalledManifest(session);
                                 foreach(var mod in received.List.Mods)if(state.List.Mods.Any(m=>m.Id==mod.Id&&m.Variants.Any(v=>v.Id==mod.DefaultVariant)))state.SnapshotReceipts[mod.Id+"/"+mod.DefaultVariant]=session.ReceiptId;
@@ -777,10 +785,10 @@ internal sealed partial class GeneralModWindow {
                         }catch(Exception ex){ShowError(ex);}
                     }));
                 };
-                p2p.SnapshotInstalled+=installed;
-                FormClosed+=(s,e)=>{
-                    p2p.SnapshotInstalled-=installed;
-                    if(sharingHome==null)try{p2p.Dispose();}catch(Exception){}
+                service.SnapshotInstalled+=installed;
+                releaseProjectSharing=()=>{
+                    service.SnapshotInstalled-=installed;
+                    if(sharingHome==null)try{service.Dispose();}catch(Exception){}
                 };
             }
     }
