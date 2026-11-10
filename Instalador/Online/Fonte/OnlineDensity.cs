@@ -168,7 +168,7 @@ public sealed partial class FixedInstaller {
             }
             string ledger=Safe.In(Data,r.Id+".json");Save(ledger,r);
             try {
-                BackupSaves(Safe.In(Data,"backups/"+r.Id+"/saves"));r.Status="instalando";Save(ledger,r);int written=0;
+                BackupSaves();r.Status="instalando";Save(ledger,r);int written=0;
                 foreach(var f in r.Files){
                     Closed();string dest=Safe.In(game,f.Path);
                     if(f.Before==null){if(File.Exists(dest)||Directory.Exists(dest))throw new IOException("Destino ocupado após conferência: "+f.Path);}

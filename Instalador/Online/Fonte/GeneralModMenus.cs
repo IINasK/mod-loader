@@ -104,7 +104,7 @@ internal sealed partial class GeneralModWindow {
     }
     async void ShowOptions(){
         if(working||scanning)return;
-        using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder,cache.PreviewRetainedDownloads,state.Destination??"")){
+        using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder,            cache.PreviewRetainedDownloads,state.Destination??"",root=>Cyberpunk(root).PreviewOldSaveBackups())){
             dialog.AnchorTo(optionsButton);
             if(dialog.ShowDialog(this)!=DialogResult.OK){RefreshStorageSize();return;}
             bool moved=SetDestination(dialog.Destination);

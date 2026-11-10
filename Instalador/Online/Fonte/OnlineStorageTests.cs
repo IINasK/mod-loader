@@ -23,6 +23,7 @@ public static class OnlineStorageTests {
         check(Directory.GetFiles(Path.Combine(game,".CoopModsOnline","backups"),"save.dat",SearchOption.AllDirectories).Length==1,"Backup do save sintético permanece disponível.");
         engine.Undo(s=>{});
         check(!File.Exists(Path.Combine(game,"archive","pc","mod","test-a.archive")),"Desfazer funciona depois de eliminar a preparação.");
+        TestSaveBackupRotation(root,catalog,cache,saves,check);
         string failure=OnlineTests.Fixture(root,"failure");bool failed=false;
         try{new FixedInstaller(catalog,cache,failure,saves,true).Install(new[]{"Extra"},true,s=>{},1);}catch(IOException){failed=true;}
         check(failed&&Empty(cache),"Falha de cópia e rollback não deixam preparação extraída.");
@@ -90,6 +91,62 @@ public static class OnlineStorageTests {
         check(remaining.Length<=8&&remaining.Sum(file=>file.Length)<=64L*1024*1024,"Abrir uma sessão reserva espaço para o registro atual dentro do limite.");
         OnlineDiagnostics.Stop();
         Safe.WriteJson(Path.Combine(root,"resultado-armazenamento.json"),new{Passed=true,Tests=tests,RealGameTouched=false,NetworkUsed=false});return tests.Count;
+    }
+    static void TestSaveBackupRotation(string root,FixedCatalog catalog,DownloadCache cache,string saves,Action<bool,string> check){
+        string game=OnlineTests.Fixture(root,"r");
+        string data=Path.Combine(game,".CoopModsOnline"), backups=Path.Combine(data,"backups");
+        string latest=Path.Combine(backups,"saves-current"), original=Path.Combine(saves,"save.dat");
+        var engine=new FixedInstaller(catalog,cache,game,saves,true);
+        Action install=()=>engine.Install(new[]{"Extra"},true,s=>{});
+        install();
+        string legacyId=Directory.GetFiles(data,"*.json").Single();
+        string legacy=Path.Combine(backups,Path.GetFileNameWithoutExtension(legacyId),"saves");
+        Directory.CreateDirectory(Path.GetDirectoryName(legacy));
+        Directory.Move(latest,legacy);
+        check(engine.PreviewOldSaveBackups().Count==0&&File.Exists(Path.Combine(legacy,"save.dat")),
+            "Sem uma cópia rotativa, o backup legado mais recente fica disponível.");
+        engine.Undo(s=>{});
+        install();
+        string copy=Path.Combine(latest,"save.dat");
+        File.SetLastWriteTimeUtc(copy,new DateTime(2020,1,1,0,0,0,DateTimeKind.Utc));
+        engine.Undo(s=>{});
+        install();
+        check(File.GetLastWriteTimeUtc(copy).Year==2020,"Operações com os mesmos saves reutilizam o backup já conferido.");
+        string previous=Path.Combine(backups,"saves-previous"), pending=Path.Combine(backups,"saves-pending");
+        engine.Undo(s=>{});
+        Directory.Move(latest,previous);
+        Directory.CreateDirectory(pending);
+        File.WriteAllText(Path.Combine(pending,"incomplete"),"partial");
+        install();
+        check(File.GetLastWriteTimeUtc(copy).Year==2020&&!Directory.Exists(previous)&&!Directory.Exists(pending),
+            "Após interrupção durante a troca, a próxima operação recupera a cópia conferida e descarta a preparação incompleta.");
+        File.WriteAllText(original,"new state");
+        engine.Undo(s=>{});
+        install();
+        check(File.ReadAllText(copy)=="new state"&&!Directory.Exists(previous)&&!Directory.Exists(pending),
+            "Uma mudança no save atualiza a cópia rotativa sem criar um novo histórico.");
+        var plan=engine.PreviewOldSaveBackups();
+        check(plan.Count==1&&plan.Bytes==new FileInfo(Path.Combine(legacy,"save.dat")).Length&&Directory.Exists(legacy),
+            "A prévia contabiliza somente a cópia histórica autenticada.");
+        string added=Path.Combine(legacy,"new-after-preview.dat");
+        File.WriteAllText(added,"keep");
+        int skipped;
+        check(plan.Apply(out skipped)==0&&skipped==1&&File.Exists(added),
+            "Uma cópia que mudou depois da prévia não é apagada.");
+        File.Delete(added);
+        string unknown=Path.Combine(backups,new string('f',32),"saves");
+        Directory.CreateDirectory(unknown);
+        File.WriteAllText(Path.Combine(unknown,"save.dat"),"unknown");
+        string modBackup=Path.Combine(Path.GetDirectoryName(legacy),"desativados","original.bin");
+        Directory.CreateDirectory(Path.GetDirectoryName(modBackup));
+        File.WriteAllText(modBackup,"keep mod backup");
+        plan=engine.PreviewOldSaveBackups();
+        check(plan.Apply(out skipped)==plan.Bytes&&skipped==0&&!Directory.Exists(legacy)&&File.Exists(Path.Combine(unknown,"save.dat"))&&
+            File.ReadAllText(copy)=="new state"&&File.ReadAllText(original)=="new state"&&File.ReadAllText(modBackup)=="keep mod backup",
+            "Limpeza libera o histórico aprovado e preserva os saves originais, o último backup e pastas sem registro.");
+        engine.Undo(s=>{});
+        check(!File.Exists(Safe.In(game,catalog.Packages[1].Files[0].Path)),"Desfazer a instalação continua funcionando após limpar cópias de saves.");
+        File.WriteAllText(original,"fixture preserved");
     }
     static bool Empty(DownloadCache cache){string path=Path.Combine(cache.Root,"preparacao");return !Directory.Exists(path)||Directory.GetDirectories(path).Length==0;}
     static string Preparation(DownloadCache cache,string contents){string path=Path.Combine(cache.Root,"preparacao",Guid.NewGuid().ToString("N"));Directory.CreateDirectory(path);File.WriteAllText(Path.Combine(path,"file.txt"),contents);return path;}

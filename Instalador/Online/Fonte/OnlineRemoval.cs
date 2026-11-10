@@ -51,7 +51,7 @@ public sealed partial class FixedInstaller {
             var receipt=new OnlineReceipt{Id=Guid.NewGuid().ToString("N"),CatalogId=catalog.Id,CreatedUtc=DateTime.UtcNow.ToString("o"),Status="desativando",Operation="deactivate",BackupLayout="flat-v1",Mods=present.Select(m=>m.Id).ToList()};
             string ledger=Safe.In(Data,receipt.Id+".json");Save(ledger,receipt);
             try {
-                BackupSaves(Safe.In(Data,"backups/"+receipt.Id+"/saves"));int moved=0;
+                BackupSaves();int moved=0;
                 foreach(var mod in present)foreach(var file in mod.Files.Where(f=>!f.UserData)) {
                     Closed();string source=Safe.In(game,file.Path);
                     if(!File.Exists(source)){if(Directory.Exists(source))throw new IOException("Uma pasta ocupa o arquivo do mod: "+file.Path);continue;}

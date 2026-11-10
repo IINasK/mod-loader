@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 internal sealed class GeneralOptionsDialog : GeneralDialog {
@@ -17,18 +18,21 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
     internal string DownloadFolder { get; private set; }
     internal string Destination { get; private set; }
 
-    internal GeneralOptionsDialog(string theme, string language, string folder, Func<DownloadCache.CleanupPlan> previewCleanup = null,string installationFolder=null)
+    internal GeneralOptionsDialog(string theme, string language, string folder, Func<DownloadCache.CleanupPlan> previewCleanup = null,string installationFolder=null,Func<string,FixedInstaller.SaveBackupCleanup> previewSaveBackups=null)
         : base(T("Opções", "Options")) {
         projectOptions=installationFolder!=null;
-        ClientSize = new Size(620, (previewCleanup == null ? 392 : 472)+(projectOptions?86:0));
+        bool showSaveCleanup=previewSaveBackups!=null&&!String.IsNullOrWhiteSpace(installationFolder)&&
+            Directory.Exists(Path.Combine(installationFolder,".CoopModsOnline","backups"));
+        ClientSize = new Size(620, (previewCleanup == null ? 392 : 472)+(projectOptions?86:0)+(showSaveCleanup?60:0));
         Font = GeneralStyle.Font(12);
         AutoScaleMode = AutoScaleMode.Dpi;
 
         var layout = new TableLayoutPanel {
-            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7,
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 8,
             Padding = new Padding(24, 16, 24, 20), Margin = Padding.Empty
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -81,11 +85,21 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
             clean.Margin=Padding.Empty;cachePanel.Controls.Add(clean,1,0);layout.Controls.Add(cachePanel,0,4);
         }
 
+        if(showSaveCleanup){
+            Button cleanSaves=null;
+            cleanSaves=GeneralStyle.Button(T("Limpar backups de saves","Clear save backups"),
+                async()=>await ClearSaveBackups(cleanSaves,()=>previewSaveBackups(installationFolder)));
+            cleanSaves.Name="CleanOldSaveBackups";
+            cleanSaves.Margin=new Padding(0,10,0,0);
+            cleanSaves.Anchor=AnchorStyles.Right;
+            layout.Controls.Add(cleanSaves,0,5);
+        }
+
         error.Dock = DockStyle.Fill;
         error.Margin = new Padding(0, 6, 0, 0);
         error.AutoEllipsis = true;
         error.AccessibleName = T("Aviso", "Notice");
-        layout.Controls.Add(error, 0, 5);
+        layout.Controls.Add(error, 0, 6);
 
         var commands = new FlowLayoutPanel {
             Dock = DockStyle.Fill, AutoSize = true, WrapContents = false,
@@ -97,7 +111,7 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
         cancel.Margin = new Padding(0, 0, 10, 0);
         commands.Controls.Add(save);
         commands.Controls.Add(cancel);
-        layout.Controls.Add(commands, 0, 6);
+        layout.Controls.Add(commands, 0, 7);
         AcceptButton = save;
         CancelButton = cancel;
         GeneralStyle.Apply(this, GeneralStyle.Dark);
@@ -116,6 +130,33 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
                 "Open brave://extensions, chrome://extensions or edge://extensions in your browser. Turn on developer mode, choose Load unpacked and select the folder opened in File Explorer.");
             GeneralDialog.Message(this, steps + "\n\n" + folder, T("Conectar navegador", "Connect browser"));
         } catch (Exception ex) { ShowNotice(ex.Message, true); }
+    }
+
+    async Task ClearSaveBackups(Button button,Func<FixedInstaller.SaveBackupCleanup> preview){
+        button.Enabled=false;
+        ShowNotice(T("Conferindo os backups…","Checking backups…"));
+        try{
+            var plan=await Task.Run(preview);
+            if(IsDisposed)return;
+            if(plan.Count==0){ShowNotice(T("Nenhum backup antigo identificado.","No old backups identified."));return;}
+            string summary=String.Format(T(
+                "Excluir {0:N0} backups antigos de saves ({1})? A cópia mais recente, os saves originais e os backups dos mods serão preservados.",
+                "Delete {0:N0} old save backups ({1})? The latest copy, original saves and mod backups will be kept."),
+                plan.Count,GeneralStorageSize.Format(plan.Bytes));
+            if(GeneralDialog.Message(this,summary,button.Text,MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes){
+                ShowNotice("");return;
+            }
+            var result=await Task.Run(()=>{
+                int skipped;
+                long bytes=plan.Apply(out skipped);
+                return Tuple.Create(bytes,skipped);
+            });
+            if(IsDisposed)return;
+            string notice=T("Espaço liberado: ","Space freed: ")+GeneralStorageSize.Format(result.Item1);
+            if(result.Item2>0)notice+=" · "+String.Format(T("Backups não removidos: {0:N0}","Backups skipped: {0:N0}"),result.Item2);
+            ShowNotice(notice);
+        }catch(Exception ex){if(!IsDisposed)ShowNotice(ex.Message,true);}
+        finally{if(!IsDisposed)button.Enabled=true;}
     }
 
     void ClearOldCopies(Func<DownloadCache.CleanupPlan> preview){

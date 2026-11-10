@@ -46,7 +46,7 @@ jobs:
           if ($install.ExitCode -ne 0 -or !(Test-Path "$installed/Update.exe") -or !(Test-Path "$installed/current/LoaderDev.exe") -or !(Test-Path "$installed/current/sq.version")) {
             throw 'O Setup não criou a instalação Dev esperada.'
           }
-          foreach ($test in @('paths','updates')) {
+          foreach ($test in @('paths','updates','save-backups')) {
             $result = Start-Process -FilePath "$installed/current/LoaderDev.exe" -ArgumentList "--self-test-$test", ('"' + $fixture.FullName + '"') -PassThru -Wait -WindowStyle Hidden
             if ($result.ExitCode -ne 0) { throw "Teste Dev falhou: $test." }
           }

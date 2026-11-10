@@ -331,7 +331,7 @@ public sealed partial class FixedInstaller {
             string ledger=Safe.In(Data,(localImport?"importados/":"")+id+".json");Save(ledger,receipt);
             OnlineDiagnostics.Record("install.begin",null,"Pacotes preparados; iniciando cópia para o jogo.",new{Game=game,Receipt=id,Mods=pending.Select(m=>m.Id).ToArray(),Files=pending.Sum(m=>m.Files.Count)});
             try {
-                BackupSaves(Safe.In(Data,"backups/"+id+"/saves"));
+                BackupSaves();
                 receipt.Status="instalando";Save(ledger,receipt);int written=0;
                 foreach(var m in pending)foreach(var f in m.Files) {
                     Closed();string dest=Safe.In(game,f.Path);Safe.NoLinks(dest);
@@ -372,10 +372,14 @@ public sealed partial class FixedInstaller {
     }
     void Save(string path,OnlineReceipt r){var plain=Encoding.UTF8.GetBytes(Safe.Json.Serialize(r));Safe.WriteJson(path,new ReceiptEnvelope{Protected=Convert.ToBase64String(ProtectedData.Protect(plain,null,DataProtectionScope.CurrentUser))});}
     OnlineReceipt ReadReceipt(string path){return ReadReceiptCore(path,false);}
-    OnlineReceipt ReadReceiptCore(string path,bool inspection) {
+    OnlineReceipt ReadReceiptEnvelope(string path,bool inspection) {
         Safe.NoLinks(path);if(new FileInfo(path).Length>8000000)throw new IOException("Registro excessivo.");OnlineReceipt r;
         try{var envelope=Safe.Json.Deserialize<ReceiptEnvelope>(inspection?GeneralProjectStorage.ReadText(path,8000000):File.ReadAllText(path));r=Safe.Json.Deserialize<OnlineReceipt>(Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(envelope.Protected),null,DataProtectionScope.CurrentUser)));}
         catch(Exception ex){if(ex is OutOfMemoryException)throw;throw new IOException("Registro alterado, corrompido ou criado por outra conta do Windows. Nenhum arquivo será removido.");}
+        return r;
+    }
+    OnlineReceipt ReadReceiptCore(string path,bool inspection) {
+        var r=ReadReceiptEnvelope(path,inspection);
         if(r==null||r.CatalogId!=catalog.Id||!Regex.IsMatch(r.Id??"","^[a-f0-9]{32}$")||Path.GetFileName(path)!=r.Id+".json"||r.Files==null||r.Files.Count>20000||r.Mods==null)throw new IOException("Registro inválido. Não foi alterado nenhum arquivo.");
         if(r.Operation==ExtraResetOperation){ValidateExtraResetReceipt(r,path);return r;}
         if(r.Operation==LocalModPackage.ReceiptOperation){
@@ -447,9 +451,5 @@ public sealed partial class FixedInstaller {
     }
     string UpgradeBackup(OnlineReceipt receipt,string relative) {
         using(var sha=SHA256.Create())return Safe.In(Data,"backups/"+receipt.Id+"/fpv-originais/"+Safe.Hex(sha.ComputeHash(Encoding.UTF8.GetBytes(relative)))+".bin");
-    }
-    void BackupSaves(string dest) {
-        if(String.IsNullOrEmpty(saves)||!Directory.Exists(saves))return;Safe.NoLinks(saves);var dirs=new Stack<string>();dirs.Push(saves);
-        while(dirs.Count>0){string dir=dirs.Pop();Safe.NoLinks(dir);foreach(string sub in Directory.GetDirectories(dir)){Safe.NoLinks(sub);dirs.Push(sub);}foreach(string source in Directory.GetFiles(dir)){Safe.NoLinks(source);string relative=source.Substring(saves.TrimEnd('\\').Length+1).Replace('\\','/');string target=Safe.In(dest,relative);Directory.CreateDirectory(Path.GetDirectoryName(target));File.Copy(source,target,false);if(Safe.Hash(source)!=Safe.Hash(target))throw new IOException("Backup de saves não conferiu.");}}
     }
 }
