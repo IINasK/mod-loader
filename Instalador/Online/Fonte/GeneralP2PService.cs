@@ -71,6 +71,11 @@ internal sealed partial class P2PService : IDisposable {
     }
     internal string ApplicationData {get{return installedData;}}
     internal bool Installing {get{return installedSessions.Any(s=>s.Stage!=null&&!s.Completed&&String.IsNullOrEmpty(s.Error));}}
+    internal bool HasActiveTransfers {get{
+        return Installing||SnapshotSessions().Any(session=>!session.Completed&&!session.Discarded&&
+            !session.Paused&&!session.Held&&!session.RecoveryPending&&String.IsNullOrEmpty(session.Error)&&
+            (!session.Sender||session.Peer!=null||session.Recipients.Any(recipient=>!Terminal(recipient.Phase))));
+    }}
     readonly object manifestsLock=new object();
     readonly Dictionary<string,P2PManifest> allowedManifests=new Dictionary<string,P2PManifest>();
     internal P2PService(string root,string store,bool localOnly=false,bool offerRecovery=false){
