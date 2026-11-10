@@ -8,6 +8,9 @@ internal static class RetiredPackEntries {
     internal const string RadioId="SpotOnRadio";
     internal const string RadioArchiveHash="1b55f0713673221f18e9c619f9e990456383be781ebe611dd0fa08927da62f13";
     internal const string HotlineId="15-NCPDHotline", HotlineHash="d493b3db9c77fe5895f7eb6b697f70a02ec3dbb0db90b038181ed825c0a16658";
+    internal const string Map8KId="mod-17811", RipperPantsId="mod-18084";
+    internal const string Map8KHash="95602fb43a0ae73bf0c78f102258dcdea0f2c377729d4ac95d4d3b60eaefa0c5";
+    internal const string RipperPantsHash="1b777f045286f9914a7888324438709aa7e4fa890ff00dbc5ba1c514c503750e";
     internal const string DroneId="mod-31642";
     internal const string DroneArchiveHash="6f0114f760f0d37d109f006955cc435d16a97b22a92c1987ec93a018b2183467";
     static readonly string[] DroneFolders={
@@ -25,10 +28,19 @@ internal static class RetiredPackEntries {
             file.Sha256=="5036a02f8c9163f7035f6a6f2cb58de0d99d62fab572c8cafe6faea3faef3789";
     }
 
-    internal static bool PreparedArchive(ModImportItem item){return item!=null&&item.Kind=="Arquivo"&&(item.Sha256==HotlineHash||item.Sha256==DroneArchiveHash||item.Sha256==RadioArchiveHash||EmptyStoreHashes.Contains(item.Sha256));}
+    static readonly HashSet<string> RetiredIds=new HashSet<string>(EmptyStoreIds.Concat(new[]{
+        HotlineId,DroneId,RadioId,"mod-12572",Map8KId,RipperPantsId
+    }),StringComparer.Ordinal);
+    static readonly HashSet<string> RetiredHashes=new HashSet<string>(EmptyStoreHashes.Concat(new[]{
+        HotlineHash,DroneArchiveHash,RadioArchiveHash,Map8KHash,RipperPantsHash
+    }),StringComparer.Ordinal);
+    static readonly HashSet<string> RetiredArchiveIds=new HashSet<string>(RetiredHashes.Select(hash=>"file-"+hash),StringComparer.Ordinal);
+
+    internal static bool PreparedArchive(ModImportItem item){return item!=null&&item.Kind=="Arquivo"&&RetiredHashes.Contains(item.Sha256);}
     internal static HashSet<string> Remove(GeneralModList list){
         // Retire only known built-in identities; a new custom item remains the user's choice.
-        var removed=new HashSet<string>(list.Mods.Where(mod=>EmptyStoreIds.Contains(mod.Id)||EmptyStoreHashes.Any(h=>mod.Id=="file-"+h)||mod.Id==HotlineId||mod.Id=="file-"+HotlineHash||mod.Id==RadioId||mod.Id=="file-"+RadioArchiveHash||mod.Id=="mod-12572"||mod.Id==DroneId||mod.Id=="file-"+DroneArchiveHash||mod.Variants.Any(v=>EmptyStoreIds.Contains(v.CyberpunkId)||v.CyberpunkId==HotlineId||v.CyberpunkId==RadioId||v.CyberpunkId=="mod-12572"||v.CyberpunkId==DroneId)).Select(mod=>mod.Id),StringComparer.Ordinal);
+        var removed=new HashSet<string>(list.Mods.Where(mod=>RetiredIds.Contains(mod.Id)||RetiredArchiveIds.Contains(mod.Id)||
+            mod.Variants.Any(variant=>RetiredIds.Contains(variant.CyberpunkId))).Select(mod=>mod.Id),StringComparer.Ordinal);
         list.Mods.RemoveAll(mod=>removed.Contains(mod.Id));
         foreach(var preset in list.Presets)preset.ModIds.RemoveAll(removed.Contains);
         return removed;

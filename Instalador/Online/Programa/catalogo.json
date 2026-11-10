@@ -14133,46 +14133,6 @@
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/29619?tab=files&file_id=159826"
     },
     {
-      "Id": "mod-17811",
-      "Name": "Realistic Map · 8K",
-      "Version": "1.0.0",
-      "Profile": "Complementos",
-      "GameVersion": "2.5",
-      "RequiresPL": false,
-      "RequiresRedmod": false,
-      "Immutable": false,
-      "Dependencies": [],
-      "Warning": "",
-      "Assets": [
-        {
-          "Id": "a0",
-          "Name": "Realistic Map 8K-17811-1-0-0-1750282678.zip",
-          "Sha256": "95602fb43a0ae73bf0c78f102258dcdea0f2c377729d4ac95d4d3b60eaefa0c5",
-          "Size": 64108949,
-          "Format": "zip",
-          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/17811?tab=files&file_id=111746",
-          "ModId": 17811,
-          "FileId": 111746
-        }
-      ],
-      "Files": [
-        {
-          "Asset": "a0",
-          "Entry": "archive/pc/mod/RealisticMap8K.archive",
-          "Path": "archive/pc/mod/RealisticMap8K.archive",
-          "Size": 64110592,
-          "Sha256": "78e2d9015912c99be8e7b354ba4365c45b4cf47bb8c1ac0e420a260be5fc9aba",
-          "UserData": false
-        }
-      ],
-      "ThirdPerson": "Compatível por escopo",
-      "ThirdPersonNotes": "Substitui a imagem do mapa; não altera corpo, câmera ou física. Somente uma variante: não misture 4K/8K/16K/32K. Foram relatados mapa escuro e desalinhamento em outras instalações; observar zoom, rotas e marcadores após instalar.",
-      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/17811?tab=files&file_id=111746",
-      "PhantomLibertyStatus": "unverified",
-      "PhantomLibertyNotes": "Nenhum requisito explícito de Phantom Liberty. A textura está em archive/pc/mod; cobertura de Dogtown e execução sem DLC não testadas.",
-      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/17811?tab=files&file_id=111746"
-    },
-    {
       "Id": "mod-3486",
       "Name": "Better Loot Markers",
       "Version": "1.4.1",
@@ -18891,73 +18851,6 @@
           "Path": "r6/tweaks/raem/rm_legs_novawear.yaml",
           "Size": 4975,
           "Sha256": "853a3728087d201ef33b345491b627fadb86ef1b003cf2a3e4ea2ab5567c6b0e"
-        }
-      ]
-    },
-    {
-      "Id": "mod-18084",
-      "Name": "Ripper Pants and Belt",
-      "Version": "1.2",
-      "Profile": "Complementos",
-      "GameVersion": "2.5",
-      "RequiresPL": false,
-      "RequiresRedmod": false,
-      "Immutable": false,
-      "Dependencies": [
-        "ArchiveXL",
-        "TweakXL",
-        "mod-6945",
-        "CET",
-        "mod-14210",
-        "mod-10437"
-      ],
-      "Description": "Calças em três comprimentos e 36 cores por comprimento; cinto em 40 cores para ambos os V.\n\nComo usar: Refits automáticos incluídos. Toggle em Thigh Left esconde bolsos e tiras. Física do cinto é um download opcional e não é recomendada com rig deform. Comprar em clothes – main store. Em NightCoop, houve crashes recorrentes ao receber um jogador equipado com Ripper Cargo Black. Troque por uma calça original no equipamento e no conjunto ativo do Equipment-EX antes de entrar no mundo.\n\nDependências: ArchiveXL, TweakXL, Equipment-EX, CET, raem's Atelier Store, The Community Palette Project.\n\nInstalação e arquivos conferidos.",
-      "Warning": "Refits automáticos incluídos. Toggle em Thigh Left esconde bolsos e tiras. Física do cinto é um download opcional e não é recomendada com rig deform. Comprar em clothes – main store. Em NightCoop, houve crashes recorrentes ao receber um jogador equipado com Ripper Cargo Black. Troque por uma calça original no equipamento e no conjunto ativo do Equipment-EX antes de entrar no mundo.",
-      "PhantomLibertyStatus": "not-required",
-      "PhantomLibertyNotes": "Sem exigência explícita de expansão; runtime sem DLC não testado.",
-      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/18084",
-      "NexusModId": 18084,
-      "NexusFileId": 151532,
-      "Assets": [
-        {
-          "Id": "a0",
-          "Name": "Ripper pants - Main File 18084 1.2 2026-07-09T20-08Z OCk3C5LI5.zip",
-          "Size": 47944944,
-          "Sha256": "1b777f045286f9914a7888324438709aa7e4fa890ff00dbc5ba1c514c503750e",
-          "Format": "zip",
-          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/18084?tab=files&file_id=151532",
-          "ModId": 18084,
-          "FileId": 151532
-        }
-      ],
-      "Files": [
-        {
-          "Asset": "a0",
-          "Entry": "archive/pc/mod/rm_legs_ripper.archive",
-          "Path": "archive/pc/mod/rm_legs_ripper.archive",
-          "Size": 48381952,
-          "Sha256": "c24bacb008671c0c5abe66acb71362519c754fa3e07298f3f0ec72f818e76bf6"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "archive/pc/mod/rm_legs_ripper.xl",
-          "Path": "archive/pc/mod/rm_legs_ripper.xl",
-          "Size": 9200,
-          "Sha256": "3f5afa9125de45965af5db1be5a273a8139e62fbca7ef9be77dea406d9fa2613"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "r6/tweaks/raem/rm_legs_ripper.yaml",
-          "Path": "r6/tweaks/raem/rm_legs_ripper.yaml",
-          "Size": 3939,
-          "Sha256": "728c3c291e3be8179a09e5b7d6bf7bd586b14b72d7467372b728e0ad3bf84357"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "r6/tweaks/raem/rm_legs_ripper_belt.yaml",
-          "Path": "r6/tweaks/raem/rm_legs_ripper_belt.yaml",
-          "Size": 2205,
-          "Sha256": "773afc2313304d9f9c762f8676af5bd8ca516769e92eba6180e66962b3add3f6"
         }
       ]
     },
