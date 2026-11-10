@@ -237,41 +237,28 @@ internal sealed partial class GeneralModWindow {
             check(form.grid.Columns["Origin"].DisplayIndex==form.grid.Columns.Count-1,
                 "A coluna de origem fica no fim da tabela.");
             check(form.ToggleVersions(bodyRow)&&form.grid.Rows.Cast<DataGridViewRow>()
-                .Where(row=>row.Tag is Work).Select(row=>((Work)row.Tag).Entry.Id)
-                .OrderBy(id=>id,StringComparer.Ordinal).SequenceEqual(new[]{"hyst-ebb-rb","hyst-ebbp-rb"}),
-                "A gaveta abre as duas opções fora de uso em linhas próprias.");
+                .Where(row=>row.Tag is Work).Select(row=>((Work)row.Tag).BodyChoice)
+                .SequenceEqual(new[]{GeneralModLibrary.EbbBody,GeneralModLibrary.PushBody,GeneralModLibrary.NaturalBody}),
+                "A gaveta mostra três escolhas de corpo e mantém Togglable Feet fora dela.");
+            var optionRows=form.grid.Rows.Cast<DataGridViewRow>().Where(row=>row.Tag is Work).ToList();
+            check(optionRows.All(row=>Equals(row.Cells["Origin"].Value,"Mod Loader")&&row.Cells["Size"].Value.ToString()!="—")&&
+                optionRows.Count(row=>Equals(row.Cells["Status"].Tag,true))==1,
+                "Cada opção tem origem e tamanho, com uma única seleção ativa.");
+            var naturalRow=optionRows.Single(row=>((Work)row.Tag).BodyChoice==GeneralModLibrary.NaturalBody);
+            form.OpenRowEditor(naturalRow);
+            check(new GeneralModLibrary(Path.Combine(form.data,"lista.json")).Load().BodyChoice==GeneralModLibrary.NaturalBody&&
+                form.SelectedJobs().Single().BodyChoice==GeneralModLibrary.NaturalBody,
+                "Selecionar Natural salva a escolha e a fila usa a seleção da gaveta.");
             check(form.ToggleVersions(form.ModRows().Single(row=>(string)row.Cells["Name"].Value=="Big Body"))&&
                 !form.grid.Rows.Cast<DataGridViewRow>().Any(row=>row.Tag is Work),
                 "A gaveta fecha sem duplicar itens selecionáveis.");
             var baseVersions=form.BigBodyVersions(form.state.List.Mods,false);
             var dlcVersions=form.BigBodyVersions(form.state.List.Mods,true);
-            check(baseVersions.Count==3&&baseVersions.Any(work=>work.Entry.Id==GeneralModLibrary.VanillaFeetId)&&
-                baseVersions.Where(work=>GeneralModLibrary.IsHystBody(work.Entry.Id)).All(work=>work.Variant.Id=="with-refit-base"&&work.Variant.Sources.Count==2)&&
-                dlcVersions.Where(work=>GeneralModLibrary.IsHystBody(work.Entry.Id)).All(work=>work.Variant.Id=="with-refit-dlc"&&work.Variant.Sources.Count==3),
-                "Big Body oferece as três opções e usa os refits corretos com ou sem a expansão.");
-            bool sawBodyPicker=false;
-            Exception bodyPickerFailure=null;
-            using(var timer=new System.Windows.Forms.Timer{Interval=25}){
-                timer.Tick+=(s,e)=>{
-                    var picker=Application.OpenForms.OfType<GeneralModAlternativeDialog>().FirstOrDefault();
-                    if(picker==null)return;
-                    timer.Stop();
-                    try{
-                        var choices=AllControls(picker).OfType<GeneralPicker>().Single(control=>control.Name=="AlternativeChoices");
-                        sawBodyPicker=choices.Items.Count==3&&choices.Items.Cast<object>().Any(value=>value.ToString().Contains("Natural (EBBN)"));
-                        choices.SelectedIndex=choices.Items.Cast<object>().ToList().FindIndex(value=>value.ToString().Contains("Push-Up"));
-                        AllControls(picker).OfType<Button>().Single(button=>button.Name=="UseAlternative").PerformClick();
-                    }catch(Exception ex){bodyPickerFailure=ex;picker.Close();}
-                };
-                timer.Start();
-                bool canceled;
-                var bodyChoice=form.ChooseBigBody(form.state.List.Mods,root,out canceled);
-                if(bodyPickerFailure!=null)throw new IOException("Falha no teste do seletor Big Body.",bodyPickerFailure);
-                check(sawBodyPicker&&!canceled&&bodyChoice!=null&&bodyChoice.Entry.Id=="hyst-ebbp-rb"&&bodyChoice.SwitchAlternatives,
-                    "O pop-up do Big Body lista três versões e confirma a opção Push-Up.");
-            }
-            var baseNatural=baseVersions.Single(work=>work.Entry.Id=="hyst-ebb-rb");
-            var basePush=baseVersions.Single(work=>work.Entry.Id=="hyst-ebbp-rb");
+            check(baseVersions.Count==3&&baseVersions.All(work=>work.Variant.Id=="with-refit-base"&&work.Variant.Sources.Count==2)&&
+                dlcVersions.All(work=>work.Variant.Id=="with-refit-dlc"&&work.Variant.Sources.Count==3),
+                "As três opções usam os refits corretos com ou sem a expansão.");
+            var baseNatural=baseVersions.Single(work=>work.BodyChoice==GeneralModLibrary.NaturalBody);
+            var basePush=baseVersions.Single(work=>work.BodyChoice==GeneralModLibrary.PushBody);
             baseNatural.Variant.RequiredMods.Add("ArchiveXL");
             basePush.Variant.RequiredMods.Add("Codeware");
             var linked=form.WithLinkedDependencies(new List<Work>{baseNatural});

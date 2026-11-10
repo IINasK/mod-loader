@@ -54,6 +54,8 @@ internal sealed partial class GeneralModWindow {
             var mod=byId[(string)row.Tag];row.Cells["Size"].Value=ModSpace(mod);row.Cells["Size"].ToolTipText=SpaceTip(mod);
         }
         foreach(DataGridViewRow row in grid.Rows){
+            var work=row.Tag as Work;
+            if(work!=null&&work.BodyChoice!=null)row.Cells["Size"].Value=BodyOptionSpace(work);
             var section=row.Tag as SectionRow;
             if(section!=null&&section.Kind=="heading"){
                 section.Size=CategorySize(section.ModIds);

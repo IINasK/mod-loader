@@ -60,22 +60,18 @@ internal sealed partial class GeneralModWindow {
             realSeed.Mods.Where(mod=>GeneralModLibrary.IsFacialMod(mod.Id)).All(mod=>mod.Category==GeneralModLibrary.BodyCategory),
             "Rostos e alternativas Hyst NSFW compartilham a categoria de corpo.");
         var feet=realSeed.Mods.Single(mod=>mod.Id==GeneralModLibrary.VanillaFeetId);
-        check(bodies.Concat(new[]{feet}).Select(GeneralModLibrary.ChoiceKey).Distinct().Count()==1,
-            "Togglable Feet do corpo padrão e as duas variantes Hyst contam como uma opção.");
-        string bodyGroup=feet.AlternativeGroup;
-        feet.AlternativeGroup=null;
-        check(GeneralModLibrary.GroupBodyOptions(realSeed)&&feet.AlternativeGroup==bodyGroup&&!GeneralModLibrary.GroupBodyOptions(realSeed),
-            "O projeto padrão já salvo recebe o grupo Corpo uma única vez.");
+        check(feet.AlternativeGroup==null&&bodies.Select(GeneralModLibrary.ChoiceKey).Distinct().Count()==1,
+            "As opções Hyst são um grupo e o Togglable Feet permanece independente.");
+        feet.AlternativeGroup=GeneralModLibrary.BodyGroup;
+        check(GeneralModLibrary.GroupBodyOptions(realSeed)&&feet.AlternativeGroup==null&&!GeneralModLibrary.GroupBodyOptions(realSeed),
+            "O projeto salvo retira Togglable Feet do grupo Corpo uma única vez.");
         var independent=new GeneralModEntry{Id="independent",Name="Independente"};
         var jobs=bodies.Concat(new[]{independent}).Select(entry=>new Work{Entry=entry}).ToList();
         var package=new InstalledSnapshotManifest{Project=new GeneralModList{Mods=bodies.Concat(new[]{feet,independent}).ToList()},
-            List=new GeneralModList{Mods=new List<GeneralModEntry>{feet}}};
-        check(InstalledSnapshot.CountOutsidePack(package)==1,"Uma opção enviada satisfaz o grupo sem contar a alternativa no P2P.");
+            List=new GeneralModList{Mods=new List<GeneralModEntry>{bodies[0]}}};
+        check(InstalledSnapshot.CountOutsidePack(package)==2,"Uma opção enviada satisfaz o grupo e o Togglable Feet é contado separadamente.");
         package.List.Mods.Clear();
-        check(InstalledSnapshot.CountOutsidePack(package)==2,"Um grupo ausente conta uma vez no P2P.");
-        var bodyJobs=jobs.Concat(new[]{new Work{Entry=feet}}).ToList();
-        check(ChooseAlternatives(bodyJobs,choices=>feet.Id).Select(work=>work.Entry.Id).SequenceEqual(new[]{independent.Id,feet.Id}),
-            "A fila permite escolher Togglable Feet como alternativa às duas variantes Hyst.");
+        check(InstalledSnapshot.CountOutsidePack(package)==3,"Um grupo ausente conta uma vez no P2P.");
         check(ChooseAlternatives(jobs,choices=>choices[1].Id).Select(work=>work.Entry.Id).SequenceEqual(new[]{bodies[1].Id,independent.Id})&&
             ChooseAlternatives(jobs,choices=>"").Single().Entry==independent&&ChooseAlternatives(jobs,choices=>null)==null&&
             ChooseAlternatives(jobs.Skip(1).ToList(),choices=>{throw new IOException("Uma opção não deve abrir o seletor.");}).Count==2,

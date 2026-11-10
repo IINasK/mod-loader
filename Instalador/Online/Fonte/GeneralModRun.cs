@@ -14,7 +14,7 @@ internal sealed partial class GeneralModWindow {
         internal GeneralModVariant Variant;
         internal bool Ended,Applied,SwitchAlternatives,DependencyQueue,SaveVariant;
         internal HashSet<string> DropConflicts;
-        internal string DropDensity;
+        internal string DropDensity, BodyChoice;
         internal double Fraction;
         internal string Key { get{return GeneralModWindow.Key(Entry,Variant);} }
         internal bool Local { get{return Variant.CyberpunkId==null&&Variant.Sources.All(GeneralModDownload.IsArchivePath);} }
@@ -406,18 +406,6 @@ internal sealed partial class GeneralModWindow {
             var selection=SelectedJobs();
             var command=ClassifyJobs(selection,out jobs);
             if(command==ModAction.None)return;
-            if(jobs.Any(work=>IsBigBody(work.Entry))){
-                var preset=ActivePreset;
-                bool canceled;
-                var chosen=ChooseBigBody(state.List.Mods.Where(mod=>preset==null||preset.ModIds.Contains(mod.Id)),Root(),out canceled);
-                if(canceled)return;
-                jobs.RemoveAll(work=>IsBigBody(work.Entry));
-                if(chosen!=null){
-                    if(chosen.Entry.Id!="hyst-ebb-rb")jobs.RemoveAll(work=>work.Variant.CyberpunkId==GeneralModLibrary.EclipseTattooId);
-                    jobs.Add(chosen);
-                }
-                if(command==ModAction.Disable||command==ModAction.Enable)command=ModAction.Change;
-            }
             if(command==ModAction.ChooseDependency){await EditMod(jobs[0].Entry);return;}
             if(command==ModAction.Disable||command==ModAction.Enable){
                 await ToggleMods(jobs,Root(),command==ModAction.Enable);
@@ -614,12 +602,8 @@ internal sealed partial class GeneralModWindow {
             return;
         }
         string root=Root();
-        var requested=MakeWork(entry);
-        if(IsBigBody(entry)){
-            bool canceled;
-            requested=ChooseBigBody(state.List.Mods,root,out canceled);
-            if(requested==null)return;
-        }
+        var requested=IsBigBody(entry)?BigBodyVersions(new[]{entry},GameEdition.HasPL(root))
+            .First(work=>work.BodyChoice==entry.Id):MakeWork(entry);
         ConfirmAndEnqueue(WithLinkedDependencies(new List<Work>{requested}),root,new string[0],true);
     }
 

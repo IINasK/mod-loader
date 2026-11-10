@@ -11,8 +11,7 @@ internal sealed partial class GeneralModWindow {
     enum ModAction { None, Disable, ChooseDependency, Enable, Change, Install, Download }
 
     static bool IsBigBody(GeneralModEntry mod) {
-        return mod.AlternativeGroup==GeneralModLibrary.BodyGroup&&
-            (mod.Id==GeneralModLibrary.VanillaFeetId||GeneralModLibrary.IsHystBody(mod.Id));
+        return mod.AlternativeGroup==GeneralModLibrary.BodyGroup&&GeneralModLibrary.IsHystBody(mod.Id);
     }
 
     static string ModDisplayName(GeneralModEntry mod) {
@@ -21,38 +20,62 @@ internal sealed partial class GeneralModWindow {
 
     GeneralModEntry BigBodyRepresentative(IEnumerable<GeneralModEntry> entries) {
         var body=entries.Where(IsBigBody).ToList();
-        return body.FirstOrDefault(IsActiveAlternative)??body.FirstOrDefault(mod=>mod.Id==GeneralModLibrary.VanillaFeetId)??body.FirstOrDefault();
+        string preferred=state.BodyChoice==GeneralModLibrary.NaturalBody?GeneralModLibrary.EbbBody:state.BodyChoice;
+        return body.FirstOrDefault(mod=>mod.Id==preferred)??body.FirstOrDefault(IsActiveAlternative)??body.FirstOrDefault();
     }
 
     List<Work> BigBodyVersions(IEnumerable<GeneralModEntry> entries,bool dlc) {
-        return entries.Where(IsBigBody).Select(entry=>{
-            var current=Selected(entry);
-            if(GeneralModLibrary.IsHystBody(entry.Id)&&!IsActiveAlternative(entry)&&!state.ChosenVariants.ContainsKey(entry.Id))
-                current=entry.Variants.FirstOrDefault(variant=>variant.Id==(dlc?"with-refit-dlc":"with-refit-base"))??current;
-            if(!dlc&&current.Id=="with-refit-dlc")
-                current=entry.Variants.FirstOrDefault(variant=>variant.Id=="with-refit-base")??current;
-            return new Work{Entry=entry,Variant=current,SwitchAlternatives=true,SaveVariant=true};
-        }).ToList();
+        var versions=new List<Work>();
+        foreach(var entry in entries.Where(IsBigBody)){
+            var variant=Selected(entry);
+            if(!IsActiveAlternative(entry)&&!state.ChosenVariants.ContainsKey(entry.Id))
+                variant=entry.Variants.FirstOrDefault(option=>option.Id==(dlc?"with-refit-dlc":"with-refit-base"))??variant;
+            if(!dlc&&variant.Id=="with-refit-dlc")
+                variant=entry.Variants.FirstOrDefault(option=>option.Id=="with-refit-base")??variant;
+            versions.Add(new Work{Entry=entry,Variant=variant,BodyChoice=entry.Id,SwitchAlternatives=true,SaveVariant=true});
+            // EBBN is a shape in the EBB + RB archive. A separate choice keeps the shared files under one owner.
+            if(entry.Id==GeneralModLibrary.EbbBody)
+                versions.Add(new Work{Entry=entry,Variant=variant,BodyChoice=GeneralModLibrary.NaturalBody,SwitchAlternatives=true,SaveVariant=true});
+        }
+        return versions.OrderBy(work=>work.BodyChoice==GeneralModLibrary.NaturalBody?2:work.BodyChoice==GeneralModLibrary.PushBody?1:0).ToList();
     }
 
-    Work ChooseBigBody(IEnumerable<GeneralModEntry> entries,string root,out bool canceled) {
-        var versions=BigBodyVersions(entries,IsCyberpunk(root)&&GameEdition.HasPL(root));
-        var active=BigBodyRepresentative(versions.Select(work=>work.Entry));
-        var labels=versions.Select(work=>new GeneralModEntry{
-            Id=work.Entry.Id,Name=work.Entry.Id==GeneralModLibrary.VanillaFeetId
-                ?T("Corpo padrão · Togglable Feet","Vanilla body · Togglable Feet")
-                :work.Entry.Id=="hyst-ebb-rb"?"Hyst EBB + RB · Natural (EBBN)":"Hyst EBBP + RB · Push-Up",
-            Description=(work.Entry.Id==GeneralModLibrary.VanillaFeetId?"":work.Variant.Name+"\r\n")+work.Entry.Description
-        }).ToList();
-        using(var dialog=new GeneralModAlternativeDialog(labels,"Big Body",versions.FindIndex(work=>work.Entry==active))){
-            canceled=dialog.ShowDialog(this)!=DialogResult.OK;
-            return canceled?null:versions.FirstOrDefault(work=>work.Entry.Id==dialog.SelectedId);
-        }
+    static string BodyChoiceLabel(string choice){
+        return choice==GeneralModLibrary.NaturalBody?"EBBN + RB":choice==GeneralModLibrary.PushBody?"EBBP + RB":"EBB + RB";
+    }
+
+    string ActiveBodyChoice(GeneralModEntry entry){
+        return entry.Id==GeneralModLibrary.EbbBody&&state.BodyChoice==GeneralModLibrary.NaturalBody
+            ?GeneralModLibrary.NaturalBody:entry.Id;
+    }
+
+    void SelectBodyChoice(Work choice){
+        if(working||scanning||state.BodyChoice==choice.BodyChoice)return;
+        state.BodyChoice=choice.BodyChoice;
+        Persist();
+        DrawRows();
+        var row=grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(candidate=>candidate.Visible&&
+            candidate.Tag is Work&&((Work)candidate.Tag).BodyChoice==choice.BodyChoice);
+        if(row!=null)grid.CurrentCell=row.Cells["Name"];
     }
 
     List<Work> SelectedJobs() {
         var jobs = Marked();
-        if (jobs.Count == 0 && FocusedEntry() != null) jobs.Add(MakeWork(FocusedEntry()));
+        var focused=FocusedEntry();
+        if(jobs.Count==0){
+            var child=grid.CurrentRow==null?null:grid.CurrentRow.Tag as Work;
+            if(focused!=null)jobs.Add(MakeWork(focused));
+            else if(child!=null&&child.BodyChoice!=null&&child.BodyChoice==state.BodyChoice)jobs.Add(child);
+        }
+        int index=jobs.FindIndex(work=>IsBigBody(work.Entry));
+        if(index>=0){
+            var entry=jobs[index].Entry;
+            var chosen=BigBodyVersions(new[]{entry},IsCyberpunk(state.Destination)&&GameEdition.HasPL(state.Destination))
+                .Single(work=>work.BodyChoice==ActiveBodyChoice(entry));
+            jobs[index]=chosen;
+            jobs.RemoveAll(work=>work.Entry.Id==GeneralModLibrary.VanillaFeetId||
+                chosen.Entry.Id!=GeneralModLibrary.EbbBody&&work.Entry.Id==GeneralModLibrary.EclipseTattooId);
+        }
         return jobs;
     }
 
@@ -63,8 +86,7 @@ internal sealed partial class GeneralModWindow {
         if(status==GeneralStatusPresentation.NexusManual)return ModAction.None;
         if(GeneralModLibrary.NeedsDependencyVersion(work.Entry,work.Variant))return ModAction.ChooseDependency;
         bool active = GeneralStatusPresentation.Kind(status) == "installed";
-        if(IsBigBody(work.Entry)&&(active||status==GeneralStatusPresentation.ManualBody))
-            return ModAction.Change;
+
         if (active) {
             if (work.Variant.CyberpunkId == null || !Recipe(work).Immutable) return ModAction.Disable;
             return ModAction.None;
@@ -93,7 +115,7 @@ internal sealed partial class GeneralModWindow {
         var actions = jobs.Select(work => new { Work = work, Action = ActionFor(work, ids) }).ToList();
         var command = actions.Count == 0 ? ModAction.None : actions.Max(item => item.Action);
         actionable = actions.Where(item => command == ModAction.Download
-            ? item.Action == ModAction.Download || item.Action == ModAction.Install
+            ? item.Action == ModAction.Download || item.Action == ModAction.Install || item.Work.BodyChoice!=null&&item.Action==ModAction.Change
             : command != ModAction.None && item.Action == command).Select(item => item.Work).ToList();
         return command;
     }
@@ -339,6 +361,13 @@ internal sealed partial class GeneralModWindow {
                     return GeneralStatusPresentation.Kind(status) == "installed" || status == GeneralStatusPresentation.ManualBody;
                 });
             if (conflict != null) found.Add(conflict);
+        }
+        if(IsBigBody(incoming.Entry)){
+            var feet=state.List.Mods.FirstOrDefault(entry=>entry.Id==GeneralModLibrary.VanillaFeetId);
+            if(feet!=null){
+                var existing=MakeWork(feet);
+                if(GeneralStatusPresentation.Kind(Status(existing,root))=="installed")found.Add(existing);
+            }
         }
         if(IsBigBody(incoming.Entry)&&incoming.Entry.Id!="hyst-ebb-rb"&&found.Any(old=>old.Entry.Id=="hyst-ebb-rb")){
             var eclipse=state.List.Mods.FirstOrDefault(entry=>entry.Id==GeneralModLibrary.EclipseTattooId);

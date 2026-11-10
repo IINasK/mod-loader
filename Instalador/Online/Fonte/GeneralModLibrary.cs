@@ -50,7 +50,7 @@ public sealed class GeneralModState {
     public string Destination, DownloadFolder;
     internal string TemplateId, ProjectName;
     internal bool TemplateSubset;
-    public string Theme = "light", Language = "pt", SelectedPreset;
+    public string Theme = "light", Language = "pt", SelectedPreset, BodyChoice;
     public GeneralModList List = new GeneralModList();
     public Dictionary<string, string> ChosenVariants = new Dictionary<string, string>();
     public Dictionary<string, string> ResolvedDownloads = new Dictionary<string, string>();
@@ -67,8 +67,9 @@ public sealed class GeneralModLibrary {
     internal const string BodyCategory = "Melhorias do corpo";
     internal const string VanillaFeetId = "mod-7049";
     internal const string BodyGroup = "hyst-femv-body";
+    internal const string EbbBody = "hyst-ebb-rb", PushBody = "hyst-ebbp-rb", NaturalBody = "hyst-ebbn-rb";
     internal const string EclipseTattooId = "mod-33230";
-    internal static bool IsHystBody(string id) { return id == "hyst-ebb-rb" || id == "hyst-ebbp-rb"; }
+    internal static bool IsHystBody(string id) { return id == EbbBody || id == PushBody; }
     internal static bool IsFacialMod(string id) { return id.StartsWith("face-", StringComparison.Ordinal); }
     readonly string statePath;
 
@@ -129,11 +130,16 @@ public sealed class GeneralModLibrary {
 
     internal static bool GroupBodyOptions(GeneralModList list) {
         if(!list.Mods.Any(mod=>IsHystBody(mod.Id)))return false;
-        var ungrouped=list.Mods.Where(mod=>(mod.Id==VanillaFeetId||IsHystBody(mod.Id))&&mod.AlternativeGroup!=BodyGroup).ToList();
-        foreach(var mod in ungrouped)mod.AlternativeGroup=BodyGroup;
-        var feet=list.Mods.FirstOrDefault(mod=>mod.Id==VanillaFeetId&&mod.Category!=BodyCategory);
-        if(feet!=null)feet.Category=BodyCategory;
-        return ungrouped.Count!=0||feet!=null;
+        bool changed=false;
+        foreach(var body in list.Mods.Where(mod=>IsHystBody(mod.Id))){
+            if(body.AlternativeGroup!=BodyGroup){body.AlternativeGroup=BodyGroup;changed=true;}
+            foreach(string tag in new[]{"Appearance","Body"}){
+                if(body.Tags.Count<32&&!body.Tags.Contains(tag,StringComparer.OrdinalIgnoreCase)){body.Tags.Add(tag);changed=true;}
+            }
+        }
+        var feet=list.Mods.FirstOrDefault(mod=>mod.Id==VanillaFeetId&&mod.AlternativeGroup==BodyGroup);
+        if(feet!=null){feet.AlternativeGroup=null;changed=true;}
+        return changed;
     }
 
     internal static bool GroupColorAvailable(GeneralModList list,string groupId,string color) {

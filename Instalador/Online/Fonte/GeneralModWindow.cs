@@ -277,6 +277,7 @@ internal sealed partial class GeneralModWindow : Form {
             var section=row.Tag as SectionRow;
             if(section!=null&&section.Kind=="heading"&&e.KeyCode==Keys.Enter)ToggleCategory(row,section);
             else if(section!=null)HandleSection(section);
+            else if(e.KeyCode==Keys.F2&&row.Tag is Work&&!working&&!scanning)EditBodyOption((Work)row.Tag);
             else if(e.KeyCode!=Keys.Enter||grid.CurrentCell.OwningColumn.Name!="Variant"||!ToggleVersions(row))OpenRowEditor(row);
         };
         grid.RowPrePaint+=PaintSection;grid.CellPainting+=PaintName;
@@ -579,7 +580,7 @@ internal sealed partial class GeneralModWindow : Form {
     void AddVersionRows(GeneralModEntry entry,GeneralModVariant active,DataGridViewRow parent,bool hidden){
         var versions=IsBigBody(entry)
             ?BigBodyVersions(state.List.Mods,IsCyberpunk(state.Destination)&&GameEdition.HasPL(state.Destination))
-                .Where(work=>work.Entry!=entry).ToList()
+                .Where(work=>ActivePreset==null||ActivePreset.ModIds.Contains(work.Entry.Id)).ToList()
             :entry.Variants.Where(variant=>variant!=active).Select(variant=>new Work{Entry=entry,Variant=variant}).ToList();
         if(versions.Count==0)return;
         var cell=parent.Cells["Variant"];
@@ -587,20 +588,42 @@ internal sealed partial class GeneralModWindow : Form {
         cell.Style.Padding=new Padding(10,0,30,0);
         cell.ToolTipText=T("Mostrar ou ocultar outras versões","Show or hide other versions");
         if(!expandedVersions.Contains(DrawerKey(entry)))return;
+        bool body=IsBigBody(entry);
+        if(body)parent.Cells["Mark"].Tag="body-branch";
         for(int index=0;index<versions.Count;index++){
             var work=versions[index];
-            bool body=IsBigBody(entry);
-            string name=work.Entry.Name;
-            string label=body?NexusVariantName(work.Entry):work.Variant.Name;
-            var row=grid.Rows[grid.Rows.Add(null,name,label)];
+            string name=body&&work.BodyChoice==GeneralModLibrary.NaturalBody?"Hyst EBBN + RB (Natural)":work.Entry.Name;
+            string label=body?BodyChoiceLabel(work.BodyChoice):work.Variant.Name;
+            bool chosen=body&&work.BodyChoice==ActiveBodyChoice(entry);
+            string status=body?(chosen?T("Selecionado","Selected"):T("Não selecionado","Not selected")):null;
+            var row=grid.Rows[grid.Rows.Add(null,name,label,status,null,body?BodyOptionSpace(work):null)];
             row.Tag=work;
             row.Height=36;
             row.ReadOnly=true;
             row.Cells["Mark"].Tag=index==versions.Count-1?CategoryBranch.Last:CategoryBranch.Middle;
             row.Cells["Name"].Style.ForeColor=row.Cells["Name"].Style.SelectionForeColor=GeneralStyle.Muted;
-            row.Cells["Name"].ToolTipText=T("Dê dois cliques para abrir esta versão","Double-click to open this version");
+            row.Cells["Name"].ToolTipText=body?T("Dê dois cliques para escolher esta opção. F2 abre os detalhes.","Double-click to select this option. F2 opens details."):
+                T("Dê dois cliques para abrir esta versão","Double-click to open this version");
+            if(body){
+                row.Cells["Status"].Tag=chosen;
+                row.Cells["Status"].ToolTipText=GeneralStatusPresentation.Label(ListStatus(work.Entry));
+                row.Cells["Size"].ToolTipText=row.Cells["Size"].Value.ToString().StartsWith("≈",StringComparison.Ordinal)
+                    ?T("Tamanho do download. O espaço instalado ainda não foi medido.","Download size. Installed size has not been measured."):SpaceTip(work.Entry);
+                row.Cells["Origin"].Value=parent.Cells["Origin"].Value;
+                row.Cells["Origin"].ToolTipText=parent.Cells["Origin"].ToolTipText;
+            }
             if(hidden)row.Visible=false;
         }
+    }
+
+    string BodyOptionSpace(Work work){
+        long installed;
+        if(IsActiveAlternative(work.Entry)&&measuredMods.TryGetValue(work.Entry.Id,out installed))return GeneralStorageSize.Format(installed);
+        var sizes=work.Variant.Sources.Distinct(StringComparer.Ordinal).Select(source=>{
+            GeneralSourceInfo info;
+            return work.Variant.SourceInfo.TryGetValue(source,out info)?info.Bytes:0;
+        }).ToList();
+        return sizes.Count>0&&sizes.All(size=>size>0)?"≈ "+GeneralStorageSize.Format(sizes.Sum()):"—";
     }
 
     bool CanToggleCategory { get { return associationChoice==null&&coverageFilter==null&&searchTerms.Length==0; } }
@@ -724,8 +747,22 @@ internal sealed partial class GeneralModWindow : Form {
         }
         if(e.RowIndex>=0&&e.ColumnIndex==0&&grid.Rows[e.RowIndex].Tag is Work){
             e.PaintBackground(e.ClipBounds,true);
-            PaintCategoryBranch(e.Graphics,e.CellBounds,(CategoryBranch)grid.Rows[e.RowIndex].Cells[0].Tag);
+            var bounds=e.CellBounds;
+            bounds.X+=(bounds.Width/2)-10;bounds.Width-=(e.CellBounds.Width/2)-10;
+            PaintCategoryBranch(e.Graphics,bounds,(CategoryBranch)grid.Rows[e.RowIndex].Cells[0].Tag);
             e.Handled=true;return;
+        }
+        if(e.RowIndex>=0&&e.ColumnIndex==0&&Equals(grid.Rows[e.RowIndex].Cells[0].Tag,"body-branch")){
+            e.Paint(e.ClipBounds,DataGridViewPaintParts.All);
+            int spine=e.CellBounds.Left+e.CellBounds.Width/2;
+            using(var pen=new Pen(Color.FromArgb(160,GeneralStyle.Line)))
+                e.Graphics.DrawLine(pen,spine,e.CellBounds.Top+e.CellBounds.Height/2+8,spine,e.CellBounds.Bottom);
+            e.Handled=true;return;
+        }
+        if(e.RowIndex>=0&&e.ColumnIndex==grid.Columns["Status"].Index&&grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Tag is bool){
+            bool selected=(bool)grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Tag;
+            PaintBadge(e,Convert.ToString(e.FormattedValue),selected?Color.FromArgb(19,109,87):GeneralStyle.Selection,GeneralStyle.Foreground);
+            return;
         }
         if(e.RowIndex>=0&&e.ColumnIndex==grid.Columns["Variant"].Index&&grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Tag is List<Work>){
             e.Paint(e.ClipBounds,DataGridViewPaintParts.All);
@@ -738,7 +775,7 @@ internal sealed partial class GeneralModWindow : Form {
             var item=grid.Rows[e.RowIndex].Tag;
             e.PaintBackground(e.ClipBounds,true);
             var bounds=e.CellBounds;
-            if(item is string){
+            if(item is string||item is Work&&((Work)item).BodyChoice!=null){
                 var icon=new Rectangle(bounds.X+(bounds.Width-20)/2,bounds.Y+(bounds.Height-20)/2,20,20);
                 ModLoaderBrand.Draw(e.Graphics,icon,true);
             }else if(item is P2PSyncDifference){
@@ -762,7 +799,7 @@ internal sealed partial class GeneralModWindow : Form {
         string id=row.Tag as string;
         if(id==null&&child==null)return;
         var mod=child!=null?child.Entry:state.List.Mods.Single(m=>m.Id==id);
-        var tags=child==null?mod.Tags:Enumerable.Empty<string>();
+        var tags=child==null||child.BodyChoice!=null?mod.Tags:Enumerable.Empty<string>();
         var groups=row.Cells["Group"].Tag as List<KeyValuePair<string,Color>>;
         if(!mod.Nsfw&&!tags.Any()&&groups==null)return;
         string name=Convert.ToString(e.FormattedValue);
@@ -885,13 +922,14 @@ internal sealed partial class GeneralModWindow : Form {
         var id=row.Tag as string;
         if(id!=null){
             var mod=state.List.Mods.Single(item=>item.Id==id);
-            if(IsBigBody(mod)&&!scanning&&!working){
-                bool canceled;
-                var chosen=ChooseBigBody(state.List.Mods,state.Destination,out canceled);
-                if(chosen!=null)EditBodyOption(chosen);
-            }else Edit(mod);
+            if(IsBigBody(mod)){if(!working&&!scanning)ToggleVersions(row);}
+            else Edit(mod);
         }
-        else if(row.Tag is Work&&!scanning&&!working)EditBodyOption((Work)row.Tag);
+        else if(row.Tag is Work&&!scanning&&!working){
+            var work=(Work)row.Tag;
+            if(work.BodyChoice!=null)SelectBodyChoice(work);
+            else EditBodyOption(work);
+        }
         else if(row.Tag is P2PSyncDifference)EditDetectedMod((P2PSyncDifference)row.Tag);
     }
 

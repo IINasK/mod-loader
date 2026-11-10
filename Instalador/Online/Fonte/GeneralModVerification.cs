@@ -17,8 +17,7 @@ internal sealed partial class GeneralModWindow {
 
     string NexusVariantName(GeneralModEntry mod) {
         var variant=Selected(mod);
-        if(IsBigBody(mod))return mod.Id==GeneralModLibrary.VanillaFeetId?T("Corpo padrão","Vanilla body"):
-            mod.Id=="hyst-ebb-rb"?"Natural (EBBN)":"Push-Up (EBBP)";
+        if(IsBigBody(mod))return BodyChoiceLabel(ActiveBodyChoice(mod));
         NexusManualMatch match;
         return nexusManual.TryGetValue(mod.Id,out match)&&Object.ReferenceEquals(match.Variant,variant)&&
             !String.IsNullOrEmpty(match.Version)&&!variant.Name.Contains(match.Version)?variant.Name+" · "+match.Version:variant.Name;
