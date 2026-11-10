@@ -981,9 +981,10 @@ internal sealed partial class GeneralModWindow : Form {
                     if(IsDisposed||exitApproved)return;
                 }
                 if(answer!=DialogResult.OK)return;
-                if(existing&&item.Variants.Any(old=>state.SnapshotReceipts.ContainsKey(Key(item,old))&&
+                if(existing&&item.Variants.Any(old=>(state.SnapshotReceipts.ContainsKey(Key(item,old))||
+                    state.CyberpunkImports.Keys.Any(key=>key.StartsWith(Key(item,old)+"/",StringComparison.Ordinal)))&&
                     dialog.Result.Variants.Any(replacement=>replacement.Id==old.Id&&!GeneralInstallRoutes.Same(old.InstallRoutes,replacement.InstallRoutes))))
-                    throw new IOException(T("Desinstale a versão recebida antes de mudar seu destino.","Uninstall the received version before changing its destination."));
+                    throw new IOException(T("Desinstale a versão registrada antes de mudar seu destino.","Uninstall the registered version before changing its destination."));
                 BeginProjectEdit();
                 if(working||IsBigBody(item))dialog.Result.AlternativeGroup=item.AlternativeGroup;
                 else{

@@ -269,14 +269,20 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         var destinationRow=GeneralOptionsDialog.FolderRow(destinationLabel,installRoutes,BrowseInstallFolder);
         browseDestination=(Button)destinationRow.GetControlFromPosition(1,1);
         editorTips.SetToolTip(destinationRow.GetControlFromPosition(0,0),T(
-            "O Cyberpunk usa os destinos do catálogo. Use este campo em projetos de outros jogos.",
-            "Cyberpunk uses the catalog destinations. Use this field for other games."));
+            "Os caminhos do pacote são relativos à pasta do jogo. Use Por arquivo para destinos separados.",
+            "Archive paths are relative to the game folder. Use Per file to set separate destinations."));
         destinationRow.Margin=new Padding(3,4,3,3);
         AddEditorRow(layout,destinationRow);
-        browseContents=GeneralStyle.Button(T("Destinos por arquivo ou pasta","File and folder destinations"),OpenArchiveDestinations);
+        browseContents=GeneralStyle.Button(T("Por arquivo","Per file"),OpenArchiveDestinations);
         browseContents.Name="ArchiveDestinations";
-        browseContents.Margin=new Padding(3,3,3,8);
-        AddEditorRow(layout,browseContents);
+        browseContents.Margin=new Padding(8,0,0,0);
+        browseContents.Dock=DockStyle.Fill;
+        destinationRow.ColumnCount=3;
+        destinationRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        destinationRow.SetColumnSpan(destinationRow.GetControlFromPosition(0,0),3);
+        destinationRow.Controls.Add(browseContents,2,1);
+        editorTips.SetToolTip(browseContents,T("Veja a árvore do pacote e escolha o destino de cada arquivo ou pasta.",
+            "View the archive tree and choose where each file or folder is installed."));
         editorTips.SetToolTip(installRoutes,T(
             "Em branco, usa a raiz do jogo. Para dividir um pacote, separe com |. Exemplo: mods = %GAME%/Mods | config = %APPDATA%/Jogo/Mods",
             "Leave blank to use the game root. Use | to split an archive. Example: mods = %GAME%/Mods | config = %APPDATA%/Game/Mods"));
@@ -639,11 +645,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
             var known=(catalogPaths==null?Enumerable.Empty<string>():catalogPaths(version)).ToArray();
             var paths=known.Length==0?await Task.Run(()=>ReadArchivePaths(File.Exists(local)?local:source)):known;
             if(IsDisposed||current!=version||!String.Equals(sources.Text.Trim(),source,StringComparison.Ordinal))return;
-            if(paths.Length==0) {
-                GeneralDialog.Message(this,T("Use o link do arquivo exato no Nexus ou abra um pacote local para ver a árvore.",
-                    "Use the exact Nexus file link or open a local archive to view its contents."),title,MessageBoxButtons.OK);
-                return;
-            }
+
             var routes=editable?GeneralInstallRoutes.Parse(installRoutes.Text,installationFolder):version.InstallRoutes;
             using(var dialog=new GeneralArchiveDestinations(paths,routes,installationFolder,editable)){
                 if(dialog.ShowDialog(this)==DialogResult.OK&&editable)
@@ -667,9 +669,12 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         }
         var link=GeneralNexusLink.Parse(source);
         if(link==null||link.File==0)return new string[0];
-        var preview=(GeneralNexusInfo.ReadFilePreviews(link,()=>true)??new NexusFilePreview[0])
-            .FirstOrDefault(file=>file.Id==link.File&&file.Files!=null);
-        return preview==null?new string[0]:preview.Files.Keys.ToArray();
+        try{
+            var preview=(GeneralNexusInfo.ReadFilePreviews(link,()=>true)??new NexusFilePreview[0])
+                .FirstOrDefault(file=>file.Id==link.File&&file.Files!=null);
+            return preview==null?new string[0]:preview.Files.Keys.ToArray();
+        }catch(System.Net.WebException){return new string[0];}
+         catch(IOException){return new string[0];}
     }
 
     void BrowseInstallFolder() {
@@ -861,15 +866,16 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         changing = true;
         current = model.FirstOrDefault(variant => variant.Id == id) ?? model[0];
         SyncVariantPicker();
-        bool customDestination=!attachment&&String.IsNullOrEmpty(current.CyberpunkId)&&
-            (String.IsNullOrEmpty(installationFolder)||!File.Exists(Path.Combine(installationFolder,"bin","x64","Cyberpunk2077.exe")));
+        bool customDestination=!attachment&&String.IsNullOrEmpty(current.CyberpunkId);
         installRoutes.ReadOnly=!customDestination;
         browseDestination.Enabled=customDestination;
         RefreshRequiredMods();
         string savedRoute;
         installRoutes.Text=routeDrafts.TryGetValue(current.Id,out savedRoute)?savedRoute:GeneralInstallRoutes.Format(current.InstallRoutes);
         if(!customDestination&&installRoutes.Text.Length==0&&!attachment)
-            installRoutes.Text=T("Destino definido pelo catálogo","Destination defined by the catalog");
+            installRoutes.Text=T("Destino conferido pelo catálogo","Verified catalog destination");
+        editorTips.SetToolTip(browseDestination,customDestination?T("Escolher a pasta do pacote","Choose the folder for the archive"):
+            T("Este item fixo usa os caminhos conferidos do catálogo.","This pinned item uses the catalog's verified paths."));
         LoadSource(0);
         changing = false;
         ValidateInputs();ScheduleSourceInfo();
@@ -1001,6 +1007,8 @@ internal sealed class GeneralArchiveDestinations : GeneralDialog {
     readonly Label destination;
     readonly Button choose, clear;
     readonly bool editable;
+    readonly Label dropTarget;
+    string targetFolder;
     internal readonly List<GeneralInstallRoute> Routes;
 
     internal GeneralArchiveDestinations(IEnumerable<string> paths,IEnumerable<GeneralInstallRoute> routes,string game,bool editable) {
@@ -1036,7 +1044,28 @@ internal sealed class GeneralArchiveDestinations : GeneralDialog {
             }
         }
         root.Expand();
-        layout.Controls.Add(tree,0,0);
+        var panes=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};
+        panes.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,62));
+        panes.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,38));
+        panes.Controls.Add(tree,0,0);
+        dropTarget=new Label{Name="ArchiveDestinationDrop",Dock=DockStyle.Fill,AllowDrop=editable,TextAlign=ContentAlignment.MiddleCenter,
+            Padding=new Padding(12),Margin=new Padding(8,0,0,0),UseMnemonic=false};
+        targetFolder=game;
+        tree.ItemDrag+=(s,e)=>{
+            if(editable&&e.Item is TreeNode)tree.DoDragDrop((TreeNode)e.Item,DragDropEffects.Move);
+        };
+        dropTarget.DragEnter+=(s,e)=>{
+            e.Effect=!String.IsNullOrWhiteSpace(targetFolder)&&e.Data.GetDataPresent(typeof(TreeNode))?DragDropEffects.Move:DragDropEffects.None;
+        };
+        dropTarget.DragDrop+=(s,e)=>{
+            var node=e.Data.GetData(typeof(TreeNode)) as TreeNode;
+            if(node==null||node.TreeView!=tree||String.IsNullOrWhiteSpace(targetFolder))return;
+            tree.SelectedNode=node;
+            ApplyRoute((string)node.Tag,targetFolder);
+        };
+        UpdateDropTarget(paths.Any());
+        panes.Controls.Add(dropTarget,1,0);
+        layout.Controls.Add(panes,0,0);
         destination=GeneralModEditor.LabelFor("");
         destination.Margin=new Padding(3,9,3,6);
         layout.Controls.Add(destination,0,1);
@@ -1068,8 +1097,10 @@ internal sealed class GeneralArchiveDestinations : GeneralDialog {
 
     void ShowDestination(){
         var route=EffectiveRoute();
-        destination.Text=route!=null?route.Destination:editable?GeneralStyle.T("Pasta do jogo","Game folder"):
-            GeneralStyle.T("Destino definido pelo catálogo","Destination defined by the catalog");
+        string path=SelectedPath;
+        string suggested=tree.SelectedNode!=null&&tree.SelectedNode.Nodes.Count==0?Path.GetDirectoryName(path):path;
+        destination.Text=route!=null?route.Destination:
+            String.IsNullOrEmpty(suggested)?GeneralStyle.T("Pasta do jogo","Game folder"):"%GAME%/"+suggested.Replace('\\','/');
         clear.Enabled=route!=null&&String.Equals(route.Folder,SelectedPath,StringComparison.OrdinalIgnoreCase);
     }
 
@@ -1078,13 +1109,28 @@ internal sealed class GeneralArchiveDestinations : GeneralDialog {
             var effective=EffectiveRoute();
             string initial=effective==null?game:GeneralInstallRoutes.DirectoryFor(game,effective.Destination,false);
             string folder=WindowsFolderPicker.Choose(this,Text,initial);
-            if(folder==null)return;
-            string path=SelectedPath;
+            if(folder!=null)ApplyRoute(SelectedPath,folder);
+        }catch(Exception ex){
+            GeneralDialog.Message(this,ex.Message,Text,MessageBoxButtons.OK);
+        }
+    }
+
+    void UpdateDropTarget(bool hasFiles){
+        string help=!editable?GeneralStyle.T("Destinos fixos do catálogo","Pinned catalog destinations"):
+            hasFiles?GeneralStyle.T("Arraste um arquivo ou uma pasta para este destino","Drag a file or folder to this destination"):
+            GeneralStyle.T("Árvore indisponível. Escolha uma pasta para o pacote inteiro.","File tree unavailable. Choose a folder for the whole archive.");
+        dropTarget.Text=help+(String.IsNullOrEmpty(targetFolder)?"":"\r\n\r\n"+targetFolder);
+    }
+
+    void ApplyRoute(string path,string folder){
+        try{
             var rule=GeneralInstallRoutes.Parse(path+" = "+folder,game).Single();
             var updated=Routes.Where(route=>!route.Folder.Equals(path,StringComparison.OrdinalIgnoreCase)).Concat(new[]{rule}).ToList();
             GeneralInstallRoutes.Validate(updated);
             Routes.Clear();
             Routes.AddRange(updated);
+            targetFolder=folder;
+            UpdateDropTarget(tree.Nodes[0].Nodes.Count!=0);
             ShowDestination();
         }catch(Exception ex){
             GeneralDialog.Message(this,ex.Message,Text,MessageBoxButtons.OK);

@@ -28,7 +28,17 @@ internal static class LocalModPackage {
             Path.GetFileName(path).Equals("LICENSE",StringComparison.OrdinalIgnoreCase);
     }
 
-    internal static FixedMod Read(ModImportItem item, FixedCatalog catalog, DownloadCache cache, Action<string> report) {
+    internal static string RoutedId(string sha,List<GeneralInstallRoute> routes) {
+        if(routes==null||routes.Count==0)return "file-"+sha;
+        string mapping=GeneralInstallRoutes.Format(routes.OrderBy(route=>route.Folder,StringComparer.OrdinalIgnoreCase));
+        return "file-"+InstalledSnapshot.Hash(System.Text.Encoding.UTF8.GetBytes(sha+"\n"+mapping.ToUpperInvariant()));
+    }
+
+    internal static FixedMod Read(ModImportItem item, FixedCatalog catalog, DownloadCache cache, Action<string> report,List<GeneralInstallRoute> routes=null) {
+        routes=routes??new List<GeneralInstallRoute>();
+        GeneralInstallRoutes.Validate(routes);
+        if(routes.Any(route=>!route.Destination.StartsWith("%GAME%",StringComparison.Ordinal)))
+            throw new IOException(GeneralStyle.T("No Cyberpunk, escolha um destino dentro da pasta do jogo.","For Cyberpunk, choose a destination inside the game folder."));
         if (item==null || !FixedData.HashValid(item.Sha256) || item.Id!="file-"+item.Sha256 ||
             ModImporter.ExcludedFromVanillaProfile(item)) throw new IOException("Arquivo importado inválido.");
         if (catalog.Packages.Any(m=>NightCityDensity.Assets(m).Any(a=>a.Sha256==item.Sha256)))
@@ -36,7 +46,7 @@ internal static class LocalModPackage {
         var reserved=new HashSet<string>(catalog.Packages.SelectMany(NightCityDensity.KnownFiles).Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
         var asset=new FixedAsset{Id="local",Name=item.Name,Format="tar",Sha256=item.Sha256,Size=item.Size};
         cache.Import(item.Source,asset);
-        var result=new FixedMod{Id=item.Id,Name=item.Name,Version="Arquivo local",GameVersion=catalog.GameVersion,
+        var result=new FixedMod{Id=RoutedId(item.Sha256,routes),Name=item.Name,Version="Arquivo local",GameVersion=catalog.GameVersion,
             Dependencies=new string[0],Assets=new List<FixedAsset>{asset},Files=new List<FixedFile>()};
         using(var reader=BundledArchiveReader.Open(cache.PathFor(asset),asset.Size,asset.Sha256)) {
             var entries=reader.Files();
@@ -64,7 +74,9 @@ internal static class LocalModPackage {
                 } else if (entry.Path.IndexOf('/')<0 && new[]{".archive",".xl"}.Contains(Path.GetExtension(entry.Path).ToLowerInvariant())) {
                     path="archive/pc/mod/"+entry.Path;
                 }
-                if(path==null || !Allowed(path)) {
+                if(path!=null&&reserved.Contains(path))throw new IOException("Este pacote contém um arquivo da lista do Mod Loader: "+path+". Use o mod correspondente da lista.");
+                path=GeneralInstallRoutes.Map(entry.Path,routes,path??entry.Path);
+                if(!Allowed(path)) {
                     if (Documentation(entry.Path)) continue;
                     throw new IOException("O app não encontrou um destino seguro para "+entry.Path+". Importe uma única variante com a estrutura de pastas do jogo.");
                 }
@@ -110,10 +122,10 @@ public sealed partial class FixedInstaller {
         }
     }
 
-    internal string InstallImported(ModImportItem item, Action<string> report, Func<ModVersionDifference,bool> chooseVersion = null) {
+    internal string InstallImported(ModImportItem item, Action<string> report, Func<ModVersionDifference,bool> chooseVersion = null,List<GeneralInstallRoute> routes=null) {
         Closed();
         FixedData.ValidateGame(game,new FixedMod[0],catalog.GameFileVersion);
-        var recipe=LocalModPackage.Read(item,catalog,cache,report);
+        var recipe=LocalModPackage.Read(item,catalog,cache,report,routes);
         var owned=InstalledImports();
         if (owned.Contains(recipe.Id) && FixedData.Scan(recipe,game).IsCorrect) return recipe.Name+" já está instalado.";
         foreach(var file in recipe.Files) {

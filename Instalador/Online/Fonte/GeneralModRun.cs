@@ -65,9 +65,9 @@ internal sealed partial class GeneralModWindow {
     string CyberpunkImportId(Work work,int index,Func<string,string> readHash=null){
         string id;
         if(state.CyberpunkImports.TryGetValue(work.Receipt(index),out id))return id;
-        if(work.Entry.Id.StartsWith("file-",StringComparison.Ordinal)&&work.Entry.Id.Length==69)return work.Entry.Id;
+        if(work.Variant.InstallRoutes.Count==0&&work.Entry.Id.StartsWith("file-",StringComparison.Ordinal)&&work.Entry.Id.Length==69)return work.Entry.Id;
         string path=LocalSource(work,index);
-        return path!=null&&File.Exists(path)?"file-"+(readHash==null?Safe.Hash(path):readHash(path)):null;
+        return path!=null&&File.Exists(path)?LocalModPackage.RoutedId(readHash==null?Safe.Hash(path):readHash(path),work.Variant.InstallRoutes):null;
     }
     List<Work> Marked(){return ModRows().Where(r=>marked.Contains((string)r.Tag)).Select(r=>MakeWork(state.List.Mods.Single(m=>m.Id==(string)r.Tag))).ToList();}
     void Stage(Work work,string phase){if(testMode&&testStage!=null)testStage(work.Key,phase);}
@@ -641,7 +641,7 @@ internal sealed partial class GeneralModWindow {
             RowStatus(work,"Verificando",null,work.Entry.Name+T(": verificando arquivos…",": checking files…"));
             OnlineDiagnostics.Record("general.install.begin",work.Entry.Id,"Iniciando item da fila.",new{Variant=work.Variant.Id});
             if(work.Variant.InstallRoutes.Count>0){
-                if(IsCyberpunk(root))throw new IOException(T("O Cyberpunk usa os destinos do catálogo.","Cyberpunk uses the catalog destinations."));
+                if(work.Variant.CyberpunkId!=null)throw new IOException(T("Este mod fixo usa os destinos conferidos no catálogo.","This pinned mod uses verified catalog destinations."));
                 try{GeneralInstallRoutes.CheckFolders(root,work.Variant.InstallRoutes);}
                 catch(DirectoryNotFoundException ex){RowStatus(work,"Pulado",null,work.Entry.Name+": "+ex.Message);return;}
             }
@@ -965,7 +965,7 @@ internal sealed partial class GeneralModWindow {
             Stage(work,"install.begin");
             await Task.Run(()=>{
                 EnsureGameClosed(root);
-                if(cyberpunk){var item=ImportItem(installSource);Cyberpunk(root).InstallImported(item,Report,ChooseVersion);localId=item.Id;}
+                if(cyberpunk){var item=ImportItem(installSource);Cyberpunk(root).InstallImported(item,Report,ChooseVersion,work.Variant.InstallRoutes);localId=LocalModPackage.RoutedId(item.Sha256,work.Variant.InstallRoutes);}
                 else engine.Install(installSource,receipt,Report,difference=>{difference.Name=work.Entry.Name;return ChooseVersion(difference);},work.Variant.InstallRoutes);
             });
             work.Applied=true;Stage(work,"install.end");

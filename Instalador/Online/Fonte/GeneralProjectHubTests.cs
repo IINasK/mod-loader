@@ -229,7 +229,9 @@ internal sealed partial class GeneralModWindow {
                 var destination=(TableLayoutPanel)browse.Parent;
                 check(!routes.Multiline&&!routes.ReadOnly&&browse.Enabled&&routeBounds.Top==buttonBounds.Top&&
                     routeBounds.Bottom==buttonBounds.Bottom&&routeBounds.Right<buttonBounds.Left&&
-                    destination.GetControlFromPosition(0,0).ForeColor==GeneralStyle.Foreground,
+                                        destination.GetControlFromPosition(0,0).ForeColor==GeneralStyle.Foreground&&
+                    destination.GetControlFromPosition(2,1).Top==browse.Top&&
+                    destination.GetControlFromPosition(2,1).Height==browse.Height,
                     "The editable destination and Explorer button share a themed, single aligned row.");
                 var name=EditorField<TextBox>(editor,"modName");
                 var nsfw=EditorField<GeneralButton>(editor,"nsfw");
@@ -306,6 +308,13 @@ internal sealed partial class GeneralModWindow {
                 check(tree.Nodes.Count==1&&tree.Nodes[0].Nodes[0].Text=="plugins"&&
                     tree.Nodes[0].Nodes[0].Nodes.Cast<TreeNode>().Any(node=>(string)node.Tag=="plugins/data"),
                     "The archive keeps its folder hierarchy and relative paths for routing.");
+                var target=destinations.Controls.Find("ArchiveDestinationDrop",true).Single();
+                var dragged=tree.Nodes[0].Nodes[0].Nodes.Cast<TreeNode>().Single(item=>item.Text=="one.dll");
+                var data=new DataObject();data.SetData(typeof(TreeNode),dragged);
+                typeof(Control).GetMethod("OnDragDrop",BindingFlags.Instance|BindingFlags.NonPublic)
+                    .Invoke(target,new object[]{new DragEventArgs(data,0,0,0,DragDropEffects.Move,DragDropEffects.Move)});
+                check(destinations.Routes.Count==1&&destinations.Routes[0].Folder=="plugins/one.dll"&&
+                    destinations.Routes[0].Destination=="%GAME%","Dragging an archive file records a portable route to the selected folder.");
                 destinations.Close();
             }
             var fixedMod=NewEntry("Destino fixo",source);

@@ -24,6 +24,7 @@ public static class OnlineStorageTests {
         engine.Undo(s=>{});
         check(!File.Exists(Path.Combine(game,"archive","pc","mod","test-a.archive")),"Desfazer funciona depois de eliminar a preparação.");
         TestSaveBackupRotation(root,catalog,cache,saves,check);
+
         string failure=OnlineTests.Fixture(root,"failure");bool failed=false;
         try{new FixedInstaller(catalog,cache,failure,saves,true).Install(new[]{"Extra"},true,s=>{},1);}catch(IOException){failed=true;}
         check(failed&&Empty(cache),"Falha de cópia e rollback não deixam preparação extraída.");
@@ -69,6 +70,7 @@ public static class OnlineStorageTests {
         check(File.ReadAllText(unrelated)=="keep"&&File.Exists(Path.Combine(root,"fixture.zip")),"Limpar cache não apaga arquivos desconhecidos nem o download original.");
         check(Directory.GetFiles(Path.Combine(game,".CoopModsOnline","backups"),"save.dat",SearchOption.AllDirectories).Length==1,"Limpar cache preserva os backups usados para desfazer.");
         var absent=new DownloadCache(Path.Combine(root,"absent-cache"));check(absent.ClearDownloads()==0&&!Directory.Exists(absent.Root),"Cache ausente não cria pasta ao ser limpo.");
+        TestCyberpunkRoutes(root,catalog,cache,check);
         string logs=Path.Combine(root,"logs");Directory.CreateDirectory(logs);
         for(int i=0;i<12;i++){
             string file=Path.Combine(logs,"diagnostico-20260101-000000-"+i.ToString("x8")+".jsonl");
@@ -147,6 +149,28 @@ public static class OnlineStorageTests {
         engine.Undo(s=>{});
         check(!File.Exists(Safe.In(game,catalog.Packages[1].Files[0].Path)),"Desfazer a instalação continua funcionando após limpar cópias de saves.");
         File.WriteAllText(original,"fixture preserved");
+    }
+    static void TestCyberpunkRoutes(string root,FixedCatalog catalog,DownloadCache cache,Action<bool,string> check){
+        string game=OnlineTests.Fixture(root,"routes");
+        string source=Safe.In(root,"routed.zip");
+        using(var zip=System.IO.Compression.ZipFile.Open(source,System.IO.Compression.ZipArchiveMode.Create))
+            using(var writer=new StreamWriter(zip.CreateEntry("package/item.archive").Open()))writer.Write("custom archive");
+        string sha=Safe.Hash(source);
+        var item=new ModImportItem{Id="file-"+sha,Name=Path.GetFileName(source),Source=source,Sha256=sha,Size=new FileInfo(source).Length,Kind="Arquivo"};
+        var routes=GeneralInstallRoutes.Parse("package/item.archive = archive/pc/mod/Custom",game);
+        Directory.CreateDirectory(Safe.In(game,"archive/pc/mod/Custom"));
+        var engine=new FixedInstaller(catalog,cache,game,null,true);
+        engine.InstallImported(item,s=>{},routes:routes);
+        string destination=Safe.In(game,"archive/pc/mod/Custom/item.archive");
+        string id=LocalModPackage.RoutedId(sha,routes);
+        check(id!=item.Id&&File.Exists(destination)&&engine.InstalledImports().Contains(id)&&!File.Exists(Safe.In(game,"package/item.archive")),
+            "O importador usa a rota por arquivo e registra a nova localização.");
+        engine.RemoveImported(id,s=>{});
+        check(!File.Exists(destination)&&File.Exists(source),"A desinstalação do importado usa o destino registrado e preserva o download.");
+        bool refused=false;
+        try{engine.InstallImported(item,s=>{},routes:GeneralInstallRoutes.Parse("package/item.archive = bin/x64",game));}
+        catch(IOException){refused=true;}
+        check(refused&&!File.Exists(Safe.In(game,"bin/x64/item.archive")),"A rota do Cyberpunk preserva as pastas fora das áreas de mods.");
     }
     static bool Empty(DownloadCache cache){string path=Path.Combine(cache.Root,"preparacao");return !Directory.Exists(path)||Directory.GetDirectories(path).Length==0;}
     static string Preparation(DownloadCache cache,string contents){string path=Path.Combine(cache.Root,"preparacao",Guid.NewGuid().ToString("N"));Directory.CreateDirectory(path);File.WriteAllText(Path.Combine(path,"file.txt"),contents);return path;}

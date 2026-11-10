@@ -17,7 +17,9 @@ internal static class GeneralInstallRoutes {
         var routes = new List<GeneralInstallRoute>();
         foreach (string row in text.Split(new[] { '\r', '\n', '|' }, StringSplitOptions.RemoveEmptyEntries)) {
             if (String.IsNullOrWhiteSpace(row)) continue;
-            var fields = row.Split(new[] { '=' }, 2);
+            int delimiter=row.IndexOf(" = ",StringComparison.Ordinal);
+            var fields=delimiter<0?row.Split(new[] { '=' },2):
+                new[]{row.Substring(0,delimiter),row.Substring(delimiter+3)};
             string folder = fields.Length == 1 || String.IsNullOrWhiteSpace(fields[0]) ? "" : Relative(fields[0].Trim().Replace('\\', '/').TrimEnd('/'));
             string destination = fields.Last().Trim().Replace('\\', '/').TrimEnd('/');
             if (Path.IsPathRooted(destination)) {
@@ -124,11 +126,11 @@ internal static class GeneralInstallRoutes {
         foreach (var route in routes) DirectoryFor(game, route.Destination, true);
     }
 
-    internal static string Map(string path, IEnumerable<GeneralInstallRoute> routes) {
+    internal static string Map(string path, IEnumerable<GeneralInstallRoute> routes, string defaultPath = null) {
         if (External(path)) throw Invalid();
         var route = routes.Where(item => item.Folder.Length == 0 || path.Equals(item.Folder, StringComparison.OrdinalIgnoreCase) || path.StartsWith(item.Folder + "/", StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(item => item.Folder.Length).FirstOrDefault();
-        if (route == null) return path;
+        if (route == null) return defaultPath??path;
         string remainder = path;
         if (route.Folder.Length != 0)
             remainder = path.Length == route.Folder.Length ? Path.GetFileName(path) : path.Substring(route.Folder.Length + 1);
