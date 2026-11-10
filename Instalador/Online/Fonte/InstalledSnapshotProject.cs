@@ -102,13 +102,13 @@ public static partial class InstalledSnapshot {
         project.Presets=project.Presets.OrderByDescending(p=>p.Id==state.SelectedPreset).ToList();
         return project;
     }
-    static void ValidateProject(InstalledSnapshotManifest manifest,FixedCatalog catalog){
-        var project=manifest.Project;GeneralModLibrary.ValidateList(project,false);
+    static void ValidateProject(InstalledSnapshotManifest manifest,FixedCatalog catalog,bool localReceipt){
+        var project=localReceipt?Clone(manifest.Project):manifest.Project;GeneralModLibrary.ValidateList(project,false);
         if(manifest.TemplateId!=null&&(manifest.TemplateId!=GeneralProjectStore.CyberpunkTemplate||manifest.Game!="cyberpunk2077"))
             throw new IOException("Identidade do projeto padrão inválida.");
         foreach(var mod in project.Mods)foreach(var variant in mod.Variants.SelectMany(option=>option.WithNaturalOption()))
             if(!variant.Sources.All(s=>GeneralModDownload.IsWebSource(s)||s=="installed://"+mod.Id+"/"+variant.Id))throw new IOException("Projeto contém caminhos privados de origem.");
-        GeneralModLibrary.RestoreKnownMappings(project,GeneralModLibrary.Seed(catalog,new ModImportItem[0]));
+        GeneralModLibrary.RestoreKnownMappings(project,GeneralModLibrary.Seed(catalog,new ModImportItem[0]),localReceipt);
         foreach(var installed in manifest.List.Mods){
             var mod=project.Mods.SingleOrDefault(m=>m.Id==installed.Id);
             if(mod==null||mod.DefaultVariant!=installed.DefaultVariant)throw new IOException("Projeto não corresponde aos mods transferidos.");

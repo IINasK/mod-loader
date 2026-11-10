@@ -359,7 +359,7 @@ public sealed partial class InstalledSnapshotInstaller {
                 throw new IOException("Este recibo não contém os caminhos originais. Reimporte o pacote original para alterar o destino.");
             if (!GeneralInstallRoutes.Same(before, variant.InstallRoutes))
                 throw new IOException("O destino atual difere do recibo da instalação.");
-            var localCatalog = NightCoopRelease.CatalogForReceipt(catalog, manifest);
+            var localCatalog = HistoricalReceipts.CatalogForSnapshot(catalog, manifest);
             var recipe = InstalledSnapshot.FixedRecipe(localCatalog, variant);
             var current = GeneralInstallRoutes.FixedPaths(localCatalog, recipe, before);
             var next = GeneralInstallRoutes.FixedPaths(localCatalog, recipe, after);
@@ -391,7 +391,7 @@ public sealed partial class InstalledSnapshotInstaller {
             manifest.Project.Mods.Single(item => item.Id == mod.Id).Variants.Single(item => item.Id == variant.Id).InstallRoutes = after;
             variant.InstallRoutes = after;
             receipt.PackageHash = null;
-            InstalledSnapshot.Validate(manifest, localCatalog);
+            InstalledSnapshot.Validate(manifest, localCatalog, true);
 
             var directories = new List<string>();
             var copied = new List<SnapshotMove>();
@@ -585,7 +585,7 @@ public sealed partial class InstalledSnapshotInstaller {
         if (receipt == null || receipt.Id != id || !String.Equals(receipt.Root, destination, StringComparison.OrdinalIgnoreCase)
             || receipt.Files == null || receipt.Files.Count > 20000 || receipt.ActiveOwners == null
             || !new[] { "preparing", "installing", "installed", "rolledback", "rollback-preserved" }.Contains(receipt.Status)) throw new IOException("Recibo de snapshot inválido.");
-        InstalledSnapshot.Validate(receipt.Manifest,NightCoopRelease.CatalogForReceipt(catalog,receipt.Manifest));
+        InstalledSnapshot.Validate(receipt.Manifest,HistoricalReceipts.CatalogForSnapshot(catalog,receipt.Manifest),true);
         var keys = new HashSet<string>(WorkKeys(receipt.Manifest), StringComparer.Ordinal);
         if (receipt.ActiveOwners.Count > keys.Count || receipt.ActiveOwners.Distinct().Count() != receipt.ActiveOwners.Count || receipt.ActiveOwners.Any(k => !keys.Contains(k))) throw new IOException("Proprietários inválidos no recibo.");
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

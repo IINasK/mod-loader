@@ -15,6 +15,7 @@
 !/Instalador/Online/Fonte/*.ps1
 !/Instalador/Online/Fonte/BrowserExtension/manifest.json
 !/Instalador/Online/Fonte/BrowserExtension/downloads.js
+!/Instalador/Online/Fonte/Assets/legacy-snapshots.json
 !/Instalador/Setup/*.iss
 !/Instalador/Setup/*.ps1
 !/Instalador/Online/Programa/catalogo.json
