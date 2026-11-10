@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -41,30 +43,45 @@ internal sealed class DisabledMods {
             && !path.Equals("bin/x64/Cyberpunk2077.exe", StringComparison.OrdinalIgnoreCase);
     }
 
-    internal void Disable(Dictionary<string, List<DisabledModFile>> plan) {
+    internal string BackupFile(string key) {
+        List<DisabledModFile> files;
+        if(!Read().TryGetValue(key,out files))return null;
+        foreach(var file in files){
+            string path=Stored(file);
+            Safe.NoLinks(path);
+            if(File.Exists(path))return path;
+        }
+        return null;
+    }
+
+    internal void Disable(Dictionary<string, List<DisabledModFile>> plan, bool compress=false) {
         using (Lock()) {
             var entries = Read();
             if (plan.Keys.Any(entries.ContainsKey)) throw new IOException("A seleção já contém mods desativados.");
             var files = Unique(plan.Values.SelectMany(filesForMod => filesForMod));
             foreach (var file in files) {
                 if (!Matches(GamePath(file), file)) throw Conflict(file);
-                var blob = Blob(file);
-                if (File.Exists(blob) && !Matches(blob, file)) throw Conflict(file);
+                var blob = Stored(file);
+                if (File.Exists(blob) && !MatchesStored(blob,file)) throw Conflict(file);
             }
             foreach (var pair in plan) entries.Add(pair.Key, pair.Value);
             Safe.WriteJson(index, entries);
             try {
                 foreach (var file in files) {
                     checkClosed();
-                    string target = GamePath(file), blob = Blob(file);
+                    string target = GamePath(file), blob = Stored(file);
                     if (!Matches(target, file)) throw Conflict(file);
-                    if (!File.Exists(blob) && String.Equals(Path.GetPathRoot(target), Path.GetPathRoot(blob), StringComparison.OrdinalIgnoreCase)) {
+                    if (!File.Exists(blob) && compress) {
+                        PackVerified(target, ZipPath(file), file);
+                        if (!Matches(target,file)) throw Conflict(file);
+                        File.Delete(target);
+                    } else if (!File.Exists(blob) && String.Equals(Path.GetPathRoot(target), Path.GetPathRoot(blob), StringComparison.OrdinalIgnoreCase)) {
                         Directory.CreateDirectory(Path.GetDirectoryName(blob));
                         Safe.NoLinks(blob);
                         File.Move(target, blob);
                     } else {
                         if (!File.Exists(blob)) CopyVerified(target, blob, file);
-                        if (!Matches(target, file) || !Matches(blob, file)) throw Conflict(file);
+                        if (!Matches(target, file) || !MatchesStored(blob, file)) throw Conflict(file);
                         File.Delete(target);
                     }
                 }
@@ -87,7 +104,7 @@ internal sealed class DisabledMods {
         var files = Unique(keys.SelectMany(key => entries[key]));
         foreach (var file in files) {
             string path = GamePath(file);
-            if (Directory.Exists(path) || (File.Exists(path) ? !Matches(path, file) : !Matches(Blob(file), file)))
+            if (Directory.Exists(path) || (File.Exists(path) ? !Matches(path, file) : !MatchesStored(Stored(file), file)))
                 throw Conflict(file);
         }
         var restored = new List<DisabledModFile>();
@@ -99,7 +116,7 @@ internal sealed class DisabledMods {
                     if (!Matches(path, file)) throw Conflict(file);
                     continue;
                 }
-                CopyVerified(Blob(file), path, file);
+                CopyVerified(Stored(file), path, file);
                 restored.Add(file);
             }
             Drop(entries, keys);
@@ -128,9 +145,10 @@ internal sealed class DisabledMods {
         foreach (var file in old.GroupBy(file => file.Hash).Select(group => group.First())) {
             if (used.Contains(file.Hash)) continue;
             try {
-                string blob = Blob(file);
-                Safe.NoLinks(blob);
-                File.Delete(blob);
+                foreach(var blob in new[]{Blob(file),ZipPath(file)}){
+                    Safe.NoLinks(blob);
+                    File.Delete(blob);
+                }
             } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
     }
@@ -147,6 +165,40 @@ internal sealed class DisabledMods {
         return GeneralInstallRoutes.Resolve(game, file.Path, true);
     }
     string Blob(DisabledModFile file) { return Safe.In(cache, "files/" + file.Hash + ".bin"); }
+    string ZipPath(DisabledModFile file) { return Safe.In(cache, "files/" + file.Hash + ".zip"); }
+    string Stored(DisabledModFile file) {
+        string zip=ZipPath(file);
+        return File.Exists(zip)?zip:Blob(file);
+    }
+
+    static ZipArchiveEntry Payload(ZipArchive zip,DisabledModFile file) {
+        var entry=zip.GetEntry("payload");
+        if(zip.Entries.Count!=1||entry==null||entry.Length!=file.Size)throw Conflict(file);
+        return entry;
+    }
+
+    static bool MatchesStored(string path,DisabledModFile file) {
+        if(!path.EndsWith(".zip",StringComparison.OrdinalIgnoreCase))return Matches(path,file);
+        Safe.NoLinks(path);
+        if(!File.Exists(path))return false;
+        using(var zip=ZipFile.OpenRead(path))
+        using(var input=Payload(zip,file).Open())
+        using(var sha=SHA256.Create())return Safe.Hex(sha.ComputeHash(input))==file.Hash;
+    }
+
+    static void PackVerified(string source,string destination,DisabledModFile file) {
+        Safe.NoLinks(source);
+        Safe.NoLinks(destination);
+        Directory.CreateDirectory(Path.GetDirectoryName(destination));
+        string staging=Path.Combine(Path.GetDirectoryName(destination),".ml-"+Guid.NewGuid().ToString("N").Substring(0,12)+".zip");
+        try{
+            using(var zip=ZipFile.Open(staging,ZipArchiveMode.Create))
+            using(var output=zip.CreateEntry("payload",CompressionLevel.Fastest).Open())
+            using(var input=File.OpenRead(source))input.CopyTo(output);
+            if(!MatchesStored(staging,file))throw Conflict(file);
+            File.Move(staging,destination);
+        }finally{File.Delete(staging);}
+    }
 
     static DisabledModFile[] Unique(IEnumerable<DisabledModFile> files) {
         return files.GroupBy(file => file.Path, StringComparer.OrdinalIgnoreCase).Select(group => {
@@ -167,7 +219,12 @@ internal sealed class DisabledMods {
         Directory.CreateDirectory(Path.GetDirectoryName(destination));
         string staging = Path.Combine(Path.GetDirectoryName(destination), ".ml-" + Guid.NewGuid().ToString("N").Substring(0, 12) + ".tmp");
         try {
-            File.Copy(source, staging, false);
+            if(source.EndsWith(".zip",StringComparison.OrdinalIgnoreCase)){
+                using(var zip=ZipFile.OpenRead(source))
+                using(var input=Payload(zip,file).Open())
+                using(var output=new FileStream(staging,FileMode.CreateNew,FileAccess.Write,FileShare.None))
+                    InstalledSnapshotInstaller.CopyBounded(input,output,file.Size);
+            }else File.Copy(source, staging, false);
             if (!Matches(staging, file)) throw Conflict(file);
             File.Move(staging, destination);
         } finally { File.Delete(staging); }

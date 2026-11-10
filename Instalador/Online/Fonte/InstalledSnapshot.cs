@@ -30,6 +30,13 @@ public static partial class InstalledSnapshot {
     public static string Entry(InstalledSnapshotFile file){return "files/"+file.Sha256;}
     public static string Owner(GeneralModEntry mod,GeneralModVariant variant){return mod.Id+"/"+variant.Id;}
     static T Clone<T>(T value){return Safe.Json.Deserialize<T>(Safe.Json.Serialize(value));}
+    internal static bool MatchesBodyReceipt(InstalledSnapshotInstaller engine,GeneralModEntry mod,GeneralModVariant variant,string receipt){
+        if(mod.Id!=GeneralModLibrary.EbbBody||!mod.Variants.Any(option=>option.NaturalOption!=null))return true;
+        var installed=engine.ReadManifest(receipt).List.Mods.Single(entry=>entry.Id==mod.Id).Variants.Single();
+        var expected=Clone(variant);
+        MakeSourcesPortable(expected,mod.Id);
+        return GeneralModLibrary.SamePayload(installed,expected);
+    }
     static string Selected(GeneralModState state,GeneralModEntry mod){string id;return state.ChosenVariants.TryGetValue(mod.Id,out id)?id:mod.DefaultVariant;}
     static bool IsCyberpunk(string root){return File.Exists(Safe.In(root,"bin/x64/Cyberpunk2077.exe"));}
     static bool IncludesBodyChoice(GeneralModList list,string choice) {
@@ -88,7 +95,7 @@ public static partial class InstalledSnapshot {
             if(inspectProgress!=null)inspectProgress(index,entries.Count,mod.Name);
             try {
             var variant=GeneralModLibrary.BodyOption(state.BodyChoice,mod,mod.Variants.Single(v=>v.Id==Selected(state,mod)));
-            if(disabled.ContainsKey(Owner(mod,variant))){
+            if(disabled.ContainsKey(GeneralModLibrary.InstallationKey(mod,variant))){
                 if(allowMissing)continue;
                 throw new IOException("Este mod está desabilitado.");
             }
@@ -112,15 +119,8 @@ public static partial class InstalledSnapshot {
             var originalSources=variant.Sources.ToList();
             List<InstalledSnapshotFile> files=new List<InstalledSnapshotFile>();
             string snapshotId;
-            if(variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(work,out snapshotId)){
-                if(mod.Id==GeneralModLibrary.EbbBody&&mod.Variants.Single(v=>v.Id==variant.Id).NaturalOption!=null){
-                    var installed=receivedEngine.ReadManifest(snapshotId).List.Mods.Single(entry=>entry.Id==mod.Id).Variants.Single();
-                    var expected=Clone(variant);
-                    MakeSourcesPortable(expected,mod.Id);
-                    if(!installed.Sources.SequenceEqual(expected.Sources,StringComparer.Ordinal)||
-                        !GeneralInstallRoutes.Same(installed.InstallRoutes,variant.InstallRoutes))
-                        throw new IOException("O recibo do corpo corresponde a outra configuração de instalação.");
-                }
+            if(variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(work,out snapshotId)&&
+                MatchesBodyReceipt(receivedEngine,mod,variant,snapshotId)){
                 files=receivedEngine.ReadInstalledFiles(snapshotId,work);
             }
             else if(variant.CyberpunkId!=null) {
@@ -146,7 +146,10 @@ public static partial class InstalledSnapshot {
                     if(content!=null)files.Add(Config(config.Path,config.Format,config.Section,content));
                 }
             }else if(cyberpunk&&HasManualHystFiles(mod.Id,root)&&
-                (state.CyberpunkImports==null||!originalSources.Select((source,sourceIndex)=>work+"/"+sourceIndex+"/"+source).Any(state.CyberpunkImports.ContainsKey))) {
+                (state.CyberpunkImports==null||!Enumerable.Range(0,originalSources.Count).Any(sourceIndex=>{
+                    string id;
+                    return P2PPack.TrySlot(state.CyberpunkImports,mod,variant,sourceIndex,out id);
+                }))) {
                 var knownBody=seed.Mods.FirstOrDefault(item=>item.Id==mod.Id);
                 variant=ReadManualHyst(root,mod,knownBody,state.SelectedPreset!="no-pl",files,bodyChoice:state.BodyChoice);
                 work=Owner(mod,variant);
@@ -154,15 +157,19 @@ public static partial class InstalledSnapshot {
                 if(disabled.ContainsKey(work))throw new IOException("Este mod está desabilitado.");
             }else {
                 for(int i=0;i<originalSources.Count;i++) {
-                    string key=work+"/"+i+"/"+originalSources[i];
+                    string key=P2PPack.Slot(mod,variant,i);
                     if(cyberpunk) {
                         string id;
-                        if(state.CyberpunkImports==null||!state.CyberpunkImports.TryGetValue(key,out id)) {
+                        if(state.CyberpunkImports==null||!P2PPack.TrySlot(state.CyberpunkImports,mod,variant,i,out id)) {
                             id=mod.Id.StartsWith("file-",StringComparison.Ordinal)?mod.Id:null;
                             if(id==null)throw new IOException(mod.Name+": recibo instalado não encontrado.");
                         }
                         files.AddRange(fixedEngine.ExportSnapshotImportedFiles(id));
-                    }else files.AddRange(genericEngine.ExportSnapshotFiles(key,variant.InstallRoutes));
+                    }else{
+                        string legacy=P2PPack.LegacySlot(mod,variant,i);
+                        if(legacy!=null&&!genericEngine.HasSnapshotRecord(key))key=legacy;
+                        files.AddRange(genericEngine.ExportSnapshotFiles(key,variant.InstallRoutes));
+                    }
                 }
             }
             if(cyberpunk && files.Any(RetiredPackEntries.LocalDroneFile)) continue;

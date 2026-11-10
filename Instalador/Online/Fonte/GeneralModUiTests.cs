@@ -420,6 +420,63 @@ internal sealed partial class GeneralModWindow {
         first.AlternativeGroup=null;
         form.marked.Clear();
         form.DrawRows();
+        await TestVariantDrawerSwitch(form,root,check);
+    }
+
+    static async Task TestVariantDrawerSwitch(GeneralModWindow form,string root,Action<bool,string> check){
+        string game=form.state.Destination;
+        string route="mods/variant-switch.txt";
+        string target=Safe.In(game,route);
+        string original=TestZip(root,"variant-one.zip",route,"one");
+        string alternate=TestZip(root,"variant-two.zip",route,"two");
+        string invalid=Path.Combine(root,"variant-invalid.zip");
+        File.WriteAllText(invalid,"broken zip");
+        var mod=NewEntry("Gaveta de versões",original);
+        mod.Variants.Add(new GeneralModVariant{Id="second",Name="Versão 2",Sources=new List<string>{alternate}});
+        mod.Variants.Add(new GeneralModVariant{Id="broken",Name="Versão inválida",Sources=new List<string>{invalid}});
+        form.state.List.Mods.Add(mod);
+        var first=form.MakeWork(mod);
+        form.Generic(game).Install(original,first.Receipt(0),null);
+        await form.Scan();
+        form.ToggleVersions(form.ModRows().Single(row=>Equals(row.Tag,mod.Id)));
+
+        Func<string,Work> choose=id=>{
+            var row=form.grid.Rows.Cast<DataGridViewRow>().Single(item=>item.Tag is Work&&
+                ((Work)item.Tag).Entry==mod&&((Work)item.Tag).Variant.Id==id);
+            form.grid.CurrentCell=row.Cells["Name"];
+            form.OpenRowEditor(row);
+            var requested=form.SelectedJobs().Single();
+            check(requested.Variant.Id==id&&form.primaryAction.Text=="Atualizar",
+                "A gaveta oferece Atualizar para "+id+" sem trocar a versão em uso.");
+            return requested;
+        };
+        var second=choose("second");
+        check(form.Selected(mod).Id==first.Variant.Id&&File.ReadAllText(target)=="one","Escolher a linha preserva os arquivos ativos.");
+        var pending=new List<Work>();
+        check(form.PlanSelected(new List<Work>{second},game,pending).Count==0&&pending.SequenceEqual(new[]{second}),
+            "A atualização usa o download local e enfileira a versão escolhida.");
+        await form.RunWork(second,game,false);
+        var store=form.DisabledAt(game);
+        check(File.ReadAllText(target)=="two"&&form.Selected(mod).Id=="second"&&
+            Path.GetExtension(store.BackupFile(first.Key))==".zip","A troca compacta a versão anterior e ativa a nova.");
+        var cachedRow=form.grid.Rows.Cast<DataGridViewRow>().Single(row=>row.Tag is Work&&((Work)row.Tag).Key==first.Key);
+        check(Equals(cachedRow.Cells["Status"].Value,"Instalado")&&Equals(cachedRow.Cells["Status"].Tag,false),
+            "A variante guardada aparece instalada em cinza.");
+
+        var bad=choose("broken");
+        await form.RunWork(bad,game,false);
+        check(File.ReadAllText(target)=="two"&&form.Selected(mod).Id=="second"&&store.Read().ContainsKey(first.Key),
+            "Um ZIP inválido preserva a variante anterior e o cache existente.");
+        File.Delete(original);
+        await form.RunWork(choose("default"),game,false);
+        check(File.ReadAllText(target)=="one"&&form.Selected(mod).Id=="default"&&
+            Path.GetExtension(store.BackupFile(second.Key))==".zip","Voltar usa o cache sem o download original.");
+
+        form.RemoveManagedWorks(new List<Work>{first,second},game,new HashSet<string>(store.Read().Keys));
+        store.Discard(new[]{second.Key});
+        form.state.List.Mods.Remove(mod);
+        form.pendingVersion=null;
+        form.DrawRows();
     }
 
     static void TestSyncRemovalReview(GeneralModWindow owner,string root,Action<bool,string> check){

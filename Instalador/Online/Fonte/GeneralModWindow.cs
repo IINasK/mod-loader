@@ -261,6 +261,7 @@ internal sealed partial class GeneralModWindow : Form {
             if(e.ColumnIndex==grid.Columns["Name"].Index&&row.Cells["Group"].Tag is string&&e.Y>=row.Height/2){
                 ToggleVersions(row);return;
             }
+            if(row.Tag is Work){SelectVersion((Work)row.Tag);return;}
             if(e.ColumnIndex!=0||!(row.Tag is string))return;
             var mark=row.Cells["Mark"];
             bool desiredMark=!markBeforeMouseDown;
@@ -447,7 +448,7 @@ internal sealed partial class GeneralModWindow : Form {
             return detected.Variant;
         return entry.Variants.FirstOrDefault(variant=>variant.Id==id)??entry.Variants.First(variant=>variant.Id==entry.DefaultVariant);
     }
-    static string Key(GeneralModEntry entry,GeneralModVariant variant){return entry.Id+"/"+variant.Id;}
+    static string Key(GeneralModEntry entry,GeneralModVariant variant){return GeneralModLibrary.InstallationKey(entry,variant);}
     void Persist(){library.Save(CommittedProject());startupIssue=null;}
     string UncatName(){return state.List.UncategorizedName=="Sem categoria"?T("Sem categoria","Uncategorized"):state.List.UncategorizedName;}
     void RebuildPresets(){
@@ -469,6 +470,7 @@ internal sealed partial class GeneralModWindow : Form {
     }
     void DrawRows(){
         if(grid==null)return;string old=grid.CurrentRow==null?null:grid.CurrentRow.Tag as string;
+        var oldVersion=grid.CurrentRow==null?null:grid.CurrentRow.Tag as Work;
         int scroll=grid.FirstDisplayedScrollingRowIndex;drawing=true;hoveredRow=-1;grid.Rows.Clear();
         var visible=VisibleMods();var groups=new List<string>();
         bool picking=associationChoice!=null;
@@ -532,13 +534,17 @@ internal sealed partial class GeneralModWindow : Form {
         }
         if(!picking&&!flat&&groupFilters==null&&coverageFilter==null&&searchTerms.Length==0&&(visible.Count>0||statusFilters==null))AddSection("new",null,56);
         else if(visible.Count==0&&inventory.Count==0)AddSection("empty",null,56);
-        if(old==null)grid.ClearSelection();
+        if(oldVersion!=null){
+            var row=grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(candidate=>candidate.Visible&&
+                candidate.Tag is Work&&SameVersion((Work)candidate.Tag,oldVersion));
+            if(row!=null)grid.CurrentCell=row.Cells["Name"];
+        }else if(old==null)grid.ClearSelection();
         if(scroll>=0&&scroll<grid.RowCount)try{grid.FirstDisplayedScrollingRowIndex=scroll;}catch(InvalidOperationException){}
         drawing=false;UpdateCounts();
     }
     void AddModRow(GeneralModEntry mod,string previous,bool picking,bool collapsed,CategoryBranch? branch){
         var variant=Selected(mod);
-        string key=Key(mod,variant),status=ListStatus(mod),raw=InstallationStatus(mod,status);
+        string key=MakeWork(mod).Key,status=ListStatus(mod),raw=InstallationStatus(mod,status);
         int percent;
         var row=grid.Rows[grid.Rows.Add(marked.Contains(mod.Id),picking?mod.Name:ModDisplayName(mod),
             NexusVariantName(mod),GeneralStatusPresentation.Label(raw),progress.TryGetValue(key,out percent)?(object)percent:null,ModSpace(mod))];
@@ -557,7 +563,7 @@ internal sealed partial class GeneralModWindow : Form {
         row.Cells["CategoryIndent"].Tag=branch;
         if(collapsed)row.Visible=false;
         else if(mod.Id==previous)grid.CurrentCell=row.Cells["Name"];
-        if(!picking)AddVersionRows(mod,variant,row,collapsed);
+        if(!picking)AddVersionRows(mod,row,collapsed);
     }
 
     DataGridViewRow AddSection(string kind,string category,int height){
@@ -582,7 +588,7 @@ internal sealed partial class GeneralModWindow : Form {
         return true;
     }
 
-    void AddVersionRows(GeneralModEntry entry,GeneralModVariant active,DataGridViewRow parent,bool hidden){
+    void AddVersionRows(GeneralModEntry entry,DataGridViewRow parent,bool hidden){
         var versions=IsBigBody(entry)
             ?BodyVersionsForPreset()
             :entry.Variants.Skip(entry.Variants.Count>1?0:1).Select(variant=>new Work{Entry=entry,Variant=variant}).ToList();
@@ -602,8 +608,11 @@ internal sealed partial class GeneralModWindow : Form {
             var work=versions[index];
             string name=VersionDisplayName(work);
             string label=body?BodyChoiceLabel(work):work.Variant.Name;
-            bool chosen=body?work.BodyChoice==ActiveBodyChoice(entry):work.Variant==active;
-            string status=chosen?T("Selecionado","Selected"):T("Não selecionado","Not selected");
+            bool chosen=VersionIsActive(work);
+            string raw;
+            statuses.TryGetValue(work.Key,out raw);
+            bool installed=InstalledVersion(raw)||raw==GeneralStatusPresentation.Disabled;
+            string status=installed?T("Instalado","Installed"):T("Não instalado","Not installed");
             var row=grid.Rows[grid.Rows.Add(null,name,label,status,null,BodyOptionSpace(work))];
             row.Tag=work;
             row.Cells["Name"].Tag=work.Variant.Nsfw??work.Entry.Nsfw;
@@ -617,10 +626,12 @@ internal sealed partial class GeneralModWindow : Form {
                 if(chosen)style.Font=optionSelectedFont;
             }
             row.Cells["Name"].ToolTipText=String.Join("\r\n",new[]{work.Variant.Description??work.Entry.Description,
-                T("Dê dois cliques para escolher esta opção. F2 abre os detalhes.","Double-click to select this option. F2 opens details.")}.Where(value=>!String.IsNullOrWhiteSpace(value)));
+                T("Clique para escolher. Confirme no botão do rodapé. F2 abre os detalhes.","Click to select. Apply with the footer button. F2 opens details.")}.Where(value=>!String.IsNullOrWhiteSpace(value)));
             {
                 row.Cells["Status"].Tag=chosen;
-                row.Cells["Status"].ToolTipText=GeneralStatusPresentation.Label(ListStatus(work.Entry));
+                row.Cells["Status"].ToolTipText=raw==GeneralStatusPresentation.Disabled
+                    ?T("Versão guardada no cache deste projeto.","Version stored in this project's cache.")
+                    :installed&&!chosen?T("Compartilha os arquivos da versão ativa.","Shares the files of the active version."):status;
                 row.Cells["Size"].ToolTipText=row.Cells["Size"].Value.ToString().StartsWith("≈",StringComparison.Ordinal)
                     ?T("Tamanho do download. O espaço instalado ainda não foi medido.","Download size. Installed size has not been measured.")
                     :VerifiedBodyBytes(work.Entry,work.Variant).HasValue?T("Tamanho dos arquivos instalados e verificados.","Size of the verified installed files."):SpaceTip(work.Entry);
@@ -894,24 +905,14 @@ internal sealed partial class GeneralModWindow : Form {
         var v=new GeneralModVariant{Id="default",Name=T("Principal","Main")};if(source!=null)v.Sources.Add(source);
         return new GeneralModEntry{Id="mod-"+Guid.NewGuid().ToString("N"),Name=name,DefaultVariant=v.Id,Variants=new List<GeneralModVariant>{v}};
     }
-    async void OpenRowEditor(DataGridViewRow row){
+    void OpenRowEditor(DataGridViewRow row){
         if(row==null)return;
         var id=row.Tag as string;
         if(id!=null){
             var mod=state.List.Mods.Single(item=>item.Id==id);
             Edit(mod);
         }
-        else if(row.Tag is Work&&!scanning&&!working){
-            var work=(Work)row.Tag;
-            if(work.BodyChoice!=null)SelectBodyChoice(work);
-            else if(Selected(work.Entry)!=work.Variant){
-                BeginProjectEdit();
-                state.ChosenVariants[work.Entry.Id]=work.Variant.Id;
-                FinishProjectEdit();
-                DrawRows();
-                await Scan();
-            }
-        }
+        else if(row.Tag is Work)SelectVersion((Work)row.Tag);
         else if(row.Tag is P2PSyncDifference)EditDetectedMod((P2PSyncDifference)row.Tag);
     }
 
@@ -996,7 +997,6 @@ internal sealed partial class GeneralModWindow : Form {
         bool? moved=routes.Count==0||BuiltInProject?false:await ChangeInstalledDestinations(routes[0].Key,routes[0].Value);
         if(!moved.HasValue)return false;
         BeginProjectEdit();
-        state.BodyChoice=dialog.SelectedVariant;
         state.List.AlternativeGroups[GeneralModLibrary.BodyGroup].DisplayName=dialog.Result.Name;
         foreach(var pair in changed){
             string profile=selected!=null&&pair.Key==selected.Entry?selected.Variant.Id:Selected(pair.Key).Id;
@@ -1011,7 +1011,7 @@ internal sealed partial class GeneralModWindow : Form {
         FinishProjectEdit();
         DrawRows();
         if(dialog.InstallRequested||moved.Value)SaveProjectEdits();
-        if(dialog.InstallRequested)ConfirmUrgentInstall(state.List.Mods.Single(entry=>entry.Id==(selected==null?dialog.SelectedVariant:selected.Entry.Id)));
+        if(dialog.InstallRequested)ConfirmUrgentInstall(state.List.Mods.Single(entry=>entry.Id==(selected==null?dialog.SelectedVariant:selected.Entry.Id)),dialog.SelectedVariant);
         else await Scan();
         return true;
     }
@@ -1049,7 +1049,13 @@ internal sealed partial class GeneralModWindow : Form {
                 },fixedChoices:editingBody,archivePreview:testMode
                     ?(Func<GeneralNexusLink,NexusFilePreview[]>)(link=>testNexusPreviews==null?null:testNexusPreviews(link,()=>!IsDisposed))
                     :nexusScan.PreviewSession(GeneralNexusInfo.ReadFilePreviews),
-                cyberpunkLayout:IsCyberpunk(state.Destination))){
+                cyberpunkLayout:IsCyberpunk(state.Destination),backupFile:variant=>{
+                    if(!Directory.Exists(state.Destination)||variant==null)return null;
+                    var selectedWork=editingBody?bodyVersions.FirstOrDefault(choice=>choice.BodyChoice==variant.Id):null;
+                    var original=item.Variants.FirstOrDefault(option=>option.Id==variant.Id);
+                    string key=selectedWork!=null?selectedWork.Key:original==null?null:Key(item,original);
+                    return key==null?null:DisabledAt(state.Destination).BackupFile(key);
+                })){
                 DialogResult answer;
                 while((answer=dialog.ShowDialog(this))==DialogResult.Retry){
                     var linked=await PickAlternative(item.Id,null,true);

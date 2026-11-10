@@ -66,11 +66,15 @@ public static partial class InstalledSnapshot {
         }
         if(IsCyberpunk(root)&&HasManualHystFiles(mod.Id,root))return false;
         for(int i=0;i<variant.Sources.Count;i++){
-            string key=work+"/"+i+"/"+variant.Sources[i];
+            string key=P2PPack.Slot(mod,variant,i);
             if(IsCyberpunk(root)){
-                string id;if(state.CyberpunkImports.TryGetValue(key,out id))return false;
+                string id;if(P2PPack.TrySlot(state.CyberpunkImports,mod,variant,i,out id))return false;
                 if(new FixedInstaller(catalog,root).HasSnapshotImportedRecord(mod.Id))return false;
-            }else if(new GeneralModInstaller(root,Path.Combine(appData,"Instalacoes")).HasSnapshotRecord(key))return false;
+            }else{
+                var engine=new GeneralModInstaller(root,Path.Combine(appData,"Instalacoes"));
+                string legacy=P2PPack.LegacySlot(mod,variant,i);
+                if(engine.HasSnapshotRecord(key)||legacy!=null&&engine.HasSnapshotRecord(legacy))return false;
+            }
         }
         return true;
     }

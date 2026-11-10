@@ -82,6 +82,16 @@ public sealed class GeneralModLibrary {
     internal static GeneralModVariant BodyOption(string bodyChoice, GeneralModEntry mod, GeneralModVariant variant) {
         return bodyChoice == NaturalBody && mod.Id == EbbBody ? variant.NaturalOption ?? variant : variant;
     }
+
+    internal static bool SamePayload(GeneralModVariant left,GeneralModVariant right) {
+        return left.Sources.SequenceEqual(right.Sources,StringComparer.Ordinal)&&
+            GeneralInstallRoutes.Same(left.InstallRoutes,right.InstallRoutes);
+    }
+
+    internal static string InstallationKey(GeneralModEntry mod,GeneralModVariant variant) {
+        var parent=mod.Id==EbbBody?mod.Variants.FirstOrDefault(item=>ReferenceEquals(item.NaturalOption,variant)):null;
+        return mod.Id+"/"+(parent!=null&&!SamePayload(parent,variant)?"natural-":"")+variant.Id;
+    }
     internal static bool IsFacialMod(string id) { return id.StartsWith("face-", StringComparison.Ordinal); }
     readonly string statePath;
 

@@ -100,6 +100,7 @@ internal sealed partial class GeneralModWindow {
     bool SetDestination(string destination){
         if(String.Equals(state.Destination??"",destination,StringComparison.OrdinalIgnoreCase))return false;
         state.Destination=destination;
+        pendingVersion=null;
         gameInventory=new P2PSyncDifference[0];
         nexusManual.Clear();
         statuses.Clear();statusDetails.Clear();progress.Clear();
