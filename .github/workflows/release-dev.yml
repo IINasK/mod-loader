@@ -46,9 +46,16 @@ jobs:
           if ($install.ExitCode -ne 0 -or !(Test-Path "$installed/Update.exe") -or !(Test-Path "$installed/current/LoaderDev.exe") -or !(Test-Path "$installed/current/sq.version")) {
             throw 'O Setup não criou a instalação Dev esperada.'
           }
+          Copy-Item -LiteralPath './Instalador/Online/FixtureGame.exe' -Destination $installed
+          $env:TEMP = $fixture.FullName
+          $env:TMP = $fixture.FullName
           foreach ($test in @('paths','updates','save-backups')) {
             $result = Start-Process -FilePath "$installed/current/LoaderDev.exe" -ArgumentList "--self-test-$test", ('"' + $fixture.FullName + '"') -PassThru -Wait -WindowStyle Hidden
-            if ($result.ExitCode -ne 0) { throw "Teste Dev falhou: $test." }
+            if ($result.ExitCode -ne 0) {
+              $diagnostic = Join-Path $fixture.FullName 'CyberpunkCoopOnline-erro.txt'
+              if (Test-Path -LiteralPath $diagnostic) { Get-Content -LiteralPath $diagnostic }
+              throw "Teste Dev falhou: $test."
+            }
           }
 
       - name: Publicar somente no canal Dev
