@@ -79,6 +79,43 @@ internal sealed partial class GeneralModWindow {
             form.categoryFilters=new HashSet<string>{"Principal","Veículos"};form.variantFilters=null;form.statusFilters=new HashSet<string>{"Baixando","Falha"};form.DrawRows();check(form.VisibleMods().Count==2,"Multisseleção de situações conserva as duas situações escolhidas.");
             form.nameFilter="bet";form.DrawRows();check(form.VisibleMods().Single()==second,"Busca do cabeçalho Mod é combinada e não distingue maiúsculas.");
             form.ResetColumnFilters();form.DrawRows();check(form.VisibleMods().Count==3,"Limpar filtros restaura todos os itens do preset.");
+            form.measuredMods[first.Id]=50;
+            form.measuredMods[second.Id]=900;
+            using(var timer=new Timer{Interval=40}){
+                timer.Tick+=(s,e)=>{
+                    var filter=Application.OpenForms.OfType<GeneralColumnFilterDialog>().FirstOrDefault();
+                    if(filter==null)return;
+                    timer.Stop();
+                    AllControls(filter).OfType<Button>().Single(button=>button.Name=="DefaultOrder").PerformClick();
+                };
+                timer.Start();
+                form.ShowColumnFilter(form.grid.Columns["Size"].Index);
+            }
+            check(form.ModRows().Select(row=>(string)row.Tag).SequenceEqual(new[]{second.Id,first.Id,third.Id})&&
+                !form.grid.Rows.Cast<DataGridViewRow>().Any(row=>row.Tag is SectionRow),
+                "Ordenar por espaço cruza as categorias e deixa itens sem medição no fim.");
+            form.orderColumn="Variant";form.DrawRows();
+            check(form.ModRows().Select(row=>(string)row.Tag).SequenceEqual(new[]{first.Id,third.Id,second.Id}),
+                "Ordenar por variante reúne as principais primeiro.");
+            form.statuses[Key(third,form.Selected(third))]="Pendente";
+            form.orderColumn="Status";form.DrawRows();
+            check(form.ModRows().Select(row=>(string)row.Tag).SequenceEqual(new[]{first.Id,second.Id,third.Id}),
+                "Ordenar por situação reúne instalados primeiro e pendentes por último.");
+            form.statuses[Key(third,form.Selected(third))]="Falhou";
+            var extra=new GeneralModVariant{Id="wave",Name="Wave",Sources=new List<string>{archive}};
+            first.Variants.Add(extra);
+            form.state.ChosenVariants[first.Id]=extra.Id;
+            form.groupFilters=new HashSet<string>{first.Name};
+            form.DrawRows();
+            check(form.VisibleMods().Single()==first&&Equals(form.ModRows().Single().Cells["Group"].Tag,"Wave"),
+                "O filtro de grupo encontra a gaveta e o marcador reflete a variante ativa.");
+            first.Variants.Remove(extra);
+            form.state.ChosenVariants.Remove(first.Id);
+            form.measuredMods.Clear();
+            form.ClearListFilters();
+            check(form.orderColumn==null&&form.groupFilters==null&&form.grid.Rows.Cast<DataGridViewRow>()
+                .Any(row=>row.Tag is SectionRow&&((SectionRow)row.Tag).Kind=="heading"),
+                "A seta de voltar recupera as categorias e limpa a ordenação e o filtro de grupo.");
             form.categoryFilters=new HashSet<string>();form.DrawRows();check(form.VisibleMods().Count==0,"Nenhuma categoria marcada é diferente de selecionar todas.");
             form.ResetColumnFilters();form.DrawRows();
             var fillers=Enumerable.Range(0,157).Select(index=>NewEntry("Componente "+index,archive)).ToList();
@@ -153,7 +190,8 @@ internal sealed partial class GeneralModWindow {
             form.statuses[Key(second,form.Selected(second))]="Instalado";
             form.DrawRows();
             var badges=form.ModRows().Where(row=>Equals(row.Tag,first.Id)||Equals(row.Tag,second.Id)).Select(row=>row.Cells["Group"]).ToArray();
-            check(!form.grid.Columns["Group"].Visible&&badges.Length==2&&badges.All(cell=>cell.Value==null),"Grupos existentes ficam fora da apresentação da tabela.");
+            check(form.grid.Columns["Group"].Visible&&badges.Length==2&&badges.All(cell=>cell.Value==null),
+                "O cabeçalho de grupos volta sem converter vínculos antigos em gavetas.");
             check(form.totalProgress.Caption.EndsWith("1 / 2")&&form.counts.Text.Contains("Instalados: 1"),"Duas alternativas instaladas contam como uma escolha, com outro mod pendente.");
 
             form.statuses[Key(first,form.Selected(first))]="Não instalado";

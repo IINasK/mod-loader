@@ -109,13 +109,15 @@ internal sealed partial class GeneralModWindow {
         string previous;statuses.TryGetValue(work.Key,out previous);
         statuses[work.Key]=status;
         if(message!=null)statusDetails[work.Key]=message;else statusDetails.Remove(work.Key);
-        if((coverageFilter!=null||statusFilters!=null||work.Entry.AlternativeGroup!=null)&&previous!=status)DrawRows();
+        if((coverageFilter!=null||statusFilters!=null||orderColumn=="Status"||work.Entry.AlternativeGroup!=null)&&previous!=status)DrawRows();
         if(pct.HasValue)progress[work.Key]=pct.Value;else progress.Remove(work.Key);
         var visible=grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(r=>Equals(r.Tag,work.Entry.Id));
         var listed=state.List.Mods.FirstOrDefault(m=>m.Id==work.Entry.Id);
         if(visible!=null&&listed!=null&&Object.ReferenceEquals(Selected(listed),work.Variant)){
             string shown=ListStatus(listed);
-            visible.Cells["Status"].Value=GeneralStatusPresentation.Label(InstallationStatus(listed,shown));visible.Cells["Status"].ToolTipText=TableStatusDetail(listed,work.Key,shown);
+            string raw=InstallationStatus(listed,shown);
+            visible.Cells["Status"].Tag=raw;
+            visible.Cells["Status"].Value=GeneralStatusPresentation.Label(raw);visible.Cells["Status"].ToolTipText=TableStatusDetail(listed,work.Key,shown);
             visible.Cells["Progress"].Value=pct.HasValue?(object)pct.Value:"—";grid.InvalidateCell(visible.Cells["Status"]);UpdateCounts();
         }
         if(message!=null)detail.Text=message;
@@ -349,7 +351,9 @@ internal sealed partial class GeneralModWindow {
                 statusDetails.Remove(work.Key);statuses[work.Key]=result;progress.Remove(work.Key);
                 DataGridViewRow row;
                 if(visibleRows.TryGetValue(work.Entry.Id,out row)&&row.DataGridView==grid){
-                    row.Cells["Status"].Value=GeneralStatusPresentation.Label(InstallationStatus(work.Entry,result));
+                    string raw=InstallationStatus(work.Entry,result);
+                    row.Cells["Status"].Tag=raw;
+                    row.Cells["Status"].Value=GeneralStatusPresentation.Label(raw);
                     row.Cells["Status"].ToolTipText=TableStatusDetail(work.Entry,work.Key,result);
                     grid.InvalidateCell(row.Cells["Status"]);
                 }
@@ -1072,12 +1076,20 @@ internal sealed partial class GeneralModWindow {
         foreach(var process in processes)process.Dispose();
         if(processes.Length!=0)throw new IOException("Feche o Cyberpunk 2077 antes de instalar ou remover mods.");
     }
+    IEnumerable<string> UninstallSelection(){
+        foreach(var row in ModRows()){
+            string id=(string)row.Tag;
+            if(!row.Visible||!marked.Contains(id))continue;
+            string status=row.Cells["Status"].Tag as string;
+            if(GeneralStatusPresentation.Kind(status)=="installed"||status==GeneralStatusPresentation.Disabled)yield return id;
+        }
+    }
     async Task Uninstall(){
         if(projectDraft!=null&&!ConfirmProjectNavigation())return;
         if(working||scanning)return;
         try{
-            var jobs=Marked();
-            if(jobs.Count==0){var item=FocusedEntry();if(item!=null)jobs.Add(MakeWork(item));}
+            var checkedIds=new HashSet<string>(UninstallSelection(),StringComparer.Ordinal);
+            var jobs=state.List.Mods.Where(mod=>checkedIds.Contains(mod.Id)).Select(MakeWork).ToList();
             if(jobs.Count==0)return;
             string root=Root();
             if(GeneralDialog.Message(this,T("Desinstalar os mods selecionados e apagar suas cópias desabilitadas?","Uninstall the selected mods and delete their disabled copies?"),

@@ -47,6 +47,12 @@ internal sealed class GeneralReveal : IDisposable {
         if(target.IsDisposed)return;timer.Stop();origin=anchor;opening=true;complete=null;
         Running=GeneralStyle.AnimationsEnabled;if(Running)Frame(0);else SetRound();
     }
+    internal void StartPreparedOpen(){
+        if(!Running)return;
+        start=0;
+        watch.Restart();
+        timer.Start();
+    }
     internal void Begin(bool open,Point anchor,Action done=null){
         if(target.IsDisposed)return;
         timer.Stop();opening=open;origin=anchor;complete=done;
@@ -108,19 +114,20 @@ internal class GeneralDialog : Form {
         close.Click+=(s,e)=>Complete(DialogResult.Cancel);header.Controls.Add(close,1,0);
         title.MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){ReleaseCapture();SendMessage(Handle,0x00A1,(IntPtr)2,IntPtr.Zero);}};
         shell.Controls.Add(header,0,0);shell.Controls.Add(Content,0,1);base.Controls.Add(shell);Text=text;
-        reveal=new GeneralReveal(this);SetStyle(ControlStyles.ResizeRedraw|ControlStyles.OptimizedDoubleBuffer,true);
+        reveal=new GeneralReveal(this);SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.ResizeRedraw|ControlStyles.OptimizedDoubleBuffer,true);
     }
     protected override void OnTextChanged(EventArgs e){base.OnTextChanged(e);if(title!=null)title.Text=Text;}
     protected virtual bool AnimateAppearance { get { return true; } }
     protected override void SetVisibleCore(bool value){
-        if(value&&!Visible&&reveal!=null){
+        bool opening=value&&!Visible&&reveal!=null;
+        if(opening){
             allowClose=closing=false;
             origin=new Point(Width-36,0);
             if(AnimateAppearance)reveal.PrepareOpen(origin);else reveal.SetRound();
         }
         base.SetVisibleCore(value);
+        if(opening&&Visible&&!closing&&!allowClose&&AnimateAppearance)reveal.StartPreparedOpen();
     }
-    protected override void OnShown(EventArgs e){base.OnShown(e);if(closing||allowClose||!AnimateAppearance)return;origin=new Point(Width-36,0);reveal.Begin(true,origin);}
     protected override void OnPaintBackground(PaintEventArgs e){
         GeneralStyle.PaintCard(e.Graphics,ClientSize);
     }
@@ -288,7 +295,12 @@ internal sealed class GeneralPicker : UserControl {
                 afterClose();
             }));
         };
-        popup.Opened+=(s,e)=>{scroll.RefreshScroll();list.Focus();Invalidate();};
+        popup.Opening+=(s,e)=>{
+            if(e.Cancel)return;
+            // Lay out the hosted list and scrollbar before the drop-down is visible.
+            if(list.Handle!=IntPtr.Zero)scroll.RefreshScroll();
+        };
+        popup.Opened+=(s,e)=>{list.Focus();Invalidate();};
         dropdown=popup;
         var point=GeneralPopupPlacement.Location(this,ClientRectangle,popup.Size,false);
         popup.Show(this,PointToClient(point));Invalidate();

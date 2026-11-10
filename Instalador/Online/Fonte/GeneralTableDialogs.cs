@@ -43,9 +43,10 @@ internal sealed class GeneralColumnFilterDialog : GeneralDialog {
     readonly string[] values;
     internal HashSet<string> ResultValues { get; private set; }
     internal string SearchText { get; private set; }
+    internal bool? ReverseOrder { get; private set; }
 
-    internal GeneralColumnFilterDialog(string title, IEnumerable<string> choices, IEnumerable<string> selected = null, string search = "", bool withSearch = false) : base(title) {
-        ClientSize = new Size(540, withSearch ? 570 : 490);
+    internal GeneralColumnFilterDialog(string title, IEnumerable<string> choices, IEnumerable<string> selected = null, string search = "", bool withSearch = false, string[] sorts = null, bool withValues = true) : base(title) {
+        ClientSize = new Size(540, withSearch ? 570 : !withValues ? 200 : sorts==null ? 490 : 530);
         values = (choices ?? Enumerable.Empty<string>()).Where(value => value != null).Distinct(StringComparer.Ordinal).ToArray();
         var initial = new HashSet<string>(selected ?? values, StringComparer.Ordinal);
         foreach (string value in values) list.Items.Add(String.IsNullOrEmpty(value) ? GeneralStyle.T("(Sem valor)", "(Empty)") : value, initial.Contains(value));
@@ -57,6 +58,16 @@ internal sealed class GeneralColumnFilterDialog : GeneralDialog {
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        if(sorts!=null){
+            var sortActions=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,WrapContents=false,Margin=new Padding(0,0,0,10)};
+            for(int index=0;index<sorts.Length;index++){
+                bool reverse=index!=0;
+                var button=GeneralStyle.Button(sorts[index],()=>SaveSelection(reverse));
+                button.Name=reverse?"ReverseOrder":"DefaultOrder";
+                sortActions.Controls.Add(button);
+            }
+            layout.Controls.Add(sortActions,0,0);
+        }
         if (withSearch) {
             var searchLayout = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, Margin = new Padding(0, 0, 0, 12) };
             searchLayout.Controls.Add(GeneralModEditor.LabelFor(GeneralStyle.T("Contém", "Contains")));
@@ -71,15 +82,23 @@ internal sealed class GeneralColumnFilterDialog : GeneralDialog {
         var clear = GeneralStyle.Button(GeneralStyle.T("Limpar", "Clear"), () => CheckAll(false)); clear.Name = "ClearValues";
         selection.Controls.Add(all); selection.Controls.Add(clear); layout.Controls.Add(selection, 0, 3);
         var commands = GeneralTableDialogLayout.Commands();
-        var apply = GeneralStyle.Button(GeneralStyle.T("Aplicar", "Apply"), () => {
-            ResultValues = new HashSet<string>(list.CheckedIndices.Cast<int>().Select(index => values[index]), StringComparer.Ordinal);
-            SearchText = this.search.Text.Trim(); Complete(DialogResult.OK);
-        }, true);
+        var apply = GeneralStyle.Button(GeneralStyle.T("Aplicar", "Apply"), () => SaveSelection(null), true);
         apply.Name = "ApplyColumnFilter";
         var cancel = GeneralStyle.Button(GeneralStyle.T("Cancelar", "Cancel"), () => Complete(DialogResult.Cancel)); cancel.Name = "CancelColumnFilter";
         commands.Controls.Add(apply); commands.Controls.Add(cancel); layout.Controls.Add(commands, 0, 4); Content.Controls.Add(layout);
-        AcceptButton = apply; CancelButton = cancel;
+        if(!withValues){
+            foreach(int row in new[]{1,2,3})layout.GetControlFromPosition(0,row).Visible=false;
+            apply.Visible=false;
+        }else AcceptButton = apply;
+        CancelButton = cancel;
         GeneralStyle.Apply(this, GeneralStyle.Dark); this.search.BorderStyle = BorderStyle.None; list.BorderStyle = BorderStyle.None;
+    }
+
+    void SaveSelection(bool? reverse){
+        ReverseOrder=reverse;
+        ResultValues=new HashSet<string>(list.CheckedIndices.Cast<int>().Select(index=>values[index]),StringComparer.Ordinal);
+        SearchText=search.Text.Trim();
+        Complete(DialogResult.OK);
     }
 
     void CheckAll(bool value) { for (int index = 0; index < list.Items.Count; index++) list.SetItemChecked(index, value); }

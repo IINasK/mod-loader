@@ -14,7 +14,7 @@ internal static class GeneralStyle {
     internal static bool BlackTheme;
     internal static void UseTheme(string theme){Dark=theme=="dark"||theme=="black";RedTheme=theme=="light-red";BlackTheme=theme=="black";}
     internal static string Language="pt";
-    internal static bool AnimationsEnabled=true;
+    internal static bool AnimationsEnabled;
     static readonly PrivateFontCollection fonts=new PrivateFontCollection();
     static readonly IntPtr fontMemory;
     [DllImport("gdi32.dll")]static extern IntPtr AddFontMemResourceEx(IntPtr memory,uint size,IntPtr reserved,ref uint count);

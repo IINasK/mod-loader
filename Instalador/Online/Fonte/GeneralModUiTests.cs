@@ -88,7 +88,7 @@ internal sealed partial class GeneralModWindow {
                 verifyButton.Text==""&&((GeneralButton)verifyButton).Bare&&((GeneralButton)verifyButton).IconKind=="refresh"&&
                 !AllControls(form).OfType<GeneralButton>().Any(button=>button!=verifyButton&&button.IconKind=="refresh"),
                 "Verificar fica ao lado da ação principal no rodapé.");
-            check(!form.grid.Columns["Group"].Visible&&form.grid.AllowUserToResizeColumns,
+            check(form.grid.Columns["Group"].Visible&&form.grid.AllowUserToResizeColumns,
                 "Grupos ocupam a linha do nome e as divisórias do cabeçalho permitem ajustar a largura.");
             int initialStatusWidth=form.grid.Columns["Status"].Width;
             form.grid.Columns["Status"].Width=initialStatusWidth+28;

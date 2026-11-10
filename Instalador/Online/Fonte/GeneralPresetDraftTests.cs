@@ -54,6 +54,16 @@ internal sealed partial class GeneralModWindow {
             form.testProjectSaveChoice=()=>DialogResult.Yes;
             check(form.ConfirmProjectNavigation()&&form.projectDraft==null&&form.library.Load().List.Mods.First().Tags.Contains("tag salva"),
                 "Salvar ao sair grava as edições da lista.");
+            form.marked.Clear();
+            form.DrawRows();
+            check(!form.removeButton.Visible,"Desinstalar fica oculto sem itens marcados.");
+            form.marked.Add(a.Id);
+            form.DrawRows();
+            check(!form.removeButton.Visible,"Marcar um item pendente não mostra Desinstalar.");
+            form.statuses[Key(a,form.Selected(a))]="Instalado";
+            form.DrawRows();
+            check(form.removeButton.Visible&&form.removeButton.Text=="Desinstalar"&&form.UninstallSelection().SequenceEqual(new[]{a.Id}),
+                "A ação Desinstalar aparece para a seleção instalada.");
             foreach(string theme in new[]{"light","light-red","dark"}){
                 state.Theme=theme;form.BuildInterface();form.PerformLayout();await Task.Delay(40);
                 var remove=AllControls(form).OfType<Button>().Single(button=>button.Name=="UninstallSelected");var install=AllControls(form).OfType<Button>().Single(button=>button.Name=="DownloadInstall");

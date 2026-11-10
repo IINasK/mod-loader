@@ -27,7 +27,7 @@ internal sealed partial class GeneralModWindow : Form {
     GeneralPicker preset;
     DataGridView grid;
     Label detail,counts;
-    Button next,optionsButton,expandList,projectsButton,homeButton;
+    Button next,optionsButton,expandList,projectsButton,homeButton,removeButton;
     GeneralStorageLabel storageSize;
     TableLayoutPanel mainLayout,tableTools;
     bool listExpanded;
@@ -170,7 +170,7 @@ internal sealed partial class GeneralModWindow : Form {
         presetSettings=IconButton("save",T("Salvar alterações","Save changes"),SaveCurrentPreset,true);((GeneralButton)presetSettings).Bare=true;presetSettings.Name="SavePreset";presetSettings.Margin=Padding.Empty;
         deletePreset=IconButton("trash",T("Excluir preset","Delete preset"),DeletePreset,true);((GeneralButton)deletePreset).Bare=true;((GeneralButton)deletePreset).Destructive=true;deletePreset.Name="DeletePreset";deletePreset.Margin=Padding.Empty;
 
-        clearFilters=IconButton("undo",T("Limpar todos os filtros","Clear all filters"),ClearListFilters,true);
+        clearFilters=IconButton("undo",T("Restaurar filtros e ordem padrão","Reset filters and sort order"),ClearListFilters,true);
         ((GeneralButton)clearFilters).Bare=true;clearFilters.Name="ClearFilters";clearFilters.Margin=Padding.Empty;
 
         var summary=Flow();summary.Margin=new Padding(0,0,0,12);layout.Controls.Add(summary,0,3);
@@ -210,8 +210,9 @@ internal sealed partial class GeneralModWindow : Form {
             ScrollBars=ScrollBars.Vertical,Margin=Padding.Empty,ColumnHeadersHeight=44,ColumnHeadersHeightSizeMode=DataGridViewColumnHeadersHeightSizeMode.DisableResizing};
         grid.DefaultCellStyle=new DataGridViewCellStyle{BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground,SelectionBackColor=GeneralStyle.Selection,SelectionForeColor=GeneralStyle.Foreground,Font=GeneralStyle.Font(12),Padding=new Padding(10,0,8,0)};
         optionSelectedFont=GeneralStyle.Font(12,true);
-        var selectedFont=optionSelectedFont;
-        grid.Disposed+=(s,e)=>selectedFont.Dispose();
+        groupIndicatorFont=GeneralStyle.Font(9.5f,true);
+        var selectedFont=optionSelectedFont;var groupFont=groupIndicatorFont;
+        grid.Disposed+=(s,e)=>{selectedFont.Dispose();groupFont.Dispose();};
         grid.ColumnHeadersDefaultCellStyle=new DataGridViewCellStyle{BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Muted,Font=GeneralStyle.Font(10.5f,true),Padding=new Padding(10,0,8,0),SelectionBackColor=GeneralStyle.Surface};
         grid.Columns.Add(new DataGridViewCheckBoxColumn{Name="Mark",HeaderText="",Width=44,SortMode=DataGridViewColumnSortMode.NotSortable});
         grid.Columns.Add(new DataGridViewTextBoxColumn{Name="Name",HeaderText="Mods",MinimumWidth=160,FillWeight=85,AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill,ReadOnly=true,SortMode=DataGridViewColumnSortMode.NotSortable});
@@ -220,7 +221,7 @@ internal sealed partial class GeneralModWindow : Form {
         grid.Columns.Add(new DataGridViewTextBoxColumn{Name="Progress",Visible=false,ReadOnly=true});
         grid.Columns.Add(new DataGridViewTextBoxColumn{Name="Size",HeaderText=T("Espaço","Space"),MinimumWidth=108,FillWeight=15,AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill,ReadOnly=true,SortMode=DataGridViewColumnSortMode.NotSortable,DefaultCellStyle=new DataGridViewCellStyle{Alignment=DataGridViewContentAlignment.MiddleRight,ForeColor=GeneralStyle.Muted}});
         grid.Columns["Size"].DisplayIndex=2;
-        grid.Columns.Add(new DataGridViewTextBoxColumn{Name="Group",HeaderText=T("Grupo","Group"),Visible=false,ReadOnly=true,SortMode=DataGridViewColumnSortMode.NotSortable});
+        grid.Columns.Add(new DataGridViewTextBoxColumn{Name="Group",HeaderText=T("Grupo","Group"),Width=92,ReadOnly=true,SortMode=DataGridViewColumnSortMode.NotSortable});
         grid.Columns["Group"].DisplayIndex=grid.Columns["Status"].DisplayIndex+1;
         grid.Columns.Add(new DataGridViewTextBoxColumn{Name="Origin",HeaderText=T("Origem","Origin"),Width=56,ReadOnly=true,SortMode=DataGridViewColumnSortMode.NotSortable,
             HeaderCell=new DataGridViewColumnHeaderCell{Style=new DataGridViewCellStyle{Alignment=DataGridViewContentAlignment.MiddleCenter,Padding=Padding.Empty}}});
@@ -257,6 +258,9 @@ internal sealed partial class GeneralModWindow : Form {
                 return;
             }
             if(e.ColumnIndex==grid.Columns["Variant"].Index&&e.X>=grid.Columns[e.ColumnIndex].Width-30&&ToggleVersions(row))return;
+            if(e.ColumnIndex==grid.Columns["Name"].Index&&row.Cells["Group"].Tag is string&&e.Y>=row.Height/2){
+                ToggleVersions(row);return;
+            }
             if(e.ColumnIndex!=0||!(row.Tag is string))return;
             var mark=row.Cells["Mark"];
             bool desiredMark=!markBeforeMouseDown;
@@ -335,7 +339,7 @@ internal sealed partial class GeneralModWindow : Form {
                 if(modGrid.IsDisposed)return;
                 if(associationChoice==null)
                     SetTableToolsVisible(showToolsAfterScroll||modGrid.FirstDisplayedScrollingRowIndex<=0);
-                modGrid.Invalidate();
+                if(hoveredRow>=0)SetHover(-1);
             }));
         };
         detail=new Label{Dock=DockStyle.Fill,AutoEllipsis=true,TextAlign=ContentAlignment.MiddleCenter,
@@ -351,7 +355,10 @@ internal sealed partial class GeneralModWindow : Form {
         totalProgress.SegmentActivated+=FilterCoverage;
         bars.Controls.Add(currentProgress,1,0);bars.Controls.Add(totalProgress,2,0);layout.Controls.Add(bars,0,6);
         var bottom=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=false,Height=56,MinimumSize=new Size(0,56),ColumnCount=4,RowCount=1,Margin=Padding.Empty};bottom.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));bottom.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));bottom.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));bottom.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-        var remove=Command(T("Desinstalar selecionados","Uninstall selected"),async()=>await Uninstall(),true);((GeneralButton)remove).Destructive=true;((GeneralButton)remove).Primary=true;remove.Name="UninstallSelected";remove.MinimumSize=new Size(226,52);remove.Font=GeneralStyle.Font(13,true);remove.Margin=Padding.Empty;remove.Anchor=AnchorStyles.Left;bottom.Controls.Add(remove,0,0);
+        var remove=removeButton=Command(T("Desinstalar","Uninstall"),async()=>await Uninstall(),true);
+        ((GeneralButton)remove).Destructive=true;((GeneralButton)remove).Primary=true;
+        remove.Name="UninstallSelected";remove.MinimumSize=new Size(226,52);remove.Font=GeneralStyle.Font(13,true);
+        remove.Margin=Padding.Empty;remove.Anchor=AnchorStyles.Left;remove.Visible=false;bottom.Controls.Add(remove,0,0);
         var install=primaryAction=Command(T("Baixar","Download"),StartSelected,true);((GeneralButton)install).Primary=true;install.Name="DownloadInstall";install.MinimumSize=new Size(226,52);install.Font=GeneralStyle.Font(13,true);install.Margin=Padding.Empty;install.Anchor=AnchorStyles.Right;bottom.Controls.Add(install,3,0);
         var verify=(GeneralButton)IconButton("refresh",T("Verificar projeto","Verify project"),async()=>await VerifyProject(),true);
         verify.Bare=true;verify.Name="VerifyProject";verify.MinimumSize=new Size(44,52);verify.Margin=new Padding(0,0,10,0);
@@ -471,48 +478,38 @@ internal sealed partial class GeneralModWindow : Form {
             marked.Add(bodyRow.Id);
         }
 
-        groups.Add(null);groups.AddRange(picking?state.List.Categories:PresetCategories());
-        if(!picking&&categoryFilters!=null)groups=groups.Where(category=>categoryFilters.Contains(category??"")).ToList();
-        if(picking||coverageFilter!=null||variantFilters!=null||statusFilters!=null||!String.IsNullOrWhiteSpace(nameFilter)||searchTerms.Length>0)groups=groups.Where(category=>visible.Any(mod=>String.Equals(mod.Category,category,StringComparison.OrdinalIgnoreCase)||String.IsNullOrEmpty(mod.Category)&&category==null)).ToList();
-        foreach(var category in groups){
-            if(grid.Rows.Count>0)AddSection("divider",category,23);
-            string description;
-            if(category==null)description=state.List.UncategorizedDescription;
-            else if(!state.List.CategoryDescriptions.TryGetValue(category,out description))description=null;
-            var members=visible.Where(mod=>String.Equals(mod.Category??"",category??"",StringComparison.OrdinalIgnoreCase)).ToList();
-            var heading=AddSection("heading",category,String.IsNullOrWhiteSpace(description)?54:78);
-            var section=(SectionRow)heading.Tag;
-            section.ModIds=members.Select(mod=>mod.Id).ToArray();
-            section.Size=CategorySize(section.ModIds);
-            bool collapsed=CategoryCollapsed(section);
-            foreach(var m in members){
-                var v=Selected(m);string key=Key(m,v),status=ListStatus(m);int pct;bool hasProgress=progress.TryGetValue(key,out pct);
-                int i=grid.Rows.Add(marked.Contains(m.Id),picking?m.Name:ModDisplayName(m),NexusVariantName(m),GeneralStatusPresentation.Label(InstallationStatus(m,status)),hasProgress?(object)pct:null,ModSpace(m));var row=grid.Rows[i];row.Tag=m.Id;row.Cells["Status"].ToolTipText=TableStatusDetail(m,key,status);
-                row.Cells["Size"].ToolTipText=SpaceTip(m);
-                row.Cells["Name"].ToolTipText=v.Description??m.Description;
-                row.Cells["Name"].Tag=GeneralModLibrary.BodyOption(state.BodyChoice,m,v).Nsfw??m.Nsfw;
-                var origin=row.Cells["Origin"];
-                origin.Value="Mod Loader";
-                origin.ToolTipText=v.CyberpunkId==null
-                    ?T("Item cadastrado neste projeto do Mod Loader.","Item registered in this Mod Loader project.")
-                    :T("Item do catálogo do Mod Loader. Os arquivos também podem ter sido instalados manualmente.","Mod Loader catalog item. The files may also have been installed manually.");
-                if(status==GeneralStatusPresentation.ChooseDependency){
-                    var nameCell=row.Cells["Name"];
-                    nameCell.Style.ForeColor=nameCell.Style.SelectionForeColor=ColorTranslator.FromHtml(GeneralStyle.Dark?"#ffbf80":"#9a4e00");
+        bool flat=!picking&&orderColumn!=null;
+        if(flat){
+            foreach(var mod in OrderedMods(visible))AddModRow(mod,old,false,false,null);
+        }else{
+            groups.Add(null);groups.AddRange(picking?state.List.Categories:PresetCategories());
+            if(!picking&&categoryFilters!=null)groups=groups.Where(category=>categoryFilters.Contains(category??"")).ToList();
+            if(picking||coverageFilter!=null||variantFilters!=null||statusFilters!=null||groupFilters!=null||!String.IsNullOrWhiteSpace(nameFilter)||searchTerms.Length>0)groups=groups.Where(category=>visible.Any(mod=>String.Equals(mod.Category,category,StringComparison.OrdinalIgnoreCase)||String.IsNullOrEmpty(mod.Category)&&category==null)).ToList();
+            foreach(var category in groups){
+                if(grid.Rows.Count>0)AddSection("divider",category,23);
+                string description;
+                if(category==null)description=state.List.UncategorizedDescription;
+                else if(!state.List.CategoryDescriptions.TryGetValue(category,out description))description=null;
+                var members=visible.Where(mod=>String.Equals(mod.Category??"",category??"",StringComparison.OrdinalIgnoreCase)).ToList();
+                var heading=AddSection("heading",category,String.IsNullOrWhiteSpace(description)?54:78);
+                var section=(SectionRow)heading.Tag;
+                section.ModIds=members.Select(mod=>mod.Id).ToArray();
+                section.Size=CategorySize(section.ModIds);
+                bool collapsed=CategoryCollapsed(section);
+                foreach(var mod in members){
+                    var branch=mod==members[0]?CategoryBranch.First:CategoryBranch.Middle;
+                    if(mod==members[members.Count-1])branch|=CategoryBranch.Last;
+                    AddModRow(mod,old,picking,collapsed,branch);
                 }
-                var branch=m==members[0]?CategoryBranch.First:CategoryBranch.Middle;
-                if(m==members[members.Count-1])branch|=CategoryBranch.Last;
-                row.Cells["CategoryIndent"].Tag=branch;
-                if(collapsed)row.Visible=false;
-                else if(m.Id==old)grid.CurrentCell=row.Cells["Name"];
-                if(!picking)AddVersionRows(m,v,row,collapsed);
+                if(!picking&&groupFilters==null&&coverageFilter==null&&searchTerms.Length==0)AddSection("add",category,44).Visible=!collapsed;
             }
-            if(!picking&&coverageFilter==null&&searchTerms.Length==0)AddSection("add",category,44).Visible=!collapsed;
         }
         var inventory=VisibleGameInventory().GroupBy(InventoryLinkStore.Key,StringComparer.OrdinalIgnoreCase).ToList();
         if(inventory.Count>0){
-            if(grid.Rows.Count>0)AddSection("divider",null,23);
-            AddSection("inventory",T("Fora do catálogo do projeto","Outside the project catalog"),54);
+            if(!flat){
+                if(grid.Rows.Count>0)AddSection("divider",null,23);
+                AddSection("inventory",T("Fora do catálogo do projeto","Outside the project catalog"),54);
+            }
             var inventoryMembers=DisplayedInventory().Where(file=>file.Kind=="found").ToLookup(InventoryLinkStore.Key,InventoryPaths);
             var savedGroups=InventoryLinks.Groups.ToDictionary(group=>group.Id,StringComparer.Ordinal);
             foreach(var entry in inventory){
@@ -533,12 +530,36 @@ internal sealed partial class GeneralModWindow : Form {
                     "Game files found outside this project. Drag onto another unidentified item to group them.");
             }
         }
-        if(!picking&&coverageFilter==null&&searchTerms.Length==0&&(visible.Count>0||statusFilters==null))AddSection("new",null,56);
+        if(!picking&&!flat&&groupFilters==null&&coverageFilter==null&&searchTerms.Length==0&&(visible.Count>0||statusFilters==null))AddSection("new",null,56);
         else if(visible.Count==0&&inventory.Count==0)AddSection("empty",null,56);
         if(old==null)grid.ClearSelection();
         if(scroll>=0&&scroll<grid.RowCount)try{grid.FirstDisplayedScrollingRowIndex=scroll;}catch(InvalidOperationException){}
         drawing=false;UpdateCounts();
     }
+    void AddModRow(GeneralModEntry mod,string previous,bool picking,bool collapsed,CategoryBranch? branch){
+        var variant=Selected(mod);
+        string key=Key(mod,variant),status=ListStatus(mod),raw=InstallationStatus(mod,status);
+        int percent;
+        var row=grid.Rows[grid.Rows.Add(marked.Contains(mod.Id),picking?mod.Name:ModDisplayName(mod),
+            NexusVariantName(mod),GeneralStatusPresentation.Label(raw),progress.TryGetValue(key,out percent)?(object)percent:null,ModSpace(mod))];
+        row.Tag=mod.Id;
+        row.Cells["Status"].Tag=raw;
+        row.Cells["Status"].ToolTipText=TableStatusDetail(mod,key,status);
+        row.Cells["Size"].ToolTipText=SpaceTip(mod);
+        row.Cells["Name"].ToolTipText=variant.Description??mod.Description;
+        row.Cells["Name"].Tag=GeneralModLibrary.BodyOption(state.BodyChoice,mod,variant).Nsfw??mod.Nsfw;
+        row.Cells["Origin"].Value="Mod Loader";
+        row.Cells["Origin"].ToolTipText=variant.CyberpunkId==null
+            ?T("Item cadastrado neste projeto do Mod Loader.","Item registered in this Mod Loader project.")
+            :T("Item do catálogo do Mod Loader. Os arquivos também podem ter sido instalados manualmente.","Mod Loader catalog item. The files may also have been installed manually.");
+        if(status==GeneralStatusPresentation.ChooseDependency)
+            row.Cells["Name"].Style.ForeColor=row.Cells["Name"].Style.SelectionForeColor=ColorTranslator.FromHtml(GeneralStyle.Dark?"#ffbf80":"#9a4e00");
+        row.Cells["CategoryIndent"].Tag=branch;
+        if(collapsed)row.Visible=false;
+        else if(mod.Id==previous)grid.CurrentCell=row.Cells["Name"];
+        if(!picking)AddVersionRows(mod,variant,row,collapsed);
+    }
+
     DataGridViewRow AddSection(string kind,string category,int height){
         int i=grid.Rows.Add();var row=grid.Rows[i];row.Tag=new SectionRow(kind,category);row.Height=height;row.ReadOnly=true;
         row.Cells["Name"].Value=kind=="heading"?category??UncatName():kind=="inventory"?category:kind=="add"?T("Adicionar item","Add item"):kind=="new"?T("Criar nova categoria","Create new category"):"";
@@ -571,6 +592,9 @@ internal sealed partial class GeneralModWindow : Form {
         cell.Style.Padding=new Padding(10,0,30,0);
         cell.ToolTipText=T("Mostrar ou ocultar outras versões","Show or hide other versions");
         parent.Cells["Name"].Tag=versions.Any(work=>work.Variant.Nsfw??work.Entry.Nsfw);
+        parent.Cells["Group"].Tag=NexusVariantName(entry);
+        parent.Height=56;
+        parent.Cells["Name"].ToolTipText=T("Clique na versão em dourado para mostrar ou ocultar o grupo.","Click the version in gold to show or hide the group.");
         if(!expandedVersions.Contains(DrawerKey(entry)))return;
         bool body=IsBigBody(entry);
         parent.Cells["Mark"].Tag="body-branch";
@@ -607,7 +631,7 @@ internal sealed partial class GeneralModWindow : Form {
         }
     }
 
-    Font optionSelectedFont;
+    Font optionSelectedFont,groupIndicatorFont;
 
     string InstallationStatus(GeneralModEntry entry,string status){
         if(!IsBigBody(entry))return status;
@@ -660,6 +684,10 @@ internal sealed partial class GeneralModWindow : Form {
         }finally{grid.ResumeLayout(true);}
         grid.InvalidateRow(heading.Index);
         grid.InvalidateCell(0,-1);
+        UpdateUninstallButton();
+    }
+    void UpdateUninstallButton(){
+        if(removeButton!=null)removeButton.Visible=associationChoice==null&&UninstallSelection().Any();
     }
     void UpdateCounts(){
         if(counts==null)return;var rows=ModRows().ToList();int selected=rows.Count(r=>marked.Contains((string)r.Tag));
@@ -670,6 +698,7 @@ internal sealed partial class GeneralModWindow : Form {
         int installed=visible.Where(mod=>GeneralStatusPresentation.Kind(ListStatus(mod))=="installed")
             .Select(GeneralModLibrary.ChoiceKey).Distinct(StringComparer.Ordinal).Count();
         int failed=rows.Count(r=>{var m=state.List.Mods.Single(x=>x.Id==(string)r.Tag);string status;return statuses.TryGetValue(Key(m,Selected(m)),out status)&&GeneralStatusPresentation.Kind(status)=="error";});
+        UpdateUninstallButton();
         RefreshPrimaryAction();
         counts.Text=T("Mods na lista: ","Mods in list: ")+rows.Count+"   ·   "+T("Medidos: ","Measured: ")+rows.Count(r=>measuredMods.ContainsKey((string)r.Tag))+"/"+rows.Count+"   ·   "+T("Instalados: ","Installed: ")+installed+"   ·   "+T("Falhas: ","Failed: ")+failed;UpdatePresetCommands();UpdatePackCoverage();
     }
@@ -746,10 +775,10 @@ internal sealed partial class GeneralModWindow : Form {
         }
         if(e.RowIndex==-1&&e.ColumnIndex>0){
             e.PaintBackground(e.ClipBounds,true);
-            if(associationChoice==null&&e.ColumnIndex<=3){
-                bool active=e.ColumnIndex==1?categoryFilters!=null||!String.IsNullOrEmpty(nameFilter):e.ColumnIndex==2?variantFilters!=null:statusFilters!=null;
-                var bounds=e.CellBounds;
-                PaintFilterHeader(e,bounds,grid.Columns[e.ColumnIndex].HeaderText,active);
+            string column=grid.Columns[e.ColumnIndex].Name;
+            if(associationChoice==null&&IsFilterColumn(column)){
+                bool active=ColumnFilterActive(column)||orderColumn==column;
+                PaintFilterHeader(e,e.CellBounds,grid.Columns[e.ColumnIndex].HeaderText,active);
                 e.Handled=true;return;
             }
         }
@@ -801,15 +830,25 @@ internal sealed partial class GeneralModWindow : Form {
             var value=selected==0?System.Windows.Forms.VisualStyles.CheckBoxState.UncheckedNormal:selected==rows.Count?System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal:System.Windows.Forms.VisualStyles.CheckBoxState.MixedNormal;
             CheckBoxRenderer.DrawCheckBox(e.Graphics,new Point(e.CellBounds.Left+16,e.CellBounds.Top+(e.CellBounds.Height-14)/2),value);e.Handled=true;return;
         }
-        if(e.RowIndex<0||e.ColumnIndex!=1||!Equals(grid.Rows[e.RowIndex].Cells["Name"].Tag,true))return;
+        if(e.RowIndex<0||e.ColumnIndex!=grid.Columns["Name"].Index)return;
+        var row=grid.Rows[e.RowIndex];
+        bool adult=Equals(row.Cells["Name"].Tag,true);
+        string version=row.Cells["Group"].Tag as string;
+        if(!adult&&version==null)return;
         string name=Convert.ToString(e.FormattedValue);
         e.PaintBackground(e.ClipBounds,true);
         var box=e.CellBounds;box.Inflate(-10,0);
-        const int suffix=52;
+        if(version!=null)box.Height=box.Height/2+4;
+        int suffix=adult?52:0;
         int nameWidth=Math.Min(Math.Max(1,box.Width-suffix),TextRenderer.MeasureText(name,e.CellStyle.Font).Width);
-        TextRenderer.DrawText(e.Graphics,name,e.CellStyle.Font,new Rectangle(box.X,box.Y,nameWidth,box.Height),e.CellStyle.ForeColor,TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine|TextFormatFlags.PreserveGraphicsClipping);
-        using(var font=GeneralStyle.Font(9.5f,true))
-            TextRenderer.DrawText(e.Graphics,"NSFW",font,new Rectangle(box.X+nameWidth+4,box.Y,suffix-4,box.Height),GeneralStyle.Danger,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.PreserveGraphicsClipping);
+        const TextFormatFlags flags=TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine|TextFormatFlags.PreserveGraphicsClipping;
+        TextRenderer.DrawText(e.Graphics,name,e.CellStyle.Font,new Rectangle(box.X,box.Y,nameWidth,box.Height),e.CellStyle.ForeColor,flags);
+        if(adult)TextRenderer.DrawText(e.Graphics,"NSFW",groupIndicatorFont,new Rectangle(box.X+nameWidth+4,box.Y,suffix-4,box.Height),GeneralStyle.Danger,flags);
+        if(version!=null){
+            Color gold=ColorTranslator.FromHtml(GeneralStyle.Dark?"#F2C15A":"#805704");
+            TextRenderer.DrawText(e.Graphics,version,groupIndicatorFont,
+                new Rectangle(box.X,e.CellBounds.Y+e.CellBounds.Height/2,box.Width,e.CellBounds.Height/2-4),gold,flags);
+        }
         e.Handled=true;
     }
     static void PaintFilterHeader(DataGridViewCellPaintingEventArgs e,Rectangle bounds,string label,bool active){
@@ -832,8 +871,7 @@ internal sealed partial class GeneralModWindow : Form {
         grid.Cursor=row>=0&&row<grid.RowCount?Cursors.Hand:Cursors.Default;
     }
     void PaintStatus(DataGridViewCellPaintingEventArgs e){
-        string id=(string)grid.Rows[e.RowIndex].Tag;var item=state.List.Mods.Single(m=>m.Id==id);
-        string raw=InstallationStatus(item,ListStatus(item));
+        string raw=grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Tag as string;
         PaintBadge(e,GeneralStatusPresentation.Label(raw),GeneralStatusPresentation.ColorFor(raw),Color.White);
     }
     static void PaintBadge(DataGridViewCellPaintingEventArgs e,string label,Color fill,Color textColor){

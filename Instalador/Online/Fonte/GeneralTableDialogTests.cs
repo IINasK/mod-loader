@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Windows.Forms;
 
 internal static class GeneralTableDialogTests {
@@ -30,6 +31,14 @@ internal static class GeneralTableDialogTests {
                 check(table.ReadOnly && table.Rows.Count == 25 && table.Rows.Cast<DataGridViewRow>().Select(row => (string)row.Cells[0].Value).SequenceEqual(pending),
                     "Install confirmation shows all pending downloads in individual read-only rows.");
                 check(scroll.Bar.Visible && table.DisplayedRowCount(false) < pending.Length, "Long confirmations use the shared scrollbar.");
+                table.CurrentCell = null;
+                table.Rows[3].Visible = false;
+                scroll.Bar.MoveTo(6);
+                check(table.FirstDisplayedScrollingRowIndex == 7 && scroll.Bar.Value == 6,
+                    "Dragging updates the scrollbar and table synchronously after hiding a row.");
+                table.Rows[3].Visible = true;
+                scroll.ScrollTo(0);
+                TestMiddleScroll(scroll, table, check);
                 scroll.ScrollTo(24);
                 check(table.Rows[24].Displayed && Find<Button>(dialog, "ConfirmPendingInstall").Visible, "Scrolling reaches the last mod while actions stay visible.");
                 using (var image = new Bitmap(dialog.Width, dialog.Height)) {
@@ -125,6 +134,29 @@ internal static class GeneralTableDialogTests {
         Safe.WriteJson(Path.Combine(root, "resultado-table-dialogs.json"), new { Passed = true, Tests = checks, RealGameTouched = false, NetworkUsed = false });
         return checks.Count;
     }
+    static void TestMiddleScroll(GeneralScrollView scroll, DataGridView table, Action<bool, string> check) {
+        const BindingFlags privateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
+        Cursor original = scroll.Cursor;
+        var middle = Message.Create(table.Handle, 0x0207, IntPtr.Zero, IntPtr.Zero);
+        check(Application.FilterMessage(ref middle) && scroll.Cursor == Cursors.NoMoveVert,
+            "Middle click on the table activates continuous scrolling.");
+        var filter = typeof(GeneralScrollView).GetField("middleScroll", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+        var anchor = filter.GetType().GetField("anchor", privateInstance);
+        var tick = filter.GetType().GetMethod("Scroll", privateInstance);
+        var cursor = Cursor.Position;
+        anchor.SetValue(filter, new Point(cursor.X, cursor.Y - 200));
+        tick.Invoke(filter, null);
+        tick.Invoke(filter, null);
+        int after = table.FirstDisplayedScrollingRowIndex;
+        check(after > 0, "The middle scroll advances repeatedly while the pointer remains below the anchor.");
+        anchor.SetValue(filter, new Point(cursor.X, cursor.Y + 200));
+        tick.Invoke(filter, null);
+        tick.Invoke(filter, null);
+        check(table.FirstDisplayedScrollingRowIndex < after, "Moving above the anchor reverses continuous scrolling.");
+        var escape = Message.Create(table.Handle, 0x0100, (IntPtr)Keys.Escape, IntPtr.Zero);
+        check(Application.FilterMessage(ref escape) && scroll.Cursor == original, "Escape stops the middle scroll and restores the cursor.");
+    }
+
     static void Open(Form dialog) { dialog.ShowInTaskbar = false; dialog.StartPosition = FormStartPosition.Manual; dialog.Location = new Point(-30000, -30000); dialog.Show(); Application.DoEvents(); }
     static T Find<T>(Control parent, string name) where T : Control { return Descendants(parent).OfType<T>().Single(control => control.Name == name); }
     static IEnumerable<Control> Descendants(Control parent) { foreach (Control child in parent.Controls) { yield return child; foreach (Control next in Descendants(child)) yield return next; } }

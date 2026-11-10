@@ -61,7 +61,19 @@ internal static class GeneralPopupStabilityTests {
                                     using(var picker=new GeneralPicker{Size=new Size(width,44)})CheckControl(picker,theme+" picker "+width,check);
                                 }
                             }
-                            GeneralStyle.UseTheme("light-red");GeneralStyle.AnimationsEnabled=true;
+                            GeneralStyle.UseTheme("light-red");GeneralStyle.AnimationsEnabled=false;
+                            using(var ready=new GeneralDialog("Ready card"){ClientSize=new Size(320,210),StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)}){
+                                int visibleFrames=0;
+                                ready.VisibleChanged+=(ss,ee)=>{
+                                    if(!ready.Visible)return;
+                                    visibleFrames++;
+                                    if(!HasFullCenter(ready))failure=new IOException("The first visible frame must show the complete popup.");
+                                    ready.BeginInvoke((Action)(()=>ready.Complete(visibleFrames==1?DialogResult.Retry:DialogResult.OK)));
+                                };
+                                check(ready.ShowDialog(owner)==DialogResult.Retry&&ready.ShowDialog(owner)==DialogResult.OK&&visibleFrames==2&&failure==null,
+                                    "The popup shows the whole card from its first frame and completes Retry/OK without a transition.");
+                            }
+                            GeneralStyle.AnimationsEnabled=true;
                             using(var quick=new GeneralDialog("Quick toggle"){ClientSize=new Size(320,210),StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)}){
                                 quick.Show(owner);
                                 const int extendedStyle=-20,appWindow=0x40000;

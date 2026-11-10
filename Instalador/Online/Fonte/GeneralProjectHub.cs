@@ -52,8 +52,18 @@ internal sealed partial class GeneralModWindow {
         var info=DependencySize(mod);
         return info!=null?(info.SizeApproximate?"≈ ":"")+GeneralStorageSize.Format(info.Bytes):mod.DependencySource==null?"—":"";
     }
+    long? SortableModBytes(GeneralModEntry mod){
+        if(IsBigBody(mod)){
+            var variant=GeneralModLibrary.BodyOption(state.BodyChoice,mod,Selected(mod));
+            var verified=VerifiedBodyBytes(mod,variant);
+            if(verified.HasValue)return verified;
+        }
+        long bytes;
+        return measuredMods.TryGetValue(mod.Id,out bytes)?(long?)bytes:null;
+    }
     void UpdateMeasuredRows(){
         if(grid==null||grid.IsDisposed)return;
+        if(orderColumn=="Size"&&associationChoice==null){DrawRows();return;}
         var byId=state.List.Mods.ToDictionary(mod=>mod.Id,StringComparer.Ordinal);
         foreach(var row in ModRows()){
             var mod=byId[(string)row.Tag];row.Cells["Size"].Value=ModSpace(mod);row.Cells["Size"].ToolTipText=SpaceTip(mod);
