@@ -17,6 +17,16 @@ internal sealed partial class GeneralModWindow {
         var list=new GeneralModList{Mods=new List<GeneralModEntry>{a,b,c,d}};list.Presets.Add(new GeneralModPreset{Id="test",Name="Kit teste",ModIds=new List<string>{a.Id,b.Id,c.Id,d.Id}});
         var state=new GeneralModState{List=list,Destination=target,DownloadFolder=root};
         var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
+        check(!GeneralAttention.NeedsSound(42,42,false)&&GeneralAttention.NeedsSound(43,42,false)&&
+            GeneralAttention.NeedsSound(42,42,true)&&GeneralAttention.NeedsSound(0,42,false),
+            "Notificações tocam em segundo plano, minimizadas ou sem janela ativa, e silenciam qualquer janela do app em foco.");
+        using(var decision=GeneralAttention.Chime(660,880))
+        using(var completed=GeneralAttention.Chime(784,1047)){
+            var bytes=decision.ToArray();
+            check(System.Text.Encoding.ASCII.GetString(bytes,0,4)=="RIFF"&&
+                BitConverter.ToInt32(bytes,40)==bytes.Length-44&&!bytes.SequenceEqual(completed.ToArray()),
+                "Escolhas e conclusão têm sinais WAV válidos e diferentes.");
+        }
         TestForm(FixedData.Load(),state,Path.Combine(root,"state"),root,async form=>{
             foreach(string name in new[]{"menu","list","refresh","down","up","check","close","folder"}){
                 using(var image=new Bitmap(30,30))using(var g=Graphics.FromImage(image)){

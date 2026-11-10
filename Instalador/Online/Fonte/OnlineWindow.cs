@@ -739,6 +739,7 @@ static class OnlineProgram {
 #else
         if(!GeneralAppPaths.IsDevelopment&&GeneralAutomaticUpdate.TryStart(Application.ExecutablePath,paths)){OnlineDiagnostics.Stop();return 0;}
 #endif
+        GeneralAttention.Enabled=true;
         Application.Run(new GeneralProjectHome(c,cache,paths.Data));OnlineDiagnostics.Stop();return 0;
     }catch(Exception ex){if(args.Length>0){File.WriteAllText(Path.Combine(Path.GetTempPath(),"CyberpunkCoopOnline-erro.txt"),ex.ToString());return 1;}MessageBox.Show(ex.Message,"Não foi possível abrir o programa",MessageBoxButtons.OK,MessageBoxIcon.Error);return 1;}}
 }

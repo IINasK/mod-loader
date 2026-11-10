@@ -189,11 +189,15 @@ public static class InstalledSnapshotInstallerTests {
 
         var manifest=new InstalledSnapshotManifest{Name="Sem DLC",Game="cyberpunk2077",GameFileVersion=catalog.GameFileVersion,
             TemplateId=inspected.TemplateId,TemplateSubset=true,Project=partial.List};
-        manifest.List.Mods.Add(mod);
+        var alternate=new GeneralModVariant{Id="alternate",Name="Variant sent",Sources=new List<string>{"https://example.org/alternate.zip"}};
+        manifest.Project.Mods.Single().Variants.Add(alternate);
+        var transferred=new GeneralModEntry{Id=mod.Id,Name=mod.Name,DefaultVariant=alternate.Id,
+            Variants=new List<GeneralModVariant>{alternate}};
+        manifest.List.Mods.Add(transferred);
         byte[] bytes=Encoding.UTF8.GetBytes("official fixture");
         string hash=InstalledSnapshot.Hash(bytes);
         manifest.Files.Add(new InstalledSnapshotFile{Path="archive/pc/mod/official.archive",Kind="file",Sha256=hash,Size=bytes.Length,
-            Owners=new List<string>{mod.Id+"/default"}});
+            Owners=new List<string>{mod.Id+"/alternate"}});
         WritePack(archive,manifest,new Dictionary<string,byte[]>{{hash,bytes}});
         var engine=new InstalledSnapshotInstaller(target,inbox,catalog,true);
         string receipt=engine.Install(archive,Safe.Hash(archive),null);
@@ -203,8 +207,9 @@ public static class InstalledSnapshotInstallerTests {
         Check(result.Id==official.Id&&store.Read().Projects.Count==2&&Directory.GetDirectories(Safe.In(store.Root,"Projetos")).Length==2,
             "Receber o pacote oficial reutiliza o projeto e a pasta existentes, preservando o projeto personalizado.");
         Check(refreshed.SelectedPreset=="no-pl"&&refreshed.List.Presets.Any(item=>item.Id=="all")&&
-            refreshed.SnapshotReceipts[mod.Id+"/default"]==receipt,
-            "O preset recebido fica ativo, o outro é preservado e o recibo é reconhecido no projeto oficial.");
+            refreshed.SnapshotReceipts[mod.Id+"/alternate"]==receipt&&refreshed.ChosenVariants[mod.Id]=="alternate"&&
+            refreshed.List.Mods.Single(item=>item.Id==mod.Id).DefaultVariant=="default",
+            "O projeto oficial preserva o outro preset e ativa a variante efetivamente instalada, mesmo quando o padrão da lista é diferente.");
         var freshStore=new GeneralProjectStore(Path.Combine(root,"n"));
         var first=freshStore.CreateReceived(session,inbox,catalog);
         session.Id="ml-"+Guid.NewGuid().ToString("N");

@@ -246,8 +246,7 @@ internal sealed class GeneralProjectHome : Form {
     internal static async Task RecoverSharing(Control owner,P2PService service){
         foreach(var session in service.SnapshotSessions().Where(s=>s.RecoveryPending)){
             if(owner.IsDisposed)return;
-            service.Notify();
-            using(var dialog=new GeneralDialog(T("Recebimento interrompido","Interrupted download"))){
+            using(var dialog=new GeneralDialog(T("Recebimento interrompido","Interrupted download")){RequiresDecision=true}){
                 dialog.ClientSize=new Size(650,284);
                 var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(24,12,24,20)};
                 layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));

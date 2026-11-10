@@ -368,7 +368,6 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             if(!Directory.Exists(destination.Text))throw new IOException(T("Escolha a pasta de instalação.","Choose the installation folder."));
             string target=CheckedDestination(destination.Text,invite);
             string prompt=invite.Schema==3?T("Comparar os mods do pacote ","Compare mods from the pack "):T("Receber e instalar o pacote ","Receive and install pack ");
-            service.Notify();
             if(GeneralDialog.Message(this,prompt+invite.Name+T(" em:\n"," into:\n")+target+T("\n\nMantenha o jogo fechado. Configurações anteriores terão backup.","\n\nKeep the game closed. Previous settings will be backed up."),T("Conectar ao anfitrião","Connect to the host"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
             service.ArmConnectionDiagnostic(invite.Folder,false);
             P2PSession session;
@@ -409,7 +408,6 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     }
     int[] ReviewSyncExtras(P2PSyncComparison comparison){
         if(IsDisposed||comparison.Session.Discarded)return null;
-        service.Notify();
         using(var dialog=new GeneralSyncReviewDialog(comparison)){
             var answer=dialog.ShowDialog(this);
             return answer==DialogResult.Yes?dialog.SelectedExtras:answer==DialogResult.No?new int[0]:null;
@@ -468,11 +466,10 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             .FirstOrDefault(pending=>pending!=null&&!pending.Decision.Task.IsCompleted);
         if(issue==null)return;
         reviewingVerification=true;
-        service.Notify();
         try{
             var answer=GeneralDialog.Message(this,T("Erro ao verificar o mod ","Error verifying mod ")+issue.ModName+"\n\n"+issue.Message+"\n\n"+
                 T("Deseja pular este mod e continuar? Mods que dependem dele também ficarão fora.","Skip this mod and continue? Mods that depend on it will also be left out."),
-                T("Conferência dos mods","Mod verification"),MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2);
+                T("Conferência dos mods","Mod verification"),MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2,signal:false);
             issue.Decision.TrySetResult(answer==DialogResult.Yes);
         }finally{reviewingVerification=false;}
     }
@@ -666,7 +663,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             bars.Visible=!awaiting;
             layout.RowStyles[1].Height=showPreparation?42:0;
             if(entries.Length==0)entries=new[]{new P2PRecipientProgress{
-                Caption=session.Sender?T("Envio do pacote","Pack upload"):T("Recebimento do pacote","Pack download"),
+                Caption=session.Sender?T("Envio do pacote","Pack upload"):session.Phase=="retry"?P2PService.PhaseLabel("retry"):T("Recebimento do pacote","Pack download"),
                 Percent=session.Completed||session.Phase!=null?100:view.Percent,
                 Finished=session.Completed||session.Phase!=null
             }};
@@ -776,7 +773,7 @@ internal sealed partial class GeneralModWindow {
                             if(p2p!=service)return;
                             if(sharingHome==null&&String.Equals(state.Destination,session.Destination,StringComparison.OrdinalIgnoreCase)){
                                 var received=p2p.InstalledManifest(session);
-                                foreach(var mod in received.List.Mods)if(state.List.Mods.Any(m=>m.Id==mod.Id&&m.Variants.Any(v=>v.Id==mod.DefaultVariant)))state.SnapshotReceipts[mod.Id+"/"+mod.DefaultVariant]=session.ReceiptId;
+                                GeneralProjectStore.BindReceivedVariants(state,received,session.ReceiptId);
                                 Persist();if(!working&&!scanning)await Scan();
                             }
                             detail.Text=session.ModsOutsidePack==0&&session.SyncLocalExtrasKept==0&&session.SyncHostFilesDifferent==0

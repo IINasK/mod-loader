@@ -12,6 +12,7 @@ internal sealed class GeneralSyncReviewDialog : GeneralDialog {
 
     internal GeneralSyncReviewDialog(P2PSyncComparison comparison)
         : base(T("Mods extras neste PC", "Extra mods on this PC")) {
+        RequiresDecision = true;
         Name = "SyncExtraReview";
         ClientSize = new Size(720, 450);
         var layout = new TableLayoutPanel {
@@ -69,7 +70,7 @@ internal sealed class GeneralSyncReviewDialog : GeneralDialog {
         int count = choices.CheckedItems.Count;
         if (count == 0) return;
         using (var dialog = new GeneralDialog(T("Confirmar remoção", "Confirm removal")) {
-            Name = "ConfirmSyncRemoval", ClientSize = new Size(525, 210)
+            RequiresDecision = true, Name = "ConfirmSyncRemoval", ClientSize = new Size(525, 210)
         }) {
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, Padding = new Padding(22, 8, 22, 16) };
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));

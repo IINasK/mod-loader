@@ -28,7 +28,10 @@ internal sealed partial class GeneralModWindow {
                 foreach(string key in state.CyberpunkImports.Keys.Where(key=>list.Mods.Any(mod=>key.StartsWith(mod.Id+"/",StringComparison.Ordinal))).ToArray())state.CyberpunkImports.Remove(key);
                 foreach(string key in state.SnapshotReceipts.Keys.Where(key=>list.Mods.Any(mod=>key.StartsWith(mod.Id+"/",StringComparison.Ordinal))).ToArray())state.SnapshotReceipts.Remove(key);
             }
-            if(snapshotReceipt!=null)foreach(var mod in new InstalledSnapshotInstaller(newDestination??state.Destination,data,catalog,testMode).ReadManifest(snapshotReceipt).List.Mods)state.SnapshotReceipts[mod.Id+"/"+mod.DefaultVariant]=snapshotReceipt;
+            if(snapshotReceipt!=null){
+                var manifest=new InstalledSnapshotInstaller(newDestination??state.Destination,data,catalog,testMode).ReadManifest(snapshotReceipt);
+                GeneralProjectStore.BindReceivedVariants(state,manifest,snapshotReceipt);
+            }
             if(newDestination!=null)state.Destination=newDestination;
             Persist();RebuildPresets();await Scan();return true;
         }catch(Exception ex){ShowError(ex);return false;}
