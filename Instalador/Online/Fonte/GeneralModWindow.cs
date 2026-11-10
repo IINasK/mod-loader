@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -36,6 +37,9 @@ internal sealed partial class GeneralModWindow : Form {
     readonly ToolTip tips=new ToolTip{UseAnimation=false,UseFading=false};
     readonly GeneralMenuHost menus=new GeneralMenuHost();
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
+
+    [Flags]
+    enum CategoryBranch { Middle=0, First=1, Last=2 }
 
     sealed class SectionRow {
         internal string Kind,Category,Size;
@@ -446,7 +450,9 @@ internal sealed partial class GeneralModWindow : Form {
                         .Where(value=>!String.IsNullOrWhiteSpace(value)));
                     row.Height=64;
                 }
-                row.Cells["CategoryIndent"].Tag=m==members[members.Count-1];
+                var branch=m==members[0]?CategoryBranch.First:CategoryBranch.Middle;
+                if(m==members[members.Count-1])branch|=CategoryBranch.Last;
+                row.Cells["CategoryIndent"].Tag=branch;
                 if(collapsed)row.Visible=false;
                 else if(m.Id==old)grid.CurrentCell=row.Cells["Name"];
             }
@@ -564,17 +570,32 @@ internal sealed partial class GeneralModWindow : Form {
             if(!String.IsNullOrWhiteSpace(description))using(var font=GeneralStyle.Font(10.5f))TextRenderer.DrawText(g,description.Replace("\r"," ").Replace("\n"," "),font,new Rectangle(bounds.X+18,y+31,bounds.Width-40,24),GeneralStyle.Muted,TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis|TextFormatFlags.PreserveGraphicsClipping);
         }finally{g.Restore(saved);}
     }
+    static void PaintCategoryBranch(Graphics graphics,Rectangle bounds,CategoryBranch branch){
+        int spine=bounds.X+10;
+        int center=bounds.Top+bounds.Height/2;
+        int start=bounds.Top+((branch&CategoryBranch.First)!=0?5:0);
+        const int radius=9;
+        bool last=(branch&CategoryBranch.Last)!=0;
+
+        var previous=graphics.SmoothingMode;
+        try{
+            graphics.SmoothingMode=SmoothingMode.AntiAlias;
+            using(var pen=new Pen(Color.FromArgb(160,GeneralStyle.Line)))
+            using(var elbow=new GraphicsPath()){
+                if(last)elbow.AddLine(spine,start,spine,center-radius);
+                else graphics.DrawLine(pen,spine,start,spine,bounds.Bottom);
+                elbow.AddArc(spine,center-2*radius,2*radius,2*radius,180,-90);
+                elbow.AddLine(spine+radius,center,bounds.Right-3,center);
+                graphics.DrawPath(pen,elbow);
+            }
+        }finally{graphics.SmoothingMode=previous;}
+    }
     void PaintName(object sender,DataGridViewCellPaintingEventArgs e){
         if(e.ColumnIndex==grid.Columns["CategoryIndent"].Index){
             e.PaintBackground(e.ClipBounds,true);
-            if(e.RowIndex>=0&&grid.Rows[e.RowIndex].Tag is string){
-                var bounds=e.CellBounds;
-                int branchX=bounds.X+12,y=bounds.Y+bounds.Height/2;
-                bool last=Equals(grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Tag,true);
-                using(var pen=new Pen(GeneralStyle.Line)){
-                    e.Graphics.DrawLine(pen,branchX,bounds.Top,branchX,last?y:bounds.Bottom);
-                    e.Graphics.DrawLine(pen,branchX,y,bounds.Right-2,y);
-                }
+            if(e.RowIndex>=0){
+                var branch=grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Tag as CategoryBranch?;
+                if(branch.HasValue)PaintCategoryBranch(e.Graphics,e.CellBounds,branch.Value);
             }
             e.Handled=true;return;
         }
