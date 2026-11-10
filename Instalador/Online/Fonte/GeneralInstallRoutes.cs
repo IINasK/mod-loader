@@ -50,7 +50,7 @@ internal static class GeneralInstallRoutes {
     }
 
     internal static void Validate(List<GeneralInstallRoute> routes) {
-        if (routes == null || routes.Count > 12) throw Invalid();
+        if (routes == null || routes.Count > 128) throw Invalid();
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var route in routes) {
             if (route == null || route.Folder == null || !used.Add(route.Folder)) throw Invalid();
@@ -126,10 +126,12 @@ internal static class GeneralInstallRoutes {
 
     internal static string Map(string path, IEnumerable<GeneralInstallRoute> routes) {
         if (External(path)) throw Invalid();
-        var route = routes.Where(item => item.Folder.Length == 0 || path.StartsWith(item.Folder + "/", StringComparison.OrdinalIgnoreCase))
+        var route = routes.Where(item => item.Folder.Length == 0 || path.Equals(item.Folder, StringComparison.OrdinalIgnoreCase) || path.StartsWith(item.Folder + "/", StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(item => item.Folder.Length).FirstOrDefault();
         if (route == null) return path;
-        string remainder = route.Folder.Length == 0 ? path : path.Substring(route.Folder.Length + 1);
+        string remainder = path;
+        if (route.Folder.Length != 0)
+            remainder = path.Length == route.Folder.Length ? Path.GetFileName(path) : path.Substring(route.Folder.Length + 1);
         if (route.Destination == "%GAME%") return remainder;
         if (route.Destination.StartsWith("%GAME%/", StringComparison.Ordinal)) return route.Destination.Substring(7) + "/" + remainder;
         return Prefix + route.Destination + FileMarker + remainder;

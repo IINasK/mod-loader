@@ -383,6 +383,13 @@ internal sealed partial class GeneralModEditor {
                     lastAutoName=fresh.Name;
                     modName.Text=fresh.Name;
                 }
+                if(item.Nexus!=null&&item.Nexus.File>0&&!String.IsNullOrWhiteSpace(fresh.Version)&&
+                    variants.Text.Trim()==T("Nova versão","New version"))
+                {
+                    variant.Name=fresh.Version;
+                    SyncVariantPicker();
+                    ValidateInputs();
+                }
                 restricted|=fresh.Nsfw&&String.IsNullOrWhiteSpace(fresh.Name);
             }
 

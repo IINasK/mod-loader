@@ -233,6 +233,16 @@ internal sealed partial class GeneralModWindow {
             var bodyRows=form.VisibleMods().Where(IsBigBody).ToList();
             check(bodyRows.Count==1&&ModDisplayName(bodyRows[0])=="Big Body",
                 "A tabela mostra o Big Body em uma única linha.");
+            var bodyRow=form.ModRows().Single(row=>(string)row.Cells["Name"].Value=="Big Body");
+            check(form.grid.Columns["Origin"].DisplayIndex==form.grid.Columns.Count-1,
+                "A coluna de origem fica no fim da tabela.");
+            check(form.ToggleVersions(bodyRow)&&form.grid.Rows.Cast<DataGridViewRow>()
+                .Where(row=>row.Tag is Work).Select(row=>((Work)row.Tag).Entry.Id)
+                .OrderBy(id=>id,StringComparer.Ordinal).SequenceEqual(new[]{"hyst-ebb-rb","hyst-ebbp-rb"}),
+                "A gaveta abre as duas opções fora de uso em linhas próprias.");
+            check(form.ToggleVersions(form.ModRows().Single(row=>(string)row.Cells["Name"].Value=="Big Body"))&&
+                !form.grid.Rows.Cast<DataGridViewRow>().Any(row=>row.Tag is Work),
+                "A gaveta fecha sem duplicar itens selecionáveis.");
             var baseVersions=form.BigBodyVersions(form.state.List.Mods,false);
             var dlcVersions=form.BigBodyVersions(form.state.List.Mods,true);
             check(baseVersions.Count==3&&baseVersions.Any(work=>work.Entry.Id==GeneralModLibrary.VanillaFeetId)&&

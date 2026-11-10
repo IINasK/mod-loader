@@ -207,9 +207,9 @@ internal sealed partial class GeneralModWindow {
                 var terrain=EditorField<FlowLayoutPanel>(editor,"tagChips").Controls.OfType<Button>().Single(button=>button.Text=="Terrain ×");
                 check(terrain.Top==add.Top&&terrain.Right<add.Left&&terrain.Height==add.Height&&add.Right<=add.Parent.ClientSize.Width,
                     "At narrow width Add follows the final tag with the same height and no clipping: "+terrain.Bounds+" / "+add.Bounds);
-                check(field.RectangleToScreen(field.ClientRectangle).Top<input.RectangleToScreen(input.ClientRectangle).Top&&
+                check(input.RectangleToScreen(input.ClientRectangle).Top<field.RectangleToScreen(field.ClientRectangle).Top&&
                     !AllControls(editor).OfType<Button>().Any(button=>new[]{"Adicionar link","Remover fonte","Adicionar arquivo local"}.Contains(button.Text)),
-                    "The Nexus link is above the compact editor and legacy source actions are gone.");
+                    "The source selector precedes the Nexus link and the legacy source actions are gone.");
                 CaptureUi(editor,Path.Combine(root,"compact-editor-tags.png"));
                 add.PerformClick();await Task.Delay(40);
                 var inline=EditorField<TextBox>(editor,"tags");
@@ -258,7 +258,7 @@ internal sealed partial class GeneralModWindow {
                 var popup=picker.OpenPopup;
                 var view=(GeneralScrollView)popup.Items.OfType<ToolStripControlHost>().Single().Control;
                 var list=(ListBox)view.Content;
-                check(list.Items.Cast<string>().SequenceEqual(new[]{"Preferida editada (padrão)","Original","Terceira","Adicionar"}),
+                check(list.Items.Cast<string>().SequenceEqual(new[]{"Preferida editada (padrão)","Original","Terceira","Adicionar fonte"}),
                     "The version popup shows the default first and Add last.");
                 check(!view.Bar.Visible||view.Bar.Left>=list.Width,"The scrollbar cannot cover the trash hit area.");
                 using(var bitmap=new Bitmap(popup.Width,popup.Height)){
@@ -299,6 +299,14 @@ internal sealed partial class GeneralModWindow {
                 check(editor.Result.DefaultVariant==preferred.Id&&editor.SelectedVariant==preferred.Id&&editor.Result.NsfwOverride==false&&
                     editor.Result.Variants.Select(version=>version.Name).SequenceEqual(new[]{"Preferida editada","Original","Quarta"}),
                     "The first version is saved as default and an explicitly selected version stays selected.");
+            }
+            using(var destinations=new GeneralArchiveDestinations(new[]{"plugins/one.dll","plugins/data/two.txt"},new GeneralInstallRoute[0],root,true)){
+                destinations.Show(owner);
+                var tree=(TreeView)destinations.Controls.Find("ArchiveFileTree",true).Single();
+                check(tree.Nodes.Count==1&&tree.Nodes[0].Nodes[0].Text=="plugins"&&
+                    tree.Nodes[0].Nodes[0].Nodes.Cast<TreeNode>().Any(node=>(string)node.Tag=="plugins/data"),
+                    "The archive keeps its folder hierarchy and relative paths for routing.");
+                destinations.Close();
             }
             var fixedMod=NewEntry("Destino fixo",source);
             fixedMod.Variants[0].CyberpunkId="fixed-fixture";

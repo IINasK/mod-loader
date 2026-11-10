@@ -131,9 +131,9 @@ internal sealed partial class GeneralModWindow {
             form.statuses[Key(second,form.Selected(second))]="Baixando";
             form.DrawRows();
             var origin=form.grid.Columns["Origin"];
-            check(origin.DisplayIndex==form.grid.Columns["Mark"].DisplayIndex+1&&form.grid.Columns["Name"].DisplayIndex==origin.DisplayIndex+1&&
+            check(origin.DisplayIndex==form.grid.Columns.Count-1&&
                 form.ModRows().All(row=>Equals(row.Cells["Origin"].Value,"Mod Loader")&&!String.IsNullOrWhiteSpace(row.Cells["Origin"].ToolTipText)),
-                "A origem fica entre a seleção e o nome e explica o selo do Mod Loader.");
+                "A origem fica no fim da tabela e explica o selo do Mod Loader.");
             form.gameInventory=new[]{new P2PSyncDifference{Mod="Sacred",Path="archive/pc/mod/sacred.archive",Kind="found"}};
             form.searchTerms=GeneralModSearch.Terms("sacred");form.DrawRows();
             var outside=form.grid.Rows.Cast<DataGridViewRow>().Single(row=>row.Tag is P2PSyncDifference);

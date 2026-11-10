@@ -99,12 +99,16 @@ public static class InstalledSnapshotInstallerTests {
         GeneralInstallRoutes.FixtureAppData=senderProfile;
         try{
             var mixed=RoutedEntry("mixed",url);
-            mixed.Variants[0].InstallRoutes=GeneralInstallRoutes.Parse("game = Addons\npersonal = "+Safe.In(senderProfile,"ExampleGame/Mods"),sender);
+            mixed.Variants[0].InstallRoutes=GeneralInstallRoutes.Parse("game/core.txt = Addons\npersonal = "+Safe.In(senderProfile,"ExampleGame/Mods"),sender);
             string displayRoutes=GeneralInstallRoutes.Format(mixed.Variants[0].InstallRoutes);
             if(displayRoutes.Contains("\n")||!displayRoutes.Contains(" | ")||
                 !GeneralInstallRoutes.Same(mixed.Variants[0].InstallRoutes,GeneralInstallRoutes.Parse(displayRoutes,sender)))
                 throw new IOException("Legacy multiline routes must round-trip through the single-line editor.");
             Check(mixed.Variants[0].InstallRoutes[1].Destination=="%APPDATA%/ExampleGame/Mods","O destino absoluto do remetente vira uma referência portável.");
+            var individual=GeneralInstallRoutes.Parse("game = Addons | game/core.txt = Config",sender);
+            Check(GeneralInstallRoutes.Map("game/core.txt",individual)=="Config/core.txt"&&
+                GeneralInstallRoutes.Map("game/other.txt",individual)=="Addons/other.txt",
+                "O destino de um arquivo prevalece sobre o destino de sua pasta.");
             var missing=RoutedEntry("missing",url);
             missing.Variants[0].InstallRoutes=GeneralInstallRoutes.Parse("%APPDATA%/ExampleGame/Optional",sender);
             var plain=RoutedEntry("plain",url);
@@ -117,7 +121,7 @@ public static class InstalledSnapshotInstallerTests {
                 installer.Install(archive,mod.Id+"/default/0/"+url,null,installRoutes:mod.Variants[0].InstallRoutes);
             Check(File.Exists(Safe.In(sender,"Addons/core.txt"))&&File.Exists(Safe.In(senderProfile,"ExampleGame/Mods/prefs.txt"))&&
                 installer.Status("mixed/default/0/"+url)==GeneralModInstaller.Installed,
-                "Um único arquivo instala em dois destinos e ambos constam no recibo.");
+                "Um pacote instala arquivo e pasta em destinos próprios e registra ambos no recibo.");
             Throws(()=>GeneralInstallRoutes.Parse("%APPDATA%/Microsoft/Windows/Start Menu/Programs/Startup",sender),
                 "Destinos de inicialização do Windows são recusados.");
             string snapshot=Safe.In(root,"portable/pack.zip");
