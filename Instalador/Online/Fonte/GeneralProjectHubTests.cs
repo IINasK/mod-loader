@@ -191,6 +191,42 @@ internal sealed partial class GeneralModWindow {
             }
         }
     }
+    static void TestDescriptionWheel(Form editor,TextBox description,GeneralScrollView descriptionView,Action<bool,string> check){
+        if(SystemInformation.MouseWheelScrollLines==0)return;
+        var page=AllControls(editor).OfType<GeneralScrollView>().Single(view=>view.Name=="ModEditorScroll");
+        int previous=page.Bar.Value;
+        int notch=SystemInformation.MouseWheelScrollDelta;
+        Action<int> wheel=delta=>SendUiMouseMessage(description.Handle,0x020a,new IntPtr(delta<<16),IntPtr.Zero);
+        string original=description.Text;
+        description.Text="Primeira linha\r\nSegunda linha";
+        descriptionView.RefreshScroll();
+        page.RefreshScroll();
+        page.ScrollTo(0);
+        wheel(-notch);
+        check(!descriptionView.Bar.Visible&&page.Bar.Value>0,
+            "A roda sobre duas linhas sem barra interna move o editor.");
+        description.Text=original;
+        descriptionView.RefreshScroll();
+        descriptionView.ScrollTo(0);
+        page.ScrollTo(0);
+        wheel(-notch);
+        check(descriptionView.Bar.Value>0&&page.Bar.Value==0,
+            "Uma descrição longa usa primeiro a sua própria rolagem.");
+        descriptionView.ScrollTo(descriptionView.Bar.Limit);
+        wheel(-notch);
+        check(descriptionView.Bar.Value==descriptionView.Bar.Limit&&page.Bar.Value>0,
+            "No fim da descrição, a roda para baixo move o editor.");
+        page.ScrollTo(page.Bar.Limit);
+        wheel(-notch);
+        check(page.Bar.Value==page.Bar.Limit,
+            "Quando os dois limites inferiores são atingidos, o editor permanece no fim.");
+        descriptionView.ScrollTo(0);
+        wheel(notch);
+        check(descriptionView.Bar.Value==0&&page.Bar.Value<page.Bar.Limit,
+            "No início da descrição, a roda para cima move o editor.");
+        page.ScrollTo(previous);
+    }
+
     static async Task TestCompactModEditor(Form owner,string root,Action<bool,string> check,string source){
         var mod=NewEntry("Editor compacto",source);
         mod.Tags.AddRange(new[]{"Cyberpunk Modathon 2026","Gameplay","Overhaul","Quality of Life","Terrain"});
@@ -262,6 +298,7 @@ internal sealed partial class GeneralModWindow {
                 check(descriptionView.Bar.Limit>0&&grip.Parent.Height>height,
                     "Description keeps its own scrollbar and grows on command from its resize grip.");
                 CaptureUi(editor,Path.Combine(root,"editor-themed-controls.png"));
+                TestDescriptionWheel(editor,description,descriptionView,check);
                 input.Text="Preferida editada";
                 picker.Toggle();
                 var popup=picker.OpenPopup;

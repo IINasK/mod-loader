@@ -25,7 +25,13 @@ internal sealed class GeneralScrollBar : Control {
     protected override void OnMouseMove(MouseEventArgs e){base.OnMouseMove(e);if(drag<0||!Capture)return;int travel=Math.Max(1,Height-8-Thumb.Height);MoveTo((int)Math.Round((e.Y-drag-4)*(double)Limit/travel));}
     protected override void OnMouseUp(MouseEventArgs e){base.OnMouseUp(e);drag=-1;Capture=false;Invalidate();}
     protected override void OnMouseCaptureChanged(EventArgs e){base.OnMouseCaptureChanged(e);if(!Capture)drag=-1;}
-    protected override void OnMouseWheel(MouseEventArgs e){Wheel(e.Delta);}
+    protected override void OnMouseWheel(MouseEventArgs e){
+        var view=Parent as GeneralScrollView;
+        if(view==null)Wheel(e.Delta);
+        else view.RouteWheel(e.Delta);
+        var handled=e as HandledMouseEventArgs;
+        if(handled!=null)handled.Handled=true;
+    }
     protected override void OnGotFocus(EventArgs e){base.OnGotFocus(e);Invalidate();}
     protected override void OnLostFocus(EventArgs e){base.OnLostFocus(e);Invalidate();}
     protected override AccessibleObject CreateAccessibilityInstance(){return new ScrollAccess(this);}
@@ -128,14 +134,28 @@ internal sealed class GeneralScrollView : Panel {
         else if(text!=null){int current=(int)SendMessage(text.Handle,0x00ce,IntPtr.Zero,IntPtr.Zero);SendMessage(text.Handle,0x00b6,IntPtr.Zero,(IntPtr)(value-current));}
         RefreshScroll();
     }
+    internal bool RouteWheel(int delta){
+        if(delta==0||SystemInformation.MouseWheelScrollLines==0)return false;
+        for(Control owner=this;owner!=null;owner=owner.Parent){
+            var view=owner as GeneralScrollView;
+            if(view==null)continue;
+            view.RefreshScroll();
+            var scroll=view.bar;
+            if(!scroll.Visible||(delta>0?scroll.Value==0:scroll.Value==scroll.Limit))continue;
+            scroll.Wheel(delta);
+            return true;
+        }
+        return false;
+    }
+
     protected override void Dispose(bool disposing){if(disposing&&events!=null)events.ReleaseHandle();base.Dispose(disposing);}
     sealed class NativeEvents : NativeWindow {
         readonly GeneralScrollView view;
         internal NativeEvents(GeneralScrollView view,IntPtr handle){this.view=view;AssignHandle(handle);}
         protected override void WndProc(ref Message message){
             if(message.Msg==0x020a){
-                view.RefreshScroll();
-                if(view.bar.Limit>0){view.bar.Wheel((short)((long)message.WParam>>16));message.Result=IntPtr.Zero;return;}
+                int delta=(short)((long)message.WParam>>16);
+                if(view.RouteWheel(delta)||view.bar.Limit>0){message.Result=IntPtr.Zero;return;}
             }
             base.WndProc(ref message);
             if(message.Msg==0x0115||message.Msg==0x0005||message.Msg==0x0102||message.Msg==0x000c||message.Msg==0x0101||message.Msg==0x0180||message.Msg==0x0181||message.Msg==0x0182||message.Msg==0x0184)view.Queue();
