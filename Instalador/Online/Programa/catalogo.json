@@ -19994,6 +19994,122 @@
           "Sha256": "5a66701716c77c70e62408832da96b5b15a610e65deff33eecfad159a64d2f63"
         }
       ]
+    },
+    {
+      "Id": "mod-29182",
+      "Name": "Kerry Romance for Female V",
+      "Version": "17",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "Libera o romance com Kerry para V feminina. As novas falas são em inglês, com legendas em português. Compatibilidade com NightCoop ainda não testada.",
+      "Dependencies": [
+        "ArchiveXL"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertyNotes": "O pacote inclui textos EP1. O autor não documenta o funcionamento sem Phantom Liberty.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/29182?tab=files&file_id=171593",
+      "NexusModId": 29182,
+      "NexusFileId": 171593,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Main KerryRomanceFemV 29182 17 2026-10-31T15-28Z q7jg7f9Eu.zip",
+          "Size": 9723308,
+          "Sha256": "af7fdf3614c64247817080594b5ff4b36ef01790ef94639a4df44386566aa3cd",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/29182?tab=files&file_id=171593",
+          "ModId": 29182,
+          "FileId": 171593
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/#KerryRomanceFemV_Voicemaps.archive",
+          "Path": "archive/pc/mod/#KerryRomanceFemV_Voicemaps.archive",
+          "Size": 1081344,
+          "Sha256": "c55a8a4c5d6fc1d0fc4b755a777fdcc2a94c6725ef16557ff0875e22b01993cb",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/!!KerryRomanceFemV_Core.archive.xl",
+          "Path": "archive/pc/mod/!!KerryRomanceFemV_Core.archive.xl",
+          "Size": 1508,
+          "Sha256": "3ff807cdf9effe87568495e50778f461305b6473f76e0abce2619d18dff3e133",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/!!KerryRomanceFemV_Core.archive",
+          "Path": "archive/pc/mod/!!KerryRomanceFemV_Core.archive",
+          "Size": 8986624,
+          "Sha256": "09831aeb0458312eab03b5aaee183309a1176876955c510a125eda261ff9c0ca",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-14044",
+      "Name": "Actual Chrome Compression",
+      "Description": "Reduz o custo dos implantes ao equipar o Compressor de Cromo. Neste pacote, a instalação inclui More Cyberware Slots e a base Cyberware-EX.",
+      "Version": "1.0.0",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "Ao equipar o Compressor de Cromo, reduz a capacidade de ciberware usada de 5% a 30%, conforme o nível. Compatibilidade em jogo com 2.5 e NightCoop ainda não testada.",
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "mod-36802"
+      ],
+      "RequiresPL": true,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "required",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/14044",
+      "NexusModId": 14044,
+      "NexusFileId": 73859,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Actual Chrome Compression-14044-1-0-0-1712279585.zip",
+          "Size": 1908,
+          "Sha256": "340a2cdac96ffa4df5813cf0abd2a7e725096573368f5f20eaf326a7006c94ee",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/14044?tab=files&file_id=73859",
+          "ModId": 14044,
+          "FileId": 73859
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/Actual Chrome Compression.archive",
+          "Path": "archive/pc/mod/Actual Chrome Compression.archive",
+          "Size": 8192,
+          "Sha256": "92266007b54ac40e40c1c211d7ed5bac36214357f751d208dd64dce25c9e685c",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/Actual Chrome Compression.archive.xl",
+          "Path": "archive/pc/mod/Actual Chrome Compression.archive.xl",
+          "Size": 89,
+          "Sha256": "bb539f2badfa4f1ac3faf116d0507d3e6f020dfa65a269d0c7e94476edb074bf",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/Actual Chrome Compression/Actual Chrome Compression.yaml",
+          "Path": "r6/tweaks/Actual Chrome Compression/Actual Chrome Compression.yaml",
+          "Size": 1244,
+          "Sha256": "9fb39625da862ea401ed4bb0921dbda2e4e42a5a33378a9ffe5290ec599a5535",
+          "UserData": false
+        }
+      ]
     }
   ],
   "Excluded": [

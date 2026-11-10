@@ -333,6 +333,15 @@ internal sealed partial class GeneralModWindow {
                 saved.ModIds.Add(eclipse);
                 refreshed=true;
             }
+            var natural = seed.Mods.FirstOrDefault(mod => mod.Id == "hyst-ebb-rb");
+            var savedBody = state.List.Mods.FirstOrDefault(mod => mod.Id == "hyst-ebb-rb");
+            var savedBodyOnly = savedBody == null ? null : savedBody.Variants.FirstOrDefault(variant => variant.Id == "default");
+            var naturalBodyOnly = natural == null ? null : natural.Variants.FirstOrDefault(variant => variant.Id == "default");
+            if (savedBodyOnly != null && savedBodyOnly.Name == "5.0.0 · Somente corpo" && naturalBodyOnly != null &&
+                savedBodyOnly.Sources.SequenceEqual(naturalBodyOnly.Sources, StringComparer.Ordinal)) {
+                savedBodyOnly.Name = naturalBodyOnly.Name;
+                refreshed = true;
+            }
             if(GeneralModLibrary.GroupBodyOptions(state.List))refreshed=true;
         }
         if(refreshed||state.Theme!=preferences.Theme||state.Language!=preferences.Language){

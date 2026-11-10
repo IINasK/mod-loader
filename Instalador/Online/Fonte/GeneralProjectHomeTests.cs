@@ -212,6 +212,9 @@ internal sealed partial class GeneralModWindow {
             check(form.state.Theme=="dark"&&form.state.Language=="en"&&GeneralStyle.Dark,"Tema e idioma globais acompanham a abertura de outro projeto.");
             check(form.Text.Contains("Projeto atual"),"Janela identifica o projeto aberto.");
             var oldPack=GeneralModLibrary.Seed(form.catalog,new ModImportItem[0]);
+            var oldBody = oldPack.Mods.Single(mod => mod.Id == "hyst-ebb-rb");
+            oldBody.Variants.Single(variant => variant.Id == "default").Name = "5.0.0 · Somente corpo";
+            oldBody.Variants.Single(variant => variant.Id == "with-refit-base").Name = "Meu refit";
             const string eclipse=GeneralModLibrary.EclipseTattooId;
             foreach(var preset in oldPack.Presets)preset.ModIds.Remove(eclipse);
             oldPack.Presets.Add(new GeneralModPreset{Id="custom",Name="Meu preset"});
@@ -223,6 +226,10 @@ internal sealed partial class GeneralModWindow {
                 stored.Presets.Where(preset=>preset.Id!="custom").All(preset=>preset.ModIds.Contains(eclipse))&&
                 !stored.Presets.Single(preset=>preset.Id=="custom").ModIds.Contains(eclipse),
                 "Atualizar o pacote oficial recupera a Eclipse nos dois presets oficiais e preserva o personalizado.");
+            var storedBody = stored.Mods.Single(mod => mod.Id == oldBody.Id);
+            check(storedBody.Variants.Single(variant => variant.Id == "default").Name.Contains("Natural (EBBN)") &&
+                storedBody.Variants.Single(variant => variant.Id == "with-refit-base").Name == "Meu refit",
+                "A opção Natural aparece em um projeto oficial antigo sem alterar nomes personalizados.");
             form.ProjectCommand("new");check(form.ProjectAction=="new","Novo projeto retorna à Home sem substituir a lista atual.");await Task.CompletedTask;
         });
         Safe.WriteJson(Path.Combine(root,"resultado-project-home.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});
