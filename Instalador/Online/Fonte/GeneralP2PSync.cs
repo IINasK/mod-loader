@@ -234,6 +234,7 @@ internal sealed partial class P2PService {
             throw new IOException("Refaça a comparação antes de remover mods extras.");
         new FixedInstaller(installedCatalog,session.Destination,installedFixture)
             .ApplySyncCleanup(session.SyncCleanup,preview,installed.Files.Select(file=>file.Path),message=>session.Stage=message);
+        OnlineDiagnostics.Record("p2p.sync.cleanup.complete",null,"Extras confirmados guardados no backup local.",new{Files=session.SyncCleanup.Count});
         session.SyncCleanup=null;
     }
 
@@ -312,6 +313,7 @@ internal sealed partial class P2PService {
                 throw new IOException("A seleção de mods extras é inválida.");
             var cleanup=selected.SelectMany(index=>comparison.Extras[index].Files).ToList();
             session.SyncCleanup=cleanup.Count==0?null:cleanup;
+            OnlineDiagnostics.Record("p2p.sync.cleanup.approved",null,"Remoção de extras confirmada.",new{Mods=selected.Length,Files=cleanup.Count});
             var approved = new HashSet<int>(selected);
             var kept = comparison.Extras.Where((extra, index) => !approved.Contains(index)).ToArray();
             var differences = kept.SelectMany(extra => extra.Files.Select(file => new P2PSyncDifference {

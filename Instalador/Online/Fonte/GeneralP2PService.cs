@@ -112,7 +112,7 @@ internal sealed partial class P2PService : IDisposable {
             throw new IOException("Transação inválida.");
         if(s.CompareBeforePack&&(!s.Lifecycle||!s.Automatic||s.Recipients.Length>1))throw new IOException("Registro de comparação inválido.");
         if(s.SyncCleanup!=null&&(s.Sender||!s.CompareBeforePack||s.SyncCleanup.Count>2000||
-            s.SyncCleanup.Any(file=>file==null||!FixedInstaller.SyncInventoryEntry(file.Path,file.Before))))
+            s.SyncCleanup.Any(file=>file==null||!FixedInstaller.SyncCleanupEntry(file.Path,file.Before))))
             throw new IOException("A seleção de remoção P2P é inválida.");
         if(s.Automatic&&!s.Deferred)throw new IOException("Registro automático inválido.");
         if(s.Deferred&&(s.Mode!="installed-zip"||s.Size<0||s.Size>P2PPack.MaxTotal||(s.PayloadHash==null?s.Size!=0:!P2PPack.HashValid(s.PayloadHash)||s.Size==0))||s.SelectedMods!=null&&(s.SelectedMods.Length>1000||s.SelectedMods.Any(id=>!Regex.IsMatch(id??"",@"\A[A-Za-z0-9_-]{1,120}\z"))))throw new IOException("Registro antecipado inválido.");
