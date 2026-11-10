@@ -1157,7 +1157,7 @@ internal sealed partial class GeneralModWindow {
             if(clean){
                 var plan=await Task.Run(()=>engine.PlanExtraReset());
                 if(plan.Count==0){detail.Text="Nenhum arquivo fora do pacote Cyberpunk foi encontrado.";return;}
-                using(var review=new GeneralDialog(T("Revisar arquivos fora do pacote Cyberpunk","Review files outside the Cyberpunk pack")){ClientSize=new Size(820,475)}){
+                using(var review=new GeneralDialog(T("Revisar arquivos fora do pacote Cyberpunk","Review files outside the Cyberpunk pack")){ClientSize=new Size(820,475),RequiresDecision=true}){
                     var layout=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(20,8,20,20),ColumnCount=1,RowCount=2};
                     layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
                     var field=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(12),Margin=Padding.Empty};

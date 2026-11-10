@@ -327,6 +327,7 @@ internal sealed class GeneralDependencyReview : GeneralDialog {
     internal GeneralDependencyReview(string summary,IReadOnlyList<GeneralDependencyIssue> issues,int installable,Action<string> open,
         IReadOnlyList<P2PSyncDifference> inventory=null,Action<GeneralNexusRequirement> add=null)
         :base(GeneralStyle.T("Resultado da verificação","Verification results")) {
+        RequiresDecision=installable>0||add!=null;
         ClientSize=new Size(860,Math.Min(550,290+issues.Count*35));
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(20,8,20,20)};
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));

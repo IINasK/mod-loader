@@ -153,13 +153,25 @@ internal sealed class GeneralProjectStore {
                         state.ChosenVariants[choice.Key]=choice.Value;
                 }
             }
-            foreach(var mod in manifest.List.Mods)state.SnapshotReceipts[mod.Id+"/"+mod.DefaultVariant]=session.ReceiptId;
+            BindReceivedVariants(state,manifest,session.ReceiptId);
             if(!String.Equals(Path.GetFullPath(sourceData),data,StringComparison.OrdinalIgnoreCase))
                 source.CopyReceivedRecognition(session.ReceiptId,data);
             new GeneralModLibrary(Path.Combine(data,"lista.json")).Save(state);
             if(existing==null){index.Projects.Add(project);Write(index);}
             return project;
         }
+    }
+
+    internal static void BindReceivedVariants(GeneralModState state,InstalledSnapshotManifest manifest,string receipt){
+        var entries=state.List.Mods.ToDictionary(mod=>mod.Id,StringComparer.Ordinal);
+        foreach(var mod in manifest.List.Mods){
+            GeneralModEntry entry;
+            if(!entries.TryGetValue(mod.Id,out entry)||!entry.Variants.Any(variant=>variant.Id==mod.DefaultVariant))continue;
+            state.SnapshotReceipts[mod.Id+"/"+mod.DefaultVariant]=receipt;
+            if(entry.DefaultVariant==mod.DefaultVariant)state.ChosenVariants.Remove(mod.Id);
+            else state.ChosenVariants[mod.Id]=mod.DefaultVariant;
+        }
+        if(manifest.BodyChoice!=null)state.BodyChoice=manifest.BodyChoice;
     }
 
     static GeneralModList MergeReceivedPreset(GeneralModList baseline,GeneralModList incoming){

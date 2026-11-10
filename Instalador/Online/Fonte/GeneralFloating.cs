@@ -4,7 +4,9 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
+using System.IO;
 using System.Linq;
+using System.Media;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -88,6 +90,52 @@ internal sealed class GeneralPopupMenu : ContextMenuStrip {
     }
 }
 
+internal static class GeneralAttention {
+    static readonly uint AppProcessId=(uint)Process.GetCurrentProcess().Id;
+    static readonly Lazy<SoundPlayer> Decision=new Lazy<SoundPlayer>(()=>new SoundPlayer(Chime(660,880)));
+    static readonly Lazy<SoundPlayer> Complete=new Lazy<SoundPlayer>(()=>new SoundPlayer(Chime(784,1047)));
+    internal static bool Enabled;
+    [DllImport("user32.dll")]static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")]static extern uint GetWindowThreadProcessId(IntPtr window,out uint process);
+    [DllImport("user32.dll")]static extern bool IsIconic(IntPtr window);
+
+    internal static bool NeedsSound(uint foregroundProcess,uint appProcess,bool minimized) {
+        return foregroundProcess!=appProcess||minimized;
+    }
+
+    internal static void Play(bool completed=false) {
+        if(!Enabled)return;
+        var foreground=GetForegroundWindow();
+        uint owner=0;
+        if(foreground!=IntPtr.Zero)GetWindowThreadProcessId(foreground,out owner);
+        if(!NeedsSound(owner,AppProcessId,foreground!=IntPtr.Zero&&IsIconic(foreground)))return;
+        try{(completed?Complete:Decision).Value.Play();}
+        catch(Exception ex){OnlineDiagnostics.Record("notification.sound",null,ex.GetType().Name);}
+    }
+
+    internal static MemoryStream Chime(int first,int second){
+        const int rate=16000,note=1760,gap=400,tail=640;
+        const int bytes=(note*2+gap+tail)*sizeof(short);
+        var stream=new MemoryStream(44+bytes);
+        using(var writer=new BinaryWriter(stream,System.Text.Encoding.ASCII,true)){
+            writer.Write(new[]{'R','I','F','F'});writer.Write(36+bytes);
+            writer.Write(new[]{'W','A','V','E','f','m','t',' '});writer.Write(16);
+            writer.Write((short)1);writer.Write((short)1);writer.Write(rate);writer.Write(rate*sizeof(short));
+            writer.Write((short)sizeof(short));writer.Write((short)16);
+            writer.Write(new[]{'d','a','t','a'});writer.Write(bytes);
+            foreach(int frequency in new[]{first,second}){
+                for(int frame=0;frame<note;frame++){
+                    double fade=Math.Min(1,Math.Min(frame/160.0,(note-frame)/520.0));
+                    writer.Write((short)(4600*fade*Math.Sin(2*Math.PI*frequency*frame/rate)));
+                }
+                writer.Write(new byte[(frequency==first?gap:tail)*sizeof(short)]);
+            }
+        }
+        stream.Position=0;
+        return stream;
+    }
+}
+
 internal class GeneralDialog : Form {
     protected const int HeaderHeight=52;
     readonly Label title=new Label{Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,AutoEllipsis=true};
@@ -97,6 +145,12 @@ internal class GeneralDialog : Form {
     bool allowClose,closing;
     Point origin;
     internal Panel Content {get;private set;}
+    internal bool RequiresDecision {get;set;}
+
+    public new DialogResult ShowDialog(IWin32Window owner){
+        if(RequiresDecision)GeneralAttention.Play();
+        return base.ShowDialog(owner);
+    }
     public new Control.ControlCollection Controls {get{return Content==null?base.Controls:Content.Controls;}}
     [DllImport("user32.dll")]static extern bool ReleaseCapture();
     [DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr window,int message,IntPtr wParam,IntPtr lParam);
@@ -147,8 +201,9 @@ internal class GeneralDialog : Form {
         var result=DialogResult==DialogResult.None?DialogResult.Cancel:DialogResult;
         reveal.Begin(false,origin,()=>{allowClose=true;Complete(result);});
     }
-    internal static DialogResult Message(IWin32Window owner,string text,string caption,MessageBoxButtons buttons=MessageBoxButtons.OK,MessageBoxIcon icon=MessageBoxIcon.None,MessageBoxDefaultButton defaultButton=MessageBoxDefaultButton.Button1,Action<bool> remember=null,string rememberLabel=null,string yesLabel=null,string noLabel=null){
-        using(var dialog=new GeneralDialog(caption){ClientSize=new Size(620,320),MinimumSize=new Size(420,220)}){
+    internal static DialogResult Message(IWin32Window owner,string text,string caption,MessageBoxButtons buttons=MessageBoxButtons.OK,MessageBoxIcon icon=MessageBoxIcon.None,MessageBoxDefaultButton defaultButton=MessageBoxDefaultButton.Button1,Action<bool> remember=null,string rememberLabel=null,string yesLabel=null,string noLabel=null,bool signal=true){
+        bool decision=buttons!=MessageBoxButtons.OK||remember!=null||icon==MessageBoxIcon.Warning||icon==MessageBoxIcon.Error;
+        using(var dialog=new GeneralDialog(caption){ClientSize=new Size(620,320),MinimumSize=new Size(420,220),RequiresDecision=signal&&decision}){
             var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(20,8,20,20)};
             layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             var preference=new CheckBox{Text=rememberLabel??"",AutoSize=true,Dock=DockStyle.Fill,Margin=new Padding(0,8,0,0),Name="queue-errors-suppress",Visible=remember!=null};

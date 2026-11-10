@@ -276,9 +276,9 @@ internal sealed partial class P2PService {
 
     internal static string PhaseLabel(string phase) {
         switch(phase){
-            case "review":return GeneralStyle.T("Aguardando escolha de versão","Waiting for a version choice");
+            case "review":return GeneralStyle.T("Download concluído · aguardando escolha","Download complete · waiting for a choice");
             case "installing":return GeneralStyle.T("Instalando","Installing");
-            case "retry":return GeneralStyle.T("Instalação adiada. Pode retomar.","Installation postponed. Can resume.");
+            case "retry":return GeneralStyle.T("Download concluído · instalação pendente","Download complete · installation pending");
             case "installed":return GeneralStyle.T("Instalado","Installed");
             case "discarded":return GeneralStyle.T("Recebimento descartado","Download discarded");
             default:return "";
@@ -334,7 +334,6 @@ internal sealed partial class P2PService {
                 session.ReceiptId=installer.Install(zip,session.Deferred?session.PayloadHash:session.Hash,message=>session.Stage=message,-1,difference=>{
                     SetPhase(session,"review");
                     var choice=ChooseVersion;
-                    if(choice!=null)Notify();
                     bool replace=choice!=null&&choice(difference);
                     checkpoint();
                     if(replace)SetPhase(session,"installing");
@@ -368,6 +367,7 @@ internal sealed partial class P2PService {
                 if(!disposed){
                     session.Error=ex.Message;
                     SetPhase(session,"retry");
+                    Notify();
                 }
             }finally{session.Stage=null;Interlocked.Exchange(ref installing,0);}
         });

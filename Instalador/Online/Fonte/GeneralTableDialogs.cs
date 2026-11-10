@@ -126,7 +126,7 @@ internal sealed class GeneralModAlternativeDialog : GeneralDialog {
 
     internal GeneralModAlternativeDialog(IReadOnlyList<GeneralModEntry> entries,string title=null,int suggested=-1)
         : base(title??GeneralStyle.T("Escolher uma versão","Choose one version")) {
-        Name="ModAlternativeChoice";ClientSize=new Size(680,445);
+        RequiresDecision=true;Name="ModAlternativeChoice";ClientSize=new Size(680,445);
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Padding=new Padding(20,8,20,20)};
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute,48));
@@ -170,6 +170,7 @@ internal static class GeneralTableDialogLayout {
 internal sealed class GeneralInstallConfirmation : GeneralDialog {
     internal GeneralInstallConfirmation(string destination, int queued, IReadOnlyList<string> downloads)
         : base(GeneralStyle.T("Confirmar instalação", "Confirm installation")) {
+        RequiresDecision = true;
         ClientSize = new Size(660, downloads.Count == 0 ? 250 : 310 + Math.Min(6, downloads.Count - 1) * 34);
         var layout = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(20, 8, 20, 20)

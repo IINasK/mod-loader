@@ -7,6 +7,7 @@ internal sealed class GeneralProjectDeleteChoice : GeneralDialog {
     readonly RadioButton remove=new RadioButton{Name="DeleteMods",AutoSize=true,Margin=new Padding(0,14,0,0)};
     internal bool RemoveMods {get{return remove.Checked;}}
     internal GeneralProjectDeleteChoice(string name):base(GeneralStyle.T("Excluir projeto","Delete project")){
+        RequiresDecision=true;
         ClientSize=new Size(700,340);
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Padding=new Padding(20,8,20,20)};
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
@@ -23,6 +24,7 @@ internal sealed class GeneralProjectDeleteChoice : GeneralDialog {
 }
 internal sealed class GeneralProjectDeleteReview : GeneralDialog {
     internal GeneralProjectDeleteReview(string name,ProjectDeletePlan plan):base(GeneralStyle.T("Confirmar exclusão definitiva","Confirm permanent deletion")){
+        RequiresDecision=true;
         ClientSize=new Size(760,510);MinimumSize=new Size(620,420);
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(20,8,20,20)};
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));

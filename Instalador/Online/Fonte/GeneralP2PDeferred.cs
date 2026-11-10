@@ -94,6 +94,7 @@ internal sealed partial class P2PService {
     bool ReviewSnapshotProblem(P2PSession session,string modId,string name,string message){
         if(session.SkippedVerificationMods!=null&&session.SkippedVerificationMods.Contains(modId,StringComparer.Ordinal))return true;
         var issue=new P2PVerificationIssue(name,message);
+        Notify();
         session.VerificationIssue=issue;
         try{
             while(!issue.Decision.Task.Wait(100)){

@@ -27,7 +27,7 @@ internal sealed class P2PSession {
     public string[] SelectedMods, SkippedVerificationMods;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PVerificationIssue VerificationIssue;
     [System.Web.Script.Serialization.ScriptIgnore] public GeneralModList ReviewedProject;
-    [System.Web.Script.Serialization.ScriptIgnore] public bool ChoiceNotified;
+    [System.Web.Script.Serialization.ScriptIgnore] public int ChoiceNotified;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile bool NexusReviewing;
     public bool Sender, Paused, AutoInstall, Completed, ListImported, HistoryDismissed;
     public override string ToString(){return GeneralStyle.T(Sender?"Enviando · ":"Recebendo · ",Sender?"Sending · ":"Receiving · ")+Name;}
@@ -65,9 +65,7 @@ internal sealed partial class P2PService : IDisposable {
         if(notice!=null)try{notice(completed);}catch(Exception ex){OnlineDiagnostics.Record("p2p.sound",null,ex.GetType().Name);}
     }
     internal void NotifyChoice(P2PSession session){
-        if(session.ChoiceNotified)return;
-        session.ChoiceNotified=true;
-        Notify();
+        if(Interlocked.Exchange(ref session.ChoiceNotified,1)==0)Notify();
     }
     internal string ApplicationData {get{return installedData;}}
     internal bool Installing {get{return installedSessions.Any(s=>s.Stage!=null&&!s.Completed&&String.IsNullOrEmpty(s.Error));}}
@@ -83,7 +81,7 @@ internal sealed partial class P2PService : IDisposable {
         if(Root.TrimEnd('\\').Equals(Store.TrimEnd('\\'),StringComparison.OrdinalIgnoreCase))throw new IOException("Separe os arquivos privados da pasta de transferência.");
         statePath=Safe.In(Root,"sessions.json");Engine=new SyncthingEngine(Safe.In(Root,"syncthing"),localOnly);
         if(!localOnly){
-            Notice=completed=>{if(completed)System.Media.SystemSounds.Asterisk.Play();else System.Media.SystemSounds.Exclamation.Play();};
+            Notice=GeneralAttention.Play;
             ReviewReceived=list=>GeneralNexusInfo.ReviewReceivedList(list);
         }
         if(File.Exists(statePath)){
@@ -277,7 +275,10 @@ internal sealed partial class P2PService : IDisposable {
             Engine.RemoveFolder(s.Id);s.Completed=true;Save();CleanupTransport(s);return;
         }
         if(!s.AutoInstall||installedCatalog==null||installedData==null||s.Stage!=null)return;
-        if(s.CompareBeforePack&&!HasSyncChoice(s))return;
+        if(s.CompareBeforePack&&!HasSyncChoice(s)){
+            if(HasSyncPreview(s))NotifyChoice(s);
+            return;
+        }
         if(s.Deferred&&!ResolveDeferred(s))return;
         string zip=Safe.In(Folder(s),"pack.zip");
         if(!File.Exists(zip)||new FileInfo(zip).Length!=s.Size)return;

@@ -24,7 +24,7 @@ public sealed class ModVersionKeptException : IOException {
 }
 internal sealed class GeneralVersionChoiceDialog : GeneralDialog {
     internal GeneralVersionChoiceDialog(ModVersionDifference difference):base(GeneralStyle.T("Versão diferente encontrada","Different version found")){
-        Name="VersionChoice";ClientSize=new Size(680,400);
+        RequiresDecision=true;Name="VersionChoice";ClientSize=new Size(680,400);
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(24,8,24,24)};
         layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         var text=new TextBox{Name="VersionDetails",Multiline=true,ReadOnly=true,WordWrap=true,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,Text=difference.Name+"\r\n\r\n"+GeneralStyle.T("Instalado: ","Installed: ")+difference.Current+"\r\n"+GeneralStyle.T("Solicitado: ","Requested: ")+difference.Incoming+"\r\n\r\n"+difference.Detail+"\r\n\r\n"+GeneralStyle.T("Manter atual adia este item/pacote inteiro; os outros itens da fila continuam. A escolha não vale para os próximos conflitos.","Keep current defers this entire item/pack; other queue items continue. The choice does not apply to future conflicts.")};
