@@ -1098,7 +1098,7 @@ internal sealed class GeneralArchiveDestinations : GeneralDialog {
     void ShowDestination(){
         var route=EffectiveRoute();
         string path=SelectedPath;
-        string suggested=tree.SelectedNode!=null&&tree.SelectedNode.Nodes.Count==0?Path.GetDirectoryName(path):path;
+        string suggested=path.Length!=0&&tree.SelectedNode!=null&&tree.SelectedNode.Nodes.Count==0?Path.GetDirectoryName(path):path;
         destination.Text=route!=null?route.Destination:
             String.IsNullOrEmpty(suggested)?GeneralStyle.T("Pasta do jogo","Game folder"):"%GAME%/"+suggested.Replace('\\','/');
         clear.Enabled=route!=null&&String.Equals(route.Folder,SelectedPath,StringComparison.OrdinalIgnoreCase);

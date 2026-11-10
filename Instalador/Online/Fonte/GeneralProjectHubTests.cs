@@ -317,6 +317,14 @@ internal sealed partial class GeneralModWindow {
                     destinations.Routes[0].Destination=="%GAME%","Dragging an archive file records a portable route to the selected folder.");
                 destinations.Close();
             }
+            using(var emptyTree=new GeneralArchiveDestinations(new string[0],new GeneralInstallRoute[0],root,true)){
+                emptyTree.Show(owner);
+                var tree=(TreeView)emptyTree.Controls.Find("ArchiveFileTree",true).Single();
+                check(tree.Nodes.Count==1&&tree.Nodes[0].Nodes.Count==0&&AllControls(emptyTree).OfType<Button>()
+                    .Any(button=>button.Text=="Escolher pasta"&&button.Enabled&&button.Visible),
+                    "No Nexus preview still leaves a usable destination picker for the entire archive.");
+                emptyTree.Close();
+            }
             var fixedMod=NewEntry("Destino fixo",source);
             fixedMod.Variants[0].CyberpunkId="fixed-fixture";
             using(var locked=new GeneralModEditor(fixedMod,new string[0],"default",true,"")){
