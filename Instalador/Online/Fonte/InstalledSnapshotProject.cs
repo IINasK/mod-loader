@@ -6,7 +6,7 @@ using System.Linq;
 public static partial class InstalledSnapshot {
     static bool HasInstallRoutes(InstalledSnapshotManifest manifest) {
         return manifest.List.Mods.Concat(manifest.Project==null?Enumerable.Empty<GeneralModEntry>():manifest.Project.Mods)
-            .SelectMany(mod=>mod.Variants).Any(variant=>variant.InstallRoutes.Count>0);
+            .SelectMany(mod=>mod.Variants).SelectMany(variant=>variant.WithNaturalOption()).Any(variant=>variant.InstallRoutes.Count>0);
     }
 
     internal static List<string> SkipMissingDestinations(InstalledSnapshotManifest manifest,FixedCatalog catalog,string game,Func<string[],bool> approveUserFolders) {
@@ -41,6 +41,7 @@ public static partial class InstalledSnapshot {
         var remaining=new HashSet<string>(manifest.List.Mods.Where(mod=>!unavailable.Contains(mod.Id))
             .Select(mod=>Owner(mod,mod.Variants.Single())),StringComparer.Ordinal);
         manifest.List.Mods.RemoveAll(mod=>unavailable.Contains(mod.Id));
+        if(!IncludesBodyChoice(manifest.List,manifest.BodyChoice))manifest.BodyChoice=null;
         foreach(var preset in manifest.List.Presets)preset.ModIds.RemoveAll(unavailable.Contains);
         foreach(var file in manifest.Files)file.Owners.RemoveAll(owner=>!remaining.Contains(owner));
         manifest.Files.RemoveAll(file=>file.Owners.Count==0);
@@ -73,15 +74,23 @@ public static partial class InstalledSnapshot {
         }
         return true;
     }
+    static void MakeSourcesPortable(GeneralModVariant variant,string modId){
+        if(variant.CyberpunkId==null){
+            variant.Sources=variant.Sources.Where(GeneralModDownload.IsWebSource).ToList();
+            if(variant.Sources.Count==0)variant.Sources.Add("installed://"+modId+"/"+variant.Id);
+        }
+        if(variant.SourceInfo!=null)variant.SourceInfo=variant.SourceInfo.Where(pair=>variant.Sources.Contains(pair.Key)&&GeneralModDownload.IsWebSource(pair.Key)).ToDictionary(pair=>pair.Key,pair=>pair.Value);
+    }
+
     static GeneralModList ProjectDefinition(GeneralModState state,GeneralModList installed){
         var project=Clone(state.List);
         foreach(var mod in project.Mods){
             mod.DetectedPaths.Clear();
             mod.DefaultVariant=Selected(state,mod);
-            foreach(var variant in mod.Variants){
-                variant.Sources=variant.Sources.Where(GeneralModDownload.IsWebSource).ToList();
-                if(variant.Sources.Count==0)variant.Sources.Add("installed://"+mod.Id+"/"+variant.Id);
-                variant.SourceInfo=variant.SourceInfo.Where(pair=>variant.Sources.Contains(pair.Key)).ToDictionary(pair=>pair.Key,pair=>pair.Value);
+            foreach(var variant in mod.Variants.SelectMany(option=>option.WithNaturalOption())){
+                variant.CyberpunkId=null;
+                variant.CyberpunkVariant=null;
+                MakeSourcesPortable(variant,mod.Id);
             }
         }
         foreach(var item in installed.Mods){var mod=project.Mods.SingleOrDefault(m=>m.Id==item.Id);if(mod==null)project.Mods.Add(Clone(item));else {mod.DefaultVariant=item.DefaultVariant;foreach(var variant in item.Variants)if(!mod.Variants.Any(v=>v.Id==variant.Id))mod.Variants.Add(Clone(variant));}}
@@ -93,13 +102,14 @@ public static partial class InstalledSnapshot {
         var project=manifest.Project;GeneralModLibrary.ValidateList(project,false);
         if(manifest.TemplateId!=null&&(manifest.TemplateId!=GeneralProjectStore.CyberpunkTemplate||manifest.Game!="cyberpunk2077"))
             throw new IOException("Identidade do projeto padrão inválida.");
-        foreach(var mod in project.Mods)foreach(var variant in mod.Variants)
+        foreach(var mod in project.Mods)foreach(var variant in mod.Variants.SelectMany(option=>option.WithNaturalOption()))
             if(!variant.Sources.All(s=>GeneralModDownload.IsWebSource(s)||s=="installed://"+mod.Id+"/"+variant.Id))throw new IOException("Projeto contém caminhos privados de origem.");
         GeneralModLibrary.RestoreKnownMappings(project,GeneralModLibrary.Seed(catalog,new ModImportItem[0]));
         foreach(var installed in manifest.List.Mods){
             var mod=project.Mods.SingleOrDefault(m=>m.Id==installed.Id);
             if(mod==null||mod.DefaultVariant!=installed.DefaultVariant)throw new IOException("Projeto não corresponde aos mods transferidos.");
-            var expected=installed.Variants.Single();var variant=mod.Variants.Single(v=>v.Id==mod.DefaultVariant);
+            var expected=installed.Variants.Single();
+            var variant=GeneralModLibrary.BodyOption(manifest.BodyChoice,mod,mod.Variants.Single(v=>v.Id==mod.DefaultVariant));
             if(expected.CyberpunkId==NightCityDensity.ModId&&expected.CyberpunkVariant=="legacy-low"&&variant.Id=="legacy-low"&&variant.Sources.SequenceEqual(LegacyDensityVariant(catalog).Sources)){variant.CyberpunkId=expected.CyberpunkId;variant.CyberpunkVariant=expected.CyberpunkVariant;}
             if(!variant.Sources.SequenceEqual(expected.Sources)||!GeneralInstallRoutes.Same(variant.InstallRoutes,expected.InstallRoutes)||!variant.RequiredMods.SequenceEqual(expected.RequiredMods)||variant.CyberpunkId!=expected.CyberpunkId||variant.CyberpunkVariant!=expected.CyberpunkVariant)throw new IOException("Fontes do projeto divergem do pacote instalado.");
         }

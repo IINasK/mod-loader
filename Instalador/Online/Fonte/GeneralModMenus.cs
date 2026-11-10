@@ -86,6 +86,8 @@ internal sealed partial class GeneralModWindow {
                 if(String.Equals(preset.Categories[i],category,StringComparison.OrdinalIgnoreCase))preset.Categories[i]=renamed;
         foreach(var mod in state.List.Mods.Where(item=>String.Equals(item.Category,category,StringComparison.OrdinalIgnoreCase)))
             mod.Category=renamed;
+        foreach(var option in state.List.Mods.SelectMany(mod=>mod.Variants).SelectMany(variant=>variant.WithNaturalOption()))
+            if(String.Equals(option.Category,category,StringComparison.OrdinalIgnoreCase))option.Category=renamed;
         state.List.CategoryDescriptions.Remove(category);
         if(description!=null)state.List.CategoryDescriptions[renamed]=description;
         if(categoryFilters!=null&&categoryFilters.Remove(category))categoryFilters.Add(renamed);

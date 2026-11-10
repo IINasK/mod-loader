@@ -35,7 +35,7 @@ internal sealed partial class GeneralModWindow {
             versions.Add(new Work{Entry=entry,Variant=variant,BodyChoice=entry.Id,SwitchAlternatives=true,SaveVariant=true});
             // EBBN is a shape in the EBB + RB archive. A separate choice keeps the shared files under one owner.
             if(entry.Id==GeneralModLibrary.EbbBody)
-                versions.Add(new Work{Entry=entry,Variant=variant,BodyChoice=GeneralModLibrary.NaturalBody,SwitchAlternatives=true,SaveVariant=true});
+                versions.Add(new Work{Entry=entry,Variant=variant.NaturalOption??variant,BodyChoice=GeneralModLibrary.NaturalBody,SwitchAlternatives=true,SaveVariant=true});
         }
         return versions.OrderBy(work=>work.BodyChoice==GeneralModLibrary.NaturalBody?2:work.BodyChoice==GeneralModLibrary.PushBody?1:0).ToList();
     }
@@ -52,6 +52,7 @@ internal sealed partial class GeneralModWindow {
     void SelectBodyChoice(Work choice){
         if(working||scanning||state.BodyChoice==choice.BodyChoice)return;
         state.BodyChoice=choice.BodyChoice;
+        if(projectDraft!=null)projectDraft.BodyChoice=state.BodyChoice;
         Persist();
         DrawRows();
         var row=grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(candidate=>candidate.Visible&&

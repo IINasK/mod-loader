@@ -35,6 +35,36 @@ internal static class InstalledSnapshotTests {
         check(publicManifest.List.Mods[0].Name=="Meu mod personalizado"&&publicManifest.List.Mods[0].Variants[0].Sources.SequenceEqual(new[]{page}),"Preserva nome personalizado e link público original sem exportar caminhos locais.");
         check(publicManifest.List.Presets.Count==2&&publicManifest.List.Presets[0].Id=="segundo"&&publicManifest.List.Presets[1].Name=="Minha seleção"&&publicManifest.List.CategoryDescriptions["Minha categoria"]=="Descrição mantida","Preserva nomes, membros e categorias dos presets e coloca o ativo primeiro.");
         check(InstalledSnapshot.Read(publicZip,Safe.Hash(publicZip),catalog).List.Presets.Count==2,"Metadados preservados continuam válidos na leitura do ZIP.");
+        var bodyState=State(game,page);
+        var body=bodyState.List.Mods.Single();
+        body.Id=GeneralModLibrary.EbbBody;
+        var ebb=body.Variants.Single();
+        ebb.DisplayName="Corpo EBB";ebb.Description="EBB";
+        ebb.NaturalOption=new GeneralModVariant{Id=ebb.Id,Name="Natural",DisplayName="Corpo Natural",Description="Natural",
+            Tags=new List<string>{"Natural"},Sources=new List<string>{original}};
+        bodyState.BodyChoice=GeneralModLibrary.NaturalBody;
+        WriteGenericRecord(game,data,body.Id+"/"+ebb.Id+"/0/"+original,new[]{"mods/fixture.txt"});
+        string bodyZip=Path.Combine(root,"body.zip");
+        InstalledSnapshot.Create(bodyZip,bodyState,new[]{body.Id},catalog,data,false,s=>{});
+        var bodyPack=InstalledSnapshot.Read(bodyZip,Safe.Hash(bodyZip),catalog);
+        var effective=bodyPack.List.Mods.Single().Variants.Single();
+        var full=bodyPack.Project.Mods.Single().Variants.Single();
+        check(bodyPack.BodyChoice==GeneralModLibrary.NaturalBody&&effective.Description=="Natural"&&effective.Tags.SequenceEqual(new[]{"Natural"})&&
+            effective.Sources.Single()=="installed://"+body.Id+"/"+ebb.Id&&effective.NaturalOption==null&&
+            full.Description=="EBB"&&full.Sources.Single()==page&&full.NaturalOption.Description=="Natural"&&
+            full.NaturalOption.Sources.SequenceEqual(effective.Sources)&&!Safe.Json.Serialize(bodyPack).Contains(root.Replace("\\","\\\\")),
+            "Snapshot envia os arquivos da opção Natural e mantém as configurações distintas do projeto sem vazar caminhos locais.");
+        var skippedBody=Copy(bodyPack);
+        skippedBody.Schema=2;
+        var missingFolder=GeneralInstallRoutes.Parse("%GAME%/missing-body-folder",game);
+        skippedBody.List.Mods.Single().Variants.Single().InstallRoutes=missingFolder;
+        skippedBody.Project.Mods.Single().Variants.Single().NaturalOption.InstallRoutes=missingFolder;
+        check(InstalledSnapshot.SkipMissingDestinations(skippedBody,catalog,game,null).SequenceEqual(new[]{body.Id})&&
+            skippedBody.BodyChoice==null&&skippedBody.Project.Mods.Single().Variants.Single().NaturalOption!=null,
+            "Recepção sem o destino do Natural conserva os campos editáveis e solta a escolha instalada.");
+        InstalledSnapshot.Validate(skippedBody,catalog);
+        full.NaturalOption.Sources[0]=original;
+        refuse(()=>InstalledSnapshot.Validate(bodyPack,catalog),"Bloqueia origem privada em uma configuração Natural recebida.");
         refuse(()=>InstalledSnapshot.Read(zip,new string('0',64),catalog),"Recusa hash de convite divergente.");
         Write(game,"mods/fixture.txt","later edit");
         refuse(()=>InstalledSnapshot.Create(Path.Combine(root,"bad.zip"),state,new[]{"fixture"},catalog,data,true,s=>{}),"Recusa arquivo instalado alterado após recibo.");

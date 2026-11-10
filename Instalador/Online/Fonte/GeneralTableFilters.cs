@@ -91,12 +91,16 @@ internal sealed partial class GeneralModWindow {
     }
     bool ColumnAllows(GeneralModEntry mod){
         string raw=ListStatus(mod);
+        var variant=Selected(mod);
+        var searchable=IsBigBody(mod)?BodyVersionsForPreset().SelectMany(work=>
+            (work.Variant.Tags??work.Entry.Tags).Concat(new[]{VersionDisplayName(work),BodyChoiceLabel(work.BodyChoice)})):
+            variant.Tags??mod.Tags;
         return (categoryFilters==null||categoryFilters.Contains(mod.Category??""))&&
             (variantFilters==null||variantFilters.Contains(NexusVariantName(mod)))&&
             (statusFilters==null||statusFilters.Any(value=>StatusFilterKey(value)==StatusFilterKey(GeneralStatusPresentation.Label(raw))))&&
             (String.IsNullOrWhiteSpace(nameFilter)||(ModDisplayName(mod)+" "+mod.Name).IndexOf(nameFilter,StringComparison.CurrentCultureIgnoreCase)>=0)&&
-            GeneralModSearch.Matches(searchTerms, new[]{ModDisplayName(mod),mod.Nsfw?mod.Name+" NSFW Not Safe for Work":mod.Name,NexusVariantName(mod),GeneralStatusPresentation.Label(raw)}
-                .Concat(mod.Tags).ToArray());
+            GeneralModSearch.Matches(searchTerms, new[]{ModDisplayName(mod),variant.DisplayName??mod.Name,mod.Nsfw?mod.Name+" NSFW Not Safe for Work":mod.Name,NexusVariantName(mod),GeneralStatusPresentation.Label(raw)}
+                .Concat(searchable).ToArray());
     }
     void ShowColumnFilter(int column){
         if(column<1||column>3)return;

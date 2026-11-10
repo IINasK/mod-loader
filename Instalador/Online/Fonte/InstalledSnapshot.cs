@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 
 public sealed class InstalledSnapshotManifest {
     public int Schema=1;
-    public string Name,Game,GameFileVersion,TemplateId,ProjectName;
+    public string Name,Game,GameFileVersion,TemplateId,ProjectName,BodyChoice;
     public bool TemplateSubset;
     public GeneralModList List=new GeneralModList();
     public GeneralModList Project;
@@ -32,6 +32,10 @@ public static partial class InstalledSnapshot {
     static T Clone<T>(T value){return Safe.Json.Deserialize<T>(Safe.Json.Serialize(value));}
     static string Selected(GeneralModState state,GeneralModEntry mod){string id;return state.ChosenVariants.TryGetValue(mod.Id,out id)?id:mod.DefaultVariant;}
     static bool IsCyberpunk(string root){return File.Exists(Safe.In(root,"bin/x64/Cyberpunk2077.exe"));}
+    static bool IncludesBodyChoice(GeneralModList list,string choice) {
+        return (GeneralModLibrary.IsHystBody(choice)||choice==GeneralModLibrary.NaturalBody)&&
+            list.Mods.Any(mod=>mod.Id==(choice==GeneralModLibrary.NaturalBody?GeneralModLibrary.EbbBody:choice));
+    }
     internal static bool SafeGenericPath(string path) {
         Safe.In(System.IO.Path.GetTempPath(),path);
         return !Regex.IsMatch(path,@"(^|/)(?:\.git|\.codex|\.agents|\.aws|\.CoopModsOnline|saves?|saved games|accounts?|credentials?|cookies?|logs?|cache|profiles?|userdata)(?:/|\.|$)|(?:^|/)(?:user\.settings|loginusers\.vdf|config\.vdf|steam_api\.ini|.*\.(?:dmp|log|sav|dat|db|sqlite))$",RegexOptions.IgnoreCase);
@@ -82,7 +86,7 @@ public static partial class InstalledSnapshot {
             if(checkpoint!=null)checkpoint();
             if(inspectProgress!=null)inspectProgress(index,entries.Count,mod.Name);
             try {
-            var variant=mod.Variants.Single(v=>v.Id==Selected(state,mod));
+            var variant=GeneralModLibrary.BodyOption(state.BodyChoice,mod,mod.Variants.Single(v=>v.Id==Selected(state,mod)));
             if(disabled.ContainsKey(Owner(mod,variant))){
                 if(allowMissing)continue;
                 throw new IOException("Este mod está desabilitado.");
@@ -107,7 +111,17 @@ public static partial class InstalledSnapshot {
             var originalSources=variant.Sources.ToList();
             List<InstalledSnapshotFile> files=new List<InstalledSnapshotFile>();
             string snapshotId;
-            if(variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(work,out snapshotId))files=receivedEngine.ReadInstalledFiles(snapshotId,work);
+            if(variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(work,out snapshotId)){
+                if(mod.Id==GeneralModLibrary.EbbBody&&mod.Variants.Single(v=>v.Id==variant.Id).NaturalOption!=null){
+                    var installed=receivedEngine.ReadManifest(snapshotId).List.Mods.Single(entry=>entry.Id==mod.Id).Variants.Single();
+                    var expected=Clone(variant);
+                    MakeSourcesPortable(expected,mod.Id);
+                    if(!installed.Sources.SequenceEqual(expected.Sources,StringComparer.Ordinal)||
+                        !GeneralInstallRoutes.Same(installed.InstallRoutes,variant.InstallRoutes))
+                        throw new IOException("O recibo do corpo corresponde a outra configuração de instalação.");
+                }
+                files=receivedEngine.ReadInstalledFiles(snapshotId,work);
+            }
             else if(variant.CyberpunkId!=null) {
                 if(!cyberpunk)throw new IOException(mod.Name+": o destino não é Cyberpunk 2077.");
                 var recipe=FixedRecipe(catalog,variant);
@@ -133,7 +147,7 @@ public static partial class InstalledSnapshot {
             }else if(cyberpunk&&HasManualHystFiles(mod.Id,root)&&
                 (state.CyberpunkImports==null||!originalSources.Select((source,sourceIndex)=>work+"/"+sourceIndex+"/"+source).Any(state.CyberpunkImports.ContainsKey))) {
                 var knownBody=seed.Mods.FirstOrDefault(item=>item.Id==mod.Id);
-                variant=ReadManualHyst(root,mod,knownBody,state.SelectedPreset!="no-pl",files);
+                variant=ReadManualHyst(root,mod,knownBody,state.SelectedPreset!="no-pl",files,bodyChoice:state.BodyChoice);
                 work=Owner(mod,variant);
                 originalSources=variant.Sources.ToList();
                 if(disabled.ContainsKey(work))throw new IOException("Este mod está desabilitado.");
@@ -152,8 +166,8 @@ public static partial class InstalledSnapshot {
             }
             if(cyberpunk && files.Any(RetiredPackEntries.LocalDroneFile)) continue;
             mod.Variants=new List<GeneralModVariant>{variant};mod.DefaultVariant=variant.Id;
-            if(variant.CyberpunkId==null){variant.Sources=originalSources.Where(GeneralModDownload.IsWebSource).ToList();if(variant.Sources.Count==0)variant.Sources.Add("installed://"+mod.Id+"/"+variant.Id);}
-            if(variant.SourceInfo!=null)variant.SourceInfo=variant.SourceInfo.Where(pair=>variant.Sources.Contains(pair.Key)&&GeneralModDownload.IsWebSource(pair.Key)).ToDictionary(pair=>pair.Key,pair=>pair.Value);
+            variant.NaturalOption=null;
+            MakeSourcesPortable(variant,mod.Id);
             var additions=new Dictionary<string,InstalledSnapshotFile>(StringComparer.Ordinal);
             var shared=new HashSet<InstalledSnapshotFile>();
             foreach(var file in files) {
@@ -221,7 +235,8 @@ public static partial class InstalledSnapshot {
             var copy=Clone(original);copy.ModIds=copy.ModIds.Where(included.Contains).ToList();list.Presets.Add(copy);
         }
         if(list.Presets.Count==0)list.Presets.Add(new GeneralModPreset{Id="installed",Name=manifest.Name,ModIds=list.Mods.Select(m=>m.Id).ToList()});
-        if(allowMissing||HasInstallRoutes(manifest)){
+        if(IncludesBodyChoice(list,state.BodyChoice))manifest.BodyChoice=state.BodyChoice;
+        if(allowMissing||HasInstallRoutes(manifest)||manifest.BodyChoice!=null){
             manifest.Project=ProjectDefinition(state,manifest.List);
             if(cyberpunk&&state.TemplateId==GeneralProjectStore.CyberpunkTemplate){
                 manifest.TemplateId=state.TemplateId;
@@ -273,6 +288,8 @@ public static partial class InstalledSnapshot {
         if(manifest.ProjectName!=null&&(String.IsNullOrWhiteSpace(manifest.ProjectName)||manifest.ProjectName.Length>120||manifest.ProjectName.Any(Char.IsControl)))
             throw new IOException("Nome do projeto recebido inválido.");
         GeneralModLibrary.ValidateList(manifest.List,true);
+        if(manifest.BodyChoice!=null&&(manifest.Project==null||!IncludesBodyChoice(manifest.List,manifest.BodyChoice)))
+            throw new IOException("Opção de corpo inválida no pacote.");
         if(manifest.TemplateId!=null&&manifest.Project==null||manifest.TemplateSubset&&manifest.TemplateId==null)
             throw new IOException("Identidade do projeto padrão inválida.");
         if(manifest.Project!=null)ValidateProject(manifest,catalog);
@@ -286,6 +303,7 @@ public static partial class InstalledSnapshot {
             if(mod==null||!Regex.IsMatch(mod.Id??"",@"\A[A-Za-z0-9_-]{1,120}\z")||!ids.Add(mod.Id)||String.IsNullOrWhiteSpace(mod.Name)||mod.Name.Length>300||mod.Variants==null||mod.Variants.Count!=1)throw new IOException("Mod instalado inválido.");
             var variant=mod.Variants[0];
             if(variant==null||!Regex.IsMatch(variant.Id??"",@"\A[A-Za-z0-9_-]{1,120}\z")||variant.Id!=mod.DefaultVariant||variant.Sources==null||variant.Sources.Count==0||variant.Sources.Count>32)throw new IOException("Variante instalada inválida.");
+            if(variant.NaturalOption!=null)throw new IOException("O pacote instalado deve conter só a opção usada.");
             string owner=Owner(mod,variant);owners.Add(owner,variant);
             if(variant.CyberpunkId!=null) {
                 if(manifest.Game!="cyberpunk2077")throw new IOException("Receita Cyberpunk em destino genérico.");

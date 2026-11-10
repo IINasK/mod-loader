@@ -40,6 +40,36 @@ public static class GeneralModLibraryV2Tests {
             "Vínculo de dependência e escolha manual de NSFW sobrevivem ao salvamento.");
         check(imported.Mods[0].Variants[0].Sources[0] == @"D:\mods\pacote.zip", "Referência de pacote permanece explícita sem incluir seu conteúdo.");
 
+        var bodies = Example();
+        var body = bodies.Mods.Single();
+        body.Id = GeneralModLibrary.EbbBody;
+        bodies.Presets[0].ModIds[0] = body.Id;
+        var regular = body.Variants.Single();
+        regular.Description = "Somente EBB";
+        regular.Tags = new List<string> { " EBB " };
+        regular.NaturalOption = new GeneralModVariant {
+            Id = regular.Id, Name = "EBBN", DisplayName = "Hyst Natural", Category = "coleção",
+            Description = "", Tags = new List<string>(), NsfwOverride = false,
+            Sources = new List<string> { "https://example.com/natural.zip" }, RequiredMods = new List<string> { "natural-refit" }
+        };
+        body.Variants.Add(new GeneralModVariant { Id = "old", Name = "Outra versão", Sources = new List<string> { "https://example.com/old.zip" } });
+        library.Save(new GeneralModState { List = bodies });
+        var roundtrip = library.Load().List;
+        library.Export(export, roundtrip);
+        var savedBody = library.Import(export).Mods.Single();
+        var savedRegular = savedBody.Variants.Single(v => v.Id == regular.Id);
+        var savedNatural = GeneralModLibrary.BodyOption(GeneralModLibrary.NaturalBody, savedBody, savedRegular);
+        check(savedRegular.Description == "Somente EBB" && savedRegular.Tags.SequenceEqual(new[] { "EBB" }) &&
+            savedNatural.DisplayName == "Hyst Natural" && savedNatural.Description == "" && savedNatural.Tags.Count == 0 &&
+            savedNatural.Nsfw == false && savedNatural.Category == "Coleção" && savedNatural.Sources.Single().EndsWith("/natural.zip") &&
+            savedNatural.RequiredMods.SequenceEqual(new[] { "natural-refit" }) && savedBody.Variants.Single(v => v.Id == "old").Tags == null,
+            "Versões têm metadados próprios, preservando a diferença entre campos vazios e campos herdados na exportação.");
+        GeneralModLibrary.DeleteCategory(roundtrip, "Coleção");
+        check(roundtrip.Mods.Single().Variants.Single(v => v.Id == regular.Id).NaturalOption.Category == "",
+            "Excluir uma categoria atualiza as opções Natural que a usavam.");
+        regular.NaturalOption.NaturalOption = new GeneralModVariant();
+        Throws(() => library.Save(new GeneralModState { List = bodies })); passed++;
+
         File.WriteAllText(export, "{\"Schema\":1,\"Categories\":[],\"Mods\":[{\"Id\":\"old\",\"Name\":\"Legado\",\"DefaultVariant\":\"default\",\"Variants\":[{\"Id\":\"default\",\"Name\":\"Principal\",\"Sources\":[\"https://example.com/mod.zip\"]}]}]}");
         var legacy = library.Import(export);
         File.WriteAllText(Path.Combine(root, "estado.json"), "{\"List\":" + File.ReadAllText(export) + "}");
@@ -71,6 +101,11 @@ public static class GeneralModLibraryV2Tests {
         rejectList(value => value.Mods[0].Tags.Add("casual"));
         rejectList(value => value.Mods[0].Tags.Add(""));
         rejectList(value => value.Mods[0].Tags.Add(new string('x', 61)));
+        rejectList(value => value.Mods[0].Variants[0].DisplayName = "");
+        rejectList(value => value.Mods[0].Variants[0].Description = new string('x', 4001));
+        rejectList(value => value.Mods[0].Variants[0].Tags = new List<string> { "Tag", "tag" });
+        rejectList(value => value.Mods[0].Variants[0].Category = "Não cadastrada");
+        rejectList(value => value.Mods[0].Variants[0].NaturalOption = new GeneralModVariant());
         rejectList(value => value.CategoryDescriptions.Add("Inexistente", "Descrição"));
         rejectList(value => value.CategoryDescriptions["Coleção"] = new string('x', 4001));
         rejectList(value => value.CategoryDescriptions.Add("coleção", "Duplicada"));

@@ -39,11 +39,20 @@ public sealed class GeneralModEntry {
 
 public sealed class GeneralModVariant {
     public string Id, Name, CyberpunkId, CyberpunkVariant;
+    public string DisplayName, Category, Description;
+    public List<string> Tags;
+    public bool? Nsfw, NsfwOverride;
+    public GeneralModVariant NaturalOption;
     public List<string> RequiredMods = new List<string>();
     public List<GeneralInstallRoute> InstallRoutes = new List<GeneralInstallRoute>();
     public List<string> CompatibilityGroups = new List<string>();
     public List<string> Sources = new List<string>();
     public Dictionary<string,GeneralSourceInfo> SourceInfo = new Dictionary<string,GeneralSourceInfo>();
+
+    internal IEnumerable<GeneralModVariant> WithNaturalOption() {
+        yield return this;
+        if (NaturalOption != null) yield return NaturalOption;
+    }
 }
 
 public sealed class GeneralModState {
@@ -70,6 +79,9 @@ public sealed class GeneralModLibrary {
     internal const string EbbBody = "hyst-ebb-rb", PushBody = "hyst-ebbp-rb", NaturalBody = "hyst-ebbn-rb";
     internal const string EclipseTattooId = "mod-33230";
     internal static bool IsHystBody(string id) { return id == EbbBody || id == PushBody; }
+    internal static GeneralModVariant BodyOption(string bodyChoice, GeneralModEntry mod, GeneralModVariant variant) {
+        return bodyChoice == NaturalBody && mod.Id == EbbBody ? variant.NaturalOption ?? variant : variant;
+    }
     internal static bool IsFacialMod(string id) { return id.StartsWith("face-", StringComparison.Ordinal); }
     readonly string statePath;
 
@@ -107,9 +119,17 @@ public sealed class GeneralModLibrary {
             list.Schema, list.Categories, list.CategoryDescriptions, list.Presets, list.UncategorizedName, list.UncategorizedDescription, list.AlternativeGroups,
             Mods = list.Mods.Select(mod => new {
                 mod.Id, mod.Name, mod.Category, mod.DefaultVariant, mod.Description, mod.Tags, mod.CompatibilityGroups, mod.Nsfw, mod.NsfwOverride, mod.AlternativeGroup, mod.DependencySource, mod.DependencyFile,
-                Variants = mod.Variants.Select(variant => new { variant.Id, variant.Name, variant.Sources, variant.SourceInfo, variant.CompatibilityGroups, variant.RequiredMods, variant.InstallRoutes }).ToList()
+                Variants = mod.Variants.Select(ExportVariant).ToList()
             }).ToList()
         });
+    }
+
+    static object ExportVariant(GeneralModVariant variant) {
+        return new {
+            variant.Id, variant.Name, variant.Sources, variant.SourceInfo, variant.CompatibilityGroups, variant.RequiredMods, variant.InstallRoutes,
+            variant.DisplayName, variant.Category, variant.Description, variant.Tags, variant.Nsfw, variant.NsfwOverride,
+            NaturalOption = variant.NaturalOption == null ? null : ExportVariant(variant.NaturalOption)
+        };
     }
 
     internal static List<string> ValidateCompatibilityGroups(IEnumerable<string> groups) {
@@ -185,6 +205,8 @@ public sealed class GeneralModLibrary {
         if (existing == null) throw new IOException("A categoria não pertence à lista. O grupo sem categoria não pode ser excluído.");
         foreach (var mod in list.Mods.Where(item => String.Equals(item.Category, existing, StringComparison.OrdinalIgnoreCase)))
             mod.Category = null;
+        foreach (var option in list.Mods.SelectMany(mod => mod.Variants).SelectMany(variant => variant.WithNaturalOption()))
+            if (String.Equals(option.Category, existing, StringComparison.OrdinalIgnoreCase)) option.Category = "";
         list.Categories.Remove(existing);
         list.CategoryDescriptions.Remove(existing);
         foreach (var preset in list.Presets) preset.Categories.RemoveAll(item => String.Equals(item, existing, StringComparison.OrdinalIgnoreCase));
@@ -300,8 +322,13 @@ public sealed class GeneralModLibrary {
     }
 
     static void ApplyAuditedAdultFlags(GeneralModList list) {
-        foreach(var mod in list.Mods)
-            mod.Nsfw=mod.NsfwOverride??(mod.Nsfw||mod.Variants.SelectMany(variant=>variant.Sources).Any(GeneralNexusInfo.IsAuditedAdultSource));
+        foreach(var mod in list.Mods) {
+            var options = mod.Variants.SelectMany(variant => variant.WithNaturalOption());
+            mod.Nsfw=mod.NsfwOverride??(mod.Nsfw||options.SelectMany(variant=>variant.Sources).Any(GeneralNexusInfo.IsAuditedAdultSource));
+            foreach (var option in options)
+                if (option.Nsfw.HasValue || option.NsfwOverride.HasValue)
+                    option.Nsfw = option.NsfwOverride ?? (option.Nsfw.GetValueOrDefault() || option.Sources.Any(GeneralNexusInfo.IsAuditedAdultSource));
+        }
     }
 
     static GeneralModVariant FromFixed(string modId, string variantId, string name, List<FixedAsset> assets, string density) {
@@ -386,12 +413,7 @@ public sealed class GeneralModLibrary {
             }
             mod.CompatibilityGroups = ValidateCompatibilityGroups(mod.CompatibilityGroups);
             if (mod.Tags == null) mod.Tags = new List<string>();
-            if (mod.Tags.Count > 32) throw new IOException("Use no máximo 32 tags por mod.");
-            var tags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            for (int index = 0; index < mod.Tags.Count; index++) {
-                mod.Tags[index] = RequiredText(mod.Tags[index], 60, "Tag");
-                if (!tags.Add(mod.Tags[index])) throw new IOException("O mod contém tags repetidas.");
-            }
+            ValidateTags(mod.Tags);
             if (!String.IsNullOrWhiteSpace(mod.Category)) {
                 string category;
                 if (!categories.TryGetValue(mod.Category.Trim(), out category)) throw new IOException("Categoria desconhecida em " + mod.Name + ".");
@@ -399,19 +421,15 @@ public sealed class GeneralModLibrary {
             } else mod.Category = null;
             var variantIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (var variant in mod.Variants) {
-                if (variant != null) GeneralInstallRoutes.Validate(variant.InstallRoutes);
-                if (variant == null || !ValidId(variant.Id) || !variantIds.Add(variant.Id) || variant.Sources == null || variant.Sources.Count == 0 || variant.Sources.Count > 32)
+                if (variant == null || !ValidId(variant.Id) || !variantIds.Add(variant.Id))
                     throw new IOException("Versão inválida ou repetida em " + mod.Name + ".");
-                variant.Name = RequiredText(variant.Name, 300, "Nome da versão");
-                variant.CompatibilityGroups = ValidateCompatibilityGroups(variant.CompatibilityGroups);
-                if(variant.RequiredMods==null)variant.RequiredMods=new List<string>();
-                if(variant.RequiredMods.Count>32||variant.RequiredMods.Any(id=>!ValidId(id)||id==mod.Id)||
-                    variant.RequiredMods.Distinct(StringComparer.Ordinal).Count()!=variant.RequiredMods.Count)
-                    throw new IOException("Vínculos de dependência inválidos em "+mod.Name+".");
-                if(variant.SourceInfo==null)variant.SourceInfo=new Dictionary<string,GeneralSourceInfo>();
-                if(variant.SourceInfo.Count>32||variant.SourceInfo.Any(pair=>!variant.Sources.Contains(pair.Key)||pair.Value==null||pair.Value.Bytes<0||pair.Value.Bytes>128L*1024*1024*1024||String.IsNullOrWhiteSpace(pair.Value.Name)||pair.Value.Name.Length>300||pair.Value.Name.Any(Char.IsControl)||(pair.Value.FileName??"").Length>300||(pair.Value.FileName??"").Any(Char.IsControl)||!ValidSourceVersion(pair.Value.Version)||!ValidSourceVersion(pair.Value.ModVersion)))throw new IOException("Metadados de arquivo inválidos.");
-                NormalizeSources(variant);
-                if (!trustRecipes) { variant.CyberpunkId = null; variant.CyberpunkVariant = null; }
+                var natural = variant.NaturalOption;
+                if (natural != null && (mod.Id != EbbBody || natural.Id != variant.Id || natural.NaturalOption != null))
+                    throw new IOException("Configuração Natural inválida em " + mod.Name + ".");
+                foreach (var option in variant.WithNaturalOption()) {
+                    ValidateVariant(mod, option, categories);
+                    if (!trustRecipes || option == natural) { option.CyberpunkId = null; option.CyberpunkVariant = null; }
+                }
             }
             if (String.IsNullOrEmpty(mod.AlternativeGroup)) mod.AlternativeGroup = null;
             else if (!ValidId(mod.AlternativeGroup)) throw new IOException("Associação de alternativas inválida.");
@@ -435,6 +453,40 @@ public sealed class GeneralModLibrary {
             foreach (string id in preset.ModIds)
                 if (id == null || !ids.Contains(id) || !members.Add(id)) throw new IOException("O preset contém um mod desconhecido ou repetido.");
         }
+    }
+
+    static void ValidateTags(List<string> tags) {
+        if (tags == null) return;
+        if (tags.Count > 32) throw new IOException("Use no máximo 32 tags por mod.");
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < tags.Count; i++) {
+            tags[i] = RequiredText(tags[i], 60, "Tag");
+            if (!seen.Add(tags[i])) throw new IOException("O mod contém tags repetidas.");
+        }
+    }
+
+    static void ValidateVariant(GeneralModEntry mod, GeneralModVariant variant, Dictionary<string, string> categories) {
+        GeneralInstallRoutes.Validate(variant.InstallRoutes);
+        if (variant.Sources == null || variant.Sources.Count == 0 || variant.Sources.Count > 32)
+            throw new IOException("Versão inválida em " + mod.Name + ".");
+        variant.Name = RequiredText(variant.Name, 300, "Nome da versão");
+        if (variant.DisplayName != null) variant.DisplayName = RequiredText(variant.DisplayName, 300, "Nome do mod");
+        if (variant.Description != null) variant.Description = OptionalDescription(variant.Description);
+        ValidateTags(variant.Tags);
+        if (variant.Category != null) {
+            string category = variant.Category.Trim();
+            if (category.Length == 0) variant.Category = "";
+            else if (categories.TryGetValue(category, out category)) variant.Category = category;
+            else throw new IOException("Categoria desconhecida em " + mod.Name + ".");
+        }
+        variant.CompatibilityGroups = ValidateCompatibilityGroups(variant.CompatibilityGroups);
+        if(variant.RequiredMods==null)variant.RequiredMods=new List<string>();
+        if(variant.RequiredMods.Count>32||variant.RequiredMods.Any(id=>!ValidId(id)||id==mod.Id)||
+            variant.RequiredMods.Distinct(StringComparer.Ordinal).Count()!=variant.RequiredMods.Count)
+            throw new IOException("Vínculos de dependência inválidos em "+mod.Name+".");
+        if(variant.SourceInfo==null)variant.SourceInfo=new Dictionary<string,GeneralSourceInfo>();
+        if(variant.SourceInfo.Count>32||variant.SourceInfo.Any(pair=>!variant.Sources.Contains(pair.Key)||pair.Value==null||pair.Value.Bytes<0||pair.Value.Bytes>128L*1024*1024*1024||String.IsNullOrWhiteSpace(pair.Value.Name)||pair.Value.Name.Length>300||pair.Value.Name.Any(Char.IsControl)||(pair.Value.FileName??"").Length>300||(pair.Value.FileName??"").Any(Char.IsControl)||!ValidSourceVersion(pair.Value.Version)||!ValidSourceVersion(pair.Value.ModVersion)))throw new IOException("Metadados de arquivo inválidos.");
+        NormalizeSources(variant);
     }
 
     static void ValidateChoices(GeneralModState state) {

@@ -24,6 +24,7 @@ internal sealed partial class GeneralModWindow {
         var saved=CopyProjectState();
         saved.List=projectDraft.List;
         saved.ChosenVariants=new Dictionary<string,string>(projectDraft.ChosenVariants);
+        saved.BodyChoice=projectDraft.BodyChoice;
         if(!saved.List.Presets.Any(preset=>preset.Id==saved.SelectedPreset))
             saved.SelectedPreset=projectDraft.SelectedPreset;
         foreach(var receipt in projectDraft.SnapshotReceipts)
@@ -34,7 +35,7 @@ internal sealed partial class GeneralModWindow {
         if(projectDraft==null){Persist();return;}
         GeneralModLibrary.ValidateList(state.List,true);
         if(Safe.Json.Serialize(projectDraft.List)==Safe.Json.Serialize(state.List)&&
-            Safe.Json.Serialize(projectDraft.ChosenVariants)==Safe.Json.Serialize(state.ChosenVariants))
+            Safe.Json.Serialize(projectDraft.ChosenVariants)==Safe.Json.Serialize(state.ChosenVariants)&&projectDraft.BodyChoice==state.BodyChoice)
             EndProjectEdit();
         UpdatePresetCommands();
     }
@@ -50,7 +51,7 @@ internal sealed partial class GeneralModWindow {
     void DiscardProjectEdits(){
         if(projectDraft==null)return;
         var saved=CommittedProject();
-        state.List=saved.List;state.ChosenVariants=saved.ChosenVariants;state.SelectedPreset=saved.SelectedPreset;
+        state.List=saved.List;state.ChosenVariants=saved.ChosenVariants;state.SelectedPreset=saved.SelectedPreset;state.BodyChoice=saved.BodyChoice;
         state.SnapshotReceipts=saved.SnapshotReceipts;
         marked.IntersectWith(state.List.Mods.Select(mod=>mod.Id));
         statuses.Clear();statusDetails.Clear();progress.Clear();ResetColumnFilters();

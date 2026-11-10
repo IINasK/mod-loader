@@ -140,7 +140,9 @@ internal sealed class GeneralProjectStore {
             }
             var state=new GeneralModState{
                 List=list,Theme=index.Theme,Language=index.Language,Destination=session.Destination,
-                DownloadFolder=index.DownloadFolder,SelectedPreset=incoming.Presets.Select(preset=>preset.Id).FirstOrDefault()
+                DownloadFolder=index.DownloadFolder,SelectedPreset=incoming.Presets.Select(preset=>preset.Id).FirstOrDefault(),
+                BodyChoice=manifest.BodyChoice??(previous!=null&&manifest.TemplateSubset&&
+                    !manifest.List.Mods.Any(mod=>GeneralModLibrary.IsHystBody(mod.Id))?previous.BodyChoice:null)
             };
             if(previous!=null){
                 KeepReceivedBindings(previous,state);
@@ -179,8 +181,11 @@ internal sealed class GeneralProjectStore {
         foreach(var mod in received.List.Mods){
             GeneralModEntry before;
             if(!original.TryGetValue(mod.Id,out before))continue;
-            foreach(var variant in mod.Variants){
-                var oldVariant=before.Variants.SingleOrDefault(item=>item.Id==variant.Id&&item.Sources.SequenceEqual(variant.Sources,StringComparer.Ordinal));
+            foreach(var option in mod.Variants){
+                var variant=GeneralModLibrary.BodyOption(received.BodyChoice,mod,option);
+                var oldVariant=before.Variants.Where(item=>item.Id==variant.Id)
+                    .Select(item=>GeneralModLibrary.BodyOption(previous.BodyChoice,before,item))
+                    .SingleOrDefault(item=>item.Sources.SequenceEqual(variant.Sources,StringComparer.Ordinal));
                 if(oldVariant==null)continue;
                 bool sameRoutes=GeneralInstallRoutes.Same(oldVariant.InstallRoutes,variant.InstallRoutes);
                 string owner=InstalledSnapshot.Owner(mod,variant),value;

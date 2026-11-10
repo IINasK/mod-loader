@@ -48,7 +48,7 @@ internal static class P2PPack {
         if(selected.Count==0||selected.Any(id=>!copy.Mods.Any(m=>m.Id==id)))throw new IOException("Selecione um preset com mods para compartilhar.");
         foreach(var mod in copy.Mods.Where(m=>selected.Contains(m.Id)).ToList()){
             string choice;state.ChosenVariants.TryGetValue(mod.Id,out choice);
-            var variant=mod.Variants.Single(v=>v.Id==(choice??mod.DefaultVariant));
+            var variant=GeneralModLibrary.BodyOption(state.BodyChoice,mod,mod.Variants.Single(v=>v.Id==(choice??mod.DefaultVariant)));
             if(variant.CyberpunkId!=null)foreach(var dependency in FixedData.Expand(catalog,new[]{variant.CyberpunkId}))selected.Add(dependency.Id);
         }
         foreach(var id in selected.ToArray())if(!copy.Mods.Any(m=>m.Id==id)){var dependency=seed.Mods.Single(m=>m.Id==id);dependency.Category=null;copy.Mods.Add(dependency);}
@@ -60,7 +60,8 @@ internal static class P2PPack {
         try{
         using(cache.HoldOperation())foreach(var mod in copy.Mods){
             report(mod.Name);string choice;state.ChosenVariants.TryGetValue(mod.Id,out choice);
-            var variant=mod.Variants.Single(v=>v.Id==(choice??mod.DefaultVariant));
+            var variant=GeneralModLibrary.BodyOption(state.BodyChoice,mod,mod.Variants.Single(v=>v.Id==(choice??mod.DefaultVariant)));
+            variant.NaturalOption=null;
             mod.Variants=new List<GeneralModVariant>{variant};mod.DefaultVariant=variant.Id;
             if(variant.CyberpunkId!=null){
                 var recipe=catalog.Packages.Single(m=>m.Id==variant.CyberpunkId);
@@ -122,7 +123,7 @@ internal static class P2PPack {
         foreach(var mod in m.List.Mods){
             if(mod==null||mod.Variants==null)throw new IOException("Mod inválido no pacote.");
             foreach(var v in mod.Variants){
-                if(v==null||v.Sources==null)throw new IOException("Variante inválida no pacote.");
+                if(v==null||v.Sources==null||v.NaturalOption!=null)throw new IOException("Variante inválida no pacote.");
                 for(int i=0;i<v.Sources.Count;i++){
                     string source=v.Sources[i];var binding=m.Bindings.SingleOrDefault(b=>b.Mod==mod.Id&&b.Variant==v.Id&&b.Index==i);
                     if(binding!=null&&source==Token(binding.File))continue;

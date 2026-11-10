@@ -485,7 +485,7 @@ internal sealed partial class GeneralModWindow : Form {
                 var v=Selected(m);string key=Key(m,v),status=ListStatus(m);int pct;bool hasProgress=progress.TryGetValue(key,out pct);
                 int i=grid.Rows.Add(marked.Contains(m.Id),picking?m.Name:ModDisplayName(m),NexusVariantName(m),GeneralStatusPresentation.Label(status),hasProgress?(object)pct:null,ModSpace(m));var row=grid.Rows[i];row.Tag=m.Id;row.Cells["Status"].ToolTipText=StatusDetail(key,status);
                 row.Cells["Size"].ToolTipText=SpaceTip(m);
-                row.Cells["Name"].ToolTipText=m.Description;
+                row.Cells["Name"].ToolTipText=v.Description??m.Description;
                 var origin=row.Cells["Origin"];
                 origin.Value="Mod Loader";
                 origin.ToolTipText=v.CyberpunkId==null
@@ -558,8 +558,7 @@ internal sealed partial class GeneralModWindow : Form {
 
     void AddVersionRows(GeneralModEntry entry,GeneralModVariant active,DataGridViewRow parent,bool hidden){
         var versions=IsBigBody(entry)
-            ?BigBodyVersions(state.List.Mods,IsCyberpunk(state.Destination)&&GameEdition.HasPL(state.Destination))
-                .Where(work=>ActivePreset==null||ActivePreset.ModIds.Contains(work.Entry.Id)).ToList()
+            ?BodyVersionsForPreset()
             :entry.Variants.Skip(entry.Variants.Count>1?0:1).Select(variant=>new Work{Entry=entry,Variant=variant}).ToList();
         if(versions.Count==0)return;
         var cell=parent.Cells["Variant"];
@@ -571,7 +570,7 @@ internal sealed partial class GeneralModWindow : Form {
         parent.Cells["Mark"].Tag="body-branch";
         for(int index=0;index<versions.Count;index++){
             var work=versions[index];
-            string name=body&&work.BodyChoice==GeneralModLibrary.NaturalBody?"Hyst EBBN + RB (Natural)":work.Entry.Name;
+            string name=VersionDisplayName(work);
             string label=body?BodyChoiceLabel(work.BodyChoice):work.Variant.Name;
             bool chosen=body?work.BodyChoice==ActiveBodyChoice(entry):work.Variant==active;
             string status=chosen?T("Selecionado","Selected"):T("Não selecionado","Not selected");
@@ -581,7 +580,8 @@ internal sealed partial class GeneralModWindow : Form {
             row.ReadOnly=true;
             row.Cells["Mark"].Tag=index==versions.Count-1?CategoryBranch.Last:CategoryBranch.Middle;
             row.Cells["Name"].Style.ForeColor=row.Cells["Name"].Style.SelectionForeColor=chosen?GeneralStyle.Foreground:GeneralStyle.Muted;
-            row.Cells["Name"].ToolTipText=T("Dê dois cliques para escolher esta opção. F2 abre os detalhes.","Double-click to select this option. F2 opens details.");
+            row.Cells["Name"].ToolTipText=String.Join("\r\n",new[]{work.Variant.Description??work.Entry.Description,
+                T("Dê dois cliques para escolher esta opção. F2 abre os detalhes.","Double-click to select this option. F2 opens details.")}.Where(value=>!String.IsNullOrWhiteSpace(value)));
             {
                 row.Cells["Status"].Tag=chosen;
                 row.Cells["Status"].ToolTipText=GeneralStatusPresentation.Label(ListStatus(work.Entry));
@@ -596,7 +596,8 @@ internal sealed partial class GeneralModWindow : Form {
 
     string BodyOptionSpace(Work work){
         long installed;
-        if(work.Variant==Selected(work.Entry)&&IsActiveAlternative(work.Entry)&&measuredMods.TryGetValue(work.Entry.Id,out installed))return GeneralStorageSize.Format(installed);
+        var selected=GeneralModLibrary.BodyOption(work.BodyChoice,work.Entry,Selected(work.Entry));
+        if(work.Variant==selected&&IsActiveAlternative(work.Entry)&&measuredMods.TryGetValue(work.Entry.Id,out installed))return GeneralStorageSize.Format(installed);
         var sizes=work.Variant.Sources.Distinct(StringComparer.Ordinal).Select(source=>{
             GeneralSourceInfo info;
             return work.Variant.SourceInfo.TryGetValue(source,out info)?info.Bytes:0;
@@ -772,7 +773,8 @@ internal sealed partial class GeneralModWindow : Form {
         string id=row.Tag as string;
         if(id==null&&child==null)return;
         var mod=child!=null?child.Entry:state.List.Mods.Single(m=>m.Id==id);
-        if(!mod.Nsfw)return;
+        var variant=child==null?GeneralModLibrary.BodyOption(state.BodyChoice,mod,Selected(mod)):child.Variant;
+        if(!(variant.Nsfw??mod.Nsfw))return;
         string name=Convert.ToString(e.FormattedValue);
         e.PaintBackground(e.ClipBounds,true);
         var box=e.CellBounds;box.Inflate(-10,0);
@@ -861,12 +863,88 @@ internal sealed partial class GeneralModWindow : Form {
     }
 
     async void Edit(GeneralModEntry item){await EditMod(item);}
-    async void EditBodyOption(Work body){await EditMod(body.Entry,initialVariant:body.Variant);}
-    async Task EditMod(GeneralModEntry item,bool fromInventory=false,GeneralModVariant initialVariant=null){
+    async void EditBodyOption(Work body){await EditMod(body.Entry,initialVariant:body.Variant,bodyChoice:body.BodyChoice);}
+    List<Work> BodyVersionsForPreset(){
+        return BigBodyVersions(state.List.Mods,IsCyberpunk(state.Destination)&&GameEdition.HasPL(state.Destination))
+            .Where(work=>ActivePreset==null||ActivePreset.ModIds.Contains(work.Entry.Id)).ToList();
+    }
+
+    static string VersionDisplayName(Work work){
+        return work.Variant.DisplayName??(work.BodyChoice==GeneralModLibrary.NaturalBody
+            ?"Hyst EBBN + RB (Natural)":work.Entry.Name);
+    }
+
+    static GeneralModVariant CloneVariant(GeneralModVariant variant){
+        return Safe.Json.Deserialize<GeneralModVariant>(Safe.Json.Serialize(variant));
+    }
+
+    GeneralModEntry BodyEditorEntry(GeneralModEntry entry,List<Work> choices){
+        var result=new GeneralModEntry { Id=entry.Id,Name=ModDisplayName(entry),Nsfw=choices.Any(work=>work.Variant.Nsfw??work.Entry.Nsfw),
+            AlternativeGroup=entry.AlternativeGroup, DefaultVariant=choices[0].BodyChoice };
+        foreach(var choice in choices){
+            var version=CloneVariant(choice.Variant);
+            version.Id=choice.BodyChoice;
+            version.Name=BodyChoiceLabel(choice.BodyChoice);
+            version.NaturalOption=null;
+            version.DisplayName=VersionDisplayName(choice);
+            version.Category=version.Category??choice.Entry.Category??"";
+            version.Description=version.Description??(choice.BodyChoice==GeneralModLibrary.NaturalBody
+                ?T("Formato natural do EBB com quadril RB. Usa o arquivo do EBB + RB e os refits do perfil escolhido.","Natural EBB shape with RB hips. Uses the EBB + RB archive and the selected profile’s refits.")
+                :choice.Entry.Description);
+            version.Tags=version.Tags??choice.Entry.Tags.ToList();
+            version.NsfwOverride=version.Nsfw.HasValue?version.NsfwOverride:choice.Entry.NsfwOverride;
+            version.Nsfw=version.Nsfw??choice.Entry.Nsfw;
+            result.Variants.Add(version);
+        }
+        return result;
+    }
+
+    async Task<bool> ApplyBodyEditor(GeneralModEditor dialog,List<Work> choices){
+        var changed=new List<KeyValuePair<GeneralModEntry,GeneralModEntry>>();
+        foreach(var group in choices.GroupBy(work=>work.Entry)){
+            var original=group.Key;
+            var edited=Safe.Json.Deserialize<GeneralModEntry>(Safe.Json.Serialize(original));
+            foreach(var work in group){
+                var replacement=CloneVariant(dialog.Result.Variants.Single(version=>version.Id==work.BodyChoice));
+                var target=edited.Variants.Single(version=>version.Id==work.Variant.Id);
+                replacement.Id=target.Id;
+                replacement.Name=target.Name;
+                if(work.BodyChoice==GeneralModLibrary.NaturalBody)target.NaturalOption=replacement;
+                else{
+                    replacement.NaturalOption=target.NaturalOption;
+                    edited.Variants[edited.Variants.IndexOf(target)]=replacement;
+                }
+            }
+            changed.Add(new KeyValuePair<GeneralModEntry,GeneralModEntry>(original,edited));
+        }
+        var selected=choices.Single(work=>work.BodyChoice==dialog.SelectedVariant);
+        var routes=changed.Where(pair=>pair.Key.Variants.Zip(pair.Value.Variants,(before,after)=>
+            !GeneralInstallRoutes.Same(before.InstallRoutes,after.InstallRoutes)).Any(value=>value)).ToList();
+        if(routes.Count>1)throw new IOException(T("Altere o destino de um corpo por vez.","Change the destination of one body at a time."));
+        bool? moved=routes.Count==0?false:await ChangeInstalledDestinations(routes[0].Key,routes[0].Value);
+        if(!moved.HasValue)return false;
+        BeginProjectEdit();
+        state.BodyChoice=selected.BodyChoice;
+        foreach(var pair in changed){
+            string profile=pair.Key==selected.Entry?selected.Variant.Id:Selected(pair.Key).Id;
+            ApplyEdited(pair.Key,pair.Value,profile,true,dialog.NewCategories);
+        }
+        if(dialog.InstallRequested||moved.Value)SaveProjectEdits();
+        if(dialog.InstallRequested)ConfirmUrgentInstall(changed.Single(pair=>pair.Key==selected.Entry).Value);
+        else await Scan();
+        return true;
+    }
+
+    async Task EditMod(GeneralModEntry item,bool fromInventory=false,GeneralModVariant initialVariant=null,string bodyChoice=null){
         if(scanning||associationChoice!=null)return;
         if((current!=null&&current.Entry.Id==item.Id)||(priorityCurrent!=null&&priorityCurrent.Entry.Id==item.Id)){detail.Text=T("Aguarde esta operação terminar antes de editar suas fontes.","Wait for this operation to finish before editing its sources.");return;}
         try{
             bool existing=state.List.Mods.Contains(item);var selected=initialVariant??Selected(item);
+            bool editingBody=IsBigBody(item);
+            if(editingBody&&working)return;
+            var bodyVersions=editingBody?BodyVersionsForPreset():null;
+            var editorEntry=editingBody?BodyEditorEntry(item,bodyVersions):item;
+            string editorSelection=editingBody?bodyChoice??ActiveBodyChoice(item):selected.Id;
             string info=T("Destino: ","Destination: ")+(state.Destination??T("Escolha uma pasta na tela principal.","Choose a folder on the main screen."));
             var recipe=catalog.Packages.FirstOrDefault(m=>m.Id==selected.CyberpunkId);if(recipe!=null)info=T("Versão do pacote: ","Package version: ")+recipe.Version+"   ·   "+info;
             string pack=ActivePreset!=null?ActivePreset.Name:project==null?null:project.Name;
@@ -878,14 +956,18 @@ internal sealed partial class GeneralModWindow : Form {
             var companions=DisplayedInventory().Where(file=>file.Kind=="associated"&&file.ModId==item.Id).ToList();
             if(companions.Count>0)info+="\r\n"+T("Arquivos locais associados", "Associated local files")
                 +" ("+companions.Count+")\r\n"+String.Join("\r\n",companions.Select(file=>file.Path).Take(8));
-            using(var dialog=new GeneralModEditor(item,PresetCategories(),selected.Id,!fromInventory&&(!working||current!=null),
+            using(var dialog=new GeneralModEditor(editorEntry,PresetCategories(),editorSelection,!fromInventory&&(!working||current!=null),
                 info,LookupSourceInfo,working?null:state.List.Mods,state.List,projectDraft:!working,
                 installationFolder:state.Destination,inventoryDraft:fromInventory,
                                 refreshLookup:source=>testMode?LookupSourceInfo(source):GeneralNexusInfo.Read(source),
                 catalogPaths:variant=>{
                     if(String.IsNullOrEmpty(variant.CyberpunkId))return Enumerable.Empty<string>();
                     return ProfileRecipe(new Work{Entry=item,Variant=variant}).Files.Select(file=>file.Path);
-                }, downloadedSource:(variant,index)=>LocalSource(new Work{Entry=item,Variant=variant},index))){
+                }, downloadedSource:(variant,index)=>{
+                    if(!editingBody)return LocalSource(new Work{Entry=item,Variant=variant},index);
+                    var work=bodyVersions.Single(choice=>choice.BodyChoice==variant.Id);
+                    return LocalSource(work,index);
+                },fixedChoices:editingBody)){
                 DialogResult answer;
                 while((answer=dialog.ShowDialog(this))==DialogResult.Retry){
                     var linked=await PickAlternative(item.Id,null,true);
@@ -893,6 +975,7 @@ internal sealed partial class GeneralModWindow : Form {
                     if(IsDisposed||exitApproved)return;
                 }
                 if(answer!=DialogResult.OK)return;
+                if(editingBody){await ApplyBodyEditor(dialog,bodyVersions);return;}
                 bool? moved=existing?await ChangeInstalledDestinations(item,dialog.Result):false;
                 if(!moved.HasValue)return;
                 BeginProjectEdit();

@@ -269,10 +269,61 @@ internal sealed partial class GeneralModWindow {
                 "A fila prepara apenas os vínculos da versão selecionada, com a dependência primeiro.");
             baseNatural.Variant.RequiredMods.Clear();
             basePush.Variant.RequiredMods.Clear();
+            await TestBodyDetails(form,check);
             form.ProjectCommand("new");check(form.ProjectAction=="new","Novo projeto retorna à Home sem substituir a lista atual.");await Task.CompletedTask;
         });
         Safe.WriteJson(Path.Combine(root,"resultado-project-home.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});
     }
+    static async Task TestBodyDetails(GeneralModWindow form,Action<bool,string> check){
+        var choices=form.BodyVersionsForPreset();
+        var current=choices.Single(work=>work.BodyChoice==GeneralModLibrary.EbbBody);
+        var entry=form.BodyEditorEntry(current.Entry,choices);
+        using(var editor=new GeneralModEditor(entry,new[]{GeneralModLibrary.BodyCategory},current.BodyChoice,true,"",
+            alternatives:form.state.List.Mods,groupList:form.state.List,fixedChoices:true)){
+            editor.Show(form);
+            var picker=EditorField<GeneralPicker>(editor,"variants");
+            var name=EditorField<TextBox>(editor,"modName");
+            var description=EditorField<TextBox>(editor,"description");
+            var source=EditorField<TextBox>(editor,"sources");
+            var chips=EditorField<FlowLayoutPanel>(editor,"tagChips");
+            var dependencies=EditorField<FlowLayoutPanel>(editor,"dependencyChips");
+            var title=EditorField<FlowLayoutPanel>(editor,"groupTitle");
+            check(picker.Items.Cast<string>().SequenceEqual(new[]{"EBB + RB","EBBP + RB","EBBN + RB"})&&title.Visible&&
+                title.Controls.Cast<Control>().First().Text=="Big Body"&&((TableLayoutPanel)title.Parent).GetRow(title)<((TableLayoutPanel)title.Parent).GetRow(picker.Parent),
+                "O título Big Body aparece acima do seletor, com as três escolhas da gaveta.");
+            check(source.Text==current.Variant.Sources[0],"EBB apresenta o link do próprio perfil.");
+            description.Text="Descrição exclusiva EBB";
+            editor.MergeSourceTags(new[]{"Tag EBB"});
+            editor.AddRequiredMod(form.state.List.Mods.Single(mod=>mod.Id=="ArchiveXL"));
+            picker.SelectedIndex=1;
+            var push=choices.Single(work=>work.BodyChoice==GeneralModLibrary.PushBody);
+            check(source.Text==push.Variant.Sources[0]&&source.Text!=current.Variant.Sources[0]&&
+                name.Text==push.Entry.Name&&description.Text!="Descrição exclusiva EBB"&&
+                !chips.Controls.OfType<Button>().Any(button=>button.Text=="Tag EBB ×")&&
+                !dependencies.Controls.OfType<Button>().Any(button=>button.Text.StartsWith("ArchiveXL")),
+                "Push-Up apresenta nome, descrição, link, tags e dependências próprios.");
+            picker.SelectedIndex=2;
+            check(name.Text.Contains("EBBN")&&description.Text==entry.Variants[2].Description&&source.Text==current.Variant.Sources[0],
+                "Natural tem descrição própria e indica o arquivo compartilhado com EBB.");
+            editor.AddRequiredMod(form.state.List.Mods.Single(mod=>mod.Id=="Codeware"));
+            picker.SelectedIndex=0;
+            check(description.Text=="Descrição exclusiva EBB"&&chips.Controls.OfType<Button>().Any(button=>button.Text=="Tag EBB ×")&&
+                dependencies.Controls.OfType<Button>().Any(button=>button.Text.StartsWith("ArchiveXL"))&&
+                !dependencies.Controls.OfType<Button>().Any(button=>button.Text.StartsWith("Codeware")),
+                "Trocar a escolha preserva os rascunhos independentes.");
+            picker.SelectedIndex=2;
+            EditorField<Button>(editor,"save").PerformClick();
+            check(editor.Result!=null&&await form.ApplyBodyEditor(editor,choices),"A opção Natural é aplicada no projeto.");
+        }
+        form.SaveProjectEdits();
+        var saved=form.library.Load();
+        var selected=saved.List.Mods.Single(mod=>mod.Id==GeneralModLibrary.EbbBody).Variants
+            .Single(version=>version.Id==saved.ChosenVariants[GeneralModLibrary.EbbBody]);
+        check(saved.BodyChoice==GeneralModLibrary.NaturalBody&&selected.RequiredMods.Contains("ArchiveXL")&&
+            selected.NaturalOption.RequiredMods.Contains("Codeware")&&!selected.NaturalOption.RequiredMods.Contains("ArchiveXL"),
+            "A seleção e as dependências independentes sobrevivem ao salvamento.");
+    }
+
     static void ClickSavedProject(ListBox list,Point point){typeof(ListBox).GetMethod("OnMouseClick",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(list,new object[]{new MouseEventArgs(MouseButtons.Left,1,point.X,point.Y,0)});}
     static async Task<int> ConfirmHomeDelete(GeneralProjectHome home,DialogResult[] responses,Action click,Action<bool,string> check,string root,bool removeMods=false){
         int prompts=0;GeneralDialog previous=null;Exception failure=null;

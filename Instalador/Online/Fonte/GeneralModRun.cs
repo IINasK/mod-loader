@@ -52,7 +52,11 @@ internal sealed partial class GeneralModWindow {
         if (EquipmentExOptions.Available(recipe)) return EquipmentExOptions.Resolve(recipe, work.Variant.Id);
         return work.Variant.CyberpunkVariant == null ? recipe : NightCityDensity.Resolve(recipe, work.Variant.CyberpunkVariant);
     }
-    Work MakeWork(GeneralModEntry item){return new Work{Entry=item,Variant=Selected(item)};}
+    Work MakeWork(GeneralModEntry item){
+        var selected=Selected(item);
+        return new Work{Entry=item,Variant=GeneralModLibrary.BodyOption(state.BodyChoice,item,selected),
+            BodyChoice=IsBigBody(item)?ActiveBodyChoice(item):null};
+    }
     string LocalSource(Work work,int index){
         string source=work.Variant.Sources[index],resolved;
         return GeneralModDownload.IsArchivePath(source)?source:
@@ -223,6 +227,7 @@ internal sealed partial class GeneralModWindow {
         string snapshot;
         if(exists&&work.Variant.CyberpunkId!="NightCoop"&&work.Variant.CyberpunkId!=EquipmentExOptions.ModId&&state.SnapshotReceipts.TryGetValue(work.Key,out snapshot)){
             string found=reads==null?Snapshot(root).Status(snapshot,work.Key):reads.Snapshots.Value.Status(snapshot,work.Key);
+            if(found!=GeneralModInstaller.Missing&&!SnapshotMatchesBody(work,root,snapshot))return "Versão diferente";
             if(found!=GeneralModInstaller.Missing||work.Variant.CyberpunkId==null)return found;
         }
         if(work.Variant.CyberpunkId!=null){
@@ -270,10 +275,16 @@ internal sealed partial class GeneralModWindow {
         }
         if(cyberpunk&&GeneralModLibrary.IsHystBody(work.Entry.Id)){
             var known=seed.Mods.FirstOrDefault(mod=>mod.Id==work.Entry.Id);
-            var detected=InstalledSnapshot.DetectManualHyst(root,work.Entry,known,null,hash);
+            var detected=InstalledSnapshot.DetectManualHyst(root,work.Entry,known,null,hash,work.BodyChoice);
             if(detected!=null)
                 return detected.Id==work.Variant.Id?GeneralStatusPresentation.ManualBody:"Versão diferente";
-            if(HasManualHystBody(work,root))return GeneralStatusPresentation.ManualBody;
+            if(HasManualHystBody(work,root)){
+                var saved=work.Entry.Variants.FirstOrDefault(version=>version.Id==work.Variant.Id);
+                bool customNatural=work.BodyChoice==GeneralModLibrary.NaturalBody&&saved!=null&&saved.NaturalOption!=null&&
+                    (!saved.Sources.SequenceEqual(work.Variant.Sources,StringComparer.Ordinal)||
+                     !GeneralInstallRoutes.Same(saved.InstallRoutes,work.Variant.InstallRoutes));
+                return customNatural?"Versão diferente":GeneralStatusPresentation.ManualBody;
+            }
         }
         if(exists&&includeNexus&&MatchesNexusInstallation(work,root))
             return GeneralStatusPresentation.NexusManual;
@@ -567,7 +578,14 @@ internal sealed partial class GeneralModWindow {
     bool SnapshotInstalled(Work work,string root){
         string receipt;
         return work.Variant.CyberpunkId!="NightCoop"&&work.Variant.CyberpunkId!=EquipmentExOptions.ModId&&state.SnapshotReceipts.TryGetValue(work.Key,out receipt)&&
-            Snapshot(root).Status(receipt,work.Key)==GeneralModInstaller.Installed;
+            Snapshot(root).Status(receipt,work.Key)==GeneralModInstaller.Installed&&SnapshotMatchesBody(work,root,receipt);
+    }
+
+    bool SnapshotMatchesBody(Work work,string root,string receipt){
+        if(!IsBigBody(work.Entry)||!work.Entry.Variants.Any(variant=>variant.NaturalOption!=null))return true;
+        var recorded=Snapshot(root).ReadManifest(receipt).List.Mods.Single(mod=>mod.Id==work.Entry.Id).Variants.Single();
+        return recorded.Sources.SequenceEqual(work.Variant.Sources,StringComparer.Ordinal)&&
+            GeneralInstallRoutes.Same(recorded.InstallRoutes,work.Variant.InstallRoutes);
     }
     void ConfirmAndEnqueue(List<Work> jobs,string root,IReadOnlyList<string> downloads,bool urgent){
         if(!urgent){
@@ -605,7 +623,7 @@ internal sealed partial class GeneralModWindow {
         }
         string root=Root();
         var requested=IsBigBody(entry)?BigBodyVersions(new[]{entry},GameEdition.HasPL(root))
-            .First(work=>work.BodyChoice==entry.Id):MakeWork(entry);
+            .First(work=>work.BodyChoice==ActiveBodyChoice(entry)):MakeWork(entry);
         ConfirmAndEnqueue(WithLinkedDependencies(new List<Work>{requested}),root,new string[0],true);
     }
 
