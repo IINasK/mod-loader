@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -245,6 +245,8 @@ internal sealed partial class GeneralModWindow {
                 if(NightCityDensity.Supported(density.Id))return "Instalado: "+density.Name;
                 return LocalFixedAssets(NightCityDensity.Resolve(recipe,work.Variant.CyberpunkVariant),root,reads)?"Pronto para instalar":"Não instalado";
             }
+            if(work.Variant.InstallRoutes.Count>0)
+                return RoutedFixedStatus(work,root,hash);
             var scan=reads==null?FixedData.Scan(recipe,root):reads.Fixed(recipe);
             if(scan.State=="Não instalado"&&LocalFixedAssets(recipe,root,reads))return "Pronto para instalar";
             return scan.IsCorrect?"Instalado":scan.State=="Atualização disponível"?scan.State:scan.Original>0?"Versão diferente":scan.State;
@@ -641,12 +643,12 @@ internal sealed partial class GeneralModWindow {
             RowStatus(work,"Verificando",null,work.Entry.Name+T(": verificando arquivos…",": checking files…"));
             OnlineDiagnostics.Record("general.install.begin",work.Entry.Id,"Iniciando item da fila.",new{Variant=work.Variant.Id});
             if(work.Variant.InstallRoutes.Count>0){
-                if(work.Variant.CyberpunkId!=null)throw new IOException(T("Este mod fixo usa os destinos conferidos no catálogo.","This pinned mod uses verified catalog destinations."));
+
                 try{GeneralInstallRoutes.CheckFolders(root,work.Variant.InstallRoutes);}
                 catch(DirectoryNotFoundException ex){RowStatus(work,"Pulado",null,work.Entry.Name+": "+ex.Message);return;}
             }
             if(SnapshotInstalled(work,root)){RememberInstalledVariant(work);RowStatus(work,"Instalado",100);return;}
-            if(await Task.Run(()=>MatchesNexusInstallation(work,root))){
+            if(work.Variant.InstallRoutes.Count==0&&await Task.Run(()=>MatchesNexusInstallation(work,root))){
                 RowStatus(work,GeneralStatusPresentation.NexusManual);
                 return;
             }
@@ -805,9 +807,19 @@ internal sealed partial class GeneralModWindow {
         var variants=ExpandWork(work,root);
         variants[variants.Count-1]=ProfileRecipe(work);
         FixedData.RequireInstallable(variants);FixedData.ValidateGame(root,variants,catalog.GameFileVersion);
+        var routes=work.Variant.InstallRoutes;
+        var mapped=routes.Count==0?null:GeneralInstallRoutes.FixedPaths(catalog,recipe,routes);
         var pending=new List<FixedMod>();
         foreach(var mod in variants){
             CheckSkip(work);
+            if(mapped!=null&&mod.Id==recipe.Id){
+                string routedStatus=await Task.Run(()=>RoutedFixedStatus(work,root,null));
+                if(routedStatus=="Instalado")continue;
+                if(routedStatus==GeneralModInstaller.Modified)
+                    throw new IOException(T("Há arquivos diferentes no destino escolhido.","There are modified files in the selected destination."));
+                pending.Add(mod);
+                continue;
+            }
             if (mod.Id == recipe.Id && EquipmentExOptions.Available(recipe)) {
                 var installed = await Task.Run(() => EquipmentExOptions.Read(recipe, root));
                 if (!installed.CanApply) throw new IOException(installed.Detail);
@@ -858,6 +870,12 @@ internal sealed partial class GeneralModWindow {
         RowStatus(work,"Instalando",null,work.Entry.Name+T(": preparando e instalando…",": preparing and installing…"));
         Action install=()=>{
             var engine=Cyberpunk(root);
+            if(mapped!=null){
+                if(recipe.Dependencies.Length>0)engine.Install(recipe.Dependencies,true,Report);
+                if(pending.Any(mod=>mod.Id==recipe.Id))
+                    using(engine.LockForRouteChange())Generic(root).InstallRoutedFixed(work.Receipt(0),recipe,mapped,routes,cache,Report);
+                return;
+            }
             if (EquipmentExOptions.Available(recipe)) {
                 var target = ProfileRecipe(work);
                 if (target.Dependencies.Length > 0) engine.Install(target.Dependencies, true, Report);

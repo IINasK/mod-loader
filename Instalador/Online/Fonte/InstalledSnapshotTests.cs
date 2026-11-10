@@ -139,10 +139,90 @@ internal static class InstalledSnapshotTests {
             continued.Project.Mods.Any(mod=>mod.Id==addon.Id),"Pular a base exclui seus dependentes da transferência e mantém a definição do projeto.");
         refuse(()=>InstalledSnapshot.Inspect(fixedState,new[]{addon.Id,independent.Id},fixedCatalog,fixedData,true,true,skipProblem:(id,name,error)=>false),
             "Recusar a opção de pular mantém a verificação bloqueada.");
+        RunFixedRouteTests(root,check,refuse);
         RunDensityTests(root);
         Safe.WriteJson(Path.Combine(root,"resultado-snapshot.json"),new{Passed=true,Checks=checks.Count,Tests=checks,RealGameTouched=false,OriginalArchivesRequired=false,NetworkUsed=false});
         return checks.Count;
     }
+    static void RunFixedRouteTests(string root,Action<bool,string> check,Action<Action,string> refuse){
+        string sender=Safe.In(root,"fr/s"),receiver=Safe.In(root,"fr/r");
+        string senderProfile=Safe.In(root,"fr/sa"),receiverProfile=Safe.In(root,"fr/ra");
+        string senderData=Safe.In(root,"fr/sd"),receiverData=Safe.In(root,"fr/rd");
+        string original="archive/pc/mod/fixture.archive";
+        var routed=Fixed("ArchiveXL",original,"routed archive",new string[0]);
+        routed.Files.Add(Fixed(routed.Id,"r6/scripts/Fixture/test.reds","routed script",new string[0]).Files.Single());
+        var dependent=Fixed("Audioware","r6/scripts/Fixture/dependent.reds","dependent script",new[]{routed.Id});
+        var unrelated=Fixed("Independent","archive/pc/mod/other/fixture.archive","other archive",new string[0]);
+        var catalog=new FixedCatalog{GameVersion="2.5",GameFileVersion="2.5.0.0",Packages=new List<FixedMod>{routed,dependent,unrelated}};
+        Write(sender,"bin/x64/Cyberpunk2077.exe","fixture");
+        Write(receiver,".fixture-only","fixture");
+        Write(receiver,"bin/x64/Cyberpunk2077.exe","fixture");
+        Directory.CreateDirectory(Safe.In(receiver,"Redirected"));
+        string local=Safe.In(senderProfile,"Fixture/Mods");
+        Write(senderProfile,"Fixture/Mods/fixture.archive","routed archive");
+        Write(sender,"Redirected/test.reds","routed script");
+        Write(sender,dependent.Files[0].Path,"dependent script");
+        Write(sender,unrelated.Files[0].Path,"other archive");
+        var state=new GeneralModState{Destination=sender,List=GeneralModLibrary.Seed(catalog,new ModImportItem[0])};
+        var variant=state.List.Mods.Single(mod=>mod.Id==routed.Id).Variants.Single();
+        GeneralInstallRoutes.FixtureAppData=senderProfile;
+        try{
+            variant.InstallRoutes=GeneralInstallRoutes.Parse(original+" = "+local+" | r6/scripts/Fixture = Redirected",sender);
+            refuse(()=>GeneralInstallRoutes.FixedPaths(catalog,routed,GeneralInstallRoutes.Parse(original+" = archive/pc/mod/other",sender)),
+                "Uma rota do catálogo não pode ocupar destino reservado a outro arquivo.");
+            string zip=Safe.In(root,"fr/pack.zip");
+            var manifest=InstalledSnapshot.Create(zip,state,state.List.Mods.Select(mod=>mod.Id),catalog,senderData,false,null);
+            string external=manifest.Files.Single(file=>GeneralInstallRoutes.External(file.Path)).Path;
+            check(manifest.Schema==2&&manifest.Game=="cyberpunk2077"&&manifest.Files.Any(file=>file.Path=="Redirected/test.reds")&&
+                !Safe.Json.Serialize(manifest).Contains("fr/sa")&&!File.Exists(Safe.In(sender,original)),
+                "Exporta os caminhos mapeados de mod fixado sem expor o perfil do remetente.");
+            var corrupt=Copy(manifest);
+            corrupt.Files.Single(file=>file.Path==external).Path=external.Replace("fixture.archive","unapproved.archive");
+            refuse(()=>InstalledSnapshot.Validate(corrupt,catalog),"Bloqueia destino divergente da rota e receita exatas.");
+            corrupt=Copy(manifest);
+            corrupt.Files.Single(file=>file.Path==external).Sha256=new string('b',64);
+            refuse(()=>InstalledSnapshot.Validate(corrupt,catalog),"Bloqueia conteúdo divergente mesmo com rota exata.");
+            string offline=Safe.In(root,"fr/offline.zip");
+            InstalledSnapshot.CreateModpack(offline,manifest,sender,catalog,null);
+            using(var archive=ZipFile.OpenRead(offline))
+                check(archive.GetEntry("Redirected/test.reds")!=null&&archive.GetEntry(external)!=null&&archive.GetEntry("_modloader/project.json")!=null,
+                    "O modpack guarda a árvore do jogo, o arquivo externo separado e as rotas no projeto.");
+            GeneralInstallRoutes.FixtureAppData=receiverProfile;
+            var engine=new InstalledSnapshotInstaller(receiver,receiverData,catalog,true);
+            string hash=Safe.Hash(zip);
+            string receipt=engine.Install(zip,hash,null,approveUserFolders:folders=>true);
+            check(engine.ReadSkippedDestinations(receipt).SequenceEqual(new[]{routed.Id,dependent.Id})&&
+                engine.Status(receipt,unrelated.Id+"/default")==GeneralModInstaller.Installed&&
+                !File.Exists(Safe.In(receiver,"Redirected/test.reds"))&&!File.Exists(Safe.In(receiver,dependent.Files[0].Path)),
+                "O receptor pula o mod fixado inteiro e seu dependente quando a pasta externa não existe.");
+            Directory.CreateDirectory(Safe.In(receiverProfile,"Fixture/Mods"));
+            receipt=engine.Install(zip,hash,null,approveUserFolders:folders=>folders.Single()==Safe.In(receiverProfile,"Fixture/Mods"));
+            check(engine.ReadSkippedDestinations(receipt).Length==0&&engine.Status(receipt,routed.Id+"/default")==GeneralModInstaller.Installed&&
+                File.Exists(Safe.In(receiver,"Redirected/test.reds"))&&File.Exists(Safe.In(receiverProfile,"Fixture/Mods/fixture.archive"))&&
+                !File.Exists(Safe.In(receiver,original)),
+                "Após confirmar o perfil local, instala e confere os destinos do mod fixado no computador receptor.");
+            string key=routed.Id+"/default";
+            string oldArchive=Safe.In(receiverProfile,"Fixture/Mods/fixture.archive");
+            string oldScript=Safe.In(receiver,"Redirected/test.reds");
+            string newArchive=Safe.In(receiverProfile,"Fixture/New/fixture.archive");
+            string newScript=Safe.In(receiver,"New/test.reds");
+            Directory.CreateDirectory(Path.GetDirectoryName(newArchive));
+            Directory.CreateDirectory(Path.GetDirectoryName(newScript));
+            var next=GeneralInstallRoutes.Parse(original+" = %APPDATA%/Fixture/New | r6/scripts/Fixture = New",receiver);
+            using(var locked=new FileStream(oldScript,FileMode.Open,FileAccess.Read,FileShare.Read))
+                refuse(()=>engine.Relocate(receipt,key,variant.InstallRoutes,next,null),
+                    "A tentativa de mover um arquivo bloqueado desfaz a movimentação anterior.");
+            check(File.Exists(oldArchive)&&File.Exists(oldScript)&&!File.Exists(newArchive)&&!File.Exists(newScript)&&
+                engine.Status(receipt,key)==GeneralModInstaller.Installed,
+                "Falha durante a movimentação preserva os arquivos antigos e o recibo.");
+            check(engine.Relocate(receipt,key,variant.InstallRoutes,next,null)&&File.Exists(newArchive)&&File.Exists(newScript)&&
+                !File.Exists(oldArchive)&&!File.Exists(oldScript)&&engine.Status(receipt,key)==GeneralModInstaller.Installed&&
+                engine.Status(receipt,dependent.Id+"/default")==GeneralModInstaller.Installed&&
+                GeneralInstallRoutes.Same(engine.ReadManifest(receipt).Project.Mods.Single(mod=>mod.Id==routed.Id).Variants.Single().InstallRoutes,next),
+                "Muda os destinos verificados e atualiza o mesmo recibo e a definição do projeto recebido.");
+        }finally{GeneralInstallRoutes.FixtureAppData=null;}
+    }
+
     internal static int RunDensityTests(string parent){
         string root=OnlineTests.NestedRoot(parent,"online-testes-");Directory.CreateDirectory(root);
         var checks=new List<string>();Action<bool,string> check=(ok,label)=>{if(!ok)throw new IOException(label);checks.Add(label);};

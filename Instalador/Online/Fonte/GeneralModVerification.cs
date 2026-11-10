@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
@@ -176,9 +176,8 @@ internal sealed partial class GeneralModWindow {
             }
             var listed=exact.Concat(registered.Where(file=>names.ContainsKey(file.Owner)).Select(file=>file.Path));
             extras.AddRange(engine.ReadUnlistedModFiles(listed));
-        }else{
-            foreach(var file in Generic(destination).ProjectDeletionFiles(true))add(file,key=>lookup(WorkKeyFromReceipt(key)));
         }
+        foreach(var file in Generic(destination).ProjectDeletionFiles(true))add(file,key=>lookup(WorkKeyFromReceipt(key)));
         Func<string,string> scope=cyberpunk?(Func<string,string>)FixedInstaller.ModFolder:InstalledFileOwnership.GenericScope;
         var associated=InstalledFileOwnership.FindAssociated(destination,registered,scope,
             cyberpunk?extras.Where(file=>file.Kind=="found").Select(file=>file.Path):null);

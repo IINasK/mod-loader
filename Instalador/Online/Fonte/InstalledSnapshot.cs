@@ -40,7 +40,7 @@ public static partial class InstalledSnapshot {
         var variant=Clone(GeneralModLibrary.Seed(catalog,new ModImportItem[0]).Mods.Single(m=>m.Id==NightCityDensity.ModId).Variants.Single(v=>v.CyberpunkVariant=="medium"));
         variant.Id="legacy-low";variant.CyberpunkVariant="legacy-low";variant.Name="Baixa personalizada (legado)";return variant;
     }
-    static FixedMod FixedRecipe(FixedCatalog catalog,GeneralModVariant variant) {
+    internal static FixedMod FixedRecipe(FixedCatalog catalog,GeneralModVariant variant) {
         var mod=catalog.Packages.SingleOrDefault(m=>m.Id==variant.CyberpunkId);
         if(mod==null||!String.IsNullOrEmpty(mod.BlockedReason))throw new IOException("Componente desconhecido ou retido.");
         if(mod.Id==NightCityDensity.ModId) {
@@ -111,15 +111,19 @@ public static partial class InstalledSnapshot {
             else if(variant.CyberpunkId!=null) {
                 if(!cyberpunk)throw new IOException(mod.Name+": o destino não é Cyberpunk 2077.");
                 var recipe=FixedRecipe(catalog,variant);
-                var invalid=recipe.Files.Where(file=>!file.UserData).Where(file=>{string path=Safe.In(root,file.Path);return !File.Exists(path)||new FileInfo(path).Length!=file.Size||Safe.Hash(path)!=file.Sha256;}).Select(file=>file.Path).ToList();
+                var paths=GeneralInstallRoutes.FixedPaths(catalog,recipe,variant.InstallRoutes);
+                var invalid=recipe.Files.Where(file=>!file.UserData).Where(file=>{
+                    string path=GeneralInstallRoutes.Resolve(root,paths[file.Path]);
+                    return !File.Exists(path)||new FileInfo(path).Length!=file.Size||Safe.Hash(path)!=file.Sha256;
+                }).Select(file=>paths[file.Path]).ToList();
                 if(invalid.Count>0)throw new IOException("Arquivos ausentes ou alterados ("+invalid.Count+"): "+String.Join("; ",invalid.Take(30)));
                 foreach(var file in recipe.Files) {
-                    string installed=Safe.In(root,file.Path);
+                    string installed=GeneralInstallRoutes.Resolve(root,paths[file.Path]);
                     if(file.UserData) {
                         if(includeConfigs&&File.Exists(installed))files.Add(Config(file.Path,"json",null,InstalledSnapshotConfig.Json(InstalledSnapshotConfig.Read(installed))));
                         continue;
                     }
-                    files.Add(new InstalledSnapshotFile{Path=file.Path,Sha256=file.Sha256,Size=file.Size,Kind="file"});
+                    files.Add(new InstalledSnapshotFile{Path=paths[file.Path],Sha256=file.Sha256,Size=file.Size,Kind="file"});
                 }
                 if(includeConfigs&&catalog.Defaults!=null)foreach(var config in catalog.Defaults.Where(d=>d.ModId==recipe.Id)) {
                     string path=Safe.In(root,config.Path);if(!File.Exists(path))continue;
@@ -265,7 +269,7 @@ public static partial class InstalledSnapshot {
     }
     static InstalledSnapshotFile Config(string path,string kind,string section,string content){byte[] bytes=Utf8.GetBytes(content);return new InstalledSnapshotFile{Path=path,Kind=kind,Section=section,Content=content,Size=bytes.Length,Sha256=Hash(bytes)};}
     public static void Validate(InstalledSnapshotManifest manifest,FixedCatalog catalog) {
-        if(manifest==null||(manifest.Schema!=1&&manifest.Schema!=2)||manifest.Schema==2&&(manifest.Game!="generic"||manifest.Project==null)||manifest.List==null||manifest.List.Mods==null||manifest.Files==null||manifest.Files.Count==0&&manifest.Project==null||manifest.Files.Count>MaxFiles||String.IsNullOrWhiteSpace(manifest.Name)||manifest.Name.Length>300||!(manifest.Game=="cyberpunk2077"||manifest.Game=="generic")||(manifest.Game=="cyberpunk2077"&&manifest.GameFileVersion!=catalog.GameFileVersion)||(manifest.Game=="generic"&&manifest.GameFileVersion!=null))throw new IOException("Manifesto de arquivos instalados inválido.");
+        if(manifest==null||(manifest.Schema!=1&&manifest.Schema!=2)||manifest.Schema==2&&manifest.Project==null||manifest.List==null||manifest.List.Mods==null||manifest.Files==null||manifest.Files.Count==0&&manifest.Project==null||manifest.Files.Count>MaxFiles||String.IsNullOrWhiteSpace(manifest.Name)||manifest.Name.Length>300||!(manifest.Game=="cyberpunk2077"||manifest.Game=="generic")||(manifest.Game=="cyberpunk2077"&&manifest.GameFileVersion!=catalog.GameFileVersion)||(manifest.Game=="generic"&&manifest.GameFileVersion!=null))throw new IOException("Manifesto de arquivos instalados inválido.");
         if(manifest.ProjectName!=null&&(String.IsNullOrWhiteSpace(manifest.ProjectName)||manifest.ProjectName.Length>120||manifest.ProjectName.Any(Char.IsControl)))
             throw new IOException("Nome do projeto recebido inválido.");
         GeneralModLibrary.ValidateList(manifest.List,true);
@@ -275,6 +279,7 @@ public static partial class InstalledSnapshot {
         if(manifest.Schema==1&&HasInstallRoutes(manifest))throw new IOException("Destinos personalizados exigem um pacote atualizado.");
         var owners=new Dictionary<string,GeneralModVariant>(StringComparer.Ordinal);
         var recipes=new Dictionary<string,FixedMod>(StringComparer.Ordinal);
+        var recipePaths=new Dictionary<string,Dictionary<string,FixedFile>>(StringComparer.Ordinal);
         var ids=new HashSet<string>(StringComparer.Ordinal);
         if(manifest.List.Mods.Count==0&&manifest.Project==null||manifest.List.Mods.Count>1000)throw new IOException("Lista de instalação inválida.");
         foreach(var mod in manifest.List.Mods) {
@@ -285,6 +290,8 @@ public static partial class InstalledSnapshot {
             if(variant.CyberpunkId!=null) {
                 if(manifest.Game!="cyberpunk2077")throw new IOException("Receita Cyberpunk em destino genérico.");
                 var recipe=FixedRecipe(catalog,variant);recipes.Add(owner,recipe);
+                var paths=GeneralInstallRoutes.FixedPaths(catalog,recipe,variant.InstallRoutes);
+                recipePaths.Add(owner,recipe.Files.Where(file=>!file.UserData).ToDictionary(file=>paths[file.Path],StringComparer.Ordinal));
                 var seed=recipe.Id==NightCityDensity.ModId&&variant.CyberpunkVariant=="legacy-low"?LegacyDensityVariant(catalog):GeneralModLibrary.Seed(catalog,new ModImportItem[0]).Mods.Single(m=>m.Id==recipe.Id).Variants.Single(v=>v.CyberpunkVariant==variant.CyberpunkVariant);
                 if(!seed.Sources.SequenceEqual(variant.Sources,StringComparer.Ordinal))throw new IOException("Fontes fixas alteradas no pacote.");
             }else if(variant.CyberpunkVariant!=null||!(variant.Sources.Count==1&&variant.Sources[0]=="installed://"+mod.Id+"/"+variant.Id)&&!variant.Sources.All(GeneralModDownload.IsWebSource))throw new IOException("O pacote contém caminhos privados de origem.");
@@ -309,9 +316,11 @@ public static partial class InstalledSnapshot {
             if(file.Kind=="file") {
                 if(file.Content!=null||file.Section!=null||!regular.Add(file.Path))throw new IOException("Arquivo binário contém metadados inválidos.");
                 foreach(string owner in file.Owners) {
-                    FixedMod recipe;
-                    if(recipes.TryGetValue(owner,out recipe)) {
-                        if(!recipe.Files.Any(f=>!f.UserData&&String.Equals(f.Path,file.Path,StringComparison.Ordinal)&&f.Size==file.Size&&f.Sha256==file.Sha256))throw new IOException("Arquivo diverge da receita fixada: "+file.Path);
+                    Dictionary<string,FixedFile> paths;
+                    if(recipePaths.TryGetValue(owner,out paths)) {
+                        FixedFile expected;
+                        if(!paths.TryGetValue(file.Path,out expected)||expected.Size!=file.Size||expected.Sha256!=file.Sha256)
+                            throw new IOException("Arquivo diverge da receita fixada: "+file.Path);
                     }else if(!SafeGenericPath(file.Path)||(manifest.Game=="cyberpunk2077"&&(!LocalModPackage.Allowed(file.Path)||reserved.Contains(file.Path))))throw new IOException("Destino personalizado não autorizado: "+file.Path);
                 }
             }else {
@@ -330,7 +339,11 @@ public static partial class InstalledSnapshot {
         foreach(var group in manifest.Files.Where(f=>f.Kind=="file").GroupBy(f=>f.Sha256))if(group.Select(f=>f.Size).Distinct().Count()!=1)throw new IOException("Tamanhos divergentes para o mesmo conteúdo.");
         foreach(string owner in owners.Keys) {
             if(!manifest.Files.Any(f=>f.Kind=="file"&&f.Owners.Contains(owner)))throw new IOException("Mod sem arquivos instalados.");
-            FixedMod recipe;if(recipes.TryGetValue(owner,out recipe))foreach(var expected in recipe.Files.Where(f=>!f.UserData))if(!manifest.Files.Any(f=>f.Kind=="file"&&f.Owners.Contains(owner)&&f.Path==expected.Path&&f.Sha256==expected.Sha256&&f.Size==expected.Size))throw new IOException("Arquivo fixado ausente: "+expected.Path);
+            Dictionary<string,FixedFile> paths;
+            if(recipePaths.TryGetValue(owner,out paths))
+                foreach(var expected in paths.Keys)
+                    if(!manifest.Files.Any(f=>f.Kind=="file"&&f.Owners.Contains(owner)&&f.Path==expected))
+                        throw new IOException("Arquivo fixado ausente: "+expected);
         }
     }
     public static InstalledSnapshotManifest Read(string zipPath,string expectedHash,FixedCatalog catalog) {

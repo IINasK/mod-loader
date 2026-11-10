@@ -41,7 +41,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         Name = "DependencyChips", Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
         Margin = new Padding(3, 0, 3, 3)
     };
-    readonly GeneralButton addDependency, groupColor;
+    readonly GeneralButton addDependency;
     readonly Button quickFill;
     readonly Func<string,Task<GeneralSourceInfo>> refreshLookup;
     readonly Button copySource;
@@ -60,18 +60,9 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
     int sourceGeneration, queriedGeneration = -1;
     Task sourceQuery;
     bool finishing;
-    readonly Button alternative, unlink;
-    readonly TextBox groupName = new TextBox { Name = "AlternativeGroupName", MaxLength = 18 };
-    readonly Control groupFields;
     readonly GeneralModList groupList;
-    string groupColorValue;
-    internal GeneralAlternativeGroup GroupStyle {
-        get { return LinkedAlternative == null || groupFields == null ? null : new GeneralAlternativeGroup { Name = groupName.Text.Trim(), Color = groupColorValue }; }
-    }
     readonly Button save, install;
     readonly ToolTip editorTips = new ToolTip { UseAnimation = false, UseFading = false };
-    internal GeneralModEntry LinkedAlternative { get; private set; }
-    internal bool PickingDependency { get; private set; }
     readonly List<GeneralModVariant> model;
     readonly string editingId;
     readonly GeneralModEntry initialEntry;
@@ -288,12 +279,11 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
             "Leave blank to use the game root. Use | to split an archive. Example: mods = %GAME%/Mods | config = %APPDATA%/Game/Mods"));
 
         if (alternatives != null) {
-            var options = alternatives.Where(other => other.Id != entry.Id).ToList();
             AddEditorRow(layout, EditorSection(T("Vínculos entre mods", "Mod links"), true));
             var dependencyLabel = LabelFor(T("Dependências desta versão", "Dependencies for this version"));
             dependencyLabel.Margin = new Padding(3, 4, 3, 3);
             dependencyChips.AccessibleName = dependencyLabel.Text;
-            addDependency = (GeneralButton)GeneralStyle.Button(T("+ Vincular dependência", "+ Link dependency"), () => BeginLink(true));
+            addDependency = (GeneralButton)GeneralStyle.Button(T("+ Vincular dependência", "+ Link dependency"), BeginLink);
             addDependency.Name = "LinkDependency";
             addDependency.Margin = new Padding(0, 0, 6, 4);
             editorTips.SetToolTip(addDependency,T(
@@ -305,54 +295,6 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
             AddEditorRow(layout, dependencyLabel);
             AddEditorRow(layout, dependencyChips);
             dependencyChips.Controls.Add(addDependency);
-
-            if(entry.AlternativeGroup!=GeneralModLibrary.BodyGroup){
-                var groupLabel = LabelFor(T("Grupo de alternativas", "Alternative group"));
-                groupLabel.Margin = new Padding(3, 10, 3, 3);
-                AddEditorRow(layout, groupLabel);
-                alternative = GeneralStyle.Button("", () => BeginLink(false));
-                alternative.Name = "AlternativeMod";
-                alternative.Dock = DockStyle.Fill;
-                alternative.AutoSize = false;
-                alternative.Height = 44;
-                alternative.Enabled = options.Count > 0;
-                editorTips.SetToolTip(alternative,T(
-                    "Apenas um dos mods vinculados pode ficar ativo por vez.",
-                    "Only one linked mod can be active at a time."));
-                unlink = GeneralStyle.Button(T("Desvincular", "Unlink"), () => SetLinkedAlternative(null));
-                unlink.Name = "UnlinkAlternative";
-                unlink.Dock = DockStyle.Fill;
-                var pairing = new TableLayoutPanel {
-                    Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty
-                };
-                pairing.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
-                pairing.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-                pairing.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-                pairing.Controls.Add(alternative, 0, 0);
-                pairing.Controls.Add(unlink, 1, 0);
-                AddEditorRow(layout, pairing);
-                groupColor = (GeneralButton)GeneralStyle.Button("", ChooseGroupColor);
-                groupColor.Name = "AlternativeGroupColor";
-                groupColor.AccessibleName = T("Cor do grupo", "Group color");
-                groupColor.Bare = true;
-                groupColor.AutoSize = false;
-                groupColor.Margin = Padding.Empty;
-                var groupField = EditorField(T("Nome do grupo", "Group name"), groupName);
-                var groupSurface = (GeneralSurface)groupField.Controls[1];
-                groupSurface.Padding = new Padding(14, 4, 14, 4);
-                groupSurface.AutoSize = false;
-                groupSurface.Controls.Remove(groupName);
-                var groupRow = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
-                groupName.Dock = DockStyle.None;
-                groupRow.Controls.Add(groupName);
-                groupRow.Controls.Add(groupColor);
-                groupRow.Layout += (s,e) => LayoutInlineAction(groupRow, groupName, groupColor, 38);
-                groupSurface.Controls.Add(groupRow);
-                groupFields = groupField;
-                AddEditorRow(layout, groupFields);
-                groupName.TextChanged += (s, e) => ValidateInputs();
-                SetLinkedAlternative(options.FirstOrDefault(other => entry.AlternativeGroup != null && other.AlternativeGroup == entry.AlternativeGroup));
-            }
         }
 
         installNote = LabelFor(installInfo ?? "");
@@ -366,7 +308,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
             ResizeFeedback(layout.ClientSize.Width-layout.Padding.Horizontal);
             sourceInfo.MaximumSize=new Size(Math.Max(1,layout.ClientSize.Width-layout.Padding.Horizontal-sourceInfo.Margin.Horizontal),0);
         };
-        foreach (var field in new Control[] { modName, category, tags, description, nsfw, variants, sources, alternative, unlink, groupName, groupColor, usePending, addTagButton, addDependency }) {
+        foreach (var field in new Control[] { modName, category, tags, description, nsfw, variants, sources, usePending, addTagButton, addDependency }) {
             if (field == null) continue;
             field.Enter += (s, e) => {
                 if (!Visible) return;
@@ -425,7 +367,6 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         sizeActions();
         RemoveFieldBorders(this);
         nsfw.MinimumSize=Size.Empty;
-        if(groupColor!=null)groupColor.MinimumSize=Size.Empty;
         if(addDependency!=null)addDependency.MinimumSize=new Size(44, TagHeight);
         nameRow.PerformLayout();
         SetAdult(adult);
@@ -445,23 +386,6 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         base.OnLoad(e);
     }
 
-    internal void SetLinkedAlternative(GeneralModEntry entry) {
-        var previous=LinkedAlternative;
-        LinkedAlternative = entry;
-        if (alternative == null) return;
-        alternative.Text = entry == null ? T("Vincular como opção", "Link as option") : entry.Name;
-        alternative.AccessibleName = entry == null ? alternative.Text : T("Trocar mod vinculado: ", "Change linked mod: ") + entry.Name;
-        unlink.Visible = groupFields.Visible = entry != null;
-        if(entry!=null&&(previous==null||(entry.AlternativeGroup??entry.Id)!=(previous.AlternativeGroup??previous.Id))){
-            GeneralAlternativeGroup style;
-            groupList.AlternativeGroups.TryGetValue(entry.AlternativeGroup??"",out style);
-            groupName.Text=style!=null&&style.Name!=null?style.Name:GeneralModLibrary.GroupDefaultName(entry.AlternativeGroup);
-            groupColorValue=style==null?GeneralModLibrary.DefaultGroupColor(groupList,entry.Id):style.Color;
-            UpdateGroupColor();
-        }
-        ValidateInputs();
-    }
-
     void SetAdult(bool value){
         adult=value;
         nsfw.BareInk=value?GeneralStyle.Danger:GeneralStyle.Line;
@@ -470,8 +394,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         nsfw.Invalidate();
     }
 
-    void BeginLink(bool dependency){
-        PickingDependency=dependency;
+    void BeginLink(){
         returningFromList=true;
         Complete(DialogResult.Retry);
     }
@@ -527,12 +450,14 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
             Name="DescriptionResizeGrip",Size=new Size(24,18),Cursor=Cursors.SizeNS,
             AccessibleName=T("Redimensionar descrição","Resize description"),TabStop=true
         };
-        field.Padding=new Padding(12,8,12,18);
+        field.Padding=new Padding(12,8,12,30);
         field.Controls.Add(grip);
         grip.BringToFront();
-        field.Resize+=(s,e)=>grip.Location=new Point(field.ClientSize.Width-grip.Width-13,field.ClientSize.Height-grip.Height-3);
-        grip.Location=new Point(field.ClientSize.Width-grip.Width-13,field.ClientSize.Height-grip.Height-3);
+        Action positionGrip=()=>grip.Location=new Point(field.ClientSize.Width-grip.Width-10,field.ClientSize.Height-grip.Height-8);
+        field.Resize+=(s,e)=>positionGrip();
+        positionGrip();
         grip.Paint+=(s,e)=>{
+            e.Graphics.Clear(GeneralStyle.Surface);
             using(var pen=new Pen(grip.Focused?GeneralStyle.Accent:GeneralStyle.Muted))
                 for(int offset=0;offset<9;offset+=4)e.Graphics.DrawLine(pen,7+offset,13,17,3+offset);
         };
@@ -556,21 +481,6 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         };
     }
 
-    void ChooseGroupColor(){
-        using(var chooser=new ColorDialog { Color=ColorTranslator.FromHtml(groupColorValue),FullOpen=true }){
-            if(chooser.ShowDialog(this)!=DialogResult.OK)return;
-            groupColorValue="#"+(chooser.Color.ToArgb()&0xffffff).ToString("X6");
-            UpdateGroupColor();
-            ValidateInputs();
-        }
-    }
-
-    void UpdateGroupColor(){
-        groupColor.ColorSwatch = String.IsNullOrEmpty(groupColorValue)?GeneralStyle.Accent:ColorTranslator.FromHtml(groupColorValue);
-        editorTips.SetToolTip(groupColor,groupColor.AccessibleName+" · "+groupColorValue);
-        groupColor.Invalidate();
-    }
-
     string CurrentValidation(GeneralModEntry entry){
         string error=ValidationMessage(entry);
         if(error.Length!=0)return error;
@@ -587,15 +497,9 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
             catch(ArgumentException ex){return ex.Message;}
             catch(NotSupportedException ex){return ex.Message;}
         }
-        if(LinkedAlternative!=null&&entry.Variants.Any(version=>version.RequiredMods.Any(id=>id==LinkedAlternative.Id||
-            (LinkedAlternative.AlternativeGroup!=null&&groupList.Mods.Any(mod=>mod.Id==id&&mod.AlternativeGroup==LinkedAlternative.AlternativeGroup)))))
+        if(initialEntry.AlternativeGroup!=null&&entry.Variants.Any(version=>version.RequiredMods.Any(id=>
+            groupList.Mods.Any(mod=>mod.Id==id&&mod.AlternativeGroup==initialEntry.AlternativeGroup))))
             return T("Um mod alternativo não pode ser uma dependência desta versão.","An alternative mod cannot be a dependency of this version.");
-        var style=GroupStyle;
-        if(style==null)return "";
-        if(String.IsNullOrWhiteSpace(style.Name)||style.Name.Length>18||style.Name.Any(Char.IsControl))
-            return T("Informe um nome de até 18 caracteres para o grupo.","Enter a group name of up to 18 characters.");
-        if(!GeneralModLibrary.GroupColorAvailable(groupList,LinkedAlternative.AlternativeGroup,style.Color))
-            return T("Esta cor já é usada por outro grupo.","This color is already used by another group.");
         return "";
     }
 
@@ -637,7 +541,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         var version=current;
         string source=sources.Text.Trim();
         string local=downloadedSource==null?null:downloadedSource(version,sourceIndex);
-        bool editable=!installRoutes.ReadOnly;
+        bool editable=!attachment;
         browseContents.Enabled=false;
         string title=browseContents.Text;
         browseContents.Text=T("Lendo arquivos…","Reading files…");
@@ -646,8 +550,9 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
             var paths=known.Length==0?await Task.Run(()=>ReadArchivePaths(File.Exists(local)?local:source)):known;
             if(IsDisposed||current!=version||!String.Equals(sources.Text.Trim(),source,StringComparison.Ordinal))return;
 
-            var routes=editable?GeneralInstallRoutes.Parse(installRoutes.Text,installationFolder):version.InstallRoutes;
-            using(var dialog=new GeneralArchiveDestinations(paths,routes,installationFolder,editable)){
+            var routes=GeneralInstallRoutes.Parse(installRoutes.Text,installationFolder);
+            var saved=initialEntry.Variants.FirstOrDefault(item=>item.Id==version.Id);
+            using(var dialog=new GeneralArchiveDestinations(paths,routes,installationFolder,editable,saved==null?null:saved.InstallRoutes)){
                 if(dialog.ShowDialog(this)==DialogResult.OK&&editable)
                     installRoutes.Text=GeneralInstallRoutes.Format(dialog.Routes);
             }
@@ -866,16 +771,13 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         changing = true;
         current = model.FirstOrDefault(variant => variant.Id == id) ?? model[0];
         SyncVariantPicker();
-        bool customDestination=!attachment&&String.IsNullOrEmpty(current.CyberpunkId);
+        bool customDestination=!attachment;
         installRoutes.ReadOnly=!customDestination;
         browseDestination.Enabled=customDestination;
         RefreshRequiredMods();
         string savedRoute;
         installRoutes.Text=routeDrafts.TryGetValue(current.Id,out savedRoute)?savedRoute:GeneralInstallRoutes.Format(current.InstallRoutes);
-        if(!customDestination&&installRoutes.Text.Length==0&&!attachment)
-            installRoutes.Text=T("Destino conferido pelo catálogo","Verified catalog destination");
-        editorTips.SetToolTip(browseDestination,customDestination?T("Escolher a pasta do pacote","Choose the folder for the archive"):
-            T("Este item fixo usa os caminhos conferidos do catálogo.","This pinned item uses the catalog's verified paths."));
+        editorTips.SetToolTip(browseDestination,T("Escolher a pasta do pacote","Choose the folder for the archive"));
         LoadSource(0);
         changing = false;
         ValidateInputs();ScheduleSourceInfo();
@@ -965,7 +867,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
     bool InventoryDraftChanged(GeneralModEntry draft) {
         return draft.Name!=initialEntry.Name||draft.Category!=(initialEntry.Category??"")||
             draft.Description!=(initialEntry.Description??"")||draft.Nsfw!=initialEntry.Nsfw||
-            !draft.Tags.SequenceEqual(initialEntry.Tags)||NewCategories.Count>0||LinkedAlternative!=null||
+            !draft.Tags.SequenceEqual(initialEntry.Tags)||NewCategories.Count>0||
             draft.Variants.Count!=initialEntry.Variants.Count||draft.Variants.Zip(initialEntry.Variants,(after,before)=>
                 after.Name!=before.Name||!after.Sources.SequenceEqual(before.Sources)||!after.RequiredMods.SequenceEqual(before.RequiredMods)||!GeneralInstallRoutes.Same(after.InstallRoutes,before.InstallRoutes)).Any(changed=>changed);
     }
@@ -1003,33 +905,44 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
 
 internal sealed class GeneralArchiveDestinations : GeneralDialog {
     readonly string game;
-    readonly TreeView tree;
-    readonly Label destination;
-    readonly Button choose, clear;
-    readonly bool editable;
-    readonly Label dropTarget;
-    string targetFolder;
+    readonly ListBox tree = new ListBox {
+        Name="ArchiveFileTree", Dock=DockStyle.Fill, BorderStyle=BorderStyle.None,
+        DrawMode=DrawMode.OwnerDrawFixed, ItemHeight=28, Font=GeneralStyle.Font(11), DisplayMember="Text"
+    };
+    readonly TextBox currentDestination = new TextBox { Name="ArchiveCurrentDestination", ReadOnly=true, BorderStyle=BorderStyle.None };
+    readonly TextBox newDestination = new TextBox { Name="ArchiveNewDestination", MaxLength=4096 };
+    readonly List<GeneralInstallRoute> original;
+    readonly Dictionary<string,string> drafts;
+    readonly HashSet<TreeNode> folded = new HashSet<TreeNode>();
+    readonly GeneralScrollView scroll;
+    readonly Button reset;
+    readonly TreeNode root;
+    bool updating;
+    Point dragStart;
     internal readonly List<GeneralInstallRoute> Routes;
 
-    internal GeneralArchiveDestinations(IEnumerable<string> paths,IEnumerable<GeneralInstallRoute> routes,string game,bool editable) {
+    internal GeneralArchiveDestinations(IEnumerable<string> paths,IEnumerable<GeneralInstallRoute> routes,string game,bool editable,
+        IEnumerable<GeneralInstallRoute> savedRoutes=null) {
         this.game=game;
-        this.editable=editable;
         Routes=routes.ToList();
-        Text=GeneralStyle.T("Destinos dos arquivos","File destinations");
-        ClientSize=new Size(650,520);
-        MinimumSize=new Size(490,350);
+        original=(savedRoutes??Routes).ToList();
+        drafts=Routes.ToDictionary(route=>route.Folder,route=>route.Destination,StringComparer.OrdinalIgnoreCase);
+        Text=T("Destinos dos arquivos","File destinations");
+        ClientSize=new Size(650,590);
+        MinimumSize=new Size(490,425);
         AutoScaleMode=AutoScaleMode.Dpi;
-        var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(18,8,18,14)};
+        var layout=new TableLayoutPanel {
+            Dock=DockStyle.Fill,ColumnCount=1,RowCount=5,Padding=new Padding(18,8,18,14),Margin=Padding.Empty
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        for(int i=1;i<5;i++)layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         Controls.Add(layout);
-        tree=new TreeView{Name="ArchiveFileTree",Dock=DockStyle.Fill,HideSelection=false,FullRowSelect=true,ShowLines=true,
-            BorderStyle=BorderStyle.None,ItemHeight=24,Font=GeneralStyle.Font(11),BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground};
-        var root=tree.Nodes.Add(GeneralStyle.T("Raiz do pacote","Archive root"));
-        root.Tag="";
+
+        root=new TreeNode(T("Raiz do pacote","Archive root")){Tag=""};
         var nodes=new Dictionary<string,TreeNode>(StringComparer.OrdinalIgnoreCase){{"",root}};
-        foreach(string path in paths.OrderBy(value=>value,StringComparer.OrdinalIgnoreCase)){
+        foreach(string path in paths.Concat(Routes.Concat(original).Select(route=>route.Folder)).Where(path=>!String.IsNullOrEmpty(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(path=>path,StringComparer.OrdinalIgnoreCase)){
             var parent=root;
             string relative="";
             foreach(string part in path.Split('/')){
@@ -1043,95 +956,188 @@ internal sealed class GeneralArchiveDestinations : GeneralDialog {
                 parent=node;
             }
         }
-        root.Expand();
-        var panes=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};
-        panes.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,62));
-        panes.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,38));
-        panes.Controls.Add(tree,0,0);
-        dropTarget=new Label{Name="ArchiveDestinationDrop",Dock=DockStyle.Fill,AllowDrop=editable,TextAlign=ContentAlignment.MiddleCenter,
-            Padding=new Padding(12),Margin=new Padding(8,0,0,0),UseMnemonic=false};
-        targetFolder=game;
-        tree.ItemDrag+=(s,e)=>{
-            if(editable&&e.Item is TreeNode)tree.DoDragDrop((TreeNode)e.Item,DragDropEffects.Move);
-        };
-        dropTarget.DragEnter+=(s,e)=>{
-            e.Effect=!String.IsNullOrWhiteSpace(targetFolder)&&e.Data.GetDataPresent(typeof(TreeNode))?DragDropEffects.Move:DragDropEffects.None;
-        };
-        dropTarget.DragDrop+=(s,e)=>{
-            var node=e.Data.GetData(typeof(TreeNode)) as TreeNode;
-            if(node==null||node.TreeView!=tree||String.IsNullOrWhiteSpace(targetFolder))return;
-            tree.SelectedNode=node;
-            ApplyRoute((string)node.Tag,targetFolder);
-        };
-        UpdateDropTarget(paths.Any());
-        panes.Controls.Add(dropTarget,1,0);
-        layout.Controls.Add(panes,0,0);
-        destination=GeneralModEditor.LabelFor("");
-        destination.Margin=new Padding(3,9,3,6);
-        layout.Controls.Add(destination,0,1);
-        var buttons=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.RightToLeft,WrapContents=false};
-        var apply=GeneralStyle.Button(editable?GeneralStyle.T("Aplicar","Apply"):GeneralStyle.T("Fechar","Close"),()=>DialogResult=DialogResult.OK, true);
-        choose=GeneralStyle.Button(GeneralStyle.T("Escolher pasta","Choose folder"),Choose);
-        clear=GeneralStyle.Button(GeneralStyle.T("Herdar destino","Inherit destination"),()=>{
-            Routes.RemoveAll(route=>String.Equals(route.Folder,SelectedPath,StringComparison.OrdinalIgnoreCase));
+
+        tree.AccessibleName=T("Árvore de arquivos do pacote","Archive file tree");
+        scroll=new GeneralScrollView(tree);
+        var treeFrame=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(9),Margin=new Padding(0,0,0,6)};
+        treeFrame.Controls.Add(scroll);
+        layout.Controls.Add(treeFrame,0,0);
+        tree.DrawItem+=DrawNode;
+        tree.SelectedIndexChanged+=(s,e)=>{
+            if(updating)return;
+            scroll.RefreshScroll();
             ShowDestination();
-        });
-        choose.Visible=clear.Visible=editable;
-        buttons.Controls.AddRange(new Control[]{apply,choose,clear});
-        layout.Controls.Add(buttons,0,2);
-        tree.AfterSelect+=(s,e)=>ShowDestination();
-        tree.SelectedNode=root;
+        };
+        tree.MouseDown+=(s,e)=>{
+            dragStart=e.Location;
+            if(e.Button!=MouseButtons.Left)return;
+            int index=tree.IndexFromPoint(e.Location);
+            if(index<0)return;
+            var node=(TreeNode)tree.Items[index];
+            if(node.Nodes.Count>0&&e.X>=Indent(node)&&e.X<Indent(node)+20)Toggle(node);
+        };
+        tree.KeyDown+=(s,e)=>{
+            var node=Selected;
+            if(node==null||node.Nodes.Count==0)return;
+            if(e.KeyCode==Keys.Left&&!folded.Contains(node)||e.KeyCode==Keys.Right&&folded.Contains(node)){
+                Toggle(node);e.Handled=true;
+            }
+        };
+        tree.MouseMove+=(s,e)=>{
+            if(!editable||e.Button!=MouseButtons.Left)return;
+            Size distance=SystemInformation.DragSize;
+            var threshold=new Rectangle(dragStart.X-distance.Width/2,dragStart.Y-distance.Height/2,distance.Width,distance.Height);
+            int index=tree.IndexFromPoint(dragStart);
+            if(index>=0&&!threshold.Contains(e.Location))tree.DoDragDrop(tree.Items[index],DragDropEffects.Move);
+        };
+
+        string currentLabel=T("Localização atual","Current location");
+        currentDestination.AccessibleName=currentLabel;
+        layout.Controls.Add(GeneralModEditor.LabelFor(currentLabel),0,1);
+        var currentField=GeneralModEditor.FieldFor(currentDestination,false);
+        currentField.Margin=Padding.Empty;
+        layout.Controls.Add(currentField,0,2);
+
+        string newLabel=T("Novo destino","New destination");
+        newDestination.AccessibleName=newLabel;
+        newDestination.ReadOnly=!editable;
+        newDestination.AllowDrop=editable;
+        newDestination.TextChanged+=(s,e)=>{if(!updating&&Selected!=null){
+            drafts[SelectedPath]=newDestination.Text;
+            reset.Enabled=!String.IsNullOrWhiteSpace(newDestination.Text);
+        }};
+        newDestination.DragEnter+=(s,e)=>e.Effect=e.Data.GetDataPresent(typeof(TreeNode))?DragDropEffects.Move:DragDropEffects.None;
+        newDestination.DragDrop+=(s,e)=>{
+            var node=e.Data.GetData(typeof(TreeNode)) as TreeNode;
+            if(node==null||!tree.Items.Contains(node))return;
+            string folder=String.IsNullOrWhiteSpace(newDestination.Text)?"%GAME%":newDestination.Text;
+            tree.SelectedItem=node;
+            newDestination.Text=folder;
+        };
+        var editRow=GeneralOptionsDialog.FolderRow(newLabel,newDestination,Choose);
+        editRow.Margin=new Padding(0,8,0,0);
+        layout.Controls.Add(editRow,0,3);
+        editRow.GetControlFromPosition(1,1).Enabled=editable;
+
+        var buttons=new FlowLayoutPanel {
+            Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.RightToLeft,WrapContents=false,
+            Margin=new Padding(0,10,0,0)
+        };
+        var apply=GeneralStyle.Button(T("Aplicar","Apply"),ApplyDestinations,true);
+        var cancel=GeneralStyle.Button(T("Cancelar","Cancel"),()=>DialogResult=DialogResult.Cancel);
+        reset=GeneralStyle.Button(T("Resetar","Reset"),()=>newDestination.Clear());
+        apply.Enabled=editable;
+        reset.Enabled=false;
+        buttons.Controls.AddRange(new Control[]{apply,cancel,reset});
+        layout.Controls.Add(buttons,0,4);
+        AcceptButton=apply;
+        CancelButton=cancel;
+
         GeneralStyle.Apply(this,GeneralStyle.Dark);
-        tree.BackColor=GeneralStyle.Surface;
-        tree.ForeColor=GeneralStyle.Foreground;
+        var tips=new ToolTip();
+        Disposed+=(s,e)=>tips.Dispose();
+        tips.SetToolTip(reset,T("Voltar ao destino herdado neste item.","Restore the inherited destination for this item."));
+        tips.SetToolTip(newDestination,T("Escolha uma pasta ou cole o caminho. Em branco, o item herda o destino acima.",
+            "Choose a folder or paste its path. Leave blank to inherit the parent destination."));
+        RefreshTree(root);
+    }
+
+    static string T(string pt,string en){return GeneralStyle.T(pt,en);}
+    TreeNode Selected {get{return tree.SelectedItem as TreeNode;}}
+    string SelectedPath {get{return Selected==null?"":(string)Selected.Tag;}}
+
+    void Toggle(TreeNode node){
+        if(!folded.Add(node))folded.Remove(node);
+        RefreshTree(node);
+    }
+
+    void RefreshTree(TreeNode selected){
+        int top=tree.TopIndex;
+        updating=true;
+        tree.BeginUpdate();
+        try{
+            tree.Items.Clear();
+            AddBranch(root);
+            tree.SelectedItem=selected;
+            tree.TopIndex=Math.Min(top,tree.SelectedIndex);
+        }finally{
+            tree.EndUpdate();
+            updating=false;
+        }
+        scroll.RefreshScroll();
         ShowDestination();
     }
 
-    string SelectedPath { get { return tree.SelectedNode==null?"":(string)tree.SelectedNode.Tag; } }
+    void AddBranch(TreeNode node){
+        tree.Items.Add(node);
+        if(folded.Contains(node))return;
+        foreach(TreeNode child in node.Nodes)AddBranch(child);
+    }
 
-    GeneralInstallRoute EffectiveRoute(){
-        string path=SelectedPath;
-        return Routes.Where(route=>route.Folder.Length==0||path.Equals(route.Folder,StringComparison.OrdinalIgnoreCase)||
-            path.StartsWith(route.Folder+"/",StringComparison.OrdinalIgnoreCase)).OrderByDescending(route=>route.Folder.Length).FirstOrDefault();
+    int Indent(TreeNode node){return 5+Math.Min(node.Level*18,Math.Max(0,tree.ClientSize.Width-110));}
+
+    void DrawNode(object sender,DrawItemEventArgs args){
+        if(args.Index<0)return;
+        var node=(TreeNode)tree.Items[args.Index];
+        GeneralStyle.PaintChoice(args.Graphics,args.Bounds,(args.State&DrawItemState.Selected)!=0);
+        int x=Indent(node),y=args.Bounds.Top+(args.Bounds.Height-16)/2;
+        if(node.Nodes.Count>0)LucideIcons.Draw(args.Graphics,folded.Contains(node)?"right":"down",new Rectangle(x,y,16,16),GeneralStyle.Muted);
+        TextRenderer.DrawText(args.Graphics,node.Text,tree.Font,
+            new Rectangle(x+23,args.Bounds.Top,Math.Max(0,args.Bounds.Right-x-29),args.Bounds.Height),
+            GeneralStyle.Foreground,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix);
+    }
+
+    string CurrentLocation(TreeNode node){
+        string path=(string)node.Tag;
+        var route=original.Where(item=>item.Folder.Length==0||path.Equals(item.Folder,StringComparison.OrdinalIgnoreCase)||
+            path.StartsWith(item.Folder+"/",StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(item=>item.Folder.Length).FirstOrDefault();
+        string location=route==null?"%GAME%":route.Destination;
+        string remaining=route==null||route.Folder.Length==0?path:path.Substring(route.Folder.Length).TrimStart('/');
+        if(path.Length>0&&remaining.Length==0&&node.Nodes.Count==0)remaining=node.Text;
+        return remaining.Length==0?location:location+"/"+remaining;
     }
 
     void ShowDestination(){
-        var route=EffectiveRoute();
-        string path=SelectedPath;
-        string suggested=path.Length!=0&&tree.SelectedNode!=null&&tree.SelectedNode.Nodes.Count==0?Path.GetDirectoryName(path):path;
-        destination.Text=route!=null?route.Destination:
-            String.IsNullOrEmpty(suggested)?GeneralStyle.T("Pasta do jogo","Game folder"):"%GAME%/"+suggested.Replace('\\','/');
-        clear.Enabled=route!=null&&String.Equals(route.Folder,SelectedPath,StringComparison.OrdinalIgnoreCase);
+        var node=Selected;
+        if(node==null)return;
+        updating=true;
+        try{
+            currentDestination.Text=CurrentLocation(node);
+            currentDestination.SelectionStart=0;
+            string draft;
+            newDestination.Text=drafts.TryGetValue(SelectedPath,out draft)?draft:"";
+            reset.Enabled=!newDestination.ReadOnly&&!String.IsNullOrWhiteSpace(newDestination.Text);
+        }finally{updating=false;}
     }
 
     void Choose(){
         try{
-            var effective=EffectiveRoute();
-            string initial=effective==null?game:GeneralInstallRoutes.DirectoryFor(game,effective.Destination,false);
+            string initial=game;
+            if(!String.IsNullOrWhiteSpace(newDestination.Text)){
+                try{initial=GeneralInstallRoutes.DirectoryFor(game,ParseDraft("",newDestination.Text).Destination,false);}
+                catch(IOException){}catch(ArgumentException){}catch(NotSupportedException){}
+            }
             string folder=WindowsFolderPicker.Choose(this,Text,initial);
-            if(folder!=null)ApplyRoute(SelectedPath,folder);
+            if(folder!=null)newDestination.Text=ParseDraft("",folder).Destination;
         }catch(Exception ex){
             GeneralDialog.Message(this,ex.Message,Text,MessageBoxButtons.OK);
         }
     }
 
-    void UpdateDropTarget(bool hasFiles){
-        string help=!editable?GeneralStyle.T("Destinos fixos do catálogo","Pinned catalog destinations"):
-            hasFiles?GeneralStyle.T("Arraste um arquivo ou uma pasta para este destino","Drag a file or folder to this destination"):
-            GeneralStyle.T("Árvore indisponível. Escolha uma pasta para o pacote inteiro.","File tree unavailable. Choose a folder for the whole archive.");
-        dropTarget.Text=help+(String.IsNullOrEmpty(targetFolder)?"":"\r\n\r\n"+targetFolder);
+    GeneralInstallRoute ParseDraft(string path,string text){
+        var route=GeneralInstallRoutes.Parse(" = "+text,game).Single();
+        route.Folder=path;
+        return route;
     }
 
-    void ApplyRoute(string path,string folder){
+    void ApplyDestinations(){
         try{
-            var rule=GeneralInstallRoutes.Parse(path+" = "+folder,game).Single();
-            var updated=Routes.Where(route=>!route.Folder.Equals(path,StringComparison.OrdinalIgnoreCase)).Concat(new[]{rule}).ToList();
+            var updated=drafts.Where(draft=>!String.IsNullOrWhiteSpace(draft.Value)).Select(draft=>ParseDraft(draft.Key,draft.Value)).ToList();
             GeneralInstallRoutes.Validate(updated);
             Routes.Clear();
             Routes.AddRange(updated);
-            targetFolder=folder;
-            UpdateDropTarget(tree.Nodes[0].Nodes.Count!=0);
-            ShowDestination();
+            DialogResult=DialogResult.OK;
         }catch(Exception ex){
             GeneralDialog.Message(this,ex.Message,Text,MessageBoxButtons.OK);
         }

@@ -64,13 +64,13 @@ internal sealed class GeneralReveal : IDisposable {
         int width=Math.Max(1,target.ClientSize.Width),height=Math.Max(1,target.ClientSize.Height);
         double dx=Math.Max(origin.X,width-origin.X),dy=Math.Max(origin.Y,height-origin.Y);
         float radius=(float)(Math.Sqrt(dx*dx+dy*dy)*progress+1);
-        using(var round=GeneralStyle.Round(new RectangleF(0,0,width,height),18))
+        using(var round=GeneralStyle.PopupShape(target.ClientSize))
         using(var circle=new GraphicsPath()){
             circle.AddEllipse(origin.X-radius,origin.Y-radius,radius*2,radius*2);
             var region=new Region(round);region.Intersect(circle);Replace(region);
         }
     }
-    internal void SetRound(){if(target.IsDisposed)return;progress=1;using(var round=GeneralStyle.Round(new RectangleF(0,0,Math.Max(1,target.ClientSize.Width),Math.Max(1,target.ClientSize.Height)),18))Replace(new Region(round));}
+    internal void SetRound(){if(target.IsDisposed)return;progress=1;using(var round=GeneralStyle.PopupShape(target.ClientSize))Replace(new Region(round));}
     void Replace(Region next){var previous=target.Region;target.Region=next;if(previous!=null)previous.Dispose();target.Invalidate(true);}
     public void Dispose(){timer.Stop();timer.Dispose();complete=null;Running=false;}
 }
@@ -121,8 +121,8 @@ internal class GeneralDialog : Form {
         base.SetVisibleCore(value);
     }
     protected override void OnShown(EventArgs e){base.OnShown(e);if(closing||allowClose||!AnimateAppearance)return;origin=new Point(Width-36,0);reveal.Begin(true,origin);}
-    protected override void OnPaint(PaintEventArgs e){
-        base.OnPaint(e);GeneralStyle.PaintCard(e.Graphics,ClientSize);
+    protected override void OnPaintBackground(PaintEventArgs e){
+        GeneralStyle.PaintCard(e.Graphics,ClientSize);
     }
     protected override void OnResize(EventArgs e){base.OnResize(e);if(reveal!=null&&!reveal.Running)reveal.SetRound();}
     internal void Complete(DialogResult result){DialogResult=result;if(!Modal)Close();}
@@ -164,7 +164,7 @@ internal class GeneralDialog : Form {
 
 internal static class GeneralPopupPlacement {
     internal static void RoundMenu(ToolStripDropDown popup){
-        using(var shape=GeneralStyle.Round(new RectangleF(0,0,popup.Width,popup.Height),18)){
+        using(var shape=GeneralStyle.PopupShape(popup.ClientSize)){
             var previous=popup.Region;
             popup.Region=new Region(shape);
             if(previous!=null)previous.Dispose();

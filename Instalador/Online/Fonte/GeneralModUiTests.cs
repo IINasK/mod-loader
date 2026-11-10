@@ -195,7 +195,7 @@ internal sealed partial class GeneralModWindow {
             form.state.List.Mods.Remove(dependency);
             form.state.List.Categories.Remove(DependencyCategory);
             form.DrawRows();
-            await TestAlternativePicking(form,one,two,three,root,check);
+            await TestDependencyPicking(form,one,two,three,root,check);
             TestSyncRemovalReview(form,root,check);
             string dropped=TestZip(root,"dropped.zip","mods/drop.txt","dropped");
             using(var editor=new GeneralModEditor(NewEntry("nome-do-arquivo",dropped),list.Categories,"default",true,"")){
@@ -242,7 +242,7 @@ internal sealed partial class GeneralModWindow {
         GeneralStyle.Dark=false;GeneralStyle.Language="pt";
         Safe.WriteJson(Path.Combine(root,"resultado-ui-v2.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});
     }
-    static async Task TestAlternativePicking(GeneralModWindow form,GeneralModEntry source,GeneralModEntry presetEntry,
+    static async Task TestDependencyPicking(GeneralModWindow form,GeneralModEntry source,GeneralModEntry presetEntry,
         GeneralModEntry candidate,string root,Action<bool,string> check){
         form.preset.SelectedIndex=1;
         form.SetAssociationSearch(presetEntry.Name);
@@ -283,7 +283,7 @@ internal sealed partial class GeneralModWindow {
                             Application.DoEvents();
                             CaptureUi(editor,Path.Combine(root,"editor-download-and-link.png"));
                             stage=1;
-                            AllControls(editor).OfType<Button>().Single(button=>button.Name=="AlternativeMod").PerformClick();
+                            AllControls(editor).OfType<Button>().Single(button=>button.Name=="LinkDependency").PerformClick();
                         }else if(stage==1&&form.associationChoice!=null){
                             check(form.listExpanded&&!form.optionsButton.Visible&&!form.expandList.Visible&&form.grid.ReadOnly&&
                                 !form.grid.Columns["Mark"].Visible&&form.grid.ContextMenuStrip==null,"A lista real expande e bloqueia as ações durante o vínculo.");
@@ -296,62 +296,53 @@ internal sealed partial class GeneralModWindow {
                             form.grid.CurrentCell=candidateRow.Cells["Name"];
                             candidateRow.Selected=true;
                             check(confirm.Enabled,"A linha encontrada pela busca pode ser confirmada.");
-                            CaptureUi(form,Path.Combine(root,"editor-alternative-list.png"));
+                            CaptureUi(form,Path.Combine(root,"editor-dependency-list.png"));
                             stage=2;
                             confirm.PerformClick();
                         }else if(stage==2&&editor!=null){
-                            check(Object.ReferenceEquals(opened,editor)&&editor.LinkedAlternative==candidate&&
+                            check(Object.ReferenceEquals(opened,editor)&&
                                 AllControls(editor).OfType<TextBox>().Single(box=>box.AccessibleName=="Descrição").Text=="Texto ainda não salvo"&&
                                 (editor.Region==null||editor.Region.IsVisible(editor.Width/2,editor.Height/2)),"O mesmo editor reaparece com o vínculo e o rascunho intactos.");
                             check(!form.listExpanded&&form.grid.Columns["Mark"].Visible&&!form.grid.ReadOnly&&
                                 form.searchBox.Text==presetEntry.Name&&form.marked.SetEquals(originalMarks)&&form.state.SelectedPreset=="example",
                                 "O modo de escolha restaura busca, preset, caixas e navegação.");
-                            var groupName=AllControls(editor).OfType<TextBox>().Single(box=>box.Name=="AlternativeGroupName");
-                            check(groupName.Visible&&groupName.MaxLength==18&&editor.GroupStyle.Color.StartsWith("#"),"Escolher outro mod libera o nome curto e a cor do grupo.");
-                            var swatch=AllControls(editor).OfType<GeneralButton>().Single(button=>button.Name=="AlternativeGroupColor");
-                            var linked=AllControls(editor).OfType<Button>().Single(button=>button.Name=="AlternativeMod");
-                            var unlink=AllControls(editor).OfType<Button>().Single(button=>button.Name=="UnlinkAlternative");
-                            check(linked.Top==unlink.Top&&linked.Height==unlink.Height&&linked.Height==44,
-                                "Vincular e Desvincular ocupam a mesma linha compacta: "+linked.Bounds+" / "+unlink.Bounds);
-                            check(swatch.Parent==groupName.Parent&&swatch.Left==groupName.Right&&(swatch.ColorSwatch!=null)&&
-                                swatch.Bottom<=swatch.Parent.ClientSize.Height,"A amostra de cor fica dentro do campo do grupo.");
-                            editor.AddRequiredMod(presetEntry);
+                            check(!AllControls(editor).Any(control=>control.Name=="AlternativeGroupName"||control.Name=="AlternativeGroupColor"||control.Name=="AlternativeMod"),
+                                "The editor hides generic alternative group controls.");
                             var dependencies=AllControls(editor).OfType<FlowLayoutPanel>().Single(panel=>panel.Name=="DependencyChips");
                             var chips=dependencies.Controls.OfType<Button>().ToList();
-                            check(chips.Count==2&&chips[0].Text==presetEntry.Name+" ×"&&chips[1].Name=="LinkDependency",
+                            check(chips.Count==2&&chips[0].Text==candidate.Name+" ×"&&chips[1].Name=="LinkDependency",
                                 "O vínculo vira um chip removível antes do botão de adicionar.");
                             var linkedScroll=AllControls(editor).OfType<GeneralScrollView>().Single(control=>control.Name=="ModEditorScroll");
                             linkedScroll.RefreshScroll();linkedScroll.ScrollTo(linkedScroll.Bar.Limit);Application.DoEvents();
-                            var groupBounds=groupName.RectangleToScreen(groupName.ClientRectangle);
+                            var dependencyBounds=dependencies.RectangleToScreen(dependencies.ClientRectangle);
                             var bodyBounds=linkedScroll.RectangleToScreen(linkedScroll.ClientRectangle);
-                            check(Rectangle.Intersect(groupBounds,bodyBounds)==groupBounds&&
-                                dependencies.RectangleToScreen(dependencies.ClientRectangle).Top>=bodyBounds.Top,
-                                "Ao rolar até o fim, os vínculos e o grupo estão na área visível do editor: "+groupBounds+" / "+bodyBounds+
+                            check(Rectangle.Intersect(dependencyBounds,bodyBounds)==dependencyBounds,
+                                "Ao rolar até o fim, os vínculos estão na área visível do editor: "+dependencyBounds+" / "+bodyBounds+
                                 " / "+dependencies.Bounds+" / "+linkedScroll.Content.Bounds+" / "+linkedScroll.Bar.Limit+".");
                             var body=linkedScroll.Content;
                             using(var bitmap=new Bitmap(body.Width,body.Height)){
                                 body.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));
                                 int top=Math.Max(0,-body.Top);
                                 using(var cropped=bitmap.Clone(new Rectangle(0,top,bitmap.Width,Math.Min(bitmap.Height-top,linkedScroll.Height)),bitmap.PixelFormat))
-                                    cropped.Save(Path.Combine(root,"editor-dependencies-and-group.png"));
+                                    cropped.Save(Path.Combine(root,"editor-dependencies.png"));
                             }
                             chips[0].PerformClick();
                             check(dependencies.Controls.OfType<Button>().Count()==1,"Remover um chip desfaz só aquela dependência.");
-                            groupName.Text="Corpo leve";
                             stage=3;
-                            AllControls(editor).OfType<Button>().Single(button=>button.Name=="AlternativeMod").PerformClick();
+                            AllControls(editor).OfType<Button>().Single(button=>button.Name=="LinkDependency").PerformClick();
                         }else if(stage==3&&form.associationChoice!=null){
                             stage=4;
                             AllControls(form).OfType<Button>().Single(button=>button.Name=="CancelAlternativeSelection").PerformClick();
                         }else if(stage==4&&editor!=null){
-                            check(editor.LinkedAlternative==candidate&&source.AlternativeGroup==null&&candidate.AlternativeGroup==null&&editor.GroupStyle.Name=="Corpo leve",
-                                "Cancelar a escolha preserva o vínculo em rascunho e não grava a lista.");
+                            var dependencies=AllControls(editor).OfType<FlowLayoutPanel>().Single(panel=>panel.Name=="DependencyChips");
+                            check(dependencies.Controls.OfType<Button>().Single().Name=="LinkDependency"&&source.Variants[0].RequiredMods.Count==0,
+                                "Cancelar a escolha deixa o rascunho intacto e não grava a lista.");
                             stage=5;
                             timer.Stop();
                             editor.Complete(DialogResult.Cancel);
                         }
                     }catch(Exception ex){
-                        failure=new IOException("Alternative picking stage "+stage,ex);
+                        failure=new IOException("Dependency picking stage "+stage,ex);
                         if(form.associationChoice!=null)form.associationChoice.TrySetResult(null);
                         else if(opened!=null&&opened.Visible){timer.Stop();opened.Complete(DialogResult.Cancel);}
                     }

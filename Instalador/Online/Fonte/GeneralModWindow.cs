@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -238,8 +238,7 @@ internal sealed partial class GeneralModWindow : Form {
             if(Equals(row.Cells[0].Value,true))marked.Add(id);else marked.Remove(id);UpdateCounts();
         };
         grid.ColumnHeaderMouseClick+=(s,e)=>{if(associationChoice!=null)return;if(e.ColumnIndex>0){
-            bool groups=e.ColumnIndex==grid.Columns["Name"].Index&&e.X>=GroupHeaderSplit(grid.Columns[e.ColumnIndex].Width);
-            ShowColumnFilter(e.ColumnIndex,groups);return;
+            ShowColumnFilter(e.ColumnIndex);return;
         }var rows=ModRows().Where(r=>r.Visible).ToList();bool check=rows.Any(r=>!marked.Contains((string)r.Tag));foreach(var r in rows)r.Cells[0].Value=check;};
 
         bool markBeforeMouseDown=false;
@@ -253,7 +252,7 @@ internal sealed partial class GeneralModWindow : Form {
                 else HandleSection(section);
                 return;
             }
-            if(e.ColumnIndex==grid.Columns["Variant"].Index&&ToggleVersions(row))return;
+            if(e.ColumnIndex==grid.Columns["Variant"].Index&&e.X>=grid.Columns[e.ColumnIndex].Width-30&&ToggleVersions(row))return;
             if(e.ColumnIndex!=0||!(row.Tag is string))return;
             var mark=row.Cells["Mark"];
             bool desiredMark=!markBeforeMouseDown;
@@ -267,7 +266,7 @@ internal sealed partial class GeneralModWindow : Form {
         grid.CellMouseDoubleClick+=(s,e)=>{
             if(associationChoice!=null||e.Button!=MouseButtons.Left||e.RowIndex<0||e.ColumnIndex<=0)return;
             var row=grid.Rows[e.RowIndex];
-            if(e.ColumnIndex!=grid.Columns["Variant"].Index||!(row.Cells["Variant"].Tag is List<Work>))OpenRowEditor(row);
+            OpenRowEditor(row);
         };
         grid.KeyDown+=(s,e)=>{
             if(e.KeyCode!=Keys.Enter&&e.KeyCode!=Keys.F2)return;
@@ -467,13 +466,10 @@ internal sealed partial class GeneralModWindow : Form {
             marked.RemoveWhere(id=>id!=bodyRow.Id&&state.List.Mods.Any(mod=>mod.Id==id&&IsBigBody(mod)));
             marked.Add(bodyRow.Id);
         }
-        var alternativeGroups=state.List.Mods.Where(mod=>mod.AlternativeGroup!=null)
-            .GroupBy(mod=>mod.AlternativeGroup).Where(group=>group.Count()>1)
-            .ToDictionary(group=>group.Key,group=>group.FirstOrDefault(mod=>GeneralStatusPresentation.Kind(ListStatus(mod))=="installed")
-                ??group.FirstOrDefault(mod=>ListStatus(mod)==GeneralStatusPresentation.ManualBody),StringComparer.Ordinal);
+
         groups.Add(null);groups.AddRange(picking?state.List.Categories:PresetCategories());
         if(!picking&&categoryFilters!=null)groups=groups.Where(category=>categoryFilters.Contains(category??"")).ToList();
-        if(picking||coverageFilter!=null||variantFilters!=null||statusFilters!=null||!String.IsNullOrWhiteSpace(nameFilter)||groupFilters!=null||searchTerms.Length>0)groups=groups.Where(category=>visible.Any(mod=>String.Equals(mod.Category,category,StringComparison.OrdinalIgnoreCase)||String.IsNullOrEmpty(mod.Category)&&category==null)).ToList();
+        if(picking||coverageFilter!=null||variantFilters!=null||statusFilters!=null||!String.IsNullOrWhiteSpace(nameFilter)||searchTerms.Length>0)groups=groups.Where(category=>visible.Any(mod=>String.Equals(mod.Category,category,StringComparison.OrdinalIgnoreCase)||String.IsNullOrEmpty(mod.Category)&&category==null)).ToList();
         foreach(var category in groups){
             if(grid.Rows.Count>0)AddSection("divider",category,23);
             string description;
@@ -489,8 +485,7 @@ internal sealed partial class GeneralModWindow : Form {
                 var v=Selected(m);string key=Key(m,v),status=ListStatus(m);int pct;bool hasProgress=progress.TryGetValue(key,out pct);
                 int i=grid.Rows.Add(marked.Contains(m.Id),picking?m.Name:ModDisplayName(m),NexusVariantName(m),GeneralStatusPresentation.Label(status),hasProgress?(object)pct:null,ModSpace(m));var row=grid.Rows[i];row.Tag=m.Id;row.Cells["Status"].ToolTipText=StatusDetail(key,status);
                 row.Cells["Size"].ToolTipText=SpaceTip(m);
-                row.Cells["Name"].ToolTipText=String.Join("\n",new[]{m.Description,m.Tags.Count==0?null:"Tags · "+String.Join(", ",m.Tags)}
-                    .Where(value=>!String.IsNullOrWhiteSpace(value)));
+                row.Cells["Name"].ToolTipText=m.Description;
                 var origin=row.Cells["Origin"];
                 origin.Value="Mod Loader";
                 origin.ToolTipText=v.CyberpunkId==null
@@ -499,22 +494,6 @@ internal sealed partial class GeneralModWindow : Form {
                 if(status==GeneralStatusPresentation.ChooseDependency){
                     var nameCell=row.Cells["Name"];
                     nameCell.Style.ForeColor=nameCell.Style.SelectionForeColor=ColorTranslator.FromHtml(GeneralStyle.Dark?"#ffbf80":"#9a4e00");
-                }
-                var groupBadges=new List<KeyValuePair<string,Color>>();
-                GeneralAlternativeGroup group;GeneralModEntry active;
-                if(!IsBigBody(m)&&m.AlternativeGroup!=null&&alternativeGroups.TryGetValue(m.AlternativeGroup,out active)&&state.List.AlternativeGroups.TryGetValue(m.AlternativeGroup,out group))
-                    groupBadges.Add(new KeyValuePair<string,Color>(group.Name??GeneralModLibrary.GroupDefaultName(m.AlternativeGroup),
-                        GroupBadgeColor(ColorTranslator.FromHtml(group.Color),m==active)));
-                foreach(string compatibility in m.CompatibilityGroups.Concat(v.CompatibilityGroups).Distinct(StringComparer.OrdinalIgnoreCase))
-                    groupBadges.Add(new KeyValuePair<string,Color>(compatibility,PackCoverage.CategoryColor("compat/"+compatibility.ToUpperInvariant())));
-                if(groupBadges.Count>0){
-                    var cell=row.Cells["Group"];cell.Tag=groupBadges;
-                    cell.Value=String.Join(" · ",groupBadges.Select(badge=>badge.Key));
-                    cell.ToolTipText=String.Join("\n",groupBadges.Select(badge=>badge.Key));
-                    row.Cells["Name"].ToolTipText=String.Join("\n",new[]{row.Cells["Name"].ToolTipText,
-                        T("Grupos · ","Groups · ")+String.Join(", ",groupBadges.Select(badge=>badge.Key))}
-                        .Where(value=>!String.IsNullOrWhiteSpace(value)));
-                    row.Height=64;
                 }
                 var branch=m==members[0]?CategoryBranch.First:CategoryBranch.Middle;
                 if(m==members[members.Count-1])branch|=CategoryBranch.Last;
@@ -581,7 +560,7 @@ internal sealed partial class GeneralModWindow : Form {
         var versions=IsBigBody(entry)
             ?BigBodyVersions(state.List.Mods,IsCyberpunk(state.Destination)&&GameEdition.HasPL(state.Destination))
                 .Where(work=>ActivePreset==null||ActivePreset.ModIds.Contains(work.Entry.Id)).ToList()
-            :entry.Variants.Where(variant=>variant!=active).Select(variant=>new Work{Entry=entry,Variant=variant}).ToList();
+            :entry.Variants.Skip(entry.Variants.Count>1?0:1).Select(variant=>new Work{Entry=entry,Variant=variant}).ToList();
         if(versions.Count==0)return;
         var cell=parent.Cells["Variant"];
         cell.Tag=versions;
@@ -589,22 +568,21 @@ internal sealed partial class GeneralModWindow : Form {
         cell.ToolTipText=T("Mostrar ou ocultar outras versões","Show or hide other versions");
         if(!expandedVersions.Contains(DrawerKey(entry)))return;
         bool body=IsBigBody(entry);
-        if(body)parent.Cells["Mark"].Tag="body-branch";
+        parent.Cells["Mark"].Tag="body-branch";
         for(int index=0;index<versions.Count;index++){
             var work=versions[index];
             string name=body&&work.BodyChoice==GeneralModLibrary.NaturalBody?"Hyst EBBN + RB (Natural)":work.Entry.Name;
             string label=body?BodyChoiceLabel(work.BodyChoice):work.Variant.Name;
-            bool chosen=body&&work.BodyChoice==ActiveBodyChoice(entry);
-            string status=body?(chosen?T("Selecionado","Selected"):T("Não selecionado","Not selected")):null;
-            var row=grid.Rows[grid.Rows.Add(null,name,label,status,null,body?BodyOptionSpace(work):null)];
+            bool chosen=body?work.BodyChoice==ActiveBodyChoice(entry):work.Variant==active;
+            string status=chosen?T("Selecionado","Selected"):T("Não selecionado","Not selected");
+            var row=grid.Rows[grid.Rows.Add(null,name,label,status,null,BodyOptionSpace(work))];
             row.Tag=work;
             row.Height=36;
             row.ReadOnly=true;
             row.Cells["Mark"].Tag=index==versions.Count-1?CategoryBranch.Last:CategoryBranch.Middle;
-            row.Cells["Name"].Style.ForeColor=row.Cells["Name"].Style.SelectionForeColor=GeneralStyle.Muted;
-            row.Cells["Name"].ToolTipText=body?T("Dê dois cliques para escolher esta opção. F2 abre os detalhes.","Double-click to select this option. F2 opens details."):
-                T("Dê dois cliques para abrir esta versão","Double-click to open this version");
-            if(body){
+            row.Cells["Name"].Style.ForeColor=row.Cells["Name"].Style.SelectionForeColor=chosen?GeneralStyle.Foreground:GeneralStyle.Muted;
+            row.Cells["Name"].ToolTipText=T("Dê dois cliques para escolher esta opção. F2 abre os detalhes.","Double-click to select this option. F2 opens details.");
+            {
                 row.Cells["Status"].Tag=chosen;
                 row.Cells["Status"].ToolTipText=GeneralStatusPresentation.Label(ListStatus(work.Entry));
                 row.Cells["Size"].ToolTipText=row.Cells["Size"].Value.ToString().StartsWith("≈",StringComparison.Ordinal)
@@ -618,7 +596,7 @@ internal sealed partial class GeneralModWindow : Form {
 
     string BodyOptionSpace(Work work){
         long installed;
-        if(IsActiveAlternative(work.Entry)&&measuredMods.TryGetValue(work.Entry.Id,out installed))return GeneralStorageSize.Format(installed);
+        if(work.Variant==Selected(work.Entry)&&IsActiveAlternative(work.Entry)&&measuredMods.TryGetValue(work.Entry.Id,out installed))return GeneralStorageSize.Format(installed);
         var sizes=work.Variant.Sources.Distinct(StringComparer.Ordinal).Select(source=>{
             GeneralSourceInfo info;
             return work.Variant.SourceInfo.TryGetValue(source,out info)?info.Bytes:0;
@@ -736,12 +714,7 @@ internal sealed partial class GeneralModWindow : Form {
             if(associationChoice==null&&e.ColumnIndex<=3){
                 bool active=e.ColumnIndex==1?categoryFilters!=null||!String.IsNullOrEmpty(nameFilter):e.ColumnIndex==2?variantFilters!=null:statusFilters!=null;
                 var bounds=e.CellBounds;
-                if(e.ColumnIndex==grid.Columns["Name"].Index){
-                    int split=GroupHeaderSplit(bounds.Width);
-                    PaintFilterHeader(e,new Rectangle(bounds.X,bounds.Y,split,bounds.Height),"Mods",active);
-                    PaintFilterHeader(e,new Rectangle(bounds.X+split,bounds.Y,Math.Min(112,bounds.Width-split),bounds.Height),
-                        T("Grupo","Group"),groupFilters!=null);
-                }else PaintFilterHeader(e,bounds,grid.Columns[e.ColumnIndex].HeaderText,active);
+                PaintFilterHeader(e,bounds,grid.Columns[e.ColumnIndex].HeaderText,active);
                 e.Handled=true;return;
             }
         }
@@ -761,7 +734,7 @@ internal sealed partial class GeneralModWindow : Form {
         }
         if(e.RowIndex>=0&&e.ColumnIndex==grid.Columns["Status"].Index&&grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Tag is bool){
             bool selected=(bool)grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Tag;
-            PaintBadge(e,Convert.ToString(e.FormattedValue),selected?Color.FromArgb(19,109,87):GeneralStyle.Selection,GeneralStyle.Foreground);
+            PaintBadge(e,Convert.ToString(e.FormattedValue),selected?Color.FromArgb(11,116,75):GeneralStyle.Line,selected?Color.White:GeneralStyle.Foreground);
             return;
         }
         if(e.RowIndex>=0&&e.ColumnIndex==grid.Columns["Variant"].Index&&grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Tag is List<Work>){
@@ -775,7 +748,7 @@ internal sealed partial class GeneralModWindow : Form {
             var item=grid.Rows[e.RowIndex].Tag;
             e.PaintBackground(e.ClipBounds,true);
             var bounds=e.CellBounds;
-            if(item is string||item is Work&&((Work)item).BodyChoice!=null){
+            if(item is string||item is Work){
                 var icon=new Rectangle(bounds.X+(bounds.Width-20)/2,bounds.Y+(bounds.Height-20)/2,20,20);
                 ModLoaderBrand.Draw(e.Graphics,icon,true);
             }else if(item is P2PSyncDifference){
@@ -799,68 +772,17 @@ internal sealed partial class GeneralModWindow : Form {
         string id=row.Tag as string;
         if(id==null&&child==null)return;
         var mod=child!=null?child.Entry:state.List.Mods.Single(m=>m.Id==id);
-        var tags=child==null||child.BodyChoice!=null?mod.Tags:Enumerable.Empty<string>();
-        var groups=row.Cells["Group"].Tag as List<KeyValuePair<string,Color>>;
-        if(!mod.Nsfw&&!tags.Any()&&groups==null)return;
+        if(!mod.Nsfw)return;
         string name=Convert.ToString(e.FormattedValue);
         e.PaintBackground(e.ClipBounds,true);
         var box=e.CellBounds;box.Inflate(-10,0);
-        if(groups!=null){
-            box.Height=41;
-            PaintGroupLabels(e,new Rectangle(box.X,box.Bottom,box.Width,19),groups);
-        }
-        int suffix=mod.Nsfw?52:0;
-        int tagSpace=tags.Any()?Math.Min(180,box.Width/3):0;
-        int nameWidth=Math.Min(Math.Max(1,box.Width-suffix-tagSpace),TextRenderer.MeasureText(name,e.CellStyle.Font).Width);
+        const int suffix=52;
+        int nameWidth=Math.Min(Math.Max(1,box.Width-suffix),TextRenderer.MeasureText(name,e.CellStyle.Font).Width);
         TextRenderer.DrawText(e.Graphics,name,e.CellStyle.Font,new Rectangle(box.X,box.Y,nameWidth,box.Height),e.CellStyle.ForeColor,TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine|TextFormatFlags.PreserveGraphicsClipping);
-        int x=box.X+nameWidth;
-        if(mod.Nsfw){
-            using(var font=GeneralStyle.Font(9.5f,true))
-                TextRenderer.DrawText(e.Graphics,"NSFW",font,new Rectangle(x+4,box.Y,suffix-4,box.Height),GeneralStyle.Danger,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.PreserveGraphicsClipping);
-            x+=suffix;
-        }
-        PaintInlineBadges(e,box,x+4,box.Right,tags.Select(tag=>new KeyValuePair<string,Color>(tag,GeneralStyle.Selection)));
+        using(var font=GeneralStyle.Font(9.5f,true))
+            TextRenderer.DrawText(e.Graphics,"NSFW",font,new Rectangle(box.X+nameWidth+4,box.Y,suffix-4,box.Height),GeneralStyle.Danger,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.PreserveGraphicsClipping);
         e.Handled=true;
     }
-    static void PaintGroupLabels(DataGridViewCellPaintingEventArgs e,Rectangle box,IEnumerable<KeyValuePair<string,Color>> groups){
-        var saved=e.Graphics.Save();
-        try{
-            e.Graphics.SetClip(Rectangle.Intersect(e.CellBounds,e.ClipBounds),System.Drawing.Drawing2D.CombineMode.Intersect);
-            using(var font=GeneralStyle.Font(9.5f,true)){
-                int left=box.X;
-                foreach(var group in groups){
-                    if(box.Right-left<22)break;
-                    string label=group.Key.ToUpperInvariant();
-                    int width=Math.Min(box.Right-left,TextRenderer.MeasureText(label,font).Width);
-                    var color=GeneralStyle.Dark?GroupBadgeColor(group.Value,true):GroupBadgeColor(group.Value,false);
-                    TextRenderer.DrawText(e.Graphics,label,font,new Rectangle(left,box.Y,width,box.Height),color,
-                        TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis|TextFormatFlags.PreserveGraphicsClipping);
-                    left+=width+12;
-                }
-            }
-        }finally{e.Graphics.Restore(saved);}
-    }
-
-    static void PaintInlineBadges(DataGridViewCellPaintingEventArgs e,Rectangle row,int left,int right,IEnumerable<KeyValuePair<string,Color>> badges){
-        var saved=e.Graphics.Save();
-        try{
-            e.Graphics.SetClip(Rectangle.Intersect(e.CellBounds,e.ClipBounds),System.Drawing.Drawing2D.CombineMode.Intersect);
-            e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            using(var font=GeneralStyle.Font(9.5f))
-                foreach(var badge in badges){
-                    if(right-left<30)break;
-                    int width=Math.Min(right-left,TextRenderer.MeasureText(badge.Key,font).Width+14);
-                    var rect=new Rectangle(left,row.Y+(row.Height-24)/2,width,24);
-                    using(var path=GeneralStyle.Round(rect,12))
-                    using(var brush=new SolidBrush(badge.Value))e.Graphics.FillPath(brush,path);
-                    rect.Inflate(-5,0);
-                    TextRenderer.DrawText(e.Graphics,badge.Key,font,rect,ContrastText(badge.Value),
-                        TextFormatFlags.VerticalCenter|TextFormatFlags.HorizontalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine|TextFormatFlags.PreserveGraphicsClipping);
-                    left+=width+5;
-                }
-        }finally{e.Graphics.Restore(saved);}
-    }
-    static int GroupHeaderSplit(int width){return Math.Min(105,width/2);}
     static void PaintFilterHeader(DataGridViewCellPaintingEventArgs e,Rectangle bounds,string label,bool active){
         var saved=e.Graphics.Save();
         try{
@@ -885,18 +807,6 @@ internal sealed partial class GeneralModWindow : Form {
         string raw=ListStatus(item);
         PaintBadge(e,GeneralStatusPresentation.Label(raw),GeneralStatusPresentation.ColorFor(raw),Color.White);
     }
-    static Color GroupBadgeColor(Color color,bool active){
-        return active?Color.FromArgb((color.R*2+255)/3,(color.G*2+255)/3,(color.B*2+255)/3):
-            Color.FromArgb(color.R*2/3,color.G*2/3,color.B*2/3);
-    }
-    static double LinearColor(int value){
-        double channel=value/255.0;
-        return channel<=0.04045?channel/12.92:Math.Pow((channel+0.055)/1.055,2.4);
-    }
-    static Color ContrastText(Color fill){
-        double luminance=0.2126*LinearColor(fill.R)+0.7152*LinearColor(fill.G)+0.0722*LinearColor(fill.B);
-        return luminance>=0.179?Color.Black:Color.White;
-    }
     static void PaintBadge(DataGridViewCellPaintingEventArgs e,string label,Color fill,Color textColor){
         e.PaintBackground(e.ClipBounds,true);e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         using(var font=GeneralStyle.Font(10.5f)){
@@ -917,18 +827,23 @@ internal sealed partial class GeneralModWindow : Form {
         var v=new GeneralModVariant{Id="default",Name=T("Principal","Main")};if(source!=null)v.Sources.Add(source);
         return new GeneralModEntry{Id="mod-"+Guid.NewGuid().ToString("N"),Name=name,DefaultVariant=v.Id,Variants=new List<GeneralModVariant>{v}};
     }
-    void OpenRowEditor(DataGridViewRow row){
+    async void OpenRowEditor(DataGridViewRow row){
         if(row==null)return;
         var id=row.Tag as string;
         if(id!=null){
             var mod=state.List.Mods.Single(item=>item.Id==id);
-            if(IsBigBody(mod)){if(!working&&!scanning)ToggleVersions(row);}
-            else Edit(mod);
+            Edit(mod);
         }
         else if(row.Tag is Work&&!scanning&&!working){
             var work=(Work)row.Tag;
             if(work.BodyChoice!=null)SelectBodyChoice(work);
-            else EditBodyOption(work);
+            else if(Selected(work.Entry)!=work.Variant){
+                BeginProjectEdit();
+                state.ChosenVariants[work.Entry.Id]=work.Variant.Id;
+                FinishProjectEdit();
+                DrawRows();
+                await Scan();
+            }
         }
         else if(row.Tag is P2PSyncDifference)EditDetectedMod((P2PSyncDifference)row.Tag);
     }
@@ -973,31 +888,21 @@ internal sealed partial class GeneralModWindow : Form {
                 }, downloadedSource:(variant,index)=>LocalSource(new Work{Entry=item,Variant=variant},index))){
                 DialogResult answer;
                 while((answer=dialog.ShowDialog(this))==DialogResult.Retry){
-                    bool dependency=dialog.PickingDependency;
-                    var linked=await PickAlternative(item.Id,dependency?null:dialog.LinkedAlternative,dependency);
-                    if(linked!=null){
-                        if(dependency)dialog.AddRequiredMod(linked);else dialog.SetLinkedAlternative(linked);
-                    }
+                    var linked=await PickAlternative(item.Id,null,true);
+                    if(linked!=null)dialog.AddRequiredMod(linked);
                     if(IsDisposed||exitApproved)return;
                 }
                 if(answer!=DialogResult.OK)return;
-                if(existing&&item.Variants.Any(old=>(state.SnapshotReceipts.ContainsKey(Key(item,old))||
-                    state.CyberpunkImports.Keys.Any(key=>key.StartsWith(Key(item,old)+"/",StringComparison.Ordinal)))&&
-                    dialog.Result.Variants.Any(replacement=>replacement.Id==old.Id&&!GeneralInstallRoutes.Same(old.InstallRoutes,replacement.InstallRoutes))))
-                    throw new IOException(T("Desinstale a versão registrada antes de mudar seu destino.","Uninstall the registered version before changing its destination."));
+                bool? moved=existing?await ChangeInstalledDestinations(item,dialog.Result):false;
+                if(!moved.HasValue)return;
                 BeginProjectEdit();
-                if(working||IsBigBody(item))dialog.Result.AlternativeGroup=item.AlternativeGroup;
-                else{
-                    GeneralModLibrary.AssociateAlternative(dialog.Result,dialog.LinkedAlternative);
-                    if(dialog.Result.AlternativeGroup!=null&&dialog.GroupStyle!=null)
-                        state.List.AlternativeGroups[dialog.Result.AlternativeGroup]=dialog.GroupStyle;
-                }
+                dialog.Result.AlternativeGroup=item.AlternativeGroup;
                 var editedVariant=dialog.Result.Variants.Single(variant=>variant.Id==dialog.SelectedVariant);
                 bool needsScan=!existing||selected.Id!=editedVariant.Id||
                     !selected.Sources.SequenceEqual(editedVariant.Sources,StringComparer.Ordinal)||!GeneralInstallRoutes.Same(selected.InstallRoutes,editedVariant.InstallRoutes);
                 if(existing)ApplyCategoryName(dialog.CategoryRenameFrom,dialog.Result);
                 ApplyEdited(item,dialog.Result,dialog.SelectedVariant,existing,dialog.NewCategories);
-                if(fromInventory)SaveProjectEdits();
+                if(fromInventory||moved.Value)SaveProjectEdits();
                 if(dialog.InstallRequested){SaveProjectEdits();ConfirmUrgentInstall(dialog.Result);}
                 else if(!working&&needsScan)await Scan();
             }

@@ -9,7 +9,7 @@ public static partial class InstalledSnapshot {
             .SelectMany(mod=>mod.Variants).Any(variant=>variant.InstallRoutes.Count>0);
     }
 
-    internal static List<string> SkipMissingDestinations(InstalledSnapshotManifest manifest,string game,Func<string[],bool> approveUserFolders) {
+    internal static List<string> SkipMissingDestinations(InstalledSnapshotManifest manifest,FixedCatalog catalog,string game,Func<string[],bool> approveUserFolders) {
         if(manifest.Schema!=2)return new List<string>();
         var unavailable=new HashSet<string>(StringComparer.Ordinal);
         var personal=new Dictionary<string,string[]>(StringComparer.Ordinal);
@@ -28,8 +28,14 @@ public static partial class InstalledSnapshot {
         bool changed;
         do{
             changed=false;
-            foreach(var mod in manifest.List.Mods.Where(mod=>mod.Variants.Single().RequiredMods.Any(unavailable.Contains)))
-                changed|=unavailable.Add(mod.Id);
+            var availableRecipes=new HashSet<string>(manifest.List.Mods.Where(mod=>!unavailable.Contains(mod.Id))
+                .Select(mod=>mod.Variants.Single().CyberpunkId).Where(id=>id!=null),StringComparer.Ordinal);
+            foreach(var mod in manifest.List.Mods.Where(mod=>!unavailable.Contains(mod.Id))){
+                var variant=mod.Variants.Single();
+                if(variant.RequiredMods.Any(unavailable.Contains)||variant.CyberpunkId!=null&&
+                    FixedRecipe(catalog,variant).Dependencies.Any(id=>!availableRecipes.Contains(id)))
+                    changed|=unavailable.Add(mod.Id);
+            }
         }while(changed);
         var skipped=manifest.List.Mods.Where(mod=>unavailable.Contains(mod.Id)).Select(mod=>mod.Id).ToList();
         var remaining=new HashSet<string>(manifest.List.Mods.Where(mod=>!unavailable.Contains(mod.Id))
@@ -52,7 +58,10 @@ public static partial class InstalledSnapshot {
         if(variant.CyberpunkId!=null){
             var recipe=FixedRecipe(catalog,variant);
             var paths=recipe.Id==NightCityDensity.ModId?NightCityDensity.KnownFiles(recipe):recipe.Files;
-            return paths.Where(f=>!f.UserData).All(f=>!File.Exists(Safe.In(root,f.Path))&&!Directory.Exists(Safe.In(root,f.Path)));
+            var mapped=GeneralInstallRoutes.FixedPaths(catalog,recipe,variant.InstallRoutes);
+            return paths.Where(f=>!f.UserData).Select(f=>f.Path).Concat(recipe.Files.Where(f=>!f.UserData).Select(f=>mapped[f.Path]))
+                .Distinct(StringComparer.OrdinalIgnoreCase).Select(path=>GeneralInstallRoutes.Resolve(root,path))
+                .All(path=>!File.Exists(path)&&!Directory.Exists(path));
         }
         if(IsCyberpunk(root)&&HasManualHystFiles(mod.Id,root))return false;
         for(int i=0;i<variant.Sources.Count;i++){

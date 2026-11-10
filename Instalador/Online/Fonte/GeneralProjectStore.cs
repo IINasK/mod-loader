@@ -180,13 +180,15 @@ internal sealed class GeneralProjectStore {
             GeneralModEntry before;
             if(!original.TryGetValue(mod.Id,out before))continue;
             foreach(var variant in mod.Variants){
-                if(!before.Variants.Any(item=>item.Id==variant.Id&&item.Sources.SequenceEqual(variant.Sources,StringComparer.Ordinal)))continue;
+                var oldVariant=before.Variants.SingleOrDefault(item=>item.Id==variant.Id&&item.Sources.SequenceEqual(variant.Sources,StringComparer.Ordinal));
+                if(oldVariant==null)continue;
+                bool sameRoutes=GeneralInstallRoutes.Same(oldVariant.InstallRoutes,variant.InstallRoutes);
                 string owner=InstalledSnapshot.Owner(mod,variant),value;
-                if(sameRoot&&previous.SnapshotReceipts.TryGetValue(owner,out value))received.SnapshotReceipts[owner]=value;
+                if(sameRoot&&sameRoutes&&previous.SnapshotReceipts.TryGetValue(owner,out value))received.SnapshotReceipts[owner]=value;
                 for(int index=0;index<variant.Sources.Count;index++){
                     string slot=P2PPack.Slot(mod,variant,index);
                     if(previous.ResolvedDownloads.TryGetValue(slot,out value))received.ResolvedDownloads[slot]=value;
-                    if(sameRoot&&previous.CyberpunkImports.TryGetValue(slot,out value))received.CyberpunkImports[slot]=value;
+                    if(sameRoot&&sameRoutes&&previous.CyberpunkImports.TryGetValue(slot,out value))received.CyberpunkImports[slot]=value;
                 }
             }
         }

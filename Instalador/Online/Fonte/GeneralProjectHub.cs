@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -43,6 +43,11 @@ internal sealed partial class GeneralModWindow {
     }
     string ModSpace(GeneralModEntry mod){
         if(GeneralModLibrary.NeedsDependencyVersion(mod,Selected(mod)))return "";
+        if(IsBigBody(mod)){
+            var selected=BigBodyVersions(new[]{mod},IsCyberpunk(state.Destination)&&GameEdition.HasPL(state.Destination))
+                .Single(work=>work.BodyChoice==ActiveBodyChoice(mod));
+            return BodyOptionSpace(selected);
+        }
         long bytes;if(measuredMods.TryGetValue(mod.Id,out bytes))return GeneralStorageSize.Format(bytes);
         var info=DependencySize(mod);
         return info!=null?(info.SizeApproximate?"≈ ":"")+GeneralStorageSize.Format(info.Bytes):mod.DependencySource==null?"—":"";
@@ -55,7 +60,7 @@ internal sealed partial class GeneralModWindow {
         }
         foreach(DataGridViewRow row in grid.Rows){
             var work=row.Tag as Work;
-            if(work!=null&&work.BodyChoice!=null)row.Cells["Size"].Value=BodyOptionSpace(work);
+            if(work!=null)row.Cells["Size"].Value=BodyOptionSpace(work);
             var section=row.Tag as SectionRow;
             if(section!=null&&section.Kind=="heading"){
                 section.Size=CategorySize(section.ModIds);

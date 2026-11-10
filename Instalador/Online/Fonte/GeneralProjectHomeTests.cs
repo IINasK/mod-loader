@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -249,6 +249,9 @@ internal sealed partial class GeneralModWindow {
             check(new GeneralModLibrary(Path.Combine(form.data,"lista.json")).Load().BodyChoice==GeneralModLibrary.NaturalBody&&
                 form.SelectedJobs().Single().BodyChoice==GeneralModLibrary.NaturalBody,
                 "Selecionar Natural salva a escolha e a fila usa a seleção da gaveta.");
+            var selectedOption=form.grid.Rows.Cast<DataGridViewRow>().Single(row=>row.Tag is Work&&Equals(row.Cells["Status"].Tag,true));
+            check(Equals(form.ModRows().Single(row=>Equals(row.Cells["Name"].Value,"Big Body")).Cells["Size"].Value,
+                selectedOption.Cells["Size"].Value),"A linha principal mostra o tamanho da variante escolhida.");
             check(form.ToggleVersions(form.ModRows().Single(row=>(string)row.Cells["Name"].Value=="Big Body"))&&
                 !form.grid.Rows.Cast<DataGridViewRow>().Any(row=>row.Tag is Work),
                 "A gaveta fecha sem duplicar itens selecionáveis.");

@@ -67,7 +67,7 @@ public sealed partial class InstalledSnapshotInstaller {
                         GeneralInstallRoutes.CheckFolders(destination,pending[0].Manifest.List.Mods.SelectMany(mod=>mod.Variants.Single().InstallRoutes));
                     return Resume(pending[0],report,checkpoint,progress);
                 }
-                var skippedDestinations=InstalledSnapshot.SkipMissingDestinations(manifest,destination,approveUserFolders);
+                var skippedDestinations=InstalledSnapshot.SkipMissingDestinations(manifest,catalog,destination,approveUserFolders);
                 if(manifest.Files.Select(file=>file.Path).Distinct(StringComparer.OrdinalIgnoreCase).GroupBy(Target,StringComparer.OrdinalIgnoreCase).Any(group=>group.Count()>1))
                     throw new IOException("O pacote aponta mais de um arquivo para o mesmo destino.");
                 var complete=receipts.FirstOrDefault(r=>r.Status=="installed"&&r.ActiveOwners.Count==WorkKeys(manifest).Count()&&SameManifest(r.Manifest,manifest)&&r.Files.All(Matches));
@@ -339,6 +339,94 @@ public sealed partial class InstalledSnapshotInstaller {
         return present==0?GeneralModInstaller.Missing:present==expected?GeneralModInstaller.Installed:GeneralModInstaller.Partial;
     }
 
+    internal bool Relocate(string receiptId, string workKey, List<GeneralInstallRoute> before,
+        List<GeneralInstallRoute> after, Func<string,bool> shared) {
+        var initial = Read(receiptId);
+        if (initial == null) return false;
+        using (AcquireLock(initial.Manifest.Game)) {
+            var receipt = Read(receiptId);
+            Closed(receipt.Manifest.Game);
+            if (receipt.Status != "installed" || !receipt.ActiveOwners.Contains(workKey))
+                throw new IOException("O mod não tem instalação ativa neste recibo.");
+            var receipts = AllReceipts().ToList();
+            if (receipts.Any(other => other.Status == "preparing" || other.Status == "installing"))
+                throw new IOException("Conclua a instalação interrompida antes de mover arquivos.");
+
+            var manifest = receipt.Manifest;
+            var mod = manifest.List.Mods.Single(item => InstalledSnapshot.Owner(item, item.Variants.Single()) == workKey);
+            var variant = mod.Variants.Single();
+            if (variant.CyberpunkId == null)
+                throw new IOException("Este recibo não contém os caminhos originais. Reimporte o pacote original para alterar o destino.");
+            if (!GeneralInstallRoutes.Same(before, variant.InstallRoutes))
+                throw new IOException("O destino atual difere do recibo da instalação.");
+            var localCatalog = NightCoopRelease.CatalogForReceipt(catalog, manifest);
+            var recipe = InstalledSnapshot.FixedRecipe(localCatalog, variant);
+            var current = GeneralInstallRoutes.FixedPaths(localCatalog, recipe, before);
+            var next = GeneralInstallRoutes.FixedPaths(localCatalog, recipe, after);
+            GeneralInstallRoutes.CheckFolders(destination, after);
+            var existing = new HashSet<string>(receipts.Where(other => other.Id != receiptId && other.Status == "installed")
+                .SelectMany(other => other.Manifest.Files.Where(file => file.Owners.Any(other.ActiveOwners.Contains)))
+                .Select(file => Target(file.Path)), StringComparer.OrdinalIgnoreCase);
+            var changes = new List<SnapshotMove>();
+            foreach (var file in recipe.Files.Where(file => !file.UserData)) {
+                string oldPath = current[file.Path], newPath = next[file.Path];
+                var change = receipt.Files.Single(item => item.Path.Equals(oldPath, StringComparison.OrdinalIgnoreCase));
+                if (!change.Applied || change.Reverted || !Matches(change))
+                    throw new IOException("Arquivo de origem ausente ou alterado: " + oldPath);
+                if (oldPath.Equals(newPath, StringComparison.OrdinalIgnoreCase)) continue;
+                var payload = manifest.Files.Single(item => item.Kind == "file" && item.Path.Equals(oldPath, StringComparison.OrdinalIgnoreCase));
+                string source = Target(oldPath), target = Target(newPath);
+                if (!change.Owned || change.Before != null || payload.Owners.Count != 1 ||
+                    existing.Contains(source) || existing.Contains(target) || shared != null && (shared(source) || shared(target)))
+                    throw new IOException("O arquivo é compartilhado, preexistente ou substitui um arquivo anterior: " + oldPath);
+                if (File.Exists(target) || Directory.Exists(target) || changes.Any(item => item.Target.Equals(target, StringComparison.OrdinalIgnoreCase)))
+                    throw Conflict(newPath);
+                changes.Add(new SnapshotMove { Source = source, Target = target, Path = newPath, Hash = change.After });
+                payload.Path = newPath;
+                change.Path = newPath;
+            }
+            if (manifest.Project == null)
+                manifest.Project = Safe.Json.Deserialize<GeneralModList>(Safe.Json.Serialize(manifest.List));
+            manifest.Schema = 2;
+            manifest.Project.Mods.Single(item => item.Id == mod.Id).Variants.Single(item => item.Id == variant.Id).InstallRoutes = after;
+            variant.InstallRoutes = after;
+            receipt.PackageHash = null;
+            InstalledSnapshot.Validate(manifest, localCatalog);
+
+            var directories = new List<string>();
+            var copied = new List<SnapshotMove>();
+            var removed = new List<SnapshotMove>();
+            try {
+                foreach (var move in changes) {
+                    Closed(manifest.Game);
+                    CreateParents(move.Path, directories);
+                    ReplaceChecked(move.Source, move.Target, move.Hash, null);
+                    copied.Add(move);
+                }
+                foreach (var move in changes) {
+                    Closed(manifest.Game);
+                    if (HashOrNull(move.Target) != move.Hash) throw Conflict(move.Path);
+                    DeleteChecked(move.Source, move.Hash);
+                    removed.Add(move);
+                }
+                Save(receipt);
+            } catch {
+                foreach (var move in removed.AsEnumerable().Reverse())
+                    TryCleanup(() => ReplaceChecked(move.Target, move.Source, move.Hash, null));
+                foreach (var move in copied.AsEnumerable().Reverse())
+                    TryCleanup(() => { if (HashOrNull(move.Source) == move.Hash) DeleteChecked(move.Target, move.Hash); });
+                foreach (string directory in directories.AsEnumerable().Reverse())
+                    TryCleanup(() => DeleteEmpty(directory));
+                throw;
+            }
+            return true;
+        }
+    }
+
+    sealed class SnapshotMove {
+        internal string Source, Target, Path, Hash;
+    }
+
     public string Remove(string receiptId, IEnumerable<string> workKeys, Action<string> report, bool forgetOnly=false, Func<string,bool> preserveExternal=null) {
         var initial = Read(receiptId);
         if (initial == null) return "Nenhum snapshot instalado para remover.";
@@ -547,6 +635,7 @@ public sealed partial class InstalledSnapshotInstaller {
             if (expectedCurrent == null) File.Move(temp, target); else File.Replace(temp, target, null);
         } finally { TryCleanup(() => { Safe.NoLinks(temp); if (File.Exists(temp)) File.Delete(temp); }); }
     }
+    internal static void DeleteVerified(string target, string expected) { DeleteChecked(target, expected); }
     static void DeleteChecked(string target, string expected) {
         Safe.NoLinks(target);
         // Keep writers out during the final comparison. Validate before requesting deletion.

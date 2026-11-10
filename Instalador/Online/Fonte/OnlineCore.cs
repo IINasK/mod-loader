@@ -198,6 +198,7 @@ public sealed partial class DownloadCache {
             report("Importando "+a.Name);Import(file,a);wanted.RemoveAll(x=>x.Sha256==hash);count++;
         }return count;
     }
+    const long MaxPreparedBytes=8L*1024*1024*1024;
     public void Stage(FixedMod mod,string stage,Action<string> report) {
         using(HoldOperation()) {
         foreach(var a in mod.Assets) {
@@ -215,7 +216,7 @@ public sealed partial class DownloadCache {
                         if(((e.ExternalAttributes>>16)&0xF000)==0xA000||entries.ContainsKey(e.FullName))throw new IOException("Link ou entrada duplicada no ZIP.");
                         entries.Add(e.FullName,e);
                     }
-                    foreach(var f in files){currentEntry=f.Entry;ZipArchiveEntry e;if(!entries.TryGetValue(f.Entry,out e))throw new IOException("Arquivo previsto não encontrado dentro do pacote.");if(e.Length>8L*1024*1024*1024)throw new IOException("Arquivo ultrapassa o limite de leitura segura de 8 GiB.");using(var s=e.Open())WritePrepared(s,stage,f);report(mod.Name);}
+                    foreach(var f in files){currentEntry=f.Entry;ZipArchiveEntry e;if(!entries.TryGetValue(f.Entry,out e))throw new IOException("Arquivo previsto não encontrado dentro do pacote.");if(e.Length>MaxPreparedBytes)throw new IOException("Arquivo ultrapassa o limite de leitura segura de "+GeneralStorageSize.Format(MaxPreparedBytes)+".");using(var s=e.Open())WritePrepared(s,stage,f);report(mod.Name);}
                 }
             } else if(a.Format=="raw") {foreach(var f in files){currentEntry=f.Path;using(var s=File.OpenRead(source))WriteVerified(s,stage,f);}}
             else {
@@ -240,7 +241,7 @@ public sealed partial class DownloadCache {
         string dest=Safe.In(stage,f.Path);Directory.CreateDirectory(Path.GetDirectoryName(dest));
         using(var output=new FileStream(dest,FileMode.CreateNew,FileAccess.Write,FileShare.None))using(var sha=SHA256.Create()){
             var buffer=new byte[65536];long total=0;int n;
-            while((n=input.Read(buffer,0,buffer.Length))>0){total+=n;if(total>8L*1024*1024*1024)throw new IOException("Arquivo ultrapassa o limite de leitura segura de 8 GiB: "+f.Path);output.Write(buffer,0,n);sha.TransformBlock(buffer,0,n,buffer,0);}
+            while((n=input.Read(buffer,0,buffer.Length))>0){total+=n;if(total>MaxPreparedBytes)throw new IOException("Arquivo ultrapassa o limite de leitura segura de "+GeneralStorageSize.Format(MaxPreparedBytes)+": "+f.Path);output.Write(buffer,0,n);sha.TransformBlock(buffer,0,n,buffer,0);}
             sha.TransformFinalBlock(new byte[0],0,0);string hash=Safe.Hex(sha.Hash);if(!FpvCustomization.MatchesFile(f,total,hash))throw new FileContentMismatchException(f,total,hash);
         }
     }

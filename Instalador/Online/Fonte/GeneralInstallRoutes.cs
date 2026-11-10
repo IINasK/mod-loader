@@ -139,6 +139,45 @@ internal static class GeneralInstallRoutes {
         return Prefix + route.Destination + FileMarker + remainder;
     }
 
+    internal static Dictionary<string, string> FixedPaths(FixedCatalog catalog, FixedMod mod, List<GeneralInstallRoute> routes) {
+        Validate(routes);
+        var paths = mod.Files.ToDictionary(file => file.Path, file => Map(file.Path, routes, file.Path), StringComparer.OrdinalIgnoreCase);
+        if (routes.Count == 0) return paths;
+        if (mod.Immutable || mod.Id == "NightCoop" || mod.Id == NightCityDensity.ModId || mod.Id == EquipmentExOptions.ModId ||
+            mod.Id == RetiredPackEntries.DroneId || mod.Files.Any(file => file.UserData || file.Patch != null) ||
+            (catalog.Defaults != null && catalog.Defaults.Any(config => config.ModId == mod.Id)))
+            throw new IOException(GeneralStyle.T("Este mod usa destinos protegidos pelo catálogo.", "This mod uses destinations protected by the catalog."));
+
+        var reserved = catalog.Packages.SelectMany(NightCityDensity.KnownFiles).Select(file => file.Path)
+            .Concat(catalog.Defaults == null ? Enumerable.Empty<string>() : catalog.Defaults.Select(config => config.Path))
+            .Concat(new[] { "bin/x64/Cyberpunk2077.exe" }).ToArray();
+        var protectedFolders = catalog.Packages.SelectMany(item => item.ExclusiveCodeDirectories ?? new string[0]).ToArray();
+        var incompatiblePaths = catalog.Packages.SelectMany(item => item.IncompatiblePaths ?? new string[0]).ToArray();
+        var mapped = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in paths) {
+            if (!mapped.Add(path.Value)) throw Invalid();
+            if (String.Equals(path.Key, path.Value, StringComparison.OrdinalIgnoreCase)) continue;
+            if (External(path.Value)) {
+                var parts = SplitExternal(path.Value);
+                if (!InstalledSnapshot.SafeGenericPath(parts[0].Substring(parts[0].IndexOf('/') + 1) + "/" + parts[1]))
+                    throw Invalid();
+            } else if (!InstalledSnapshot.SafeGenericPath(path.Value) || RetiredPackEntries.LocalDronePath(path.Value) ||
+                reserved.Any(item => Overlaps(item, path.Value)) || protectedFolders.Any(item => Overlaps(item, path.Value)) ||
+                incompatiblePaths.Any(item => Overlaps(item, path.Value)))
+                throw new IOException(GeneralStyle.T("Destino protegido pelo catálogo: ", "Destination protected by the catalog: ") + path.Value);
+        }
+        foreach (var path in mapped)
+            for (int separator = path.LastIndexOf('/'); separator >= 0; separator = path.LastIndexOf('/', separator - 1))
+                if (mapped.Contains(path.Substring(0, separator))) throw Invalid();
+        return paths;
+    }
+
+    static bool Overlaps(string first, string second) {
+        return first.Equals(second, StringComparison.OrdinalIgnoreCase) ||
+            first.StartsWith(second + "/", StringComparison.OrdinalIgnoreCase) ||
+            second.StartsWith(first + "/", StringComparison.OrdinalIgnoreCase);
+    }
+
     internal static bool External(string path) { return path != null && path.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase); }
 
     static string[] SplitExternal(string path) {

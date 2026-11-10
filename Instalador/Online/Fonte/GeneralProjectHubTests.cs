@@ -60,7 +60,10 @@ internal sealed partial class GeneralModWindow {
         var reading=Task.Run(()=>{for(int i=0;i<25;i++)GeneralProjectStorage.Measure(store,catalog,cache);});
         for(int i=0;i<25;i++){var state=store.Load(first);state.Language=i%2==0?"en":"pt";new GeneralModLibrary(Path.Combine(store.DataPath(first),"lista.json")).Save(state);store.SavePreferences("light","pt",root);}
         reading.GetAwaiter().GetResult();check(store.Load(first).List.Mods.Count==1,"Background size reads never block concurrent project saves.");
-        check(GeneralStorageSize.Format(1536).EndsWith("KiB"),"Size labels use explicit binary units.");
+        check(GeneralStorageSize.Format(999)=="999 B"&&GeneralStorageSize.Format(1000)=="1 KB"&&
+            GeneralStorageSize.Format(1000000)=="1 MB"&&GeneralStorageSize.Format(1000000000)=="1 GB",
+            "Size labels use powers of 1000 at each unit boundary.");
+        check(GeneralStorageSize.Format(1536)==1.54m.ToString()+" KB","Size labels round decimal units using the current locale.");
         string snapshot=Path.Combine(root,"snapshot.zip");InstalledSnapshot.Create(snapshot,store.Load(first),new[]{entry.Id},catalog,store.DataPath(first),false,null);
         using(var archive=System.IO.Compression.ZipFile.OpenRead(snapshot))using(var reader=new StreamReader(archive.GetEntry("manifest.json").Open()))check(!reader.ReadToEnd().Contains(zip.Replace("\\","\\\\")),"Installed sharing does not retain local metadata source paths.");
         TestForm(catalog,new GeneralModState{List=new GeneralModList(),Destination=game,DownloadFolder=root},Path.Combine(root,"ui"),root,async form=>{
@@ -252,6 +255,9 @@ internal sealed partial class GeneralModWindow {
                 int height=grip.Parent.Height;
                 typeof(Control).GetMethod("OnKeyDown",BindingFlags.Instance|BindingFlags.NonPublic)
                     .Invoke(grip,new object[]{new KeyEventArgs(Keys.Down)});
+                check(grip.Bottom<=grip.Parent.ClientSize.Height-8&&grip.Right<=grip.Parent.ClientSize.Width-8&&
+                    descriptionView.Bottom<=grip.Top&&grip.BackColor==GeneralStyle.Surface,
+                    "The resize grip stays inside the themed surface with its own space below the description.");
                 check(descriptionView.Bar.Limit>0&&grip.Parent.Height>height,
                     "Description keeps its own scrollbar and grows on command from its resize grip.");
                 CaptureUi(editor,Path.Combine(root,"editor-themed-controls.png"));
@@ -302,37 +308,64 @@ internal sealed partial class GeneralModWindow {
                     editor.Result.Variants.Select(version=>version.Name).SequenceEqual(new[]{"Preferida editada","Original","Quarta"}),
                     "The first version is saved as default and an explicitly selected version stays selected.");
             }
-            using(var destinations=new GeneralArchiveDestinations(new[]{"plugins/one.dll","plugins/data/two.txt"},new GeneralInstallRoute[0],root,true)){
+            string[] archivePaths=new[]{"plugins/one.dll","plugins/data/two.txt"}
+                .Concat(Enumerable.Range(0,30).Select(index=>"plugins/file"+index+".txt")).ToArray();
+            using(var destinations=new GeneralArchiveDestinations(archivePaths,new GeneralInstallRoute[0],root,true)){
                 destinations.Show(owner);
-                var tree=(TreeView)destinations.Controls.Find("ArchiveFileTree",true).Single();
-                check(tree.Nodes.Count==1&&tree.Nodes[0].Nodes[0].Text=="plugins"&&
-                    tree.Nodes[0].Nodes[0].Nodes.Cast<TreeNode>().Any(node=>(string)node.Tag=="plugins/data"),
+                var tree=(ListBox)destinations.Controls.Find("ArchiveFileTree",true).Single();
+                var nodes=tree.Items.Cast<TreeNode>().ToDictionary(node=>(string)node.Tag);
+                check(nodes["plugins/data"].Parent==nodes["plugins"]&&nodes["plugins/data/two.txt"].Parent==nodes["plugins/data"],
                     "The archive keeps its folder hierarchy and relative paths for routing.");
-                var target=destinations.Controls.Find("ArchiveDestinationDrop",true).Single();
-                var dragged=tree.Nodes[0].Nodes[0].Nodes.Cast<TreeNode>().Single(item=>item.Text=="one.dll");
-                var data=new DataObject();data.SetData(typeof(TreeNode),dragged);
+                var view=(GeneralScrollView)tree.Parent.Parent;
+                view.RefreshScroll();
+                check(view.Bar.Visible&&view.Bar.Limit>0&&!tree.HorizontalScrollbar,"The archive tree uses the styled vertical scrollbar.");
+
+                var current=(TextBox)destinations.Controls.Find("ArchiveCurrentDestination",true).Single();
+                var target=(TextBox)destinations.Controls.Find("ArchiveNewDestination",true).Single();
+                check(current.ReadOnly&&current.BorderStyle==BorderStyle.None&&current.Text=="%GAME%"&&!target.ReadOnly,"The root shows its current location and a separate editable destination.");
+                target.Text=Path.Combine(root,"relocated");
+                tree.SelectedItem=nodes["plugins/data"];
+                check(current.Text=="%GAME%/plugins/data"&&target.Text.Length==0,"A folder can be routed without changing its expected location.");
+                target.Text="%GAME%/Data";
+                tree.SelectedItem=nodes["plugins/data/two.txt"];
+                check(current.Text=="%GAME%/plugins/data/two.txt","Selecting a file shows its full current location.");
+                target.Text="%GAME%/Temporary";
+                AllControls(destinations).OfType<Button>().Single(button=>button.Text=="Resetar").PerformClick();
+                check(target.Text.Length==0,"Reset removes only the selected override.");
+                var data=new DataObject();data.SetData(typeof(TreeNode),nodes["plugins/one.dll"]);
                 typeof(Control).GetMethod("OnDragDrop",BindingFlags.Instance|BindingFlags.NonPublic)
                     .Invoke(target,new object[]{new DragEventArgs(data,0,0,0,DragDropEffects.Move,DragDropEffects.Move)});
-                check(destinations.Routes.Count==1&&destinations.Routes[0].Folder=="plugins/one.dll"&&
-                    destinations.Routes[0].Destination=="%GAME%","Dragging an archive file records a portable route to the selected folder.");
+                check(tree.SelectedItem==nodes["plugins/one.dll"]&&target.Text=="%GAME%","Dragging a file to the destination field assigns a portable override.");
+                check(destinations.Routes.Count==0,"Route drafts do not modify the result before Apply.");
+                CaptureUi(destinations,Path.Combine(root,"editor-archive-destinations.png"));
+                AllControls(destinations).OfType<Button>().Single(button=>button.Text=="Aplicar").PerformClick();
+                check(destinations.DialogResult==DialogResult.OK&&destinations.Routes.Count==3&&
+                    destinations.Routes.Any(route=>route.Folder==""&&route.Destination=="%GAME%/relocated")&&
+                    destinations.Routes.Any(route=>route.Folder=="plugins/data"&&route.Destination=="%GAME%/Data")&&
+                    destinations.Routes.Any(route=>route.Folder=="plugins/one.dll"&&route.Destination=="%GAME%"),
+                    "Apply keeps edits to the root, folder and file together.");
                 destinations.Close();
             }
             using(var emptyTree=new GeneralArchiveDestinations(new string[0],new GeneralInstallRoute[0],root,true)){
                 emptyTree.Show(owner);
-                var tree=(TreeView)emptyTree.Controls.Find("ArchiveFileTree",true).Single();
-                check(tree.Nodes.Count==1&&tree.Nodes[0].Nodes.Count==0&&AllControls(emptyTree).OfType<Button>()
+                var tree=(ListBox)emptyTree.Controls.Find("ArchiveFileTree",true).Single();
+                check(tree.Items.Count==1&&AllControls(emptyTree).OfType<Button>()
                     .Any(button=>button.Text=="Escolher pasta"&&button.Enabled&&button.Visible),
                     "No Nexus preview still leaves a usable destination picker for the entire archive.");
+                var target=(TextBox)emptyTree.Controls.Find("ArchiveNewDestination",true).Single();
+                target.Text="%GAME%/Draft";
+                AllControls(emptyTree).OfType<Button>().Single(button=>button.Text=="Cancelar").PerformClick();
+                check(emptyTree.DialogResult==DialogResult.Cancel&&emptyTree.Routes.Count==0,"Cancel leaves the original routes intact.");
                 emptyTree.Close();
             }
-            var fixedMod=NewEntry("Destino fixo",source);
+            var fixedMod=NewEntry("Destino do catálogo",source);
             fixedMod.Variants[0].CyberpunkId="fixed-fixture";
-            using(var locked=new GeneralModEditor(fixedMod,new string[0],"default",true,"")){
-                var browse=EditorField<Button>(locked,"browseDestination");
-                var routes=EditorField<TextBox>(locked,"installRoutes");
+            using(var fixedEditor=new GeneralModEditor(fixedMod,new string[0],"default",true,"")){
+                var browse=EditorField<Button>(fixedEditor,"browseDestination");
+                var routes=EditorField<TextBox>(fixedEditor,"installRoutes");
                 var label=((TableLayoutPanel)browse.Parent).GetControlFromPosition(0,0);
-                check(!browse.Enabled&&routes.ReadOnly&&label.Enabled&&label.ForeColor==GeneralStyle.Foreground,
-                    "A catalog destination remains read-only while its dark-theme label stays legible.");
+                check(browse.Enabled&&!routes.ReadOnly&&routes.Text==""&&label.Enabled&&label.ForeColor==GeneralStyle.Foreground,
+                    "A catalog destination can be edited and its dark-theme label stays legible.");
             }
             using(var editor=new GeneralModEditor(mod,new string[0],preferred.Id,true,"")){
                 editor.Show(owner);

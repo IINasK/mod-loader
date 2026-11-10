@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.Drawing;
@@ -55,9 +55,23 @@ internal static class GeneralStyle {
         if(selected)using(var path=Round(new RectangleF(bounds.X+2,bounds.Y+2,Math.Max(1,bounds.Width-4),Math.Max(1,bounds.Height-4)),12))
             using(var brush=new SolidBrush(Selection))graphics.FillPath(brush,path);
     }
+    const int PopupRadius=18;
+    internal static GraphicsPath PopupShape(Size size){
+        return Round(new RectangleF(0,0,Math.Max(1,size.Width),Math.Max(1,size.Height)),PopupRadius);
+    }
     internal static void PaintCard(Graphics graphics,Size size){
-        graphics.SmoothingMode=SmoothingMode.AntiAlias;graphics.Clear(Surface);
-        PaintRoundedFace(graphics,new RectangleF(0,0,size.Width,size.Height),18,Line,Surface);
+        // The native window mask already defines the outer edge of this border.
+        using(var border=new SolidBrush(Line))graphics.FillRectangle(border,0,0,size.Width,size.Height);
+        var inside=new RectangleF(0,0,size.Width,size.Height);
+        inside.Inflate(-RoundedFaceBorder,-RoundedFaceBorder);
+        if(inside.Width<=0||inside.Height<=0)return;
+        var state=graphics.Save();
+        try {
+            graphics.SmoothingMode=SmoothingMode.AntiAlias;
+            graphics.PixelOffsetMode=PixelOffsetMode.Half;
+            using(var face=Round(inside,PopupRadius-RoundedFaceBorder))using(var brush=new SolidBrush(Surface))
+                graphics.FillPath(brush,face);
+        } finally { graphics.Restore(state); }
     }
     internal const int RoundedFaceInset=2;
     internal const int RoundedFaceBorder=2;
@@ -76,7 +90,7 @@ internal static class GeneralStyle {
         } finally { graphics.PixelOffsetMode=pixelOffset; }
     }
     internal static void ClipCardBody(Control control){
-        using(var shape=Round(new RectangleF(0,0,Math.Max(1,control.Width),Math.Max(1,control.Height)),18-RoundedFaceClearance)){
+        using(var shape=Round(new RectangleF(0,0,Math.Max(1,control.Width),Math.Max(1,control.Height)),PopupRadius-RoundedFaceClearance)){
             var previous=control.Region;control.Region=new Region(shape);if(previous!=null)previous.Dispose();
         }
     }
@@ -168,7 +182,7 @@ internal sealed class GeneralSurface : Panel {
 internal sealed class GeneralButton : Button {
     internal bool Primary,Destructive,Bare;
     internal string IconKind;
-    internal Color? BareInk,ColorSwatch;
+    internal Color? BareInk;
     internal GeneralButton(){SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.Opaque,true);BackColor=GeneralStyle.Background;Cursor=Cursors.Hand;FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;UseVisualStyleBackColor=false;}
     public override Size GetPreferredSize(Size proposedSize){
         var size=base.GetPreferredSize(proposedSize);
@@ -187,13 +201,7 @@ internal sealed class GeneralButton : Button {
         if(!Enabled){fill=GeneralStyle.Selection;ink=GeneralStyle.Muted;}
         if(!Bare)GeneralStyle.PaintRoundedFace(g,new RectangleF(0,0,Width,Height),Math.Min(22,Height/2),Focused?GeneralStyle.Accent:Primary?fill:GeneralStyle.Line,fill);
         else if(Focused&&ShowFocusCues){using(var pen=new Pen(GeneralStyle.Accent,2))g.DrawLine(pen,Width/2-10,Height-6,Width/2+10,Height-6);}
-        if(ColorSwatch.HasValue){
-            const int diameter=16;
-            var dot=new Rectangle((Width-diameter)/2,(Height-diameter)/2,diameter,diameter);
-            using(var brush=new SolidBrush(ColorSwatch.Value))g.FillEllipse(brush,dot);
-            using(var pen=new Pen(GeneralStyle.Line))g.DrawEllipse(pen,dot);
-            return;
-        }
+
         var textRect=new Rectangle(12,0,Width-24,Height);
         if(!String.IsNullOrEmpty(IconKind)){
             int x=String.IsNullOrEmpty(Text)?Width/2-9:14,y=Height/2-9;
@@ -279,7 +287,13 @@ internal sealed class GeneralMenuRenderer : ToolStripProfessionalRenderer {
         if(!e.Item.Selected)return;
         using(var brush=new SolidBrush(GeneralStyle.Selection))using(var shape=GeneralStyle.Round(new RectangleF(6,2,e.Item.Width-12,e.Item.Height-4),12))e.Graphics.FillPath(brush,shape);
     }
-    protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e){e.TextColor=e.Item.Enabled?GeneralStyle.Foreground:GeneralStyle.Muted;base.OnRenderItemText(e);}
+    protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e){
+        e.TextColor=e.Item.Enabled?GeneralStyle.Foreground:GeneralStyle.Muted;
+        var label=e.TextRectangle;
+        e.TextRectangle=new Rectangle(label.X,0,label.Width,e.Item.Height);
+        e.TextFormat=(e.TextFormat&~TextFormatFlags.Bottom)|TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine;
+        base.OnRenderItemText(e);
+    }
     protected override void OnRenderImageMargin(ToolStripRenderEventArgs e){}
     protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e){LucideIcons.Draw(e.Graphics,"check",new Rectangle(10,(e.Item.Height-18)/2,18,18),GeneralStyle.Accent);}
     protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e){using(var p=new Pen(GeneralStyle.SoftLine))e.Graphics.DrawLine(p,14,e.Item.Height/2,e.Item.Width-14,e.Item.Height/2);}

@@ -117,7 +117,7 @@ public sealed class BundledArchiveReader : IDisposable {
         if(fields.Count==0)return;
         string raw,sizeValue;if(!fields.TryGetValue("Path",out raw)||!fields.TryGetValue("Size",out sizeValue))throw new IOException("Entrada incompleta na lista do pacote.");
         string path=raw.Replace('\\','/');string checkRoot=System.IO.Path.Combine(System.IO.Path.GetPathRoot(System.IO.Path.GetTempPath()),"CoopReader-check");Safe.In(checkRoot,path);
-        long size;if(!Int64.TryParse(sizeValue,System.Globalization.NumberStyles.None,System.Globalization.CultureInfo.InvariantCulture,out size)||size<0||size>MaxEntryBytes)throw new IOException("Tamanho de entrada inválido ou acima de 8 GiB: "+path);
+        long size;if(!Int64.TryParse(sizeValue,System.Globalization.NumberStyles.None,System.Globalization.CultureInfo.InvariantCulture,out size)||size<0||size>MaxEntryBytes)throw new IOException("Tamanho de entrada inválido ou acima de "+GeneralStorageSize.Format(MaxEntryBytes)+": "+path);
         foreach(var field in fields){
             if((field.Key.IndexOf("link",StringComparison.OrdinalIgnoreCase)>=0||field.Key.IndexOf("reparse",StringComparison.OrdinalIgnoreCase)>=0)&&field.Value.Length!=0)throw new IOException("Atalhos, links e pontos de nova análise não são aceitos no pacote: "+path);
             if((field.Key.Equals("Encrypted",StringComparison.OrdinalIgnoreCase)||field.Key.Equals("Alternate Stream",StringComparison.OrdinalIgnoreCase)||field.Key.Equals("Split Before",StringComparison.OrdinalIgnoreCase)||field.Key.Equals("Split After",StringComparison.OrdinalIgnoreCase))&&field.Value!="-"&&field.Value.Length!=0)throw new IOException("Entradas criptografadas, fluxos alternativos ou arquivos divididos não são aceitos: "+path);
@@ -174,7 +174,7 @@ public sealed class BundledArchiveReader : IDisposable {
     sealed class CountedReadStream:Stream {
         readonly Stream inner;public long Count;public bool Ended;
         public CountedReadStream(Stream input){inner=input;}
-        public override int Read(byte[] buffer,int offset,int count){int n=inner.Read(buffer,offset,count);if(n==0)Ended=true;Count+=n;if(Count>MaxEntryBytes)throw new IOException("A extração ultrapassou o limite de 8 GiB.");return n;}
+        public override int Read(byte[] buffer,int offset,int count){int n=inner.Read(buffer,offset,count);if(n==0)Ended=true;Count+=n;if(Count>MaxEntryBytes)throw new IOException("A extração ultrapassou o limite de "+GeneralStorageSize.Format(MaxEntryBytes)+".");return n;}
         public override bool CanRead{get{return true;}}public override bool CanSeek{get{return false;}}public override bool CanWrite{get{return false;}}public override long Length{get{throw new NotSupportedException();}}public override long Position{get{return Count;}set{throw new NotSupportedException();}}
         public override void Flush(){}public override long Seek(long offset,SeekOrigin origin){throw new NotSupportedException();}public override void SetLength(long value){throw new NotSupportedException();}public override void Write(byte[] buffer,int offset,int count){throw new NotSupportedException();}
     }

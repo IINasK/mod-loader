@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -165,12 +165,12 @@ internal sealed partial class GeneralModWindow {
         bool cyberpunk = IsCyberpunk(root);
         var allFiles = Snapshot(root).ProjectDeletionFiles().ToList();
         var fixedIds = new HashSet<string>(jobs.Select(work => work.Variant.CyberpunkId).Where(id => id != null), StringComparer.Ordinal);
-        if (!cyberpunk) {
-            foreach (var file in Generic(root).ProjectDeletionFiles()) {
-                file.OwnerKeys = file.OwnerKeys.Select(WorkKeyFromReceipt).Distinct().ToList();
-                allFiles.Add(file);
-            }
-        } else {
+        var routedIds = new HashSet<string>(jobs.Where(work=>work.Variant.InstallRoutes.Count>0).Select(work=>work.Variant.CyberpunkId),StringComparer.Ordinal);
+        foreach (var file in Generic(root).ProjectDeletionFiles()) {
+            file.OwnerKeys = file.OwnerKeys.Select(WorkKeyFromReceipt).Distinct().ToList();
+            allFiles.Add(file);
+        }
+        if (cyberpunk) {
             var importOwners = state.CyberpunkImports.ToLookup(item => item.Value, item => WorkKeyFromReceipt(item.Key), StringComparer.Ordinal);
             var imports = Cyberpunk(root).ProjectDeletionFiles(null).ToList();
             foreach (var file in imports) {
@@ -198,7 +198,7 @@ internal sealed partial class GeneralModWindow {
                     if (!File.Exists(target)) continue;
                     long size = new FileInfo(target).Length;
                     string hash = file.Sha256;
-                    bool owned = !recipe.Immutable && fixedIds.Contains(package.Id);
+                    bool owned = !recipe.Immutable && fixedIds.Contains(package.Id) && !routedIds.Contains(package.Id);
                     if (owned) {
                         hash = Safe.Hash(target);
                         if (!FpvCustomization.MatchesFile(file, size, hash))
@@ -312,13 +312,16 @@ internal sealed partial class GeneralModWindow {
             foreach (var work in group) state.SnapshotReceipts.Remove(work.Key);
         }
         var standard = jobs.Except(snapshots).ToList();
-        var fixedIds = standard.Where(work => work.Variant.CyberpunkId != null && !disabled.Contains(work.Key))
+        var fixedIds = standard.Where(work => work.Variant.CyberpunkId != null && work.Variant.InstallRoutes.Count==0 && !disabled.Contains(work.Key))
             .Select(work => work.Variant.CyberpunkId).Distinct().ToArray();
         if (fixedIds.Length > 0) {
             if (!IsCyberpunk(root)) throw new IOException(T("Selecione a pasta do Cyberpunk 2077.", "Select the Cyberpunk 2077 folder."));
             notes.Add(Cyberpunk(root).DeactivateMany(fixedIds, Report, keepBackup: false));
         }
         bool cyberpunk = IsCyberpunk(root);
+        foreach(var work in standard.Where(item=>item.Variant.CyberpunkId!=null&&item.Variant.InstallRoutes.Count>0))
+            using(Cyberpunk(root).LockForRouteChange())
+                notes.Add(Generic(root).Remove(work.Receipt(0),disabled.Contains(work.Key),null,preserveExternal));
         foreach (var work in standard.Where(item => item.Variant.CyberpunkId == null)) {
             for (int index = work.Variant.Sources.Count - 1; index >= 0; index--) {
                 string key = work.Receipt(index);
@@ -343,8 +346,7 @@ internal sealed partial class GeneralModWindow {
             if(String.IsNullOrWhiteSpace(other.Destination)||!Directory.Exists(other.Destination))continue;
             string peerData=projectStore.DataPath(peer);
             var files=new InstalledSnapshotInstaller(other.Destination,peerData,catalog).ProjectDeletionFiles(true);
-            if(!IsCyberpunk(other.Destination))
-                files=files.Concat(new GeneralModInstaller(other.Destination,Path.Combine(peerData,"Instalacoes")).ProjectDeletionFiles(true));
+            files=files.Concat(new GeneralModInstaller(other.Destination,Path.Combine(peerData,"Instalacoes")).ProjectDeletionFiles(true));
             foreach(var file in files.Where(file=>GeneralInstallRoutes.External(file.Path)))
                 result.Add(GeneralInstallRoutes.Resolve(other.Destination,file.Path));
         }

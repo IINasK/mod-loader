@@ -43,9 +43,13 @@ internal static class GeneralPopupStabilityTests {
                             foreach(string theme in new[]{"light","dark","light-red","black"}){
                                 GeneralStyle.UseTheme(theme);
                                 foreach(var size in new[]{new Size(120,80),new Size(280,180)})using(var bitmap=new Bitmap(size.Width,size.Height))using(var graphics=Graphics.FromImage(bitmap)){
-                                    graphics.Clear(Color.Magenta);GeneralStyle.PaintCard(graphics,size);
-                                    CheckBand(bitmap,theme+" card "+size.Width,check);
-                                    check(bitmap.GetPixel(0,0).ToArgb()==GeneralStyle.Surface.ToArgb(),"Card corners clear old pixels in "+theme+" at "+size.Width+"px.");
+                                    graphics.Clear(Color.Magenta);
+                                    using(var shape=GeneralStyle.PopupShape(size))using(var clip=new Region(shape))graphics.Clip=clip;
+                                    GeneralStyle.PaintCard(graphics,size);
+                                    var right=size.Width-1;var bottom=size.Height-1;
+                                    check(new[]{bitmap.GetPixel(0,0),bitmap.GetPixel(right,0),bitmap.GetPixel(0,bottom),bitmap.GetPixel(right,bottom)}
+                                        .All(pixel=>pixel.ToArgb()==Color.Magenta.ToArgb()),theme+" popup corners expose the backdrop.");
+                                    CheckPopupFrame(bitmap,theme+" popup "+size.Width,check);
                                     bitmap.Save(Path.Combine(root,"card-"+theme+"-"+size.Width+".png"),System.Drawing.Imaging.ImageFormat.Png);
                                 }
                                 foreach(int width in new[]{120,280}){
@@ -88,6 +92,18 @@ internal static class GeneralPopupStabilityTests {
                                 }
                                 check(openings==2&&openedPrepared&&clicks==0,"Reopening shows the complete rounded menu and never invokes an item.");
                             }
+                            GeneralStyle.UseTheme("black");
+                            using(var menu=GeneralMenuRenderer.Create()){
+                                var first=GeneralMenuRenderer.Add(menu,"Details and variants",()=>{});
+                                var second=GeneralMenuRenderer.Add(menu,"Open source in browser",()=>{});
+                                menu.Show(owner,new Point(20,20));
+                                using(var bitmap=new Bitmap(menu.Width,menu.Height)){
+                                    menu.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));
+                                    bitmap.Save(Path.Combine(root,"context-menu-black.png"),System.Drawing.Imaging.ImageFormat.Png);
+                                    CheckMenuLabel(bitmap,first,check);CheckMenuLabel(bitmap,second,check);
+                                }
+                                menu.Close();
+                            }
                             using(var picker=new GeneralPicker{Size=new Size(268,44),Location=new Point(320,126)}){
                                 owner.Controls.Add(picker);picker.Items.AddRange(new object[]{"Português","English"});picker.SelectedIndex=0;
                                 var expected=GeneralPopupPlacement.Location(picker,picker.ClientRectangle,new Size(300,104),false);
@@ -115,6 +131,31 @@ internal static class GeneralPopupStabilityTests {
     static bool HasFullCenter(Control control){return control.Region!=null&&control.Region.IsVisible(control.ClientSize.Width/2,control.ClientSize.Height/2);}
     static void CheckControl(Control control,string label,Action<bool,string> check){
         using(var bitmap=new Bitmap(control.Width,control.Height)){control.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));CheckBand(bitmap,label,check);}
+    }
+    static void CheckMenuLabel(Bitmap bitmap,ToolStripItem item,Action<bool,string> check){
+        var rows=new List<int>();var bounds=item.Bounds;
+        for(int y=Math.Max(0,bounds.Top);y<Math.Min(bitmap.Height,bounds.Bottom);y++)
+            for(int x=Math.Max(0,bounds.Left+8);x<Math.Min(bitmap.Width,bounds.Right-8);x++){
+                var pixel=bitmap.GetPixel(x,y);
+                if(pixel.R>210&&pixel.G>210&&pixel.B>210){rows.Add(y);break;}
+            }
+        double center=rows.Count>0?(rows.First()+rows.Last()+1)*.5:-1;
+        check(Math.Abs(center-(bounds.Top+bounds.Height*.5))<=3,
+            "Context label "+item.Text+" is centered vertically within the "+bounds.Height+"px target. Glyph center "+center+", row top "+bounds.Top+".");
+    }
+    static void CheckPopupFrame(Bitmap bitmap,string label,Action<bool,string> check){
+        int width=bitmap.Width,height=bitmap.Height,x=width/2,y=height/2;
+        Func<int,Color[]> edges=depth=>new[]{bitmap.GetPixel(x,depth),bitmap.GetPixel(x,height-1-depth),
+            bitmap.GetPixel(depth,y),bitmap.GetPixel(width-1-depth,y)};
+        for(int depth=0;depth<GeneralStyle.RoundedFaceBorder;depth++)
+            check(edges(depth).All(pixel=>pixel.ToArgb()==GeneralStyle.Line.ToArgb()),label+": border touches the outer mask at depth "+depth+".");
+        int line=GeneralStyle.Line.ToArgb(),surface=GeneralStyle.Surface.ToArgb();
+        check(edges(GeneralStyle.RoundedFaceBorder+1).All(pixel=>pixel.ToArgb()==surface),label+": the inner fill starts just after the border.");
+        for(int yCorner=0;yCorner<18;yCorner++){
+            int xCorner=0;
+            while(xCorner<18&&bitmap.GetPixel(xCorner,height-1-yCorner).ToArgb()==Color.Magenta.ToArgb())xCorner++;
+            check(xCorner<18&&bitmap.GetPixel(xCorner,height-1-yCorner).ToArgb()==line,label+": no outer fringe around the reported bottom-left corner, row "+yCorner+".");
+        }
     }
     static void CheckBand(Bitmap bitmap,string label,Action<bool,string> check){
         int x=bitmap.Width/2,y=bitmap.Height/2;

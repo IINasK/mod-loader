@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -8,10 +8,10 @@ using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
-    HashSet<string> categoryFilters,variantFilters,statusFilters,groupFilters;
+    HashSet<string> categoryFilters,variantFilters,statusFilters;
     Button clearFilters;
     bool HasListFilters {get{return coverageFilter!=null||categoryFilters!=null||variantFilters!=null||
-        statusFilters!=null||groupFilters!=null||nameFilter.Length!=0||searchQuery.Length!=0;}}
+        statusFilters!=null||nameFilter.Length!=0||searchQuery.Length!=0;}}
     string nameFilter="";
     TextBox searchBox;
     string searchQuery="";
@@ -23,9 +23,9 @@ internal sealed partial class GeneralModWindow {
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,28));layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));surface.Controls.Add(layout);
         var icon=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};icon.Paint+=(s,e)=>LucideIcons.Draw(e.Graphics,"search",new Rectangle(0,(icon.Height-18)/2,18,18),GeneralStyle.Muted);layout.Controls.Add(icon,0,0);
-        searchBox=new TextBox{Name="ModSearch",BorderStyle=BorderStyle.None,Dock=DockStyle.Fill,MaxLength=160,Font=GeneralStyle.Font(11),Margin=new Padding(0,10,0,0),BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground,Text=searchQuery,AccessibleName=T("Pesquisar por nome, tag, grupo, variante ou situação","Search by name, tag, group, variant or status")};
+        searchBox=new TextBox{Name="ModSearch",BorderStyle=BorderStyle.None,Dock=DockStyle.Fill,MaxLength=160,Font=GeneralStyle.Font(11),Margin=new Padding(0,10,0,0),BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground,Text=searchQuery,AccessibleName=T("Pesquisar por nome, tag, variante ou situação","Search by name, tag, variant or status")};
         tips.SetToolTip(searchBox,searchBox.AccessibleName+T(". Aceita partes do nome e pequenos erros de digitação.",". Accepts partial names and minor typos."));layout.Controls.Add(searchBox,1,0);
-        searchBox.HandleCreated+=(s,e)=>SendMessage(((Control)s).Handle,0x1501,new IntPtr(1),T("Pesquisar nome, tag, grupo, variante ou situação…","Search name, tag, group, variant or status…"));
+        searchBox.HandleCreated+=(s,e)=>SendMessage(((Control)s).Handle,0x1501,new IntPtr(1),T("Pesquisar nome, tag, variante ou situação…","Search name, tag, variant or status…"));
         var clear=(GeneralButton)GeneralStyle.Button("",()=>{searchBox.Clear();searchBox.Focus();});clear.Name="ClearSearch";clear.Bare=true;clear.IconKind="close";clear.AutoSize=false;clear.MinimumSize=new Size(44,44);clear.Dock=DockStyle.Fill;clear.Margin=Padding.Empty;clear.AccessibleName=T("Limpar pesquisa","Clear search");clear.Enabled=searchQuery.Length>0;layout.Controls.Add(clear,2,0);
         var input=searchBox;var delay=new Timer{Interval=150};
         Action apply=()=>{delay.Stop();searchQuery=input.Text;searchTerms=GeneralModSearch.Terms(searchQuery);clear.Enabled=searchQuery.Length>0;DrawRows();};
@@ -48,7 +48,7 @@ internal sealed partial class GeneralModWindow {
     }
     string DefaultCategory {get{return categoryFilters!=null&&categoryFilters.Count==1?categoryFilters.Single():null;}}
     void ResetColumnFilters(){
-        categoryFilters=variantFilters=statusFilters=groupFilters=null;
+        categoryFilters=variantFilters=statusFilters=null;
         coverageFilter=null;
         nameFilter=searchQuery="";
         searchTerms=new string[0];
@@ -81,7 +81,7 @@ internal sealed partial class GeneralModWindow {
     }
     static string GameInventoryStatus {get{return T("Encontrado no jogo","Found in game");}}
     IEnumerable<P2PSyncDifference> VisibleGameInventory(){
-        if(associationChoice!=null||coverageFilter!=null||categoryFilters!=null||variantFilters!=null||groupFilters!=null||
+        if(associationChoice!=null||coverageFilter!=null||categoryFilters!=null||variantFilters!=null||
             statusFilters!=null&&!statusFilters.Any(value=>StatusFilterKey(value)=="game-inventory"))
             return Enumerable.Empty<P2PSyncDifference>();
         var included=new HashSet<string>(state.List.Mods.SelectMany(mod=>mod.DetectedPaths),StringComparer.OrdinalIgnoreCase);
@@ -89,38 +89,16 @@ internal sealed partial class GeneralModWindow {
             (String.IsNullOrWhiteSpace(nameFilter)||(file.Mod??file.Path).IndexOf(nameFilter,StringComparison.CurrentCultureIgnoreCase)>=0)&&
             GeneralModSearch.Matches(searchTerms,file.Mod,file.Path,GameInventoryStatus));
     }
-    IEnumerable<string> ModGroups(GeneralModEntry mod){
-        GeneralAlternativeGroup group;
-        if(!IsBigBody(mod)&&mod.AlternativeGroup!=null&&state.List.AlternativeGroups.TryGetValue(mod.AlternativeGroup,out group))
-            yield return group.Name??GeneralModLibrary.GroupDefaultName(mod.AlternativeGroup);
-        foreach(string value in mod.CompatibilityGroups.Concat(Selected(mod).CompatibilityGroups))
-            yield return value;
-    }
-
     bool ColumnAllows(GeneralModEntry mod){
         string raw=ListStatus(mod);
         return (categoryFilters==null||categoryFilters.Contains(mod.Category??""))&&
-            (variantFilters==null||variantFilters.Contains(NexusVariantName(mod)))&&(groupFilters==null||ModGroups(mod).Any(groupFilters.Contains))&&
+            (variantFilters==null||variantFilters.Contains(NexusVariantName(mod)))&&
             (statusFilters==null||statusFilters.Any(value=>StatusFilterKey(value)==StatusFilterKey(GeneralStatusPresentation.Label(raw))))&&
             (String.IsNullOrWhiteSpace(nameFilter)||(ModDisplayName(mod)+" "+mod.Name).IndexOf(nameFilter,StringComparison.CurrentCultureIgnoreCase)>=0)&&
             GeneralModSearch.Matches(searchTerms, new[]{ModDisplayName(mod),mod.Nsfw?mod.Name+" NSFW Not Safe for Work":mod.Name,NexusVariantName(mod),GeneralStatusPresentation.Label(raw)}
-                .Concat(mod.Tags).Concat(ModGroups(mod)).ToArray());
+                .Concat(mod.Tags).ToArray());
     }
-    void ShowColumnFilter(int column,bool groups=false){
-        if(groups){
-            var valuesByGroup=state.List.Mods.SelectMany(ModGroups).Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(value=>value,StringComparer.CurrentCultureIgnoreCase).ToList();
-            using(var dialog=new GeneralColumnFilterDialog(T("Filtrar grupos","Filter groups"),valuesByGroup,groupFilters,null,false)){
-                var area=grid.GetCellDisplayRectangle(column,-1,true);
-                int offset=GroupHeaderSplit(area.Width);area.X+=offset;area.Width-=offset;
-                dialog.AnchorBelow(grid,area,false);
-                if(dialog.ShowDialog(this)!=DialogResult.OK)return;
-                groupFilters=dialog.ResultValues.Count==valuesByGroup.Count?null:
-                    new HashSet<string>(dialog.ResultValues,StringComparer.OrdinalIgnoreCase);
-                DrawRows();
-            }
-            return;
-        }
+    void ShowColumnFilter(int column){
         if(column<1||column>3)return;
         string uncat=UncatName();
         var values=column==1?new[]{uncat}.Concat(PresetCategories()).ToList():column==2?state.List.Mods.Select(NexusVariantName).Distinct().OrderBy(value=>value).ToList():

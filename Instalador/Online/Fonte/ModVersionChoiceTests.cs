@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -97,7 +97,7 @@ internal static class ModVersionChoiceTests {
             }
         }
         GeneralStyle.Language="pt";GeneralStyle.UseTheme("light-red");GeneralModWindow.RunVersionQueueTests(root,check);
-        check(GeneralModInstallerTests.Run(root)==11,"Existing generic installation/removal regression checks pass.");
+        check(GeneralModInstallerTests.Run(root)==17,"Existing generic installation/removal regression checks pass.");
         InstalledSnapshotInstallerTests.Run(root);check(true,"Existing received pack installation/removal regression checks pass.");
         Safe.WriteJson(Path.Combine(root,"resultado-version-choice.json"),new{Passed=true,Tests=tests,RealGameTouched=false,NetworkUsed=false});return tests.Count;
         }finally{GeneralStyle.UseTheme(priorTheme);GeneralStyle.Language=priorLanguage;GeneralStyle.AnimationsEnabled=priorAnimations;}

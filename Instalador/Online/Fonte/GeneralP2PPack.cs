@@ -26,13 +26,13 @@ internal static class P2PPack {
     static string Token(string file){return "shared:"+file;}
     static P2PBlob Blob(string path,string extension){
         Safe.NoLinks(path);var info=new FileInfo(path);
-        if(!info.Exists||info.Length<=0||info.Length>MaxFile)throw new IOException("Arquivo ausente, vazio ou acima de 16 GiB: "+info.Name);
+        if(!info.Exists||info.Length<=0||info.Length>MaxFile)throw new IOException("Arquivo ausente, vazio ou acima de "+GeneralStorageSize.Format(MaxFile)+": "+info.Name);
         return new P2PBlob{Hash=Safe.Hash(path),Size=info.Length,Extension=extension};
     }
     static string Extension(FixedAsset a){return a.Format=="raw"?".bin":a.Format=="zip"?".zip":a.Format=="7z"?".7z":a.Format=="rar"?".rar":".bin";}
     static void Add(P2PManifest manifest,string folder,string source,P2PBlob blob,bool immutableCache=false){
         if(manifest.Files.Any(f=>f.File==blob.File))return;
-        if(manifest.Files.Count>=5000||manifest.Files.Sum(f=>f.Size)+blob.Size>MaxTotal)throw new IOException("Pacote excede 5000 arquivos ou 128 GiB.");
+        if(manifest.Files.Count>=5000||manifest.Files.Sum(f=>f.Size)+blob.Size>MaxTotal)throw new IOException("Pacote excede 5000 arquivos ou "+GeneralStorageSize.Format(MaxTotal)+".");
         string dest=Safe.In(folder,blob.File);Safe.NoLinks(source);
         // The sender owns this immutable, send-only snapshot. Hard links avoid duplicating its cache.
         if(!immutableCache||!CreateHardLink(dest,source,IntPtr.Zero))Safe.CopyAtomic(source,dest,blob.Hash);
