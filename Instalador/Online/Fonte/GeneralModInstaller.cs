@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,7 +19,7 @@ public sealed partial class GeneralModInstaller {
     }
 
     public sealed class RecordFile {
-        public string Path;
+        public string Path, ArchivePath;
         public string Sha256;
         public long Size;
         public bool Owned;
@@ -102,7 +102,7 @@ public sealed partial class GeneralModInstaller {
                             using (var output = new FileStream(stageFile, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                                 input.CopyTo(output);
                         });
-                        var file = new RecordFile { Path = paths[i], Size = entry.Size, Sha256 = Safe.Hash(stageFile) };
+                        var file = new RecordFile { Path = paths[i], ArchivePath = entry.Path, Size = entry.Size, Sha256 = Safe.Hash(stageFile) };
                         record.Files.Add(file);
                     }
                 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -60,7 +60,10 @@ internal sealed partial class GeneralModWindow {
         var reading=Task.Run(()=>{for(int i=0;i<25;i++)GeneralProjectStorage.Measure(store,catalog,cache);});
         for(int i=0;i<25;i++){var state=store.Load(first);state.Language=i%2==0?"en":"pt";new GeneralModLibrary(Path.Combine(store.DataPath(first),"lista.json")).Save(state);store.SavePreferences("light","pt",root);}
         reading.GetAwaiter().GetResult();check(store.Load(first).List.Mods.Count==1,"Background size reads never block concurrent project saves.");
-        check(GeneralStorageSize.Format(1536).EndsWith("KiB"),"Size labels use explicit binary units.");
+        check(GeneralStorageSize.Format(999)=="999 B"&&GeneralStorageSize.Format(1000)=="1 KB"&&
+            GeneralStorageSize.Format(1000000)=="1 MB"&&GeneralStorageSize.Format(1000000000)=="1 GB",
+            "Size labels use powers of 1000 at each unit boundary.");
+        check(GeneralStorageSize.Format(1536)==1.54m.ToString()+" KB","Size labels round decimal units using the current locale.");
         string snapshot=Path.Combine(root,"snapshot.zip");InstalledSnapshot.Create(snapshot,store.Load(first),new[]{entry.Id},catalog,store.DataPath(first),false,null);
         using(var archive=System.IO.Compression.ZipFile.OpenRead(snapshot))using(var reader=new StreamReader(archive.GetEntry("manifest.json").Open()))check(!reader.ReadToEnd().Contains(zip.Replace("\\","\\\\")),"Installed sharing does not retain local metadata source paths.");
         TestForm(catalog,new GeneralModState{List=new GeneralModList(),Destination=game,DownloadFolder=root},Path.Combine(root,"ui"),root,async form=>{
@@ -109,7 +112,7 @@ internal sealed partial class GeneralModWindow {
                 EditorField<TextBox>(editor,"modName").Text="My custom name";
                 EditorField<TextBox>(editor,"sources").Text="https://www.nexusmods.com/cyberpunk2077/mods/34305";
                 await Task.Delay(800);check(EditorField<TextBox>(editor,"modName").Text=="My custom name","Metadata refresh preserves a user-entered name.");
-                check(EditorField<Label>(editor,"sourceInfo").Text.Contains("Slow download")&&EditorField<Button>(editor,"save").Enabled&&EditorField<Label>(editor,"sourceInfo").RectangleToScreen(EditorField<Label>(editor,"sourceInfo").ClientRectangle).Bottom<=editor.RectangleToScreen(editor.ClientRectangle).Bottom,"Overview page shows simple advice without blocking save.");
+                check(EditorField<Label>(editor,"sourceInfo").Text.IndexOf("Slow download",StringComparison.OrdinalIgnoreCase)>=0&&!EditorField<Button>(editor,"save").Enabled&&EditorField<Label>(editor,"sourceInfo").RectangleToScreen(EditorField<Label>(editor,"sourceInfo").ClientRectangle).Bottom<=editor.RectangleToScreen(editor.ClientRectangle).Bottom,"The overview page explains why an exact Nexus file must be selected before saving.");
                 editor.ClientSize=new Size(700,710);editor.PerformLayout();Application.DoEvents();await Task.Delay(40);
                 CaptureUi(editor,Path.Combine(root,"source-overview-warning.png"));
                 var sourceBox=EditorField<TextBox>(editor,"sources");
@@ -118,6 +121,8 @@ internal sealed partial class GeneralModWindow {
                     saveButton.RectangleToScreen(saveButton.ClientRectangle).Bottom<=editor.RectangleToScreen(editor.ClientRectangle).Bottom,
                     "Source and actions stay usable at narrow width. Source="+sourceBox.Bounds+
                     ", save="+saveButton.RectangleToScreen(saveButton.ClientRectangle)+", editor="+editor.RectangleToScreen(editor.ClientRectangle));
+                sourceBox.Text="https://www.nexusmods.com/cyberpunk2077/mods/34305?tab=files&file_id=169285";
+                await Task.Delay(800);
                 chips.Controls.OfType<Button>().Single(button=>button.Text=="Audio ×").PerformClick();
                 EditorField<Button>(editor,"save").PerformClick();var library=new GeneralModLibrary(Path.Combine(root,"saved.json"));library.Save(new GeneralModState{List=new GeneralModList{Mods=new List<GeneralModEntry>{editor.Result}}});
                 var loaded=library.Load().List.Mods.Single();
@@ -186,6 +191,88 @@ internal sealed partial class GeneralModWindow {
             }
         }
     }
+    static void ClickScrollableField(Control field){
+        field.Focus();
+        var point=new IntPtr((4<<16)|4);
+        SendUiMouseMessage(field.Handle,0x0201,new IntPtr(1),point);
+        SendUiMouseMessage(field.Handle,0x0202,IntPtr.Zero,point);
+    }
+
+    static void TestDescriptionWheel(GeneralModEditor editor,TextBox description,GeneralScrollView descriptionView,Action<bool,string> check){
+        if(SystemInformation.MouseWheelScrollLines==0)return;
+        var page=AllControls(editor).OfType<GeneralScrollView>().Single(view=>view.Name=="ModEditorScroll");
+        int previous=page.Bar.Value;
+        int notch=SystemInformation.MouseWheelScrollDelta;
+        Action<int> wheel=delta=>SendUiMouseMessage(description.Handle,0x020a,new IntPtr(delta<<16),IntPtr.Zero);
+        string original=description.Text;
+        description.Text="Primeira linha\r\nSegunda linha";
+        descriptionView.RefreshScroll();
+        page.RefreshScroll();
+        page.ScrollTo(0);
+        wheel(-notch);
+        check(!descriptionView.Bar.Visible&&page.Bar.Value>0,
+            "A roda sobre duas linhas sem barra interna move o editor.");
+        description.Text=original;
+        descriptionView.RefreshScroll();
+        descriptionView.ScrollTo(0);
+        description.Focus();
+        page.ScrollTo(0);
+        wheel(-notch);
+        check(descriptionView.Bar.Value==0&&page.Bar.Value>0,
+            "Focar a descrição sem clicar mantém a roda no editor.");
+        page.ScrollTo(page.Bar.Limit);
+        wheel(-notch);
+        check(descriptionView.Bar.Value==0&&page.Bar.Value==page.Bar.Limit,
+            "No fim do editor, a caixa sem clique continua parada mesmo quando pode rolar.");
+        ClickScrollableField(description);
+        page.ScrollTo(0);
+        wheel(-notch);
+        check(descriptionView.Bar.Value>0&&page.Bar.Value==0,
+            "Após clicar, uma descrição longa usa primeiro a sua própria rolagem.");
+        descriptionView.ScrollTo(descriptionView.Bar.Limit);
+        wheel(-notch);
+        check(descriptionView.Bar.Value==descriptionView.Bar.Limit&&page.Bar.Value>0,
+            "No fim da descrição, a roda para baixo move o editor.");
+        page.ScrollTo(page.Bar.Limit);
+        wheel(-notch);
+        check(page.Bar.Value==page.Bar.Limit,
+            "Quando os dois limites inferiores são atingidos, o editor permanece no fim.");
+        descriptionView.ScrollTo(0);
+        wheel(notch);
+        check(descriptionView.Bar.Value==0&&page.Bar.Value<page.Bar.Limit,
+            "No início da descrição, a roda para cima move o editor.");
+        EditorField<TextBox>(editor,"modName").Focus();
+        description.Focus();
+        page.ScrollTo(0);
+        wheel(-notch);
+        check(descriptionView.Bar.Value==0&&page.Bar.Value>0,
+            "Sair do campo desativa a rolagem interna até um novo clique.");
+        page.ScrollTo(previous);
+    }
+
+    static void TestArchiveTreeWheel(GeneralModEditor editor,GeneralArchiveDestinations destinations,Action<bool,string> check){
+        if(SystemInformation.MouseWheelScrollLines==0)return;
+        var tree=(ListBox)destinations.Controls.Find("ArchiveFileTree",true).Single();
+        var treeView=(GeneralScrollView)tree.Parent.Parent;
+        var page=AllControls(editor).OfType<GeneralScrollView>().Single(view=>view.Name=="ModEditorScroll");
+        int previous=page.Bar.Value;
+        var paths=Enumerable.Range(0,40).Select(index=>"mods/file"+index+".txt");
+        destinations.ShowPreview(GeneralArchivePreview.Load(null,null,paths,false));
+        treeView.RefreshScroll();
+        var notch=new IntPtr(-SystemInformation.MouseWheelScrollDelta<<16);
+        page.ScrollTo(0);
+        SendUiMouseMessage(tree.Handle,0x020a,notch,IntPtr.Zero);
+        check(treeView.Bar.Limit>0&&treeView.Bar.Value==0&&page.Bar.Value>0,
+            "Sem clicar, a roda sobre a árvore de destinos move o editor.");
+        ClickScrollableField(tree);
+        page.ScrollTo(0);
+        SendUiMouseMessage(tree.Handle,0x020a,notch,IntPtr.Zero);
+        check(treeView.Bar.Value>0&&page.Bar.Value==0,
+            "Clicar na árvore de destinos habilita sua rolagem interna.");
+        destinations.ShowPreview(null);
+        page.ScrollTo(previous);
+    }
+
     static async Task TestCompactModEditor(Form owner,string root,Action<bool,string> check,string source){
         var mod=NewEntry("Editor compacto",source);
         mod.Tags.AddRange(new[]{"Cyberpunk Modathon 2026","Gameplay","Overhaul","Quality of Life","Terrain"});
@@ -207,9 +294,9 @@ internal sealed partial class GeneralModWindow {
                 var terrain=EditorField<FlowLayoutPanel>(editor,"tagChips").Controls.OfType<Button>().Single(button=>button.Text=="Terrain ×");
                 check(terrain.Top==add.Top&&terrain.Right<add.Left&&terrain.Height==add.Height&&add.Right<=add.Parent.ClientSize.Width,
                     "At narrow width Add follows the final tag with the same height and no clipping: "+terrain.Bounds+" / "+add.Bounds);
-                check(field.RectangleToScreen(field.ClientRectangle).Top<input.RectangleToScreen(input.ClientRectangle).Top&&
+                check(input.RectangleToScreen(input.ClientRectangle).Top<field.RectangleToScreen(field.ClientRectangle).Top&&
                     !AllControls(editor).OfType<Button>().Any(button=>new[]{"Adicionar link","Remover fonte","Adicionar arquivo local"}.Contains(button.Text)),
-                    "The Nexus link is above the compact editor and legacy source actions are gone.");
+                    "The source selector precedes the Nexus link and the legacy source actions are gone.");
                 CaptureUi(editor,Path.Combine(root,"compact-editor-tags.png"));
                 add.PerformClick();await Task.Delay(40);
                 var inline=EditorField<TextBox>(editor,"tags");
@@ -222,15 +309,16 @@ internal sealed partial class GeneralModWindow {
 
                 check(input.Visible&&input.Text=="Preferida"&&picker.Items.Cast<string>().SequenceEqual(new[]{"Preferida","Original","Terceira"}),
                     "A legacy default moves first and remains the selected editable name.");
-                var routes=EditorField<TextBox>(editor,"installRoutes");
-                var browse=AllControls(editor).OfType<Button>().Single(button=>button.Text=="Escolher pasta");
+                var destinations=EditorField<GeneralArchiveDestinations>(editor,"archiveDestinations");
+                var routes=(TextBox)destinations.Controls.Find("ArchiveCurrentDestination",true).Single();
+                var browse=AllControls(destinations).OfType<Button>().Single(button=>button.Text=="Escolher pasta");
                 var routeBounds=routes.Parent.RectangleToScreen(routes.Parent.ClientRectangle);
                 var buttonBounds=browse.RectangleToScreen(browse.ClientRectangle);
                 var destination=(TableLayoutPanel)browse.Parent;
                 check(!routes.Multiline&&!routes.ReadOnly&&browse.Enabled&&routeBounds.Top==buttonBounds.Top&&
                     routeBounds.Bottom==buttonBounds.Bottom&&routeBounds.Right<buttonBounds.Left&&
                     destination.GetControlFromPosition(0,0).ForeColor==GeneralStyle.Foreground,
-                    "The editable destination and Explorer button share a themed, single aligned row.");
+                    "The inline destination and Explorer button share a themed, single aligned row.");
                 var name=EditorField<TextBox>(editor,"modName");
                 var nsfw=EditorField<GeneralButton>(editor,"nsfw");
                 check(nsfw.Parent==name.Parent&&nsfw.Left>=name.Right&&nsfw.BareInk==GeneralStyle.Line,
@@ -250,15 +338,20 @@ internal sealed partial class GeneralModWindow {
                 int height=grip.Parent.Height;
                 typeof(Control).GetMethod("OnKeyDown",BindingFlags.Instance|BindingFlags.NonPublic)
                     .Invoke(grip,new object[]{new KeyEventArgs(Keys.Down)});
+                check(grip.Bottom<=grip.Parent.ClientSize.Height-8&&grip.Right<=grip.Parent.ClientSize.Width-8&&
+                    descriptionView.Bottom<=grip.Top&&grip.BackColor==GeneralStyle.Surface,
+                    "The resize grip stays inside the themed surface with its own space below the description.");
                 check(descriptionView.Bar.Limit>0&&grip.Parent.Height>height,
                     "Description keeps its own scrollbar and grows on command from its resize grip.");
                 CaptureUi(editor,Path.Combine(root,"editor-themed-controls.png"));
+                TestDescriptionWheel(editor,description,descriptionView,check);
+                TestArchiveTreeWheel(editor,destinations,check);
                 input.Text="Preferida editada";
                 picker.Toggle();
                 var popup=picker.OpenPopup;
                 var view=(GeneralScrollView)popup.Items.OfType<ToolStripControlHost>().Single().Control;
                 var list=(ListBox)view.Content;
-                check(list.Items.Cast<string>().SequenceEqual(new[]{"Preferida editada (padrão)","Original","Terceira","Adicionar"}),
+                check(list.Items.Cast<string>().SequenceEqual(new[]{"Preferida editada (padrão)","Original","Terceira","Adicionar nova versão"}),
                     "The version popup shows the default first and Add last.");
                 check(!view.Bar.Visible||view.Bar.Left>=list.Width,"The scrollbar cannot cover the trash hit area.");
                 using(var bitmap=new Bitmap(popup.Width,popup.Height)){
@@ -286,8 +379,9 @@ internal sealed partial class GeneralModWindow {
                 await Until(()=>picker.Items.Count==3);
                 check(input.Text=="Nova versão"&&input.SelectionLength==input.Text.Length,"Add opens a new version with its name selected for editing.");
                 input.Text="Quarta";
+                EditorField<TextBox>(editor,"modName").Text="Novo arquivo";
                 field.Text=source.Replace("/34305?","/4591?");
-                check(!EditorField<Button>(editor,"save").Enabled,"A file from another Nexus mod is rejected.");
+                check(EditorField<Button>(editor,"save").Enabled,"A newly added version can use a different Nexus mod.");
                 field.Text="https://example.com/mod.zip";
                 check(!EditorField<Button>(editor,"save").Enabled,"A new external link is rejected.");
                 field.Text=source.Replace("169285","169288");
@@ -300,14 +394,55 @@ internal sealed partial class GeneralModWindow {
                     editor.Result.Variants.Select(version=>version.Name).SequenceEqual(new[]{"Preferida editada","Original","Quarta"}),
                     "The first version is saved as default and an explicitly selected version stays selected.");
             }
-            var fixedMod=NewEntry("Destino fixo",source);
-            fixedMod.Variants[0].CyberpunkId="fixed-fixture";
-            using(var locked=new GeneralModEditor(fixedMod,new string[0],"default",true,"")){
-                var browse=EditorField<Button>(locked,"browseDestination");
-                var routes=EditorField<TextBox>(locked,"installRoutes");
-                var label=((TableLayoutPanel)browse.Parent).GetControlFromPosition(0,0);
-                check(!browse.Enabled&&routes.ReadOnly&&label.Enabled&&label.ForeColor==GeneralStyle.Foreground,
-                    "A catalog destination remains read-only while its dark-theme label stays legible.");
+            string[] archivePaths=new[]{"plugins/one.dll","plugins/data/two.txt"}
+                .Concat(Enumerable.Range(0,30).Select(index=>"plugins/file"+index+".txt")).ToArray();
+            using(var host=new Form{ClientSize=new Size(720,490)})
+            using(var destinations=new GeneralArchiveDestinations(root)){
+                host.Controls.Add(destinations);
+                var drafts=GeneralArchiveDestinations.RouteDraft(new GeneralInstallRoute[0]);
+                List<GeneralInstallRoute> routes=null;
+                destinations.Applied+=applied=>routes=applied;
+                destinations.SetRoutes(new GeneralInstallRoute[0],drafts);
+                destinations.ShowPreview(GeneralArchivePreview.Load(null,null,archivePaths,false));
+                GeneralStyle.Apply(host,GeneralStyle.Dark);
+                host.Show(owner);
+                var tree=(ListBox)destinations.Controls.Find("ArchiveFileTree",true).Single();
+                var nodes=tree.Items.Cast<TreeNode>().ToDictionary(node=>(string)node.Tag);
+                check(nodes["plugins/data"].Parent==nodes["plugins"]&&nodes["plugins/data/two.txt"].Parent==nodes["plugins/data"],
+                    "The inline archive tree keeps the folder hierarchy and relative paths for routing.");
+                var view=(GeneralScrollView)tree.Parent.Parent;
+                view.RefreshScroll();
+                check(view.Bar.Visible&&view.Bar.Limit>0&&!tree.HorizontalScrollbar,"The archive tree uses the styled vertical scrollbar.");
+                var location=(TextBox)destinations.Controls.Find("ArchiveCurrentDestination",true).Single();
+                check(!location.ReadOnly&&location.Text==root,"The root shows the editable project folder.");
+                location.Text=Path.Combine(root,"relocated");
+                tree.SelectedItem=nodes["plugins/data"];
+                check(location.Text==Path.Combine(root,"relocated","plugins","data"),"Children show an inherited destination.");
+                location.Text="%GAME%/Data";
+                tree.SelectedItem=nodes["plugins/data/two.txt"];
+                check(location.Text==Path.Combine(root,"Data"),"A file shows its destination folder.");
+                location.Text="%GAME%/Temporary";
+                AllControls(destinations).OfType<Button>().Single(button=>button.Name=="ResetArchiveDestination").PerformClick();
+                check(location.Text==Path.Combine(root,"Data"),"Reset removes only the selected override.");
+                tree.SelectedItem=nodes["plugins/one.dll"];
+                location.Text="%GAME%";
+                check(routes==null,"Drafts are independent of the applied result.");
+                CaptureUi(host,Path.Combine(root,"editor-archive-destinations.png"));
+                AllControls(destinations).OfType<Button>().Single(button=>button.Name=="ApplyArchiveDestinations").PerformClick();
+                check(routes!=null&&routes.Count==3&&
+                    routes.Any(route=>route.Folder==""&&route.Destination=="%GAME%/relocated")&&
+                    routes.Any(route=>route.Folder=="plugins/data"&&route.Destination=="%GAME%/Data")&&
+                    routes.Any(route=>route.Folder=="plugins/one.dll"&&route.Destination=="%GAME%"),
+                    "Apply keeps edits to the root, folder and file together.");
+                tree.SelectedIndex=0;
+                location.Text="%GAME%/Draft";
+                AllControls(destinations).OfType<Button>().Single(button=>button.Name=="CancelArchiveDestinations").PerformClick();
+                check(location.Text==Path.Combine(root,"relocated")&&routes.Count==3,"Cancel restores the last applied routes.");
+                destinations.SetRoutes(new GeneralInstallRoute[0],GeneralArchiveDestinations.RouteDraft(new GeneralInstallRoute[0]));
+                destinations.ShowPreview(null);
+                check(tree.Items.Count==1&&location.Text==root&&AllControls(destinations).OfType<Button>()
+                    .Any(button=>button.Text=="Escolher pasta"&&button.Enabled&&button.Visible),
+                    "No preview still leaves a usable destination picker for the entire archive.");
             }
             using(var editor=new GeneralModEditor(mod,new string[0],preferred.Id,true,"")){
                 editor.Show(owner);

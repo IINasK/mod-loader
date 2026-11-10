@@ -8,11 +8,15 @@ internal static class GeneralStatusPresentation {
     internal const string OtherChoice="Outra versão escolhida";
     internal const string ManualBody="Corpo detectado";
     internal const string DetectedFiles="Arquivos detectados";
+    internal const string NexusManual="Instalação manual detectada";
+    internal const string NexusAmbiguous="Versão indeterminada";
     internal const string Disabled="Desabilitado";
     internal const string ChooseDependency="Escolher versão";
     internal static string Label(string raw) {
         if(raw==OtherChoice)return GeneralStyle.T(OtherChoice,"Other version selected");
         if(raw==DetectedFiles)return GeneralStyle.T(DetectedFiles,"Files detected");
+        if(raw==NexusManual)return GeneralStyle.T(NexusManual,"Manual installation detected");
+        if(raw==NexusAmbiguous)return GeneralStyle.T(NexusAmbiguous,"Version undetermined");
         if(raw==ManualBody)return GeneralStyle.T(ManualBody,"Body detected");
         if(raw==Disabled)return GeneralStyle.T(Disabled,"Disabled");
         if(raw==ChooseDependency)return GeneralStyle.T(ChooseDependency,"Choose version");
@@ -33,6 +37,8 @@ internal static class GeneralStatusPresentation {
         if(raw==ChooseDependency)return ColorTranslator.FromHtml("#A14C00");
         if(raw==Disabled||raw=="Versão mantida")return ColorTranslator.FromHtml("#514E78");
         if(raw==DetectedFiles)return ColorTranslator.FromHtml("#705815");
+        if(raw==NexusManual)return ColorTranslator.FromHtml("#226B64");
+        if(raw==NexusAmbiguous)return ColorTranslator.FromHtml("#A14C00");
         if(raw==ManualBody)return ColorTranslator.FromHtml("#226B64");
         string value=(raw??"").Trim().ToLowerInvariant();
         string kind=Kind(raw);

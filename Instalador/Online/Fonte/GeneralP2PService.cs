@@ -323,6 +323,7 @@ internal sealed partial class P2PService : IDisposable {
         var invite=new P2PInvite{Schema=session.CompareBeforePack?3:session.Lifecycle?2:1,Kind=session.Sender?"offer":"accept",Device=Engine.Device,
             Folder=session.Id,ManifestHash=session.Hash,Name=session.Name,Mode=session.Mode,Size=session.Deferred?0:session.Size,Deferred=session.Deferred,Automatic=session.Automatic};
         if(session.Sender&&session.Mode=="installed-zip"){
+            invite.Game=P2PInvite.CyberpunkFolder(session.Destination)==null?"generic":P2PInvite.CyberpunkGame;
             invite.SuggestHostFolder(session.Destination);
             invite.RelayDevice=Engine.InviteRelayDevice;
         }
@@ -351,6 +352,8 @@ internal sealed partial class P2PService : IDisposable {
             return existing;
         }
         if(Sessions.Count>=100)throw new IOException("Remova compartilhamentos antigos antes de receber outro.");
+        if(autoInstall&&invite.Game==P2PInvite.CyberpunkGame&&P2PInvite.CyberpunkFolder(destination)==null)
+            throw new IOException("Escolha a pasta do Cyberpunk 2077 que contém bin\\x64\\Cyberpunk2077.exe.");
         if(invite.Mode=="installed-zip"&&autoInstall){if(String.IsNullOrWhiteSpace(destination)||!Directory.Exists(destination))throw new IOException("Escolha a pasta de instalação antes de receber.");Safe.NoLinks(destination);}
         var session=new P2PSession{Id=invite.Folder,Name=invite.Name,Hash=invite.ManifestHash,Peer=invite.Device,Mode=invite.Mode,Size=invite.Size,Deferred=invite.Deferred,Automatic=invite.Automatic,Lifecycle=invite.Schema>=2,CompareBeforePack=invite.Schema==3,Destination=destination,AutoInstall=autoInstall,RelayDevice=invite.RelayDevice};
         string folder=Folder(session);Directory.CreateDirectory(folder);

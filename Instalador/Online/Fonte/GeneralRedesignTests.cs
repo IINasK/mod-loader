@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -79,12 +79,98 @@ internal sealed partial class GeneralModWindow {
             form.categoryFilters=new HashSet<string>{"Principal","Veículos"};form.variantFilters=null;form.statusFilters=new HashSet<string>{"Baixando","Falha"};form.DrawRows();check(form.VisibleMods().Count==2,"Multisseleção de situações conserva as duas situações escolhidas.");
             form.nameFilter="bet";form.DrawRows();check(form.VisibleMods().Single()==second,"Busca do cabeçalho Mod é combinada e não distingue maiúsculas.");
             form.ResetColumnFilters();form.DrawRows();check(form.VisibleMods().Count==3,"Limpar filtros restaura todos os itens do preset.");
+            form.measuredMods[first.Id]=50;
+            form.measuredMods[second.Id]=900;
+            using(var timer=new Timer{Interval=40}){
+                timer.Tick+=(s,e)=>{
+                    var filter=Application.OpenForms.OfType<GeneralColumnFilterDialog>().FirstOrDefault();
+                    if(filter==null)return;
+                    timer.Stop();
+                    AllControls(filter).OfType<Button>().Single(button=>button.Name=="DefaultOrder").PerformClick();
+                };
+                timer.Start();
+                form.ShowColumnFilter(form.grid.Columns["Size"].Index);
+            }
+            check(form.ModRows().Select(row=>(string)row.Tag).SequenceEqual(new[]{second.Id,first.Id,third.Id})&&
+                !form.grid.Rows.Cast<DataGridViewRow>().Any(row=>row.Tag is SectionRow),
+                "Ordenar por espaço cruza as categorias e deixa itens sem medição no fim.");
+            form.orderColumn="Variant";form.DrawRows();
+            check(form.ModRows().Select(row=>(string)row.Tag).SequenceEqual(new[]{first.Id,third.Id,second.Id}),
+                "Ordenar por variante reúne as principais primeiro.");
+            form.statuses[Key(third,form.Selected(third))]="Pendente";
+            form.orderColumn="Status";form.DrawRows();
+            check(form.ModRows().Select(row=>(string)row.Tag).SequenceEqual(new[]{first.Id,second.Id,third.Id}),
+                "Ordenar por situação reúne instalados primeiro e pendentes por último.");
+            form.statuses[Key(third,form.Selected(third))]="Falhou";
+            var extra=new GeneralModVariant{Id="wave",Name="Wave",Sources=new List<string>{archive}};
+            first.Variants.Add(extra);
+            form.state.ChosenVariants[first.Id]=extra.Id;
+            form.groupFilters=new HashSet<string>{first.Name};
+            form.DrawRows();
+            check(form.VisibleMods().Single()==first&&Equals(form.ModRows().Single().Cells["Group"].Tag,"Wave"),
+                "O filtro de grupo encontra a gaveta e o marcador reflete a variante ativa.");
+            first.Variants.Remove(extra);
+            form.state.ChosenVariants.Remove(first.Id);
+            form.measuredMods.Clear();
+            form.ClearListFilters();
+            check(form.orderColumn==null&&form.groupFilters==null&&form.grid.Rows.Cast<DataGridViewRow>()
+                .Any(row=>row.Tag is SectionRow&&((SectionRow)row.Tag).Kind=="heading"),
+                "A seta de voltar recupera as categorias e limpa a ordenação e o filtro de grupo.");
             form.categoryFilters=new HashSet<string>();form.DrawRows();check(form.VisibleMods().Count==0,"Nenhuma categoria marcada é diferente de selecionar todas.");
             form.ResetColumnFilters();form.DrawRows();
+            var fillers=Enumerable.Range(0,157).Select(index=>NewEntry("Componente "+index,archive)).ToList();
+            foreach(var item in fillers){
+                list.Mods.Add(item);
+                list.Presets[0].ModIds.Add(item.Id);
+                form.statuses[Key(item,form.Selected(item))]="Instalado";
+            }
+            form.statuses[Key(second,form.Selected(second))]="Instalado";
+            form.marked.Add(second.Id);
+            form.collapsedCategories.Add("Principal");
+            form.statusFilters=new HashSet<string>{"Instalado"};
+            form.SetAssociationSearch("Beta");
+            check(form.totalProgress.Value==99&&form.totalProgress.Caption.EndsWith("159 / 160"),
+                "A barra mantém a cobertura do preset mesmo com filtros na tabela.");
+            var coverageBar=form.totalProgress;
+            var clickSegment=typeof(GeneralProgress).GetMethod("OnMouseClick",BindingFlags.Instance|BindingFlags.NonPublic);
+            clickSegment.Invoke(coverageBar,new object[]{new MouseEventArgs(MouseButtons.Left,1,coverageBar.Width-7,24,0)});
+            check(form.ModRows().Single().Visible&&Equals(form.ModRows().Single().Tag,third.Id)&&
+                form.totalProgress.Value==99&&form.searchBox.Text=="",
+                "Um clique perto de 1% revela só o mod restante mesmo numa categoria recolhida e com filtros anteriores.");
+            form.ClearListFilters();
+            var coverageView=(GeneralScrollView)form.grid.Parent.Parent;
+            coverageView.ScrollTo(30);
+            await Task.Delay(30);
+            check(!form.clearFilters.Visible,"Rolar para baixo recolhe as ferramentas antes do clique na barra.");
+            clickSegment.Invoke(coverageBar,new object[]{new MouseEventArgs(MouseButtons.Left,1,coverageBar.Width-7,24,0)});
+            await Task.Delay(30);
+            check(form.clearFilters.Visible&&form.grid.FirstDisplayedScrollingRowIndex==0&&coverageView.Bar.Limit==0,
+                "A barra volta ao topo, restaura a seta e oculta a rolagem quando o resultado cabe na tabela.");
+            CaptureUi(form,Path.Combine(root,"coverage-filter.png"));
+            form.categoryFilters=new HashSet<string>{"Principal"};
+
+            form.variantFilters=new HashSet<string>{"Alternativa"};
+            form.statusFilters=new HashSet<string>{"Instalado"};
+            form.nameFilter="Beta";
+            form.SetAssociationSearch("Beta");
+            check(form.clearFilters.Enabled&&form.clearFilters.Left==form.deletePreset.Right,"A seta de limpar filtros fica ao lado da lixeira.");
+            form.clearFilters.PerformClick();
+            check(!form.HasListFilters&&!form.clearFilters.Enabled&&form.searchBox.Text==""&&
+                form.VisibleMods().Count==160&&form.marked.SetEquals(new[]{second.Id})&&form.state.SelectedPreset=="kit",
+                "Limpar filtros restaura o preset e preserva os mods marcados.");
+            form.marked.Clear();
+            form.collapsedCategories.Clear();
+            foreach(var item in fillers){
+                list.Mods.Remove(item);
+                list.Presets[0].ModIds.Remove(item.Id);
+                form.statuses.Remove(Key(item,form.Selected(item)));
+            }
+            form.statuses[Key(second,form.Selected(second))]="Baixando";
+            form.DrawRows();
             var origin=form.grid.Columns["Origin"];
-            check(origin.DisplayIndex==form.grid.Columns["Mark"].DisplayIndex+1&&form.grid.Columns["Name"].DisplayIndex==origin.DisplayIndex+1&&
+            check(origin.DisplayIndex==form.grid.Columns.Count-1&&
                 form.ModRows().All(row=>Equals(row.Cells["Origin"].Value,"Mod Loader")&&!String.IsNullOrWhiteSpace(row.Cells["Origin"].ToolTipText)),
-                "A origem fica entre a seleção e o nome e explica o selo do Mod Loader.");
+                "A origem fica no fim da tabela e explica o selo do Mod Loader.");
             form.gameInventory=new[]{new P2PSyncDifference{Mod="Sacred",Path="archive/pc/mod/sacred.archive",Kind="found"}};
             form.searchTerms=GeneralModSearch.Terms("sacred");form.DrawRows();
             var outside=form.grid.Rows.Cast<DataGridViewRow>().Single(row=>row.Tag is P2PSyncDifference);
@@ -104,9 +190,10 @@ internal sealed partial class GeneralModWindow {
             form.statuses[Key(second,form.Selected(second))]="Instalado";
             form.DrawRows();
             var badges=form.ModRows().Where(row=>Equals(row.Tag,first.Id)||Equals(row.Tag,second.Id)).Select(row=>row.Cells["Group"]).ToArray();
-            check(!form.grid.Columns["Group"].Visible&&badges.Length==2&&badges.All(cell=>Equals(cell.Value,"Corpo")),"O grupo aparece na linha do nome das alternativas.");
+            check(form.grid.Columns["Group"].Visible&&badges.Length==2&&badges.All(cell=>cell.Value==null),
+                "O cabeçalho de grupos volta sem converter vínculos antigos em gavetas.");
             check(form.totalProgress.Caption.EndsWith("1 / 2")&&form.counts.Text.Contains("Instalados: 1"),"Duas alternativas instaladas contam como uma escolha, com outro mod pendente.");
-            check(((List<KeyValuePair<string,Color>>)badges[0].Tag)[0].Value.GetBrightness()>((List<KeyValuePair<string,Color>>)badges[1].Tag)[0].Value.GetBrightness(),"A alternativa ativa usa a cor mais clara do grupo.");
+
             form.statuses[Key(first,form.Selected(first))]="Não instalado";
             form.statuses[Key(second,form.Selected(second))]="Não instalado";
             form.DrawRows();
@@ -118,15 +205,9 @@ internal sealed partial class GeneralModWindow {
             first.Variants[0].CompatibilityGroups.Add("Pés padrão");
             first.Tags.Add("teste exclusivo");
             form.SetAssociationSearch("teste exclusivo");
-            check(form.VisibleMods().Single()==first&&form.ModRows().Single().Cells["Name"].ToolTipText.Contains("teste exclusivo"),
-                "A busca encontra tags manuais e a linha apresenta as tags.");
+            check(form.VisibleMods().Single()==first&&!(form.ModRows().Single().Cells["Name"].ToolTipText??"").Contains("teste exclusivo"),
+                "A busca encontra tags manuais sem mostrar as tags na tabela.");
             form.SetAssociationSearch("");
-            form.groupFilters=new HashSet<string>{"Refit FemV"};form.DrawRows();
-            var groupRow=form.ModRows().Single();
-            check(groupRow.Height>form.grid.RowTemplate.Height&&Equals(groupRow.Tag,first.Id)&&
-                ((string)groupRow.Cells["Group"].Value).Contains("Pés padrão"),
-                "O filtro encontra qualquer grupo e os grupos do mod e da variante dividem uma linha abaixo do nome.");
-            form.groupFilters=null;form.DrawRows();
             string groupsExport=Path.Combine(root,"groups.json");
             var groupsLibrary=new GeneralModLibrary(Path.Combine(root,"groups-state.json"));
             groupsLibrary.Export(groupsExport,list);
@@ -172,10 +253,12 @@ internal sealed partial class GeneralModWindow {
             }
             foreach(bool dark in new[]{false,true}){
                 GeneralStyle.Dark=dark;using(var bitmap=new Bitmap(300,180))using(var graphics=Graphics.FromImage(bitmap)){
-                    graphics.Clear(Color.Magenta);GeneralStyle.PaintCard(graphics,bitmap.Size);
-                    check(bitmap.GetPixel(0,0).ToArgb()==GeneralStyle.Surface.ToArgb(),"Pintura limpa o canto opaco: "+dark);
+                    graphics.Clear(Color.Magenta);
+                    using(var shape=GeneralStyle.PopupShape(bitmap.Size))using(var clip=new Region(shape))graphics.Clip=clip;
+                    GeneralStyle.PaintCard(graphics,bitmap.Size);
+                    check(bitmap.GetPixel(0,0).ToArgb()==Color.Magenta.ToArgb(),"Máscara revela o fundo no canto: "+dark);
                     check(bitmap.GetPixel(150,90).ToArgb()==GeneralStyle.Surface.ToArgb(),"Pintura limpa a superfície central: "+dark);
-                    check(bitmap.GetPixel(150,0).ToArgb()!=Color.Magenta.ToArgb(),"Borda não conserva pixels da pintura anterior: "+dark);
+                    check(bitmap.GetPixel(150,0).ToArgb()==GeneralStyle.Line.ToArgb(),"Contorno coincide com o recorte da janela: "+dark);
                 }
             }
             GeneralStyle.Dark=false;

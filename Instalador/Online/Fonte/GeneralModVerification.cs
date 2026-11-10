@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
@@ -10,6 +10,18 @@ using System.Windows.Forms;
 internal sealed partial class GeneralModWindow {
     const string DependencyCategory="Dependências",CoreDependencyCategory="Núcleo e dependências";
     IReadOnlyList<P2PSyncDifference> gameInventory=new P2PSyncDifference[0];
+
+    readonly NexusManualScan nexusScan=new NexusManualScan();
+    Dictionary<string,NexusManualMatch> nexusManual=new Dictionary<string,NexusManualMatch>(StringComparer.Ordinal);
+    Func<GeneralNexusLink,Func<bool>,NexusFilePreview[]> testNexusPreviews;
+
+    string NexusVariantName(GeneralModEntry mod) {
+        var variant=Selected(mod);
+        if(IsBigBody(mod))return BodyChoiceLabel(ActiveBodyChoice(mod))??Selected(mod).Name;
+        NexusManualMatch match;
+        return nexusManual.TryGetValue(mod.Id,out match)&&Object.ReferenceEquals(match.Variant,variant)&&
+            !String.IsNullOrEmpty(match.Version)&&!variant.Name.Contains(match.Version)?variant.Name+" · "+match.Version:variant.Name;
+    }
 
     sealed class ProjectVerification {
         readonly bool online;
@@ -81,6 +93,8 @@ internal sealed partial class GeneralModWindow {
             var audit=new ProjectVerification(!testMode);
             await Scan(audit);
             if(IsDisposed||audit.Reads==null)return;
+            await ReviewInventoryLinks();
+            if(IsDisposed)return;
             var install=new Dictionary<string,Work>(StringComparer.Ordinal);
             var issues=ReviewDependencies(audit,install);
             var summary=String.Format(T("{0} mods verificados · {1} com tags atualizadas","{0} mods checked · {1} with updated tags"),
@@ -94,7 +108,7 @@ internal sealed partial class GeneralModWindow {
             if(audit.InventoryUnavailable)
                 summary+="\r\n"+T("Não foi possível ler os arquivos fora da lista.","Could not read files outside the list.");
             detail.Text=issues.Count==0?T("Verificação concluída.","Verification complete."):T("Verificação concluída com dependências para revisar.","Verification complete with dependencies to review.");
-            using(var dialog=new GeneralDependencyReview(summary,issues,install.Count,launch,gameInventory,AddReviewedDependency)){
+            using(var dialog=new GeneralDependencyReview(summary,issues,install.Count,launch,DisplayedInventory().Where(file=>file.Kind=="found").ToArray(),AddReviewedDependency)){
                 if(dialog.ShowDialog(this)!=DialogResult.OK)return;
             }
             string root=Root();
@@ -103,6 +117,7 @@ internal sealed partial class GeneralModWindow {
                     return dialog.ShowDialog(this)==DialogResult.OK?dialog.SelectedId:null;
             });
             if(selected==null||selected.Count==0)return;
+            selected=WithLinkedDependencies(selected);
             var pending=new List<Work>();
             List<string> downloads;
             scanning=true;Busy(true);
@@ -116,23 +131,61 @@ internal sealed partial class GeneralModWindow {
         }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
     }
 
-    List<P2PSyncDifference> TryReadGameInventory(string destination) {
-        try{return ReadGameInventory(destination);}
+    List<P2PSyncDifference> TryReadGameInventory(string destination,ScanReads reads) {
+        try{return ReadGameInventory(destination,reads);}
         catch(IOException){return null;}
         catch(UnauthorizedAccessException){return null;}
     }
 
-    List<P2PSyncDifference> ReadGameInventory(string destination) {
-        var selectedRecipes=new HashSet<string>(state.List.Mods.SelectMany(mod=>mod.Variants)
-            .Select(variant=>variant.CyberpunkId).Where(id=>id!=null),StringComparer.Ordinal);
-        var known=catalog.Packages.Where(recipe=>selectedRecipes.Contains(recipe.Id))
-            .SelectMany(NightCityDensity.KnownFiles).Select(file=>file.Path);
-        var imported=new HashSet<string>(state.CyberpunkImports.Values,StringComparer.Ordinal);
-        var engine=Cyberpunk(destination);
-        return engine.ReadUnlistedModFiles(known
-            .Concat(engine.ProjectDeletionFiles(imported,true).Select(file=>file.Path))
-            .Concat(Snapshot(destination).ProjectDeletionFiles(true).Select(file=>file.Path))
-            .Concat(state.List.Mods.SelectMany(mod=>mod.DetectedPaths)));
+    List<P2PSyncDifference> ReadGameInventory(string destination,ScanReads reads=null) {
+        destination=Path.GetFullPath(destination).TrimEnd('\\');
+        bool cyberpunk=IsCyberpunk(destination);
+        var byWork=state.List.Mods.SelectMany(mod=>mod.Variants.Select(variant=>new{Mod=mod,Key=Key(mod,variant)}))
+            .ToDictionary(item=>item.Key,item=>item.Mod.Id,StringComparer.Ordinal);
+        var names=state.List.Mods.ToDictionary(mod=>mod.Id,mod=>mod.Name,StringComparer.Ordinal);
+        var registered=new List<ModFileAnchor>();
+        Action<ProjectDeleteFile,Func<string,IEnumerable<string>>> add=(file,owners)=>{
+            foreach(string owner in file.OwnerKeys.SelectMany(owners).Distinct(StringComparer.Ordinal))
+                registered.Add(new ModFileAnchor{Owner=owner,Path=file.Path,Hash=file.Hash});
+        };
+        Func<string,IEnumerable<string>> lookup=key=>byWork.ContainsKey(key)?new[]{byWork[key]}:new string[0];
+        foreach(var file in Snapshot(destination).ProjectDeletionFiles(true))add(file,lookup);
+        var exact=new HashSet<string>(state.List.Mods.SelectMany(mod=>mod.DetectedPaths),StringComparer.OrdinalIgnoreCase);
+        var extras=new List<P2PSyncDifference>();
+        if(cyberpunk){
+            var engine=Cyberpunk(destination);
+            var fixedOwners=state.List.Mods.SelectMany(mod=>mod.Variants.Where(variant=>variant.CyberpunkId!=null)
+                .Select(variant=>new{Id=variant.CyberpunkId,Owner=mod.Id})).ToLookup(item=>item.Id,item=>item.Owner,StringComparer.Ordinal);
+            foreach(var anchor in engine.CatalogAnchors()){
+                var owners=fixedOwners[anchor.Owner].Distinct(StringComparer.Ordinal).ToArray();
+                if(owners.Length==0)registered.Add(new ModFileAnchor{Owner="catalog:"+anchor.Owner,Path=anchor.Path,Hash=anchor.Hash});
+                else {
+                    exact.Add(anchor.Path);
+                    foreach(string owner in owners)registered.Add(new ModFileAnchor{Owner=owner,Path=anchor.Path,Hash=anchor.Hash});
+                }
+            }
+            var imports=state.CyberpunkImports.ToLookup(item=>item.Value,item=>WorkKeyFromReceipt(item.Key),StringComparer.Ordinal);
+            foreach(var file in engine.ProjectDeletionFiles(new HashSet<string>(imports.Select(item=>item.Key),StringComparer.Ordinal),true))
+                add(file,key=>imports[key].SelectMany(lookup));
+            foreach(var mod in state.List.Mods.Where(mod=>GeneralModLibrary.IsHystBody(mod.Id))){
+                var files=new List<InstalledSnapshotFile>();
+                var installed=InstalledSnapshot.DetectManualHyst(destination,mod,seed.Mods.FirstOrDefault(item=>item.Id==mod.Id),files,reads==null?null:(Func<string,string>)reads.Hash);
+                if(installed==null)continue;
+                foreach(var file in files)registered.Add(new ModFileAnchor{Owner=mod.Id,Path=file.Path,Hash=file.Sha256});
+                extras.Add(new P2PSyncDifference{Kind="verified-variant",Mod=mod.Name,ModId=mod.Id,
+                    VariantId=installed.Id,VerifiedBytes=files.Sum(file=>file.Size)});
+            }
+            var listed=exact.Concat(registered.Where(file=>names.ContainsKey(file.Owner)).Select(file=>file.Path));
+            extras.AddRange(engine.ReadUnlistedModFiles(listed));
+        }
+        foreach(var file in Generic(destination).ProjectDeletionFiles(true))add(file,key=>lookup(WorkKeyFromReceipt(key)));
+        Func<string,string> scope=cyberpunk?(Func<string,string>)FixedInstaller.ModFolder:InstalledFileOwnership.GenericScope;
+        var associated=InstalledFileOwnership.FindAssociated(destination,registered,scope,
+            cyberpunk?extras.Where(file=>file.Kind=="found").Select(file=>file.Path):null);
+        extras.RemoveAll(file=>file.Kind=="found"&&associated.ContainsKey(file.Path)&&names.ContainsKey(associated[file.Path]));
+        foreach(var pair in associated.Where(item=>names.ContainsKey(item.Value)))
+            extras.Add(new P2PSyncDifference{Kind="associated",Mod=names[pair.Value],ModId=pair.Value,Path=pair.Key});
+        return extras;
     }
 
     List<GeneralDependencyIssue> ReviewDependencies(ProjectVerification audit,Dictionary<string,Work> install) {
@@ -148,7 +201,7 @@ internal sealed partial class GeneralModWindow {
         bool changed=false;
         foreach(var work in audit.Checked.Where(work=>members==null||members.Contains(work.Entry.Id)).ToArray()){
             if(work.Variant.CyberpunkId!=null){
-                foreach(var recipe in FixedData.Expand(catalog,new[]{work.Variant.CyberpunkId}).Where(recipe=>recipe.Id!=work.Variant.CyberpunkId)){
+                foreach(var recipe in ExpandWork(work,state.Destination).Where(recipe=>recipe.Id!=work.Variant.CyberpunkId)){
                     var dependency=recipes[recipe.Id].FirstOrDefault(candidate=>members==null||members.Contains(candidate.Entry.Id))
                         ??recipes[recipe.Id].FirstOrDefault();
                     if(dependency==null){
@@ -238,8 +291,9 @@ internal sealed partial class GeneralModWindow {
     void AddReviewedDependency(GeneralNexusRequirement target) {
         var preset=ActivePreset;
         if(!CanAddDependency(preset)||state.List.Mods.Any(entry=>entry.DependencySource==target.Source.Url))return;
+        BeginProjectEdit();
         CreateDependency(target,preset);
-        Persist();DrawRows();
+        FinishProjectEdit();DrawRows();
     }
 
     GeneralModEntry CreateDependency(GeneralNexusRequirement target,GeneralModPreset preset) {

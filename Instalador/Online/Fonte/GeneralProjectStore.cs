@@ -9,6 +9,7 @@ internal sealed class GeneralProject {
     public string Id, Name;
     public string TemplateId;
     public bool Legacy;
+    public int WindowWidth, WindowHeight;
 }
 
 internal sealed class GeneralProjectIndex {
@@ -140,7 +141,9 @@ internal sealed class GeneralProjectStore {
             }
             var state=new GeneralModState{
                 List=list,Theme=index.Theme,Language=index.Language,Destination=session.Destination,
-                DownloadFolder=index.DownloadFolder,SelectedPreset=incoming.Presets.Select(preset=>preset.Id).FirstOrDefault()
+                DownloadFolder=index.DownloadFolder,SelectedPreset=incoming.Presets.Select(preset=>preset.Id).FirstOrDefault(),
+                BodyChoice=manifest.BodyChoice??(previous!=null&&manifest.TemplateSubset&&
+                    !manifest.List.Mods.Any(mod=>GeneralModLibrary.IsHystBody(mod.Id))?previous.BodyChoice:null)
             };
             if(previous!=null){
                 KeepReceivedBindings(previous,state);
@@ -179,29 +182,53 @@ internal sealed class GeneralProjectStore {
         foreach(var mod in received.List.Mods){
             GeneralModEntry before;
             if(!original.TryGetValue(mod.Id,out before))continue;
-            foreach(var variant in mod.Variants){
-                if(!before.Variants.Any(item=>item.Id==variant.Id&&item.Sources.SequenceEqual(variant.Sources,StringComparer.Ordinal)))continue;
+            foreach(var option in mod.Variants){
+                var variant=GeneralModLibrary.BodyOption(received.BodyChoice,mod,option);
+                var oldVariant=before.Variants.Where(item=>item.Id==variant.Id)
+                    .Select(item=>GeneralModLibrary.BodyOption(previous.BodyChoice,before,item))
+                    .SingleOrDefault(item=>item.Sources.SequenceEqual(variant.Sources,StringComparer.Ordinal));
+                if(oldVariant==null)continue;
+                bool sameRoutes=GeneralInstallRoutes.Same(oldVariant.InstallRoutes,variant.InstallRoutes);
                 string owner=InstalledSnapshot.Owner(mod,variant),value;
-                if(sameRoot&&previous.SnapshotReceipts.TryGetValue(owner,out value))received.SnapshotReceipts[owner]=value;
+                if(sameRoot&&sameRoutes&&previous.SnapshotReceipts.TryGetValue(owner,out value))received.SnapshotReceipts[owner]=value;
                 for(int index=0;index<variant.Sources.Count;index++){
                     string slot=P2PPack.Slot(mod,variant,index);
                     if(previous.ResolvedDownloads.TryGetValue(slot,out value))received.ResolvedDownloads[slot]=value;
-                    if(sameRoot&&previous.CyberpunkImports.TryGetValue(slot,out value))received.CyberpunkImports[slot]=value;
+                    if(sameRoot&&sameRoutes&&previous.CyberpunkImports.TryGetValue(slot,out value))received.CyberpunkImports[slot]=value;
                 }
             }
         }
     }
 
-    internal GeneralProject Duplicate(GeneralProject source,string name,FixedCatalog catalog){
+    internal void SaveWindowSize(GeneralProject project,int width,int height){
         lock(gate){
-            name=ProjectName(name);var original=Load(source);var index=Read();
+            var index=Read();
+            var saved=Registered(index,project);
+            if(saved.WindowWidth==width&&saved.WindowHeight==height)return;
+            saved.WindowWidth=width;saved.WindowHeight=height;
+            Write(index);
+            project.WindowWidth=width;project.WindowHeight=height;
+        }
+    }
+
+    internal GeneralProject Duplicate(GeneralProject source,string name,FixedCatalog catalog,GeneralModState edited=null){
+        lock(gate){
+            name=ProjectName(name);var index=Read();var registered=Registered(index,source);
             if(index.Projects.Count>=200)throw new IOException("Use no máximo 200 projetos nesta biblioteca.");
-            var state=Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(original));
-            var copy=new GeneralProject{Id=Guid.NewGuid().ToString("N"),Name=name};string target=DataPath(copy),from=DataPath(source);
+            if(edited!=null){
+                string baseName=name.Substring(0,Math.Min(114,name.Length));
+                for(int suffix=2;index.Projects.Any(item=>String.Equals(item.Name,name,StringComparison.OrdinalIgnoreCase));suffix++)
+                    name=baseName+" ("+suffix+")";
+            }
+            var state=Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(edited??Load(source)));
+            var copy=new GeneralProject{Id=Guid.NewGuid().ToString("N"),Name=name,WindowWidth=registered.WindowWidth,WindowHeight=registered.WindowHeight};
+            string target=DataPath(copy),from=DataPath(source);
             DownloadCache.DuplicateSources(Path.Combine(from,"Cache"),Path.Combine(target,"Cache"));
             if(!String.IsNullOrWhiteSpace(state.Destination)&&Directory.Exists(state.Destination)){
                 new GeneralModInstaller(state.Destination,Path.Combine(from,"Instalacoes")).DuplicateRecognition(Path.Combine(target,"Instalacoes"));
                 new InstalledSnapshotInstaller(state.Destination,from,catalog).DuplicateRecognition(target);
+                var links=new InventoryLinkStore(from,state.Destination).Load();
+                if(links.Groups.Count>0||links.Ignored.Count>0)new InventoryLinkStore(target,state.Destination).Save(links);
             }else state.SnapshotReceipts.Clear();
             new GeneralModLibrary(Path.Combine(target,"lista.json")).Save(state);
             index.Projects.Add(copy);Write(index);return copy;

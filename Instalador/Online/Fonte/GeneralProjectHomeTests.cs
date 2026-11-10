@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -189,8 +189,10 @@ internal sealed partial class GeneralModWindow {
                                 home.OpenRequested(remaining);
                                 answerTransfer.Stop();
                                 if(failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+                                var edited=store.Read().Projects.Single(item=>item.TemplateId==null);
                                 check(home.IsDisposed&&transferPrompts==2&&draftPrompts==1&&
-                                    store.Load(remaining).List.Mods.First().Tags.Contains("salvar ao fechar"),
+                                    store.Load(edited).List.Mods.First().Tags.Contains("salvar ao fechar")&&
+                                    before==Safe.Hash(Path.Combine(store.DataPath(remaining),"lista.json")),
                                     "Confirmar o X salva o rascunho e encerra o aplicativo sem voltar à Home ou perguntar novamente.");
                             }
                             completed=true;
@@ -212,10 +214,15 @@ internal sealed partial class GeneralModWindow {
             check(form.state.Theme=="dark"&&form.state.Language=="en"&&GeneralStyle.Dark,"Tema e idioma globais acompanham a abertura de outro projeto.");
             check(form.Text.Contains("Projeto atual"),"Janela identifica o projeto aberto.");
             var oldPack=GeneralModLibrary.Seed(form.catalog,new ModImportItem[0]);
+            var oldBody = oldPack.Mods.Single(mod => mod.Id == "hyst-ebb-rb");
+            oldBody.Variants.Single(variant => variant.Id == "default").Name = "5.0.0 · Somente corpo";
+            oldBody.Variants.Single(variant => variant.Id == "with-refit-base").Name = "Meu refit";
             const string eclipse=GeneralModLibrary.EclipseTattooId;
             foreach(var preset in oldPack.Presets)preset.ModIds.Remove(eclipse);
             oldPack.Presets.Add(new GeneralModPreset{Id="custom",Name="Meu preset"});
-            var ready=store.Create("Cyberpunk 2077",oldPack,"dark","en",root,"cyberpunk-2077");
+            string bodyGame=Path.Combine(root,"body-game");
+            Directory.CreateDirectory(bodyGame);
+            var ready=store.Create("Cyberpunk 2077",oldPack,"dark","en",bodyGame,"cyberpunk-2077");
             form.state=store.Load(ready);
             form.AttachProject(store,ready);
             var stored=new GeneralModLibrary(Path.Combine(form.data,"lista.json")).Load().List;
@@ -223,10 +230,163 @@ internal sealed partial class GeneralModWindow {
                 stored.Presets.Where(preset=>preset.Id!="custom").All(preset=>preset.ModIds.Contains(eclipse))&&
                 !stored.Presets.Single(preset=>preset.Id=="custom").ModIds.Contains(eclipse),
                 "Atualizar o pacote oficial recupera a Eclipse nos dois presets oficiais e preserva o personalizado.");
+            var storedBody = stored.Mods.Single(mod => mod.Id == oldBody.Id);
+            check(storedBody.Variants.Single(variant => variant.Id == "default").Name.Contains("Natural (EBBN)") &&
+                storedBody.Variants.Single(variant => variant.Id == "with-refit-base").Name == "Meu refit",
+                "A opção Natural aparece em um projeto oficial antigo sem alterar nomes personalizados.");
+            var bodyRows=form.VisibleMods().Where(IsBigBody).ToList();
+            check(bodyRows.Count==1&&form.ModDisplayName(bodyRows[0])=="Big Body",
+                "A tabela mostra o Big Body em uma única linha.");
+            var bodyRow=form.ModRows().Single(row=>(string)row.Cells["Name"].Value=="Big Body");
+            check(form.grid.Columns["Origin"].DisplayIndex==form.grid.Columns.Count-1,
+                "A coluna de origem fica no fim da tabela.");
+            check(form.ToggleVersions(bodyRow)&&form.grid.Rows.Cast<DataGridViewRow>()
+                .Where(row=>row.Tag is Work).Select(row=>((Work)row.Tag).BodyChoice)
+                .SequenceEqual(new[]{GeneralModLibrary.EbbBody,GeneralModLibrary.PushBody,GeneralModLibrary.NaturalBody}),
+                "A gaveta mostra três escolhas de corpo e mantém Togglable Feet fora dela.");
+            var optionRows=form.grid.Rows.Cast<DataGridViewRow>().Where(row=>row.Tag is Work).ToList();
+            var bodyOptions=optionRows.Select(row=>(Work)row.Tag).ToList();
+            var nsfwBefore=bodyOptions.Select(work=>work.Variant.Nsfw).ToArray();
+            var inactive=bodyOptions.First(work=>work.BodyChoice!=form.ActiveBodyChoice(bodyRows[0]));
+            foreach(var work in bodyOptions)work.Variant.Nsfw=work==inactive;
+            form.DrawRows();
+            check(Equals(form.ModRows().Single(row=>Equals(row.Cells["Name"].Value,"Big Body")).Cells["Name"].Tag,true)&&
+                form.grid.Rows.Cast<DataGridViewRow>().Where(row=>row.Tag is Work&&Equals(row.Cells["Name"].Tag,true))
+                    .Select(row=>((Work)row.Tag).BodyChoice).SequenceEqual(new[]{inactive.BodyChoice}),
+                "Uma opção NSFW inativa marca a gaveta e somente a linha daquela versão.");
+            inactive.Variant.Nsfw=false;
+            form.DrawRows();
+            check(Equals(form.ModRows().Single(row=>Equals(row.Cells["Name"].Value,"Big Body")).Cells["Name"].Tag,false),
+                "A gaveta sem opções NSFW não recebe o selo.");
+            for(int i=0;i<bodyOptions.Count;i++)bodyOptions[i].Variant.Nsfw=nsfwBefore[i];
+            form.DrawRows();
+            optionRows=form.grid.Rows.Cast<DataGridViewRow>().Where(row=>row.Tag is Work).ToList();
+            check(optionRows.All(row=>Equals(row.Cells["Origin"].Value,"Mod Loader")&&row.Cells["Size"].Value.ToString()!="—")&&
+                optionRows.Count(row=>Equals(row.Cells["Status"].Tag,true))==1&&
+                new[]{"Name","Variant","Size"}.All(column=>optionRows.Single(row=>Equals(row.Cells["Status"].Tag,true)).Cells[column].Style.Font.Bold)&&
+                !optionRows.Single(row=>Equals(row.Cells["Status"].Tag,true)).Cells["Status"].InheritedStyle.Font.Bold,
+                "Cada opção tem origem e tamanho, com uma única seleção ativa.");
+            var activeBody=((Work)optionRows.Single(row=>Equals(row.Cells["Status"].Tag,true)).Tag);
+            var inventory=form.gameInventory;
+            form.gameInventory=new[]{new P2PSyncDifference{Kind="verified-variant",ModId=activeBody.Entry.Id,
+                VariantId=activeBody.Variant.Id,VerifiedBytes=135000000}};
+            check(form.BodyOptionSpace(activeBody)==GeneralStorageSize.Format(135000000)&&
+                form.InstallationStatus(activeBody.Entry,GeneralStatusPresentation.ManualBody)=="Instalado",
+                "Arquivos verificados manualmente mostram o tamanho medido e a situação de instalação.");
+            form.gameInventory=inventory;
+            var naturalRow=optionRows.Single(row=>((Work)row.Tag).BodyChoice==GeneralModLibrary.NaturalBody);
+            form.OpenRowEditor(naturalRow);
+            check(new GeneralModLibrary(Path.Combine(form.data,"lista.json")).Load().BodyChoice==GeneralModLibrary.NaturalBody&&
+                form.SelectedJobs().Single().BodyChoice==GeneralModLibrary.NaturalBody,
+                "Selecionar Natural salva a escolha e a fila usa a seleção da gaveta.");
+            var selectedOption=form.grid.Rows.Cast<DataGridViewRow>().Single(row=>row.Tag is Work&&Equals(row.Cells["Status"].Tag,true));
+            check(Equals(form.ModRows().Single(row=>Equals(row.Cells["Name"].Value,"Big Body")).Cells["Size"].Value,
+                selectedOption.Cells["Size"].Value),"A linha principal mostra o tamanho da variante escolhida.");
+            check(form.ToggleVersions(form.ModRows().Single(row=>(string)row.Cells["Name"].Value=="Big Body"))&&
+                !form.grid.Rows.Cast<DataGridViewRow>().Any(row=>row.Tag is Work),
+                "A gaveta fecha sem duplicar itens selecionáveis.");
+            var baseVersions=form.BigBodyVersions(form.state.List.Mods,false);
+            var dlcVersions=form.BigBodyVersions(form.state.List.Mods,true);
+            check(baseVersions.Count==3&&baseVersions.All(work=>work.Variant.Id=="with-refit-base"&&work.Variant.Sources.Count==2)&&
+                dlcVersions.All(work=>work.Variant.Id=="with-refit-dlc"&&work.Variant.Sources.Count==3),
+                "As três opções usam os refits corretos com ou sem a expansão.");
+            var baseNatural=baseVersions.Single(work=>work.BodyChoice==GeneralModLibrary.NaturalBody);
+            var basePush=baseVersions.Single(work=>work.BodyChoice==GeneralModLibrary.PushBody);
+            baseNatural.Variant.RequiredMods.Add("ArchiveXL");
+            basePush.Variant.RequiredMods.Add("Codeware");
+            var linked=form.WithLinkedDependencies(new List<Work>{baseNatural});
+            check(linked.Select(work=>work.Entry.Id).SequenceEqual(new[]{"ArchiveXL","hyst-ebb-rb"}),
+                "A fila prepara apenas os vínculos da versão selecionada, com a dependência primeiro.");
+            baseNatural.Variant.RequiredMods.Clear();
+            basePush.Variant.RequiredMods.Clear();
+            await TestBodyDetails(form,check);
             form.ProjectCommand("new");check(form.ProjectAction=="new","Novo projeto retorna à Home sem substituir a lista atual.");await Task.CompletedTask;
         });
         Safe.WriteJson(Path.Combine(root,"resultado-project-home.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});
     }
+    static async Task TestBodyDetails(GeneralModWindow form,Action<bool,string> check){
+        var choices=form.BodyVersionsForPreset();
+        var current=choices.Single(work=>work.BodyChoice==GeneralModLibrary.EbbBody);
+        var entry=form.BodyEditorEntry(current.Entry,choices);
+        using(var editor=new GeneralModEditor(entry,new[]{GeneralModLibrary.BodyCategory},current.BodyChoice,true,"",
+            alternatives:form.state.List.Mods,groupList:form.state.List,fixedChoices:true)){
+            editor.Show(form);
+            var picker=EditorField<GeneralPicker>(editor,"variants");
+            var name=EditorField<TextBox>(editor,"modName");
+            var description=EditorField<TextBox>(editor,"description");
+            var source=EditorField<TextBox>(editor,"sources");
+            var chips=EditorField<FlowLayoutPanel>(editor,"tagChips");
+            var dependencies=EditorField<FlowLayoutPanel>(editor,"dependencyChips");
+            var title=EditorField<TableLayoutPanel>(editor,"groupTitle");
+            check(picker.Items.Cast<string>().SequenceEqual(new[]{"EBB + RB","EBBP + RB","EBBN + RB"})&&title.Visible&&
+                EditorField<TextBox>(editor,"groupName").Text=="Big Body"&&((TableLayoutPanel)title.Parent).GetRow(title)<((TableLayoutPanel)title.Parent).GetRow(picker.Parent),
+                "O título Big Body aparece acima do seletor, com as três escolhas da gaveta.");
+            check(title.Controls.Count==1&&EditorField<GeneralButton>(editor,"nsfw").BareInk==GeneralStyle.Danger,
+                "O título do grupo fica sem selo no editor e a marcação permanece no nome do mod.");
+            check(source.Text==current.Variant.Sources[0],"EBB apresenta o link do próprio perfil.");
+            description.Text="Descrição exclusiva EBB";
+            editor.MergeSourceTags(new[]{"Tag EBB"});
+            editor.AddRequiredMod(form.state.List.Mods.Single(mod=>mod.Id=="ArchiveXL"));
+            picker.SelectedIndex=1;
+            var push=choices.Single(work=>work.BodyChoice==GeneralModLibrary.PushBody);
+            check(source.Text==push.Variant.Sources[0]&&source.Text!=current.Variant.Sources[0]&&
+                name.Text==push.Entry.Name&&description.Text!="Descrição exclusiva EBB"&&
+                !chips.Controls.OfType<Button>().Any(button=>button.Text=="Tag EBB ×")&&
+                !dependencies.Controls.OfType<Button>().Any(button=>button.Text.StartsWith("ArchiveXL")),
+                "Push-Up apresenta nome, descrição, link, tags e dependências próprios.");
+            picker.SelectedIndex=2;
+            check(name.Text.Contains("EBBN")&&description.Text==entry.Variants[2].Description&&source.Text==current.Variant.Sources[0],
+                "Natural tem descrição própria e indica o arquivo compartilhado com EBB.");
+            editor.AddRequiredMod(form.state.List.Mods.Single(mod=>mod.Id=="Codeware"));
+            picker.SelectedIndex=0;
+            check(description.Text=="Descrição exclusiva EBB"&&chips.Controls.OfType<Button>().Any(button=>button.Text=="Tag EBB ×")&&
+                dependencies.Controls.OfType<Button>().Any(button=>button.Text.StartsWith("ArchiveXL"))&&
+                !dependencies.Controls.OfType<Button>().Any(button=>button.Text.StartsWith("Codeware")),
+                "Trocar a escolha preserva os rascunhos independentes.");
+            picker.SelectedIndex=2;
+            var groupName=EditorField<TextBox>(editor,"groupName");
+            check(groupName.Focus()&&!groupName.ReadOnly,"O nome compartilhado aceita digitação ao receber o foco.");
+            groupName.Text="Corpo personalizado";
+            picker.SelectedIndex=1;
+            check(groupName.Text=="Corpo personalizado"&&source.Text==push.Variant.Sources[0],
+                "O nome do grupo é compartilhado sem modificar os links das versões.");
+            picker.SelectedIndex=2;
+            EditorField<Button>(editor,"save").PerformClick();
+            check(editor.Result!=null&&await form.ApplyBodyEditor(editor,choices)&&
+                form.ModDisplayName(current.Entry)=="Corpo personalizado","A opção Natural e o título do grupo são aplicados no projeto.");
+        }
+        form.SaveProjectEdits();
+        var saved=form.library.Load();
+        var selected=saved.List.Mods.Single(mod=>mod.Id==GeneralModLibrary.EbbBody).Variants
+            .Single(version=>version.Id==saved.ChosenVariants[GeneralModLibrary.EbbBody]);
+        check(saved.BodyChoice==GeneralModLibrary.NaturalBody&&selected.RequiredMods.Contains("ArchiveXL")&&
+            selected.NaturalOption.RequiredMods.Contains("Codeware")&&!selected.NaturalOption.RequiredMods.Contains("ArchiveXL"),
+            "A seleção e as dependências independentes sobrevivem ao salvamento.");
+        choices=form.BodyVersionsForPreset();
+        entry=form.BodyEditorEntry(choices[0].Entry,choices);
+        using(var editor=new GeneralModEditor(entry,new[]{GeneralModLibrary.BodyCategory},choices[0].BodyChoice,true,"",
+            alternatives:form.state.List.Mods,groupList:form.state.List,fixedChoices:true)){
+            editor.Show(form);
+            var picker=EditorField<GeneralPicker>(editor,"variants");
+            check(picker.AccessibleName==T("Versão","Version")+" *"&&picker.AddChoiceLabel==T("Adicionar nova versão","Add new version"),
+                "O seletor usa um rótulo genérico e oferece nova versão.");
+            picker.AddChoice();
+            picker.Text="Quarta variante";
+            EditorField<TextBox>(editor,"modName").Text="Mod alternativo";
+            EditorField<TextBox>(editor,"sources").Text="https://www.nexusmods.com/cyberpunk2077/mods/99999?tab=files&file_id=123456";
+            editor.AddRequiredMod(form.state.List.Mods.Single(mod=>mod.Id=="Codeware"));
+            EditorField<Button>(editor,"save").PerformClick();
+            check(editor.Result!=null&&await form.ApplyBodyEditor(editor,choices),"O editor aceita uma quarta opção com fonte e dependência próprias.");
+        }
+        form.SaveProjectEdits();
+        saved=form.library.Load();
+        var extra=saved.List.Mods.Single(mod=>mod.Id==saved.BodyChoice);
+        check(extra.Name=="Mod alternativo"&&extra.Variants.Single().Name=="Quarta variante"&&
+            extra.Variants.Single().RequiredMods.SequenceEqual(new[]{"Codeware"})&&
+            form.BodyVersionsForPreset().Any(work=>work.Entry.Id==extra.Id&&BodyChoiceLabel(work)=="Quarta variante"),
+            "A quarta opção é persistida e reaparece na mesma gaveta.");
+    }
+
     static void ClickSavedProject(ListBox list,Point point){typeof(ListBox).GetMethod("OnMouseClick",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(list,new object[]{new MouseEventArgs(MouseButtons.Left,1,point.X,point.Y,0)});}
     static async Task<int> ConfirmHomeDelete(GeneralProjectHome home,DialogResult[] responses,Action click,Action<bool,string> check,string root,bool removeMods=false){
         int prompts=0;GeneralDialog previous=null;Exception failure=null;

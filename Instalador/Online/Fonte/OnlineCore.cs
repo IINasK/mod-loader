@@ -92,10 +92,10 @@ public static class FixedData {
         var blocked=mods.FirstOrDefault(m=>!String.IsNullOrEmpty(m.BlockedReason));
         if(blocked!=null)throw new IOException(blocked.Name+" está retido: "+blocked.BlockedReason);
     }
-    public static List<FixedMod> Expand(FixedCatalog c,IEnumerable<string> selected) {
+    public static List<FixedMod> Expand(FixedCatalog c,IEnumerable<string> selected,bool stockEquipment=false) {
         var result=new List<FixedMod>(); var active=new HashSet<string>(); var done=new HashSet<string>();
         Action<string> visit=null;
-        visit=id=>{if(done.Contains(id))return;if(!active.Add(id))throw new IOException("Ciclo de dependências.");var m=c.Packages.SingleOrDefault(x=>x.Id==id);if(m==null)throw new IOException("Mod fora da lista fixa: "+(id??"<sem ID>")+". A referência não pertence ao catálogo desta versão.");foreach(string d in m.Dependencies)visit(d);active.Remove(id);done.Add(id);result.Add(NightCityDensity.Default(m));};
+        visit=id=>{if(done.Contains(id))return;if(!active.Add(id))throw new IOException("Ciclo de dependências.");var m=c.Packages.SingleOrDefault(x=>x.Id==id);if(m==null)throw new IOException("Mod fora da lista fixa: "+(id??"<sem ID>")+". A referência não pertence ao catálogo desta versão.");if(stockEquipment&&EquipmentExOptions.Available(m))m=EquipmentExOptions.Resolve(m,EquipmentExOptions.StockId);foreach(string d in m.Dependencies)visit(d);active.Remove(id);done.Add(id);result.Add(NightCityDensity.Default(m));};
         foreach(string id in selected)visit(id);return result;
     }
     public static ModScan Scan(FixedMod mod,string game,bool checkIncompatibilities=true,Func<string,string> readHash=null,bool logFiles=true) {
@@ -198,6 +198,7 @@ public sealed partial class DownloadCache {
             report("Importando "+a.Name);Import(file,a);wanted.RemoveAll(x=>x.Sha256==hash);count++;
         }return count;
     }
+    const long MaxPreparedBytes=8L*1024*1024*1024;
     public void Stage(FixedMod mod,string stage,Action<string> report) {
         using(HoldOperation()) {
         foreach(var a in mod.Assets) {
@@ -215,7 +216,7 @@ public sealed partial class DownloadCache {
                         if(((e.ExternalAttributes>>16)&0xF000)==0xA000||entries.ContainsKey(e.FullName))throw new IOException("Link ou entrada duplicada no ZIP.");
                         entries.Add(e.FullName,e);
                     }
-                    foreach(var f in files){currentEntry=f.Entry;ZipArchiveEntry e;if(!entries.TryGetValue(f.Entry,out e))throw new IOException("Arquivo previsto não encontrado dentro do pacote.");if(e.Length>8L*1024*1024*1024)throw new IOException("Arquivo ultrapassa o limite de leitura segura de 8 GiB.");using(var s=e.Open())WritePrepared(s,stage,f);report(mod.Name);}
+                    foreach(var f in files){currentEntry=f.Entry;ZipArchiveEntry e;if(!entries.TryGetValue(f.Entry,out e))throw new IOException("Arquivo previsto não encontrado dentro do pacote.");if(e.Length>MaxPreparedBytes)throw new IOException("Arquivo ultrapassa o limite de leitura segura de "+GeneralStorageSize.Format(MaxPreparedBytes)+".");using(var s=e.Open())WritePrepared(s,stage,f);report(mod.Name);}
                 }
             } else if(a.Format=="raw") {foreach(var f in files){currentEntry=f.Path;using(var s=File.OpenRead(source))WriteVerified(s,stage,f);}}
             else {
@@ -240,7 +241,7 @@ public sealed partial class DownloadCache {
         string dest=Safe.In(stage,f.Path);Directory.CreateDirectory(Path.GetDirectoryName(dest));
         using(var output=new FileStream(dest,FileMode.CreateNew,FileAccess.Write,FileShare.None))using(var sha=SHA256.Create()){
             var buffer=new byte[65536];long total=0;int n;
-            while((n=input.Read(buffer,0,buffer.Length))>0){total+=n;if(total>8L*1024*1024*1024)throw new IOException("Arquivo ultrapassa o limite de leitura segura de 8 GiB: "+f.Path);output.Write(buffer,0,n);sha.TransformBlock(buffer,0,n,buffer,0);}
+            while((n=input.Read(buffer,0,buffer.Length))>0){total+=n;if(total>MaxPreparedBytes)throw new IOException("Arquivo ultrapassa o limite de leitura segura de "+GeneralStorageSize.Format(MaxPreparedBytes)+": "+f.Path);output.Write(buffer,0,n);sha.TransformBlock(buffer,0,n,buffer,0);}
             sha.TransformFinalBlock(new byte[0],0,0);string hash=Safe.Hex(sha.Hash);if(!FpvCustomization.MatchesFile(f,total,hash))throw new FileContentMismatchException(f,total,hash);
         }
     }
@@ -300,7 +301,7 @@ public sealed partial class FixedInstaller {
     void Closed(){if(fixture)return;foreach(var p in Process.GetProcessesByName("Cyberpunk2077")){p.Dispose();throw new IOException("Feche o jogo antes de instalar ou desfazer.");}}
     public string Install(IEnumerable<string> chosen,bool acceptPlan,Action<string> report,int failAfter=-1) {
         if(!acceptPlan)throw new IOException("Confirme o plano de instalação.");
-        var mods=FixedData.Expand(catalog,chosen).Select(m=>NightCityDensity.ForInstall(m,game)).ToList();if(mods.Count==0)throw new IOException("Marque pelo menos um mod.");
+        var ids=chosen.ToArray();var mods=FixedData.Expand(catalog,ids,!ids.Contains(EquipmentExOptions.ModId)&&EquipmentExOptions.StockActive(catalog,game)).Select(m=>NightCityDensity.ForInstall(m,game)).ToList();if(mods.Count==0)throw new IOException("Marque pelo menos um mod.");
         return InstallTransaction(mods,report,failAfter,false);
     }
     string InstallTransaction(List<FixedMod> mods,Action<string> report,int failAfter,bool localImport) {
@@ -331,7 +332,7 @@ public sealed partial class FixedInstaller {
             string ledger=Safe.In(Data,(localImport?"importados/":"")+id+".json");Save(ledger,receipt);
             OnlineDiagnostics.Record("install.begin",null,"Pacotes preparados; iniciando cópia para o jogo.",new{Game=game,Receipt=id,Mods=pending.Select(m=>m.Id).ToArray(),Files=pending.Sum(m=>m.Files.Count)});
             try {
-                BackupSaves(Safe.In(Data,"backups/"+id+"/saves"));
+                BackupSaves();
                 receipt.Status="instalando";Save(ledger,receipt);int written=0;
                 foreach(var m in pending)foreach(var f in m.Files) {
                     Closed();string dest=Safe.In(game,f.Path);Safe.NoLinks(dest);
@@ -372,10 +373,14 @@ public sealed partial class FixedInstaller {
     }
     void Save(string path,OnlineReceipt r){var plain=Encoding.UTF8.GetBytes(Safe.Json.Serialize(r));Safe.WriteJson(path,new ReceiptEnvelope{Protected=Convert.ToBase64String(ProtectedData.Protect(plain,null,DataProtectionScope.CurrentUser))});}
     OnlineReceipt ReadReceipt(string path){return ReadReceiptCore(path,false);}
-    OnlineReceipt ReadReceiptCore(string path,bool inspection) {
+    OnlineReceipt ReadReceiptEnvelope(string path,bool inspection) {
         Safe.NoLinks(path);if(new FileInfo(path).Length>8000000)throw new IOException("Registro excessivo.");OnlineReceipt r;
         try{var envelope=Safe.Json.Deserialize<ReceiptEnvelope>(inspection?GeneralProjectStorage.ReadText(path,8000000):File.ReadAllText(path));r=Safe.Json.Deserialize<OnlineReceipt>(Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(envelope.Protected),null,DataProtectionScope.CurrentUser)));}
         catch(Exception ex){if(ex is OutOfMemoryException)throw;throw new IOException("Registro alterado, corrompido ou criado por outra conta do Windows. Nenhum arquivo será removido.");}
+        return r;
+    }
+    OnlineReceipt ReadReceiptCore(string path,bool inspection) {
+        var r=ReadReceiptEnvelope(path,inspection);
         if(r==null||r.CatalogId!=catalog.Id||!Regex.IsMatch(r.Id??"","^[a-f0-9]{32}$")||Path.GetFileName(path)!=r.Id+".json"||r.Files==null||r.Files.Count>20000||r.Mods==null)throw new IOException("Registro inválido. Não foi alterado nenhum arquivo.");
         if(r.Operation==ExtraResetOperation){ValidateExtraResetReceipt(r,path);return r;}
         if(r.Operation==LocalModPackage.ReceiptOperation){
@@ -384,6 +389,12 @@ public sealed partial class FixedInstaller {
         }
         bool disabling=r.Operation=="deactivate";
         if(r.BackupLayout!=null&&!(disabling?r.BackupLayout=="flat-v1":r.BackupLayout=="fpv-flat-v1"))throw new IOException("Formato de backup desconhecido no registro.");
+
+        if (r.Operation == EquipmentExOptions.Operation) {
+            EquipmentExOptions.ValidateReceipt(catalog, r);
+            foreach (var file in r.Files) Safe.In(game, file.Path);
+            return r;
+        }
         if(r.Operation=="density"){NightCityDensity.ValidateReceipt(catalog,r);return r;}
         if(r.Operation!=null&&r.Operation!="install"&&!disabling)throw new IOException("Operação desconhecida no registro.");
         var mods=HistoricalReceipts.Expand(catalog,r.Mods);
@@ -408,7 +419,7 @@ public sealed partial class FixedInstaller {
         }
     }
     string UndoReceipt(OnlineReceipt r,string ledger,Action<string> report) {
-        if(r.Operation=="density")return UndoDensity(r,ledger,report);
+        if(r.Operation=="density"||r.Operation==EquipmentExOptions.Operation)return UndoDensity(r,ledger,report);
         if(r.Operation=="deactivate"||r.Operation==ExtraResetOperation)return UndoDeactivation(r,ledger,report);
         int preserved=0;r.Status="desfazendo";Save(ledger,r);
         foreach(var f in r.Files.AsEnumerable().Reverse()){
@@ -441,9 +452,5 @@ public sealed partial class FixedInstaller {
     }
     string UpgradeBackup(OnlineReceipt receipt,string relative) {
         using(var sha=SHA256.Create())return Safe.In(Data,"backups/"+receipt.Id+"/fpv-originais/"+Safe.Hex(sha.ComputeHash(Encoding.UTF8.GetBytes(relative)))+".bin");
-    }
-    void BackupSaves(string dest) {
-        if(String.IsNullOrEmpty(saves)||!Directory.Exists(saves))return;Safe.NoLinks(saves);var dirs=new Stack<string>();dirs.Push(saves);
-        while(dirs.Count>0){string dir=dirs.Pop();Safe.NoLinks(dir);foreach(string sub in Directory.GetDirectories(dir)){Safe.NoLinks(sub);dirs.Push(sub);}foreach(string source in Directory.GetFiles(dir)){Safe.NoLinks(source);string relative=source.Substring(saves.TrimEnd('\\').Length+1).Replace('\\','/');string target=Safe.In(dest,relative);Directory.CreateDirectory(Path.GetDirectoryName(target));File.Copy(source,target,false);if(Safe.Hash(source)!=Safe.Hash(target))throw new IOException("Backup de saves não conferiu.");}}
     }
 }

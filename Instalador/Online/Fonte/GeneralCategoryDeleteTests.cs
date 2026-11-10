@@ -48,11 +48,11 @@ internal static class GeneralCategoryDeleteTests {
         check(imported.Mods[0].Category == null && imported.Presets[0].ModIds.Contains("member") && imported.Mods[0].Variants[0].Sources[0] == archive, "Portable export/import retains the moved mod and its source.");
         GeneralModLibrary.DeleteCategory(loaded.List, "Vazia");
         check(!loaded.List.Categories.Contains("Vazia") && loaded.List.Mods.Count == 2, "Empty categories can be deleted.");
-        string before = Safe.Json.Serialize(loaded.List);
+        string before = ModAuditTests.Canonical(Safe.Json.DeserializeObject(Safe.Json.Serialize(loaded.List)));
         foreach (string invalid in new[] { null, "", "Avulsos", "Missing" }) {
             bool rejected = false;
             try { GeneralModLibrary.DeleteCategory(loaded.List, invalid); } catch (IOException) { rejected = true; }
-            string after=Safe.Json.Serialize(loaded.List);
+            string after=ModAuditTests.Canonical(Safe.Json.DeserializeObject(Safe.Json.Serialize(loaded.List)));
             if(!rejected||before!=after)Safe.WriteJson(Path.Combine(root,"invalid-category-diagnostic.json"),new{Invalid=invalid,Rejected=rejected,Before=before,After=after});
             check(rejected && before == after, "Invalid or root category deletion is rejected without changes: " + (invalid ?? "null"));
         }

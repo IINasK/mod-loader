@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -57,7 +57,44 @@ public static class GeneralModInstallerTests {
         Throws(() => rollback.Install(first, "mod-1", message => Directory.CreateDirectory(stateFile)));
         Check(Directory.GetFiles(secondTarget, "*", SearchOption.AllDirectories).Length == 0 &&
             Directory.GetDirectories(secondTarget, ".mod-loader-*").Length == 0, "Falha ao gravar o recibo reverte os arquivos copiados e limpa o estágio.");
-        return 11;
+        string package=MakeZip(folder,"routes.zip",new Dictionary<string,string>{
+            {"src/one.txt","one"},{"src/sub/two.txt","two"}
+        });
+        var routes=GeneralInstallRoutes.Parse("src = %GAME%/chosen | src/sub/two.txt = %GAME%/alternate",target);
+        string firstPath=Path.Combine(target,@"src\one.txt"), secondPath=Path.Combine(target,@"src\sub\two.txt");
+        string movedFirst=Path.Combine(target,@"chosen\one.txt"), movedSecond=Path.Combine(target,@"alternate\two.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(movedFirst));
+        Directory.CreateDirectory(Path.GetDirectoryName(movedSecond));
+        installer.Install(package,"relocate",null);
+        var defaults=new List<GeneralInstallRoute>();
+        File.WriteAllText(movedSecond,"pre-existing");
+        Throws(()=>installer.Relocate("relocate",defaults,routes,null));
+        Check(File.Exists(firstPath)&&File.Exists(secondPath)&&!File.Exists(movedFirst)&&File.ReadAllText(movedSecond)=="pre-existing",
+            "A conflicting destination preserves the installed package and the existing file.");
+        File.Delete(movedSecond);
+        Check(installer.Relocate("relocate",defaults,routes,null)&&File.ReadAllText(movedFirst)=="one"&&File.ReadAllText(movedSecond)=="two"&&
+            !File.Exists(firstPath)&&!File.Exists(secondPath)&&installer.Status("relocate",package,Safe.Hash,routes)==GeneralModInstaller.Installed,
+            "The installed files and their receipt follow folder and individual file rules.");
+        Check(installer.Relocate("relocate",routes,defaults,null)&&File.Exists(firstPath)&&File.Exists(secondPath)&&!File.Exists(movedFirst)&&!File.Exists(movedSecond),
+            "Reset restores the original archive paths.");
+        installer.Remove("relocate");
+        Check(!File.Exists(firstPath)&&!File.Exists(secondPath),"Uninstall uses the updated record.");
+        string pinnedSource=Path.Combine(folder,"pinned.bin");
+        File.WriteAllText(pinnedSource,"pinned");
+        var asset=new FixedAsset { Id="pinned", Name="pinned.bin", Format="raw", Size=new FileInfo(pinnedSource).Length, Sha256=Safe.Hash(pinnedSource) };
+        var pinned=new FixedMod { Id="pinned", Name="Pinned mod", Assets=new List<FixedAsset>{asset}, Files=new List<FixedFile>{
+            new FixedFile { Path="src/pinned.txt", Entry="pinned.txt", Asset=asset.Id, Size=asset.Size, Sha256=asset.Sha256 }
+        } };
+        var download=new DownloadCache(Path.Combine(folder,"fixed-cache"));
+        download.Import(pinnedSource,asset);
+        var pinnedPaths=new Dictionary<string,string>{{"src/pinned.txt","chosen/pinned.txt"}};
+        installer.InstallRoutedFixed("pinned",pinned,pinnedPaths,routes,download,message=>{});
+        string installedPinned=Path.Combine(target,@"chosen\pinned.txt");
+        Check(installer.Status("pinned")==GeneralModInstaller.Installed&&File.ReadAllText(installedPinned)=="pinned"&&
+            !File.Exists(Path.Combine(target,@"src\pinned.txt")),"An audited archive installs directly to the chosen location.");
+        installer.Remove("pinned");
+        Check(!File.Exists(installedPinned),"The pinned package is removed through its routed receipt.");
+        return 17;
     }
 
     static string MakeZip(string root, string name, Dictionary<string, string> entries) {

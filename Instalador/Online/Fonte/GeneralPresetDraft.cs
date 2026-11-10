@@ -24,6 +24,7 @@ internal sealed partial class GeneralModWindow {
         var saved=CopyProjectState();
         saved.List=projectDraft.List;
         saved.ChosenVariants=new Dictionary<string,string>(projectDraft.ChosenVariants);
+        saved.BodyChoice=projectDraft.BodyChoice;
         if(!saved.List.Presets.Any(preset=>preset.Id==saved.SelectedPreset))
             saved.SelectedPreset=projectDraft.SelectedPreset;
         foreach(var receipt in projectDraft.SnapshotReceipts)
@@ -34,7 +35,7 @@ internal sealed partial class GeneralModWindow {
         if(projectDraft==null){Persist();return;}
         GeneralModLibrary.ValidateList(state.List,true);
         if(Safe.Json.Serialize(projectDraft.List)==Safe.Json.Serialize(state.List)&&
-            Safe.Json.Serialize(projectDraft.ChosenVariants)==Safe.Json.Serialize(state.ChosenVariants))
+            Safe.Json.Serialize(projectDraft.ChosenVariants)==Safe.Json.Serialize(state.ChosenVariants)&&projectDraft.BodyChoice==state.BodyChoice)
             EndProjectEdit();
         UpdatePresetCommands();
     }
@@ -43,14 +44,27 @@ internal sealed partial class GeneralModWindow {
         if(p2p!=null)p2p.SetPreparationState(state);
     }
     void SaveProjectEdits(){
-        library.Save(state);startupIssue=null;
+        if(BuiltInProject&&projectDraft!=null){
+            var copy=projectStore.Duplicate(project,project.Name+T(" · Minha versão"," · My version"),catalog,state);
+            if(p2p!=null)p2p.SetPreparationState(CommittedProject());
+            ReleaseProjectSharing();
+            project=copy;data=projectStore.DataPath(copy);
+            library=new GeneralModLibrary(Path.Combine(data,"lista.json"));
+            cache=new DownloadCache(Path.Combine(data,"Cache"),()=>state.DownloadFolder,cache.RetainedRoot);
+            state.TemplateId=null;state.TemplateSubset=false;state.ProjectName=copy.Name;
+            inventoryLinks=null;
+            Text=GeneralAppPaths.WindowTitle+" — "+copy.Name;
+            storageGeneration++;
+            RefreshStorageSize();
+        }else library.Save(state);
+        startupIssue=null;
         EndProjectEdit();
         UpdatePresetCommands();
     }
     void DiscardProjectEdits(){
         if(projectDraft==null)return;
         var saved=CommittedProject();
-        state.List=saved.List;state.ChosenVariants=saved.ChosenVariants;state.SelectedPreset=saved.SelectedPreset;
+        state.List=saved.List;state.ChosenVariants=saved.ChosenVariants;state.SelectedPreset=saved.SelectedPreset;state.BodyChoice=saved.BodyChoice;
         state.SnapshotReceipts=saved.SnapshotReceipts;
         marked.IntersectWith(state.List.Mods.Select(mod=>mod.Id));
         statuses.Clear();statusDetails.Clear();progress.Clear();ResetColumnFilters();
@@ -81,8 +95,8 @@ internal sealed partial class GeneralModWindow {
     bool hasPresetDraft,settingDraftName;
     string draftPresetId,draftName;
     HashSet<string> draftChecked=new HashSet<string>();
-    bool ProtectedPreset {get{return project!=null&&project.TemplateId=="cyberpunk-2077"&&ActivePreset!=null&&seed.Presets.Any(item=>item.Id==ActivePreset.Id);}}
-    bool DraftNameChanged {get{return !ProtectedPreset&&hasPresetDraft&&ActivePreset!=null&&draftPresetId==ActivePreset.Id&&draftName!=ActivePreset.Name;}}
+
+    bool DraftNameChanged {get{return hasPresetDraft&&ActivePreset!=null&&draftPresetId==ActivePreset.Id&&draftName!=ActivePreset.Name;}}
     bool DraftSelectionChanged {get{return hasPresetDraft&&!draftChecked.SetEquals(marked);}}
     List<string> PresetCheckedIds(){return state.List.Mods.Where(mod=>marked.Contains(mod.Id)).Select(mod=>mod.Id).ToList();}
     void CapturePresetDraft(){hasPresetDraft=true;draftPresetId=state.SelectedPreset;draftName=ActivePreset==null?null:ActivePreset.Name;draftChecked=new HashSet<string>(marked);}
@@ -91,7 +105,8 @@ internal sealed partial class GeneralModWindow {
         if(presetSettings==null)return;bool available=!working&&!scanning&&(p2p==null||!p2p.Installing);
         bool valid=ActivePreset==null||!String.IsNullOrWhiteSpace(draftName)&&draftName.Length<=120&&!draftName.Any(Char.IsControl);
         presetSettings.Enabled=available&&valid&&(projectDraft!=null||(ActivePreset==null?marked.Any():DraftNameChanged||DraftSelectionChanged));
-        if(deletePreset!=null)deletePreset.Enabled=available&&ActivePreset!=null&&!ProtectedPreset;
+        if(deletePreset!=null)deletePreset.Enabled=available&&ActivePreset!=null;
+        if(clearFilters!=null)clearFilters.Enabled=available&&associationChoice==null&&HasListFilters;
     }
     bool ConfirmPresetNavigation(){
         return !DraftNameChanged||ConfirmProjectNavigation();
@@ -104,13 +119,14 @@ internal sealed partial class GeneralModWindow {
             detail.Text=T("Projeto salvo.","Project saved.");
             return;
         }
-        if(selected==null||ProtectedPreset){if(marked.Any()&&(selected==null||DraftSelectionChanged))SavePresetSelection(true);return;}
+        if(selected==null){if(marked.Any())SavePresetSelection(true);return;}
         SavePresetName(true);
     }
     void SavePresetName(bool saveSelection){
         var selected=ActivePreset;
         string name=(draftName??"").Trim();
         if(name.Length==0||name.Length>120||name.Any(Char.IsControl))throw new IOException(T("Informe um nome válido para o preset.","Enter a valid preset name."));
+        BeginProjectEdit();
         string previous=selected.Name;var members=selected.ModIds;
         selected.Name=name;if(saveSelection&&DraftSelectionChanged)selected.ModIds=PresetCheckedIds();
         try{SaveProjectEdits();}catch{selected.Name=previous;selected.ModIds=members;throw;}

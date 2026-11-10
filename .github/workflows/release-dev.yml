@@ -1,0 +1,110 @@
+name: Publicar Mod Loader Dev
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mod-loader-dev
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: windows-2022
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      WORK: T/CI-Dev
+      TAG: dev-preview
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Empacotar e testar
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $source = Get-Content Instalador/Online/Fonte/GeneralUpdates.cs -Raw
+          $base = [regex]::Match($source, 'CurrentVersion="(\d+\.\d+\.\d+)"').Groups[1].Value
+          if (!$base) { throw 'Versão do aplicativo ausente.' }
+          $version = "$base-dev.$env:GITHUB_RUN_NUMBER.$env:GITHUB_RUN_ATTEMPT"
+          "DEV_VERSION=$version" >> $env:GITHUB_ENV
+          $work = Join-Path $env:GITHUB_WORKSPACE $env:WORK
+          dotnet tool install vpk --version 1.2.161 --tool-path "$work/tools"
+          dotnet restore ./Instalador/Setup/Velopack.Dependencies.csproj --packages "$work/nuget"
+          ./Instalador/Setup/compilar-velopack.ps1 -NuGetPackages "$work/nuget" -Vpk "$work/tools/vpk.exe" -OutputPath $work -DevVersion $version
+          $fixture = New-Item -ItemType Directory "$work/test"
+          $installed = Join-Path $work 'Installed'
+          $install = Start-Process -FilePath "$work/Release/Mod-Loader-Dev-Setup.exe" -ArgumentList '--silent', '--installto', ('"' + $installed + '"') -PassThru -Wait -WindowStyle Hidden
+          if ($install.ExitCode -ne 0 -or !(Test-Path "$installed/Update.exe") -or !(Test-Path "$installed/current/LoaderDev.exe") -or !(Test-Path "$installed/current/sq.version")) {
+            throw 'O Setup não criou a instalação Dev esperada.'
+          }
+          Copy-Item -LiteralPath './Instalador/Online/FixtureGame.exe' -Destination $installed
+          $env:TEMP = $fixture.FullName
+          $env:TMP = $fixture.FullName
+          foreach ($test in @('paths','updates','save-backups')) {
+            $result = Start-Process -FilePath "$installed/current/LoaderDev.exe" -ArgumentList "--self-test-$test", ('"' + $fixture.FullName + '"') -PassThru -Wait -WindowStyle Hidden
+            if ($result.ExitCode -ne 0) {
+              $diagnostic = Join-Path $fixture.FullName 'CyberpunkCoopOnline-erro.txt'
+              if (Test-Path -LiteralPath $diagnostic) { Get-Content -LiteralPath $diagnostic }
+              throw "Teste Dev falhou: $test."
+            }
+          }
+
+      - name: Publicar somente no canal Dev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $repo = "repos/$env:GITHUB_REPOSITORY"
+          if ((gh api "$repo/git/ref/heads/dev" --jq '.object.sha') -ne $env:GITHUB_SHA) { return }
+          $tag = $env:TAG
+          $version = $env:DEV_VERSION
+          $release = "$env:WORK/Release"
+          $setup = 'Mod-Loader-Dev-Setup.exe'
+          $feed = 'releases.dev.json'
+          $pkg = "IINasK.ModLoader.Dev-$version-dev-full.nupkg"
+          $entry = @( (Get-Content "$release/$feed" -Raw | ConvertFrom-Json).Assets )
+          $file = Get-Item "$release/$pkg"
+          if ($entry.Count -ne 1 -or $entry[0].Type -ne 'Full' -or $entry[0].PackageId -ne 'IINasK.ModLoader.Dev' -or
+              $entry[0].FileName -ne $pkg -or $entry[0].Version -ne $version -or
+              $entry[0].Size -ne $file.Length -or $entry[0].SHA256 -ne (Get-FileHash $file.FullName).Hash) {
+            throw 'O manifesto Dev diverge do pacote.'
+          }
+
+          $current = gh api --paginate "$repo/releases" --jq ".[] | select(.tag_name == `"$tag`")" | ConvertFrom-Json
+          if (!$current) {
+            gh release create $tag --target $env:GITHUB_SHA --title 'Mod Loader Dev' --prerelease --draft --notes 'Canal Dev do Mod Loader.'
+          } elseif (!$current.prerelease) {
+            throw 'A tag reservada ao Dev pertence a uma release estável.'
+          } elseif (!$current.draft -and ($current.assets.name -contains $feed)) {
+            $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/$feed"
+            $previous = (Invoke-RestMethod $url).Assets | Where-Object Type -eq 'Full'
+          }
+          gh release upload $tag "$release/$pkg" "$release/$setup" --clobber
+          gh release upload $tag "$release/$feed" --clobber
+          $assets = gh api --paginate "$repo/releases" --jq ".[] | select(.tag_name == `"$tag`") | .assets" | ConvertFrom-Json
+          foreach ($name in @($setup,$feed,$pkg)) {
+            $asset = $assets | Where-Object name -eq $name
+            $local = Get-Item "$release/$name"
+            if (!$asset -or $asset.state -ne 'uploaded' -or $asset.size -ne $local.Length -or
+              $asset.digest -ne ('sha256:' + (Get-FileHash $local.FullName).Hash)) {
+              throw "Falha ao conferir $name no GitHub."
+            }
+          }
+          $sha = $env:GITHUB_SHA
+          gh release edit $tag --title "Mod Loader Dev $version" --draft=false --prerelease --latest=false --notes "Canal de testes. Build do commit $sha. Instale uma vez e abra o Mod Loader Dev pelo menu Iniciar para receber atualizações."
+          foreach ($asset in $assets) {
+            if ($asset.name -match '^IINasK\.ModLoader\.Dev-\d+\.\d+\.\d+-dev\.\d+(\.\d+)?-dev-full\.nupkg$' -and
+                $asset.name -ne $pkg -and $asset.name -ne $previous.FileName) {
+              gh release delete-asset $tag $asset.name --yes
+            }
+          }
+          "### [Mod Loader Dev $version](https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/$setup)" >> $env:GITHUB_STEP_SUMMARY

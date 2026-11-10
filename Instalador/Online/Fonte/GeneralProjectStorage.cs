@@ -21,7 +21,12 @@ internal sealed class GeneralStorageSize {
         }
         return files.Count==0?(long?)null:files.Sum(path=>InstalledFileBytes[path]);
     }
-    internal static string Format(long bytes){double value=bytes;string[] units={"B","KiB","MiB","GiB","TiB"};int at=0;while(value>=1024&&at<units.Length-1){value/=1024;at++;}return value.ToString(at==0?"0":"0.##")+" "+units[at];}
+    static readonly string[] SizeUnits={"B","KB","MB","GB","TB"};
+    internal static string Format(long bytes){
+        decimal value=bytes;int unit=0;
+        while(value>=1000&&unit<SizeUnits.Length-1){value/=1000;unit++;}
+        return value.ToString(unit==0?"0":"0.##")+" "+SizeUnits[unit];
+    }
     internal static string RetainedText(GeneralStorageSize size){return GeneralStyle.T("Pacotes antigos: ","Old packages: ")+Format(size.Retained);}
     internal static string ProjectCacheText(GeneralStorageSize size){return GeneralStyle.T("Cache do projeto: ","Project cache: ")+Format(size.Cache);}
     internal static string ProjectText(GeneralStorageSize size){return GeneralStyle.T("Mods: ","Mods: ")+Format(size.Mods)+"   ·   "+GeneralStyle.T("Total do projeto: ","Project total: ")+Format(size.Total)+"   ·   "+ProjectCacheText(size)+(size.Retained>0?"   ·   "+RetainedText(size):"")+(size.Unavailable>0?GeneralStyle.T(" (parcial)"," (partial)"):"");}

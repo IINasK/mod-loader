@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -43,17 +43,34 @@ internal sealed partial class GeneralModWindow {
     }
     string ModSpace(GeneralModEntry mod){
         if(GeneralModLibrary.NeedsDependencyVersion(mod,Selected(mod)))return "";
+        if(IsBigBody(mod)){
+            var selected=BigBodyVersions(new[]{mod},IsCyberpunk(state.Destination)&&GameEdition.HasPL(state.Destination))
+                .Single(work=>work.BodyChoice==ActiveBodyChoice(mod));
+            return BodyOptionSpace(selected);
+        }
         long bytes;if(measuredMods.TryGetValue(mod.Id,out bytes))return GeneralStorageSize.Format(bytes);
         var info=DependencySize(mod);
         return info!=null?(info.SizeApproximate?"≈ ":"")+GeneralStorageSize.Format(info.Bytes):mod.DependencySource==null?"—":"";
     }
+    long? SortableModBytes(GeneralModEntry mod){
+        if(IsBigBody(mod)){
+            var variant=GeneralModLibrary.BodyOption(state.BodyChoice,mod,Selected(mod));
+            var verified=VerifiedBodyBytes(mod,variant);
+            if(verified.HasValue)return verified;
+        }
+        long bytes;
+        return measuredMods.TryGetValue(mod.Id,out bytes)?(long?)bytes:null;
+    }
     void UpdateMeasuredRows(){
         if(grid==null||grid.IsDisposed)return;
+        if(orderColumn=="Size"&&associationChoice==null){DrawRows();return;}
         var byId=state.List.Mods.ToDictionary(mod=>mod.Id,StringComparer.Ordinal);
         foreach(var row in ModRows()){
             var mod=byId[(string)row.Tag];row.Cells["Size"].Value=ModSpace(mod);row.Cells["Size"].ToolTipText=SpaceTip(mod);
         }
         foreach(DataGridViewRow row in grid.Rows){
+            var work=row.Tag as Work;
+            if(work!=null)row.Cells["Size"].Value=BodyOptionSpace(work);
             var section=row.Tag as SectionRow;
             if(section!=null&&section.Kind=="heading"){
                 section.Size=CategorySize(section.ModIds);
@@ -70,6 +87,13 @@ internal sealed partial class GeneralModWindow {
 
     string SpaceTip(GeneralModEntry mod){
         if(GeneralModLibrary.NeedsDependencyVersion(mod,Selected(mod)))return T("Escolha a versão da dependência.","Choose the dependency version.");
+        if(IsBigBody(mod)){
+            string size=ModSpace(mod);
+            if(size.StartsWith("≈",StringComparison.Ordinal))
+                return T("Tamanho do download. O espaço instalado ainda não foi medido.","Download size. Installed size has not been measured.");
+            if(VerifiedBodyBytes(mod,GeneralModLibrary.BodyOption(state.BodyChoice,mod,Selected(mod))).HasValue)
+                return T("Tamanho dos arquivos instalados e verificados.","Size of the verified installed files.");
+        }
         if(!measuredMods.ContainsKey(mod.Id)&&DependencySize(mod)!=null)return T("Tamanho do download informado pelo Nexus.","Download size reported by Nexus.");
         return measuredMods.ContainsKey(mod.Id)?T("Arquivos instalados deste mod. Arquivos compartilhados aparecem em cada mod; o total do projeto os conta uma vez.","Installed files for this mod. Shared files appear for each mod; the project total counts them once."):T("Tamanho não identificado: nenhum arquivo instalado foi localizado ou a leitura não foi concluída. O tamanho do download não é usado como tamanho instalado.","Size not identified: no installed files were found or measurement is incomplete. Download size is not used as installed size.");}
     void ToggleProjectsPanel(){

@@ -25,13 +25,14 @@ public sealed partial class FixedInstaller {
             var scan=FixedData.Scan(mod,game,false);
             if(scan.IsConflict)throw new IOException("Há arquivos diferentes ou não verificáveis. Desativação bloqueada para preservar suas alterações.");
             if(scan.Correct+scan.Original==0)return "Este mod não está instalado. Nada foi alterado.";
-            var dependents=catalog.Packages.Where(m=>m.Id!=modId&&FixedData.Expand(catalog,new[]{m.Id}).Any(d=>d.Id==modId))
+            bool stockEquipment=EquipmentExOptions.StockActive(catalog,game);
+            var dependents=catalog.Packages.Where(m=>m.Id!=modId&&FixedData.Expand(catalog,new[]{m.Id},stockEquipment).Any(d=>d.Id==modId))
                 .Where(m=>{var s=FixedData.Scan(m,game);return s.Correct+s.Original+s.Different>0||s.State=="Não verificável";}).Select(m=>m.Name).ToList();
             if(dependents.Count>0)throw new IOException("Desative primeiro os mods que usam este componente: "+String.Join(", ",dependents));
             var r=new OnlineReceipt{Id=Guid.NewGuid().ToString("N"),CatalogId=catalog.Id,CreatedUtc=DateTime.UtcNow.ToString("o"),Status="desativando",Operation="deactivate",BackupLayout="flat-v1",Mods=new List<string>{modId}};
             string ledger=Safe.In(Data,r.Id+".json");Save(ledger,r);
             try {
-                BackupSaves(Safe.In(Data,"backups/"+r.Id+"/saves"));int moved=0;
+                BackupSaves();int moved=0;
                 foreach(var f in mod.Files.Where(f=>!f.UserData)) {
                     Closed();string source=Safe.In(game,f.Path);
                     if(!File.Exists(source)){if(Directory.Exists(source))throw new IOException("Uma pasta ocupa o arquivo do mod.");continue;}
@@ -56,7 +57,7 @@ public sealed partial class FixedInstaller {
         return Safe.In(Data,"backups/"+r.Id+"/desativados/"+relative);
     }
     void EnsureUndoDependencies(OnlineReceipt receipt) {
-        if(receipt.Operation=="deactivate"||receipt.Operation=="density")return;
+        if(receipt.Operation=="deactivate"||receipt.Operation=="density"||receipt.Operation==EquipmentExOptions.Operation)return;
         var removing=new HashSet<string>(receipt.Files.Where(f=>f.Before==null&&f.Applied&&File.Exists(Safe.In(game,f.Path))&&Safe.Hash(Safe.In(game,f.Path))==f.After).Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
         var components=catalog.Packages.Where(m=>m.Files.Any(f=>removing.Contains(f.Path))).Select(m=>m.Id).ToList();
         // A verified rollback can leave stock Equipment-EX installed without WEAVE or its new dependencies.
@@ -70,23 +71,13 @@ public sealed partial class FixedInstaller {
                 if(f.Asset==script.Asset)return removing.Contains(f.Path)||!File.Exists(path)&&!Directory.Exists(path);
                 return !removing.Contains(f.Path)&&File.Exists(path)&&Safe.Hash(path)==f.Sha256;
             });
+        bool stockEquipment=restoresStock||EquipmentExOptions.StockActive(catalog,game);
         if(restoresStock)components.Remove(equipment.Id);
         foreach(var m in catalog.Packages) {
-            if(!UndoDependencies(m,restoresStock).Any(d=>components.Contains(d)))continue;
+            if(!FixedData.Expand(catalog,new[]{m.Id},stockEquipment).Any(d=>d.Id!=m.Id&&components.Contains(d.Id)))continue;
             var scan=FixedData.Scan(m,game);
             if(scan.State=="Não verificável"||m.Files.Any(f=>!removing.Contains(f.Path)&&(File.Exists(Safe.In(game,f.Path))||Directory.Exists(Safe.In(game,f.Path)))))
                 throw new IOException("Desfazer retiraria uma dependência de "+m.Name+". Desative esse mod primeiro; seus arquivos foram preservados.");
-        }
-    }
-    IEnumerable<string> UndoDependencies(FixedMod mod,bool stockEquipment) {
-        if(!stockEquipment){foreach(var d in FixedData.Expand(catalog,new[]{mod.Id}))if(d.Id!=mod.Id)yield return d.Id;yield break;}
-        var seen=new HashSet<string>(StringComparer.Ordinal);
-        var pending=new Stack<string>(mod.Dependencies.Where(d=>mod.Id!="mod-6945"||d!="mod-30726"));
-        while(pending.Count>0){
-            string id=pending.Pop();if(!seen.Add(id))continue;
-            yield return id;
-            foreach(string d in catalog.Packages.Single(m=>m.Id==id).Dependencies)
-                if(id!="mod-6945"||d!="mod-30726")pending.Push(d);
         }
     }
     string UndoDeactivation(OnlineReceipt r,string ledger,Action<string> report) {

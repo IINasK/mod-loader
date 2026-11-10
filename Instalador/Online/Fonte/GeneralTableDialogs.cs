@@ -8,15 +8,16 @@ internal sealed class GeneralNameDialog : GeneralDialog {
     readonly TextBox input = new TextBox { Name = "NameInput", MaxLength = 120, Dock = DockStyle.Fill };
     internal string ResultName { get; private set; }
 
-    internal GeneralNameDialog(string title, string initialName,string description=null) : base(title) {
+    internal GeneralNameDialog(string title, string initialName,string description=null,string fieldLabel=null,int maxLength=120) : base(title) {
         ClientSize = new Size(500, description==null?220:300);
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(20, 8, 20, 20), ColumnCount = 1, RowCount = 3 };
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(description==null?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.Absolute,52));
         if(description!=null)layout.RowStyles.Add(new RowStyle(SizeType.Absolute,52));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.Controls.Add(GeneralModEditor.LabelFor(GeneralStyle.T("Nome *", "Name *")), 0, 0);
-        input.AccessibleName = GeneralStyle.T("Nome", "Name");
+        input.MaxLength=maxLength;
+        layout.Controls.Add(GeneralModEditor.LabelFor(fieldLabel??GeneralStyle.T("Nome *", "Name *")), 0, 0);
+        input.AccessibleName = fieldLabel??GeneralStyle.T("Nome", "Name");
         layout.Controls.Add(GeneralTableDialogLayout.Input(input), 0, 1);
         var commands = GeneralTableDialogLayout.Commands();
         var save = GeneralStyle.Button(GeneralStyle.T("Salvar", "Save"), () => {
@@ -42,9 +43,10 @@ internal sealed class GeneralColumnFilterDialog : GeneralDialog {
     readonly string[] values;
     internal HashSet<string> ResultValues { get; private set; }
     internal string SearchText { get; private set; }
+    internal bool? ReverseOrder { get; private set; }
 
-    internal GeneralColumnFilterDialog(string title, IEnumerable<string> choices, IEnumerable<string> selected = null, string search = "", bool withSearch = false) : base(title) {
-        ClientSize = new Size(540, withSearch ? 570 : 490);
+    internal GeneralColumnFilterDialog(string title, IEnumerable<string> choices, IEnumerable<string> selected = null, string search = "", bool withSearch = false, string[] sorts = null, bool withValues = true) : base(title) {
+        ClientSize = new Size(540, withSearch ? 570 : !withValues ? 200 : sorts==null ? 490 : 530);
         values = (choices ?? Enumerable.Empty<string>()).Where(value => value != null).Distinct(StringComparer.Ordinal).ToArray();
         var initial = new HashSet<string>(selected ?? values, StringComparer.Ordinal);
         foreach (string value in values) list.Items.Add(String.IsNullOrEmpty(value) ? GeneralStyle.T("(Sem valor)", "(Empty)") : value, initial.Contains(value));
@@ -56,6 +58,16 @@ internal sealed class GeneralColumnFilterDialog : GeneralDialog {
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        if(sorts!=null){
+            var sortActions=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,WrapContents=false,Margin=new Padding(0,0,0,10)};
+            for(int index=0;index<sorts.Length;index++){
+                bool reverse=index!=0;
+                var button=GeneralStyle.Button(sorts[index],()=>SaveSelection(reverse));
+                button.Name=reverse?"ReverseOrder":"DefaultOrder";
+                sortActions.Controls.Add(button);
+            }
+            layout.Controls.Add(sortActions,0,0);
+        }
         if (withSearch) {
             var searchLayout = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, Margin = new Padding(0, 0, 0, 12) };
             searchLayout.Controls.Add(GeneralModEditor.LabelFor(GeneralStyle.T("Contém", "Contains")));
@@ -70,15 +82,23 @@ internal sealed class GeneralColumnFilterDialog : GeneralDialog {
         var clear = GeneralStyle.Button(GeneralStyle.T("Limpar", "Clear"), () => CheckAll(false)); clear.Name = "ClearValues";
         selection.Controls.Add(all); selection.Controls.Add(clear); layout.Controls.Add(selection, 0, 3);
         var commands = GeneralTableDialogLayout.Commands();
-        var apply = GeneralStyle.Button(GeneralStyle.T("Aplicar", "Apply"), () => {
-            ResultValues = new HashSet<string>(list.CheckedIndices.Cast<int>().Select(index => values[index]), StringComparer.Ordinal);
-            SearchText = this.search.Text.Trim(); Complete(DialogResult.OK);
-        }, true);
+        var apply = GeneralStyle.Button(GeneralStyle.T("Aplicar", "Apply"), () => SaveSelection(null), true);
         apply.Name = "ApplyColumnFilter";
         var cancel = GeneralStyle.Button(GeneralStyle.T("Cancelar", "Cancel"), () => Complete(DialogResult.Cancel)); cancel.Name = "CancelColumnFilter";
         commands.Controls.Add(apply); commands.Controls.Add(cancel); layout.Controls.Add(commands, 0, 4); Content.Controls.Add(layout);
-        AcceptButton = apply; CancelButton = cancel;
+        if(!withValues){
+            foreach(int row in new[]{1,2,3})layout.GetControlFromPosition(0,row).Visible=false;
+            apply.Visible=false;
+        }else AcceptButton = apply;
+        CancelButton = cancel;
         GeneralStyle.Apply(this, GeneralStyle.Dark); this.search.BorderStyle = BorderStyle.None; list.BorderStyle = BorderStyle.None;
+    }
+
+    void SaveSelection(bool? reverse){
+        ReverseOrder=reverse;
+        ResultValues=new HashSet<string>(list.CheckedIndices.Cast<int>().Select(index=>values[index]),StringComparer.Ordinal);
+        SearchText=search.Text.Trim();
+        Complete(DialogResult.OK);
     }
 
     void CheckAll(bool value) { for (int index = 0; index < list.Items.Count; index++) list.SetItemChecked(index, value); }
@@ -104,17 +124,19 @@ internal sealed class GeneralPresetActionsDialog : GeneralDialog {
 internal sealed class GeneralModAlternativeDialog : GeneralDialog {
     internal string SelectedId { get; private set; }
 
-    internal GeneralModAlternativeDialog(IReadOnlyList<GeneralModEntry> entries)
-        : base(GeneralStyle.T("Escolher uma versão","Choose one version")) {
+    internal GeneralModAlternativeDialog(IReadOnlyList<GeneralModEntry> entries,string title=null,int suggested=-1)
+        : base(title??GeneralStyle.T("Escolher uma versão","Choose one version")) {
         Name="ModAlternativeChoice";ClientSize=new Size(680,445);
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Padding=new Padding(20,8,20,20)};
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute,48));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.Controls.Add(GeneralModEditor.LabelFor(GeneralStyle.T(
+        layout.Controls.Add(GeneralModEditor.LabelFor(title==null?GeneralStyle.T(
             "Estes mods são alternativas. Escolha uma versão para esta instalação.",
-            "These mods are alternatives. Choose one version for this installation.")),0,0);
+            "These mods are alternatives. Choose one version for this installation."):GeneralStyle.T(
+            "Escolha o corpo. A troca desabilita a versão ativa e seus complementos incompatíveis.",
+            "Choose the body. Switching disables the active version and its incompatible add-ons.")),0,0);
         var options=new GeneralPicker{Name="AlternativeChoices",Dock=DockStyle.Fill,DropDownStyle=ComboBoxStyle.DropDownList};
         foreach(var entry in entries)options.Items.Add(entry.Name);
         layout.Controls.Add(options,0,1);
@@ -125,9 +147,10 @@ internal sealed class GeneralModAlternativeDialog : GeneralDialog {
             SelectedId=entries[options.SelectedIndex].Id;Complete(DialogResult.OK);
         },true);
         use.Name="UseAlternative";use.Enabled=false;
-        var skip=GeneralStyle.Button(GeneralStyle.T("Pular grupo","Skip group"),()=>{SelectedId="";Complete(DialogResult.OK);});
+        var skip=GeneralStyle.Button(title==null?GeneralStyle.T("Pular grupo","Skip group"):GeneralStyle.T("Pular mod","Skip mod"),()=>{SelectedId="";Complete(DialogResult.OK);});
         var cancel=GeneralStyle.Button(GeneralStyle.T("Cancelar","Cancel"),()=>Complete(DialogResult.Cancel));
         options.SelectedIndexChanged+=(s,e)=>{use.Enabled=options.SelectedIndex>=0;};
+        options.SelectedIndex=suggested;
         text.Text=String.Join("\r\n\r\n",entries.Select(entry=>entry.Name+(String.IsNullOrWhiteSpace(entry.Description)?"":"\r\n"+entry.Description)));
         buttons.Controls.Add(use);buttons.Controls.Add(skip);buttons.Controls.Add(cancel);
         layout.Controls.Add(buttons,0,3);Content.Controls.Add(layout);CancelButton=cancel;

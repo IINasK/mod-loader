@@ -64,7 +64,9 @@ Para empacotar localmente, use o SDK .NET 8 e o vpk 1.2.161. Restaure as depend�
 
 ## Testar antes de publicar
 
-Faça mudanças na branch local `dev`. Execute `Instalador/Setup/compilar-dev.ps1` para atualizar o mesmo `T/Dev/LoaderDev.exe`. O Mod Loader Dev usa projetos, cache, logs e temporários P2P próprios e não consulta as atualizações da versão estável. Escolha explicitamente a pasta de jogo se quiser testar uma instalação.
+Baixe o [instalador do Mod Loader Dev](https://github.com/IINasK/mod-loader/releases/download/dev-preview/Mod-Loader-Dev-Setup.exe) uma vez. A partir daí, abra **Mod Loader Dev** no menu Iniciar. Ele verifica atualizações do canal Dev ao iniciar e atualiza a mesma instalação. Projetos, preferências e cache continuam na pasta Dev existente, inclusive os usados pela edição portátil.
+
+O fluxo de testes usa a branch `dev`. Enviar um commit à `dev` aciona o [fluxo de publicação Dev](https://github.com/IINasK/mod-loader/actions/workflows/release-dev.yml). Para testes locais sem publicar, `Instalador/Setup/compilar-dev.ps1` continua gerando `T/Dev/LoaderDev.exe`. Feche a edição portátil antes de abrir a instalada: ambas acessam os mesmos dados Dev.
 
 Após a aprovação, envie as mudanças testadas para `main`. A publicação estável continua automática a partir da `main`.
 

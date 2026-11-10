@@ -13,10 +13,17 @@ internal static class GeneralP2PUiTests {
         bool dark=GeneralStyle.Dark,red=GeneralStyle.RedTheme,black=GeneralStyle.BlackTheme,animation=GeneralStyle.AnimationsEnabled;string language=GeneralStyle.Language;
         try{
             var catalog=FixedData.Load();var state=new GeneralModState{List=GeneralModLibrary.Seed(catalog,new ModImportItem[0]),Destination=Path.Combine(root,"game")};string before=StateContents(state);
+            string localGame=Path.Combine(root,"local-game"),otherGame=Path.Combine(root,"another-game");
+            foreach(string game in new[]{localGame,otherGame}){
+                string bin=Path.Combine(game,"bin","x64");
+                Directory.CreateDirectory(bin);
+                File.WriteAllText(Path.Combine(bin,"Cyberpunk2077.exe"),"fixture");
+            }
+            var foundGames=new List<string>{localGame};
             using(var service=new P2PService(Path.Combine(root,"private"),Path.Combine(root,"transport"),true)){
                 foreach(string theme in new[]{"light","light-red","dark","black"})foreach(string locale in new[]{"pt","en"}){
                     GeneralStyle.UseTheme(theme);GeneralStyle.Language=locale;GeneralStyle.AnimationsEnabled=false;
-                    using(var dialog=new GeneralP2PDialog(service,state,catalog,false)){
+                    using(var dialog=new GeneralP2PDialog(service,state,catalog,false,()=>System.Threading.Tasks.Task.FromResult(foundGames))){
                         dialog.ShowInTaskbar=false;dialog.StartPosition=FormStartPosition.Manual;dialog.Location=new Point(-30000,-30000);dialog.Show();
                         // The test supplies the transfer status explicitly.
                         ((Timer)typeof(GeneralP2PDialog).GetField("timer",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(dialog)).Stop();
@@ -47,6 +54,42 @@ internal static class GeneralP2PUiTests {
                             "Pasta pessoal vira aviso e não preenche o destino: "+theme+locale);
                         offered.PrivateFolder=false;input.Text=offered.Encode();Application.DoEvents();
                         check(!folderHint.Visible&&destination.Text.Length==0,"Convite legado mantém o seletor local sem sugestão: "+theme+locale);
+                        if(theme=="light"&&locale=="pt"){
+                            string configured=state.Destination;
+                            state.Destination=localGame;
+                            state.TemplateId=GeneralProjectStore.CyberpunkTemplate;
+                            offered.SuggestedFolder=otherGame;
+                            input.Text=offered.Encode();Application.DoEvents();
+                            check(destination.Text==localGame,"Convite antigo usa primeiro a instalação configurada no projeto Cyberpunk.");
+                            offered.Game=P2PInvite.CyberpunkGame;
+                            offered.SuggestedFolder=manual;
+                            input.Text=offered.Encode();Application.DoEvents();
+                            check(destination.Text==localGame,"Convite Cyberpunk não aceita uma pasta genérica no lugar da instalação.");
+                            var validate=typeof(GeneralP2PDialog).GetMethod("CheckedDestination",BindingFlags.Instance|BindingFlags.NonPublic);
+                            bool rejected=false;
+                            try{validate.Invoke(dialog,new object[]{manual,offered});}
+                            catch(TargetInvocationException ex){rejected=ex.InnerException is IOException;}
+                            check(rejected&&(string)validate.Invoke(dialog,new object[]{localGame,offered})==localGame,
+                                "A escolha manual rejeita uma pasta sem o executável e aceita a raiz correta.");
+                            state.TemplateId=null;
+                            state.Destination=configured;
+                            offered.SuggestedFolder=null;
+                            input.Text=offered.Encode();Application.DoEvents();
+                            check(destination.Text==localGame,"Uma única instalação detectada no PC é preenchida sem depender da pasta do anfitrião. "+destination.Text+" / "+folderHint.Text);
+                            foundGames.Add(otherGame);
+                            offered.PrivateFolder=true;
+                            input.Text=offered.Encode();Application.DoEvents();
+                            check(destination.Text.Length==0&&folderHint.Text.Contains("executável"),
+                                "Com duas instalações detectadas, o app pede para o usuário escolher.");
+                            offered.Game="generic";
+                            offered.PrivateFolder=false;
+                            offered.SuggestedFolder=manual;
+                            input.Text=offered.Encode();Application.DoEvents();
+                            check(destination.Text==manual,"Pacotes genéricos continuam aceitando a pasta local sugerida.");
+                            offered.Game=null;
+                            offered.SuggestedFolder=null;
+                            input.Text=offered.Encode();Application.DoEvents();
+                        }
                         using(var image=new Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(root,"layout-"+theme+"-"+locale+".png"),System.Drawing.Imaging.ImageFormat.Png);}
                         Safe.WriteJson(Path.Combine(root,"layout.json"),Children(dialog.Content).Where(c=>!String.IsNullOrEmpty(c.Name)||c is TableLayoutPanel).Select(c=>new{Name=c.Name,Type=c.GetType().Name,Bounds=c.Bounds.ToString(),Parent=c.Parent.ClientRectangle.ToString()}).ToArray());
                         foreach(Control control in new Control[]{input,output,destination,connect,generate,Find<Button>(dialog,"p2p-folder"),Find<Button>(dialog,"p2p-copy"),Find<Label>(dialog,"p2p-status")})check(!control.Visible||Inside(control,dialog.Content),"Controle sem recorte: "+control.Name+theme+locale);

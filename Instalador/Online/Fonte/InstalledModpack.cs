@@ -21,7 +21,7 @@ public static partial class InstalledSnapshot {
                     var file=group.First();if(report!=null)report("Exportando "+file.Path);
                     using(var target=zip.CreateEntry(file.Path,CompressionLevel.Fastest).Open()){
                         if(file.Kind=="file"){
-                            string source=Safe.In(root,file.Path);Safe.NoLinks(source);
+                            string source=GeneralInstallRoutes.Resolve(root,file.Path,true);
                             using(var input=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read))using(var sha=SHA256.Create()){
                                 ValidateCustomData(manifest,file,input);input.Position=0;byte[] buffer=new byte[1048576];long length=0;int n;
                                 while((n=input.Read(buffer,0,buffer.Length))>0){length+=n;if(length>file.Size)throw new IOException("Arquivo mudou: "+file.Path);sha.TransformBlock(buffer,0,n,null,0);target.Write(buffer,0,n);}

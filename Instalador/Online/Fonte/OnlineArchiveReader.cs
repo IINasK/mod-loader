@@ -33,11 +33,23 @@ public sealed class BundledArchiveReader : IDisposable {
         var reader=new BundledArchiveReader();
         try{reader.Initialize(file,expectedSize,expectedSha256);return reader;}catch{reader.Dispose();throw;}
     }
-    void Initialize(string file,long expectedSize,string expectedSha256) {
-        if(expectedSize<0||expectedSize>MaxEntryBytes||!FixedData.HashValid(expectedSha256))throw new IOException("Identidade do pacote compactado inválida.");
+    internal static ReaderArchiveEntry[] ReadEntries(string file) {
+        using(var reader=new BundledArchiveReader()) {
+            reader.Initialize(file,null,null);
+            return reader.Files();
+        }
+    }
+    void Initialize(string file,long? expectedSize,string expectedSha256) {
+        if(expectedSize.HasValue&&(expectedSize<0||expectedSize>MaxEntryBytes||!FixedData.HashValid(expectedSha256)))
+            throw new IOException("Identidade do pacote compactado inválida.");
         source=System.IO.Path.GetFullPath(file);Safe.NoLinks(source);
         sourceLock=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read);
-        using(var sha=SHA256.Create())if(sourceLock.Length!=expectedSize||Safe.Hex(sha.ComputeHash(sourceLock))!=expectedSha256)throw new IOException("O pacote compactado mudou ou não corresponde ao download aprovado.");
+        if(sourceLock.Length>MaxEntryBytes)throw new IOException("O pacote compactado ultrapassa o limite de tamanho.");
+        if(expectedSize.HasValue) {
+            using(var sha=SHA256.Create())
+                if(sourceLock.Length!=expectedSize||Safe.Hex(sha.ComputeHash(sourceLock))!=expectedSha256)
+                    throw new IOException("O pacote compactado mudou ou não corresponde ao download aprovado.");
+        }
         string temp=System.IO.Path.GetFullPath(System.IO.Path.GetTempPath());Safe.NoLinks(temp);
         folder=System.IO.Path.Combine(temp,"CyberpunkCoop-reader-"+Guid.NewGuid().ToString("N"));
         if(System.IO.Directory.Exists(folder)||File.Exists(folder))throw new IOException("A pasta temporária do leitor já existe.");
@@ -49,7 +61,7 @@ public sealed class BundledArchiveReader : IDisposable {
         exeLock=Materialize("CyberpunkCoop.Reader.7z.exe",executable,ArchiveReaderIdentity.ExeSize,ArchiveReaderIdentity.ExeHash);
         dllLock=Materialize("CyberpunkCoop.Reader.7z.dll",dll,ArchiveReaderIdentity.DllSize,ArchiveReaderIdentity.DllHash);
         entries=ParseListing(List());
-        OnlineDiagnostics.Record("archive.reader.ready",null,"Pacote conferido e listado pelo leitor incluído no aplicativo.",new{ReaderVersion=ArchiveReaderIdentity.Version,Entries=entries.Count,SourceSha256=expectedSha256});
+        if(expectedSize.HasValue)OnlineDiagnostics.Record("archive.reader.ready",null,"Pacote conferido e listado pelo leitor incluído no aplicativo.",new{ReaderVersion=ArchiveReaderIdentity.Version,Entries=entries.Count,SourceSha256=expectedSha256});
     }
     static FileStream Materialize(string resource,string path,long expectedSize,string expectedHash) {
         using(var input=typeof(BundledArchiveReader).Assembly.GetManifestResourceStream(resource)){
@@ -117,7 +129,7 @@ public sealed class BundledArchiveReader : IDisposable {
         if(fields.Count==0)return;
         string raw,sizeValue;if(!fields.TryGetValue("Path",out raw)||!fields.TryGetValue("Size",out sizeValue))throw new IOException("Entrada incompleta na lista do pacote.");
         string path=raw.Replace('\\','/');string checkRoot=System.IO.Path.Combine(System.IO.Path.GetPathRoot(System.IO.Path.GetTempPath()),"CoopReader-check");Safe.In(checkRoot,path);
-        long size;if(!Int64.TryParse(sizeValue,System.Globalization.NumberStyles.None,System.Globalization.CultureInfo.InvariantCulture,out size)||size<0||size>MaxEntryBytes)throw new IOException("Tamanho de entrada inválido ou acima de 8 GiB: "+path);
+        long size;if(!Int64.TryParse(sizeValue,System.Globalization.NumberStyles.None,System.Globalization.CultureInfo.InvariantCulture,out size)||size<0||size>MaxEntryBytes)throw new IOException("Tamanho de entrada inválido ou acima de "+GeneralStorageSize.Format(MaxEntryBytes)+": "+path);
         foreach(var field in fields){
             if((field.Key.IndexOf("link",StringComparison.OrdinalIgnoreCase)>=0||field.Key.IndexOf("reparse",StringComparison.OrdinalIgnoreCase)>=0)&&field.Value.Length!=0)throw new IOException("Atalhos, links e pontos de nova análise não são aceitos no pacote: "+path);
             if((field.Key.Equals("Encrypted",StringComparison.OrdinalIgnoreCase)||field.Key.Equals("Alternate Stream",StringComparison.OrdinalIgnoreCase)||field.Key.Equals("Split Before",StringComparison.OrdinalIgnoreCase)||field.Key.Equals("Split After",StringComparison.OrdinalIgnoreCase))&&field.Value!="-"&&field.Value.Length!=0)throw new IOException("Entradas criptografadas, fluxos alternativos ou arquivos divididos não são aceitos: "+path);
@@ -174,7 +186,7 @@ public sealed class BundledArchiveReader : IDisposable {
     sealed class CountedReadStream:Stream {
         readonly Stream inner;public long Count;public bool Ended;
         public CountedReadStream(Stream input){inner=input;}
-        public override int Read(byte[] buffer,int offset,int count){int n=inner.Read(buffer,offset,count);if(n==0)Ended=true;Count+=n;if(Count>MaxEntryBytes)throw new IOException("A extração ultrapassou o limite de 8 GiB.");return n;}
+        public override int Read(byte[] buffer,int offset,int count){int n=inner.Read(buffer,offset,count);if(n==0)Ended=true;Count+=n;if(Count>MaxEntryBytes)throw new IOException("A extração ultrapassou o limite de "+GeneralStorageSize.Format(MaxEntryBytes)+".");return n;}
         public override bool CanRead{get{return true;}}public override bool CanSeek{get{return false;}}public override bool CanWrite{get{return false;}}public override long Length{get{throw new NotSupportedException();}}public override long Position{get{return Count;}set{throw new NotSupportedException();}}
         public override void Flush(){}public override long Seek(long offset,SeekOrigin origin){throw new NotSupportedException();}public override void SetLength(long value){throw new NotSupportedException();}public override void Write(byte[] buffer,int offset,int count){throw new NotSupportedException();}
     }

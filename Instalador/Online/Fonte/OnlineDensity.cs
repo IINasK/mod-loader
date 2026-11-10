@@ -136,22 +136,31 @@ public static class NightCityDensity {
 public sealed partial class FixedInstaller {
     string DensityBackup(OnlineReceipt r,string path){return Safe.In(Data,"backups/"+r.Id+"/densidade/"+path);}
     public string ApplyDensityProfile(string id,Action<string> report,int failAfter=-1) {
-        var mod=catalog.Packages.SingleOrDefault(m=>m.Id==NightCityDensity.ModId);
-        var target=NightCityDensity.Resolve(mod,id);
+        return ApplyFixedProfile(NightCityDensity.ModId,id,report,failAfter);
+    }
+    internal string ApplyEquipmentExProfile(string id,Action<string> report,int failAfter=-1) {
+        return ApplyFixedProfile(EquipmentExOptions.ModId,id,report,failAfter);
+    }
+    string ApplyFixedProfile(string modId,string id,Action<string> report,int failAfter) {
+        bool equipment=modId==EquipmentExOptions.ModId;
+        var mod=catalog.Packages.SingleOrDefault(m=>m.Id==modId);
+        Func<string,FixedMod> resolve=choice=>equipment?EquipmentExOptions.Resolve(mod,choice):NightCityDensity.Resolve(mod,choice);
+        Func<DensityProfileState> read=()=>equipment?EquipmentExOptions.Read(mod,game):NightCityDensity.Read(mod,game);
+        var target=resolve(id);
         FixedData.RequireInstallable(new[]{mod});FixedData.ValidateGame(game,new[]{mod},catalog.GameFileVersion);Closed();
-        foreach(var d in FixedData.Expand(catalog,mod.Dependencies))if(!FixedData.Scan(d,game).IsCorrect)throw new IOException("Instale primeiro a base e os requisitos pelo botão Baixar e instalar: "+d.Name);
+        foreach(var d in FixedData.Expand(catalog,target.Dependencies,EquipmentExOptions.StockActive(catalog,game)))if(!FixedData.Scan(d,game).IsCorrect)throw new IOException("Instale primeiro a base e os requisitos pelo botão Baixar e instalar: "+d.Name);
         Directory.CreateDirectory(Data);
         using(var mutex=new FileStream(Safe.In(Data,"operacao.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None)) {
-            EnsureNoIncomplete();var state=NightCityDensity.Read(mod,game);if(!state.CanApply)throw new IOException(state.Detail);
-            if(state.Id==id)return "A densidade "+state.Name+" já está instalada. Nada foi alterado.";
-            var before=state.Id=="absent"?new List<FixedFile>():NightCityDensity.Installed(mod,game).Files;
+            EnsureNoIncomplete();var state=read();if(!state.CanApply)throw new IOException(state.Detail);
+            if(state.Id==id&&!state.Partial)return state.Name+" já está instalado. Nada foi alterado.";
+            var before=state.Id=="absent"?new List<FixedFile>():equipment?resolve(state.Id).Files.Where(file=>File.Exists(Safe.In(game,file.Path))).ToList():NightCityDensity.Installed(mod,game).Files;
             string operationId=Guid.NewGuid().ToString("N"),stage=Safe.In(cache.Root,"preparacao/"+operationId);Directory.CreateDirectory(stage);
             var stageLease=cache.HoldPreparation(stage);
             try {
             long bytes=target.Files.Sum(f=>f.Size)+before.Sum(f=>f.Size);
-            if(new DriveInfo(Path.GetPathRoot(game)).AvailableFreeSpace<bytes*2+100L*1024*1024)throw new IOException("Espaço insuficiente para trocar a densidade.");
+            if(new DriveInfo(Path.GetPathRoot(game)).AvailableFreeSpace<bytes*2+100L*1024*1024)throw new IOException("Espaço insuficiente para trocar a versão.");
             cache.Stage(target,stage,report);
-            var r=new OnlineReceipt{Id=operationId,CatalogId=catalog.Id,Status="preparando",CreatedUtc=DateTime.UtcNow.ToString("o"),Operation="density",DensityBefore=state.Id,DensityAfter=id,Mods=new List<string>{mod.Id}};
+            var r=new OnlineReceipt{Id=operationId,CatalogId=catalog.Id,Status="preparando",CreatedUtc=DateTime.UtcNow.ToString("o"),Operation=equipment?EquipmentExOptions.Operation:"density",DensityBefore=state.Id,DensityAfter=id,Mods=new List<string>{mod.Id}};
             foreach(string path in before.Select(f=>f.Path).Union(target.Files.Select(f=>f.Path),StringComparer.OrdinalIgnoreCase)){
                 var previous=before.SingleOrDefault(f=>f.Path==path);var next=target.Files.SingleOrDefault(f=>f.Path==path);
                 if(previous!=null&&next!=null&&previous.Sha256==next.Sha256)continue;
@@ -159,7 +168,7 @@ public sealed partial class FixedInstaller {
             }
             string ledger=Safe.In(Data,r.Id+".json");Save(ledger,r);
             try {
-                BackupSaves(Safe.In(Data,"backups/"+r.Id+"/saves"));r.Status="instalando";Save(ledger,r);int written=0;
+                BackupSaves();r.Status="instalando";Save(ledger,r);int written=0;
                 foreach(var f in r.Files){
                     Closed();string dest=Safe.In(game,f.Path);
                     if(f.Before==null){if(File.Exists(dest)||Directory.Exists(dest))throw new IOException("Destino ocupado após conferência: "+f.Path);}
@@ -175,12 +184,12 @@ public sealed partial class FixedInstaller {
                         try{File.Copy(Safe.In(stage,f.Path),tmp,false);if(Safe.Hash(tmp)!=f.After)throw new IOException("Cópia divergente.");Safe.NoLinks(dest);File.Move(tmp,dest);}
                         finally{if(File.Exists(tmp)){Safe.NoLinks(tmp);File.Delete(tmp);}}
                     }
-                    f.Applied=true;Save(ledger,r);written++;report("Aplicando densidade: "+f.Path);
-                    if(failAfter>=0&&written>=failAfter)throw new IOException("Falha de teste na troca de densidade.");
+                    f.Applied=true;Save(ledger,r);written++;report("Aplicando "+target.Name+": "+f.Path);
+                    if(failAfter>=0&&written>=failAfter)throw new IOException("Falha de teste na troca de versão.");
                 }
-                if(NightCityDensity.Read(mod,game).Id!=id)throw new IOException("A densidade final não conferiu.");
+                var result=read();if(result.Id!=id||result.Partial)throw new IOException("A versão instalada não conferiu.");
                 r.Status="instalado";Save(ledger,r);
-                return "Densidade "+NightCityDensity.Read(mod,game).Name+" instalada. Versão anterior guardada para desfazer. Use a mesma escolha nos dois PCs e reinicie o jogo.";
+                return result.Name+" instalado. Versão anterior guardada para desfazer. Use a mesma escolha nos dois PCs e reinicie o jogo.";
             }catch{try{UndoDensity(r,ledger,report);}catch{}throw;}
             }finally{stageLease.Dispose();cache.CleanPreparation(stage);}
         }
@@ -209,6 +218,6 @@ public sealed partial class FixedInstaller {
             f.Reverted=true;Save(ledger,r);
         }
         r.Status=pending==0?"desfeito":"restauracao_pendente";Save(ledger,r);
-        return pending==0?"Troca de densidade desfeita. Perfil anterior restaurado; arquivos alheios preservados.":"Restauração com conflitos: arquivos alterados depois foram preservados. Resolva os conflitos antes de continuar.";
+        return pending==0?"Troca desfeita. Versão anterior restaurada.":"Restauração com conflitos: arquivos alterados depois foram preservados. Resolva os conflitos antes de continuar.";
     }
 }

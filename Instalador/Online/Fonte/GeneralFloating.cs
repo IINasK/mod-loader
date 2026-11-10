@@ -15,7 +15,7 @@ internal static class LucideIcons {
     // Official lucide-static 0.468.0 glyphs; the upstream map and license are in Assets.
     static readonly Dictionary<string,string> glyphs=new Dictionary<string,string>{
         {"menu","\ue118"},{"options","\ue118"},{"list","\ue10b"},{"refresh","\ue148"},{"maximize","\ue116"},{"minimize","\ue11e"},
-        {"folder","\ue246"},{"down","\ue071"},{"up","\ue074"},{"left","\ue072"},{"right","\ue073"},{"check","\ue070"},{"close","\ue1b1"},{"settings","\ue157"},{"trash","\ue18d"},{"package","\ue12c"},
+        {"folder","\ue246"},{"down","\ue071"},{"up","\ue074"},{"left","\ue072"},{"right","\ue073"},{"check","\ue070"},{"close","\ue1b1"},{"settings","\ue157"},{"trash","\ue18d"},{"undo","\ue2a0"},{"package","\ue12c"},
         {"save","\ue150"},{"new","\ue0cd"},{"open","\ue246"},{"export","\ue19d"},{"import","\ue0b6"},{"share","\ue159"},{"copy","\ue0a2"},{"pause","\ue131"},{"play","\ue13f"},{"home","\ue0f8"},{"search","\ue154"},{"plus","\ue140"}
     };
     static LucideIcons(){
@@ -47,6 +47,12 @@ internal sealed class GeneralReveal : IDisposable {
         if(target.IsDisposed)return;timer.Stop();origin=anchor;opening=true;complete=null;
         Running=GeneralStyle.AnimationsEnabled;if(Running)Frame(0);else SetRound();
     }
+    internal void StartPreparedOpen(){
+        if(!Running)return;
+        start=0;
+        watch.Restart();
+        timer.Start();
+    }
     internal void Begin(bool open,Point anchor,Action done=null){
         if(target.IsDisposed)return;
         timer.Stop();opening=open;origin=anchor;complete=done;
@@ -64,13 +70,13 @@ internal sealed class GeneralReveal : IDisposable {
         int width=Math.Max(1,target.ClientSize.Width),height=Math.Max(1,target.ClientSize.Height);
         double dx=Math.Max(origin.X,width-origin.X),dy=Math.Max(origin.Y,height-origin.Y);
         float radius=(float)(Math.Sqrt(dx*dx+dy*dy)*progress+1);
-        using(var round=GeneralStyle.Round(new RectangleF(0,0,width,height),18))
+        using(var round=GeneralStyle.PopupShape(target.ClientSize))
         using(var circle=new GraphicsPath()){
             circle.AddEllipse(origin.X-radius,origin.Y-radius,radius*2,radius*2);
             var region=new Region(round);region.Intersect(circle);Replace(region);
         }
     }
-    internal void SetRound(){if(target.IsDisposed)return;progress=1;using(var round=GeneralStyle.Round(new RectangleF(0,0,Math.Max(1,target.ClientSize.Width),Math.Max(1,target.ClientSize.Height)),18))Replace(new Region(round));}
+    internal void SetRound(){if(target.IsDisposed)return;progress=1;using(var round=GeneralStyle.PopupShape(target.ClientSize))Replace(new Region(round));}
     void Replace(Region next){var previous=target.Region;target.Region=next;if(previous!=null)previous.Dispose();target.Invalidate(true);}
     public void Dispose(){timer.Stop();timer.Dispose();complete=null;Running=false;}
 }
@@ -108,21 +114,22 @@ internal class GeneralDialog : Form {
         close.Click+=(s,e)=>Complete(DialogResult.Cancel);header.Controls.Add(close,1,0);
         title.MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){ReleaseCapture();SendMessage(Handle,0x00A1,(IntPtr)2,IntPtr.Zero);}};
         shell.Controls.Add(header,0,0);shell.Controls.Add(Content,0,1);base.Controls.Add(shell);Text=text;
-        reveal=new GeneralReveal(this);SetStyle(ControlStyles.ResizeRedraw|ControlStyles.OptimizedDoubleBuffer,true);
+        reveal=new GeneralReveal(this);SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.ResizeRedraw|ControlStyles.OptimizedDoubleBuffer,true);
     }
     protected override void OnTextChanged(EventArgs e){base.OnTextChanged(e);if(title!=null)title.Text=Text;}
     protected virtual bool AnimateAppearance { get { return true; } }
     protected override void SetVisibleCore(bool value){
-        if(value&&!Visible&&reveal!=null){
+        bool opening=value&&!Visible&&reveal!=null;
+        if(opening){
             allowClose=closing=false;
             origin=new Point(Width-36,0);
             if(AnimateAppearance)reveal.PrepareOpen(origin);else reveal.SetRound();
         }
         base.SetVisibleCore(value);
+        if(opening&&Visible&&!closing&&!allowClose&&AnimateAppearance)reveal.StartPreparedOpen();
     }
-    protected override void OnShown(EventArgs e){base.OnShown(e);if(closing||allowClose||!AnimateAppearance)return;origin=new Point(Width-36,0);reveal.Begin(true,origin);}
-    protected override void OnPaint(PaintEventArgs e){
-        base.OnPaint(e);GeneralStyle.PaintCard(e.Graphics,ClientSize);
+    protected override void OnPaintBackground(PaintEventArgs e){
+        GeneralStyle.PaintCard(e.Graphics,ClientSize);
     }
     protected override void OnResize(EventArgs e){base.OnResize(e);if(reveal!=null&&!reveal.Running)reveal.SetRound();}
     internal void Complete(DialogResult result){DialogResult=result;if(!Modal)Close();}
@@ -164,7 +171,7 @@ internal class GeneralDialog : Form {
 
 internal static class GeneralPopupPlacement {
     internal static void RoundMenu(ToolStripDropDown popup){
-        using(var shape=GeneralStyle.Round(new RectangleF(0,0,popup.Width,popup.Height),18)){
+        using(var shape=GeneralStyle.PopupShape(popup.ClientSize)){
             var previous=popup.Region;
             popup.Region=new Region(shape);
             if(previous!=null)previous.Dispose();
@@ -288,7 +295,12 @@ internal sealed class GeneralPicker : UserControl {
                 afterClose();
             }));
         };
-        popup.Opened+=(s,e)=>{scroll.RefreshScroll();list.Focus();Invalidate();};
+        popup.Opening+=(s,e)=>{
+            if(e.Cancel)return;
+            // Lay out the hosted list and scrollbar before the drop-down is visible.
+            if(list.Handle!=IntPtr.Zero)scroll.RefreshScroll();
+        };
+        popup.Opened+=(s,e)=>{list.Focus();Invalidate();};
         dropdown=popup;
         var point=GeneralPopupPlacement.Location(this,ClientRectangle,popup.Size,false);
         popup.Show(this,PointToClient(point));Invalidate();

@@ -17,7 +17,9 @@ internal static class GeneralInstallRoutes {
         var routes = new List<GeneralInstallRoute>();
         foreach (string row in text.Split(new[] { '\r', '\n', '|' }, StringSplitOptions.RemoveEmptyEntries)) {
             if (String.IsNullOrWhiteSpace(row)) continue;
-            var fields = row.Split(new[] { '=' }, 2);
+            int delimiter=row.IndexOf(" = ",StringComparison.Ordinal);
+            var fields=delimiter<0?row.Split(new[] { '=' },2):
+                new[]{row.Substring(0,delimiter),row.Substring(delimiter+3)};
             string folder = fields.Length == 1 || String.IsNullOrWhiteSpace(fields[0]) ? "" : Relative(fields[0].Trim().Replace('\\', '/').TrimEnd('/'));
             string destination = fields.Last().Trim().Replace('\\', '/').TrimEnd('/');
             if (Path.IsPathRooted(destination)) {
@@ -50,7 +52,7 @@ internal static class GeneralInstallRoutes {
     }
 
     internal static void Validate(List<GeneralInstallRoute> routes) {
-        if (routes == null || routes.Count > 12) throw Invalid();
+        if (routes == null || routes.Count > 128) throw Invalid();
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var route in routes) {
             if (route == null || route.Folder == null || !used.Add(route.Folder)) throw Invalid();
@@ -124,15 +126,56 @@ internal static class GeneralInstallRoutes {
         foreach (var route in routes) DirectoryFor(game, route.Destination, true);
     }
 
-    internal static string Map(string path, IEnumerable<GeneralInstallRoute> routes) {
+    internal static string Map(string path, IEnumerable<GeneralInstallRoute> routes, string defaultPath = null) {
         if (External(path)) throw Invalid();
-        var route = routes.Where(item => item.Folder.Length == 0 || path.StartsWith(item.Folder + "/", StringComparison.OrdinalIgnoreCase))
+        var route = routes.Where(item => item.Folder.Length == 0 || path.Equals(item.Folder, StringComparison.OrdinalIgnoreCase) || path.StartsWith(item.Folder + "/", StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(item => item.Folder.Length).FirstOrDefault();
-        if (route == null) return path;
-        string remainder = route.Folder.Length == 0 ? path : path.Substring(route.Folder.Length + 1);
+        if (route == null) return defaultPath??path;
+        string remainder = path;
+        if (route.Folder.Length != 0)
+            remainder = path.Length == route.Folder.Length ? Path.GetFileName(path) : path.Substring(route.Folder.Length + 1);
         if (route.Destination == "%GAME%") return remainder;
         if (route.Destination.StartsWith("%GAME%/", StringComparison.Ordinal)) return route.Destination.Substring(7) + "/" + remainder;
         return Prefix + route.Destination + FileMarker + remainder;
+    }
+
+    internal static Dictionary<string, string> FixedPaths(FixedCatalog catalog, FixedMod mod, List<GeneralInstallRoute> routes) {
+        Validate(routes);
+        var paths = mod.Files.ToDictionary(file => file.Path, file => Map(file.Path, routes, file.Path), StringComparer.OrdinalIgnoreCase);
+        if (routes.Count == 0) return paths;
+        if (mod.Immutable || mod.Id == "NightCoop" || mod.Id == NightCityDensity.ModId || mod.Id == EquipmentExOptions.ModId ||
+            mod.Id == RetiredPackEntries.DroneId || mod.Files.Any(file => file.UserData || file.Patch != null) ||
+            (catalog.Defaults != null && catalog.Defaults.Any(config => config.ModId == mod.Id)))
+            throw new IOException(GeneralStyle.T("Este mod usa destinos protegidos pelo catálogo.", "This mod uses destinations protected by the catalog."));
+
+        var reserved = catalog.Packages.SelectMany(NightCityDensity.KnownFiles).Select(file => file.Path)
+            .Concat(catalog.Defaults == null ? Enumerable.Empty<string>() : catalog.Defaults.Select(config => config.Path))
+            .Concat(new[] { "bin/x64/Cyberpunk2077.exe" }).ToArray();
+        var protectedFolders = catalog.Packages.SelectMany(item => item.ExclusiveCodeDirectories ?? new string[0]).ToArray();
+        var incompatiblePaths = catalog.Packages.SelectMany(item => item.IncompatiblePaths ?? new string[0]).ToArray();
+        var mapped = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in paths) {
+            if (!mapped.Add(path.Value)) throw Invalid();
+            if (String.Equals(path.Key, path.Value, StringComparison.OrdinalIgnoreCase)) continue;
+            if (External(path.Value)) {
+                var parts = SplitExternal(path.Value);
+                if (!InstalledSnapshot.SafeGenericPath(parts[0].Substring(parts[0].IndexOf('/') + 1) + "/" + parts[1]))
+                    throw Invalid();
+            } else if (!InstalledSnapshot.SafeGenericPath(path.Value) || RetiredPackEntries.LocalDronePath(path.Value) ||
+                reserved.Any(item => Overlaps(item, path.Value)) || protectedFolders.Any(item => Overlaps(item, path.Value)) ||
+                incompatiblePaths.Any(item => Overlaps(item, path.Value)))
+                throw new IOException(GeneralStyle.T("Destino protegido pelo catálogo: ", "Destination protected by the catalog: ") + path.Value);
+        }
+        foreach (var path in mapped)
+            for (int separator = path.LastIndexOf('/'); separator >= 0; separator = path.LastIndexOf('/', separator - 1))
+                if (mapped.Contains(path.Substring(0, separator))) throw Invalid();
+        return paths;
+    }
+
+    static bool Overlaps(string first, string second) {
+        return first.Equals(second, StringComparison.OrdinalIgnoreCase) ||
+            first.StartsWith(second + "/", StringComparison.OrdinalIgnoreCase) ||
+            second.StartsWith(first + "/", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static bool External(string path) { return path != null && path.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase); }

@@ -7,16 +7,23 @@ using System.Text;
 
 internal sealed class PackCoverageSegment {
     internal string Label;
-    internal int Count;
+    internal string Category;
+    internal string[] ModIds;
+    internal int Count {get{return ModIds.Length;}}
     internal Color Color;
 }
 internal static class PackCoverage {
     static string paletteKey;
     static Dictionary<string,Color> palette;
     internal static List<PackCoverageSegment> Build(IEnumerable<GeneralModEntry> entries,Func<GeneralModEntry,bool> available,string uncategorized){
-        var mods=entries.ToList();var segments=new List<PackCoverageSegment>();int count=mods.Count(available);
-        if(count>0)segments.Add(new PackCoverageSegment{Label=GeneralStyle.T("Baixados / instalados","Downloaded / installed"),Count=count,Color=Color.FromArgb(19,122,77)});
-        var categories=mods.Select(m=>m.Category??uncategorized).Distinct().OrderBy(c=>c,StringComparer.Ordinal).ToList();string key=String.Join("\n",categories);
+        var mods=entries.ToList();
+        var segments=new List<PackCoverageSegment>();
+        var ready=mods.Where(available).ToArray();
+        if(ready.Length>0)segments.Add(new PackCoverageSegment{
+            Label=GeneralStyle.T("Baixados / instalados","Downloaded / installed"),
+            ModIds=ready.Select(mod=>mod.Id).ToArray(),Color=Color.FromArgb(19,122,77)
+        });
+        var categories=mods.Select(m=>String.IsNullOrEmpty(m.Category)?uncategorized:m.Category).Distinct().OrderBy(c=>c,StringComparer.Ordinal).ToList();string key=String.Join("\n",categories);
         if(palette==null||paletteKey!=key){
             var colors=new Dictionary<string,Color>();
             foreach(string category in categories){
@@ -25,7 +32,12 @@ internal static class PackCoverage {
             }
             palette=colors;paletteKey=key;
         }
-        foreach(var group in mods.Where(m=>!available(m)).GroupBy(m=>m.Category??uncategorized))segments.Add(new PackCoverageSegment{Label=group.Key,Count=group.Count(),Color=palette[group.Key]});
+        foreach(var group in mods.Except(ready).GroupBy(mod=>mod.Category??"",StringComparer.OrdinalIgnoreCase)){
+            string label=group.Key.Length==0?uncategorized:group.Key;
+            segments.Add(new PackCoverageSegment{
+                Category=group.Key,Label=label,ModIds=group.Select(mod=>mod.Id).ToArray(),Color=palette[label]
+            });
+        }
         return segments;
     }
     static int Distance(Color a,Color b){return (a.R-b.R)*(a.R-b.R)+(a.G-b.G)*(a.G-b.G)+(a.B-b.B)*(a.B-b.B);}
@@ -37,12 +49,38 @@ internal static class PackCoverage {
     }
 }
 internal sealed partial class GeneralModWindow {
+    PackCoverageSegment coverageFilter;
+
+    List<PackCoverageSegment> ProjectCoverage(){
+        var preset=ActivePreset;
+        var included=preset==null?null:new HashSet<string>(preset.ModIds,StringComparer.Ordinal);
+        Func<GeneralModEntry,bool> available=mod=>{
+            string status;
+            return statuses.TryGetValue(Key(mod,Selected(mod)),out status)&&
+                (GeneralStatusPresentation.Kind(status)=="installed"||status=="Pronto para instalar"||
+                 status=="Instalando"||status==GeneralStatusPresentation.ManualBody);
+        };
+        var mods=state.List.Mods.Where(mod=>included==null||included.Contains(mod.Id)).GroupBy(GeneralModLibrary.ChoiceKey)
+            .Select(choice=>choice.FirstOrDefault(available)??choice.First());
+        return PackCoverage.Build(mods,available,UncatName());
+    }
+
+    void FilterCoverage(PackCoverageSegment segment){
+        if(working||scanning||associationChoice!=null)return;
+        ResetColumnFilters();
+        coverageFilter=segment;
+        RedrawFromTop();
+    }
+
     void UpdatePackCoverage(){
-        if(totalProgress==null)return;var preset=state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);
-        Func<GeneralModEntry,bool> available=mod=>{string status;return statuses.TryGetValue(Key(mod,Selected(mod)),out status)&&(GeneralStatusPresentation.Kind(status)=="installed"||status=="Pronto para instalar"||status=="Instalando"||status==GeneralStatusPresentation.ManualBody);};
-        var mods=state.List.Mods.Where(mod=>preset==null||preset.ModIds.Contains(mod.Id)).GroupBy(GeneralModLibrary.ChoiceKey)
-            .Select(choice=>choice.FirstOrDefault(available)??choice.First()).ToList();
-        int count=mods.Count(available);totalProgress.Segments=PackCoverage.Build(mods,available,UncatName());totalProgress.Value=mods.Count==0?0:100*count/mods.Count;
-        totalProgress.Caption=T("Mods baixados / instalados: ","Downloaded / installed mods: ")+count+" / "+mods.Count;totalProgress.Invalidate();
+        if(totalProgress==null)return;
+        var segments=ProjectCoverage();
+        int count=segments.Where(segment=>segment.Category==null).Sum(segment=>segment.Count);
+        int total=segments.Sum(segment=>segment.Count);
+        totalProgress.Segments=segments;
+        totalProgress.Value=total==0?0:100*count/total;
+        totalProgress.Caption=T("Mods baixados / instalados: ","Downloaded / installed mods: ")+count+" / "+total;
+        if(coverageFilter!=null)totalProgress.Caption+=T(" · Filtro: "," · Filter: ")+coverageFilter.Label;
+        totalProgress.Invalidate();
     }
 }

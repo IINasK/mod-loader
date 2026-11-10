@@ -1,7 +1,8 @@
-﻿param(
+param(
     [Parameter(Mandatory=$true)][string]$NuGetPackages,
     [string]$Vpk='vpk',
-    [string]$OutputPath
+    [string]$OutputPath,
+    [string]$DevVersion
 )
 $ErrorActionPreference='Stop'
 $project=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -12,8 +13,23 @@ $version=[regex]::Match((Get-Content -LiteralPath (Join-Path $source 'GeneralUpd
 if(!$version){throw 'Versao do aplicativo ausente'}
 $app=Join-Path $OutputPath 'App'
 $release=Join-Path $OutputPath 'Release'
-& (Join-Path $source 'compilar.ps1') -VelopackBuildDirectory $app -NuGetPackages $NuGetPackages
-& $Vpk pack --packId IINasK.ModLoader --packVersion $version --packDir $app --mainExe ModLoader.exe --packTitle 'Mod Loader' --packAuthors IINasK --shortcuts StartMenu --runtime win-x64 --icon (Join-Path $source 'Assets\ModLoader.ico') --outputDir $release
+$packId='IINasK.ModLoader'
+$exe='ModLoader.exe'
+$title='Mod Loader'
+$channel='win'
+$setup='Mod-Loader-Setup.exe'
+$dev=$DevVersion -ne ''
+if($dev){
+    if($DevVersion -notmatch '^\d+\.\d+\.\d+-dev\.\d+(\.\d+)?$'){throw 'Versão Dev inválida.'}
+    $version=$DevVersion
+    $packId+='.Dev'
+    $exe='LoaderDev.exe'
+    $title+=' Dev'
+    $channel='dev'
+    $setup='Mod-Loader-Dev-Setup.exe'
+}
+& (Join-Path $source 'compilar.ps1') -VelopackBuildDirectory $app -NuGetPackages $NuGetPackages -Dev:$dev
+& $Vpk pack --packId $packId --packVersion $version --packDir $app --mainExe $exe --packTitle $title --packAuthors IINasK --shortcuts StartMenu --runtime win-x64 --channel $channel --icon (Join-Path $source 'Assets\ModLoader.ico') --outputDir $release
 if($LASTEXITCODE){throw 'Empacotamento Velopack falhou'}
-Copy-Item -LiteralPath (Join-Path $release 'IINasK.ModLoader-win-Setup.exe') -Destination (Join-Path $release 'Mod-Loader-Setup.exe') -Force
-Get-FileHash -LiteralPath (Join-Path $release 'Mod-Loader-Setup.exe')
+Copy-Item -LiteralPath (Join-Path $release "$packId-$channel-Setup.exe") -Destination (Join-Path $release $setup) -Force
+Get-FileHash -LiteralPath (Join-Path $release $setup)

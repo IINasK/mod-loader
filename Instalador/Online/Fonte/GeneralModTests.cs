@@ -20,7 +20,25 @@ internal sealed partial class GeneralModWindow {
         var real=FixedData.Load();
         var realSeed=GeneralModLibrary.Seed(real,new ModImportItem[0]);
         var nca=realSeed.Mods.Single(m=>m.Id==NightCityDensity.ModId);
-        check(realSeed.Mods.Count==158&&nca.DefaultVariant=="low"&&nca.Variants.Count==3,"Catálogo preservado com três densidades e Baixa principal.");
+        check(realSeed.Mods.All(mod=>mod.Id!=RetiredPackEntries.HotlineId)&&nca.DefaultVariant=="low"&&nca.Variants.Count==3,"Catálogo preservado com três densidades e Baixa principal.");
+        string modFolder=Safe.In(root,"plugins/character"),scriptsFolder=Safe.In(root,"scripts/character");
+        Directory.CreateDirectory(modFolder);Directory.CreateDirectory(scriptsFolder);
+        string originalFile=Safe.In(root,"plugins/character/manager.dll");
+        string scriptFile=Safe.In(root,"scripts/character/edit.script");
+        File.WriteAllText(originalFile,"known module");File.WriteAllText(scriptFile,"known script");
+        File.WriteAllText(Safe.In(root,"plugins/character/profile.sqlite3"),"local data");
+        File.WriteAllText(Safe.In(root,"scripts/character/settings.json"),"local settings");
+        File.WriteAllText(Safe.In(root,"plugins/character/unknown.dll"),"unregistered module");
+        var anchors=new List<ModFileAnchor>{
+            new ModFileAnchor{Owner="character",Path="plugins/character/manager.dll",Hash=Safe.Hash(originalFile)},
+            new ModFileAnchor{Owner="character",Path="scripts/character/edit.script",Hash=Safe.Hash(scriptFile)}
+        };
+        var companions=InstalledFileOwnership.FindAssociated(root,anchors,InstalledFileOwnership.GenericScope);
+        check(companions.Count==2&&companions.Values.All(owner=>owner=="character"),"Associa somente dados locais em múltiplos destinos verificados.");
+        anchors.Add(new ModFileAnchor{Owner="other",Path="plugins/character/unknown.dll",Hash=Safe.Hash(Safe.In(root,"plugins/character/unknown.dll"))});
+        companions=InstalledFileOwnership.FindAssociated(root,anchors,InstalledFileOwnership.GenericScope);
+        check(companions.Count==1&&companions.ContainsKey("scripts/character/settings.json"),"Preserva a ambiguidade quando dois mods usam a mesma pasta.");
+
         var eclipse=realSeed.Mods.Single(mod=>mod.Id==GeneralModLibrary.EclipseTattooId);
         check(eclipse.Category==GeneralModLibrary.BodyCategory&&
             eclipse.Variants.Single().Sources.Single()=="https://www.nexusmods.com/cyberpunk2077/mods/33230?tab=files&file_id=162991"&&
@@ -42,22 +60,18 @@ internal sealed partial class GeneralModWindow {
             realSeed.Mods.Where(mod=>GeneralModLibrary.IsFacialMod(mod.Id)).All(mod=>mod.Category==GeneralModLibrary.BodyCategory),
             "Rostos e alternativas Hyst NSFW compartilham a categoria de corpo.");
         var feet=realSeed.Mods.Single(mod=>mod.Id==GeneralModLibrary.VanillaFeetId);
-        check(bodies.Concat(new[]{feet}).Select(GeneralModLibrary.ChoiceKey).Distinct().Count()==1,
-            "Togglable Feet do corpo padrão e as duas variantes Hyst contam como uma opção.");
-        string bodyGroup=feet.AlternativeGroup;
-        feet.AlternativeGroup=null;
-        check(GeneralModLibrary.GroupBodyOptions(realSeed)&&feet.AlternativeGroup==bodyGroup&&!GeneralModLibrary.GroupBodyOptions(realSeed),
-            "O projeto padrão já salvo recebe o grupo Corpo uma única vez.");
+        check(feet.AlternativeGroup==null&&bodies.Select(GeneralModLibrary.ChoiceKey).Distinct().Count()==1,
+            "As opções Hyst são um grupo e o Togglable Feet permanece independente.");
+        feet.AlternativeGroup=GeneralModLibrary.BodyGroup;
+        check(GeneralModLibrary.GroupBodyOptions(realSeed)&&feet.AlternativeGroup==null&&!GeneralModLibrary.GroupBodyOptions(realSeed),
+            "O projeto salvo retira Togglable Feet do grupo Corpo uma única vez.");
         var independent=new GeneralModEntry{Id="independent",Name="Independente"};
         var jobs=bodies.Concat(new[]{independent}).Select(entry=>new Work{Entry=entry}).ToList();
         var package=new InstalledSnapshotManifest{Project=new GeneralModList{Mods=bodies.Concat(new[]{feet,independent}).ToList()},
-            List=new GeneralModList{Mods=new List<GeneralModEntry>{feet}}};
-        check(InstalledSnapshot.CountOutsidePack(package)==1,"Uma opção enviada satisfaz o grupo sem contar a alternativa no P2P.");
+            List=new GeneralModList{Mods=new List<GeneralModEntry>{bodies[0]}}};
+        check(InstalledSnapshot.CountOutsidePack(package)==2,"Uma opção enviada satisfaz o grupo e o Togglable Feet é contado separadamente.");
         package.List.Mods.Clear();
-        check(InstalledSnapshot.CountOutsidePack(package)==2,"Um grupo ausente conta uma vez no P2P.");
-        var bodyJobs=jobs.Concat(new[]{new Work{Entry=feet}}).ToList();
-        check(ChooseAlternatives(bodyJobs,choices=>feet.Id).Select(work=>work.Entry.Id).SequenceEqual(new[]{independent.Id,feet.Id}),
-            "A fila permite escolher Togglable Feet como alternativa às duas variantes Hyst.");
+        check(InstalledSnapshot.CountOutsidePack(package)==3,"Um grupo ausente conta uma vez no P2P.");
         check(ChooseAlternatives(jobs,choices=>choices[1].Id).Select(work=>work.Entry.Id).SequenceEqual(new[]{bodies[1].Id,independent.Id})&&
             ChooseAlternatives(jobs,choices=>"").Single().Entry==independent&&ChooseAlternatives(jobs,choices=>null)==null&&
             ChooseAlternatives(jobs.Skip(1).ToList(),choices=>{throw new IOException("Uma opção não deve abrir o seletor.");}).Count==2,

@@ -6507,133 +6507,6 @@
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/27625"
     },
     {
-      "Id": "15-NCPDHotline",
-      "Name": "Immersive NCPD Hotline",
-      "Version": "3.1.11",
-      "Profile": "Kit inicial",
-      "GameVersion": "2.5",
-      "RequiresPL": false,
-      "RequiresRedmod": false,
-      "Immutable": false,
-      "Dependencies": [
-        "CET",
-        "redscript"
-      ],
-      "Warning": "",
-      "Assets": [
-        {
-          "Id": "a0",
-          "Name": "Immersive NCPD Hotline 8557 3.1.11 2026-10-11T13-14Z xNHtNXVaL.zip",
-          "Sha256": "d493b3db9c77fe5895f7eb6b697f70a02ec3dbb0db90b038181ed825c0a16658",
-          "Size": 89760,
-          "Format": "zip",
-          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/8557",
-          "ModId": 8557,
-          "FileId": 165425
-        }
-      ],
-      "Files": [
-        {
-          "Asset": "a0",
-          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/common_base_game_data.lua",
-          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/common_base_game_data.lua",
-          "Sha256": "24d353fc5a6ee9fbae4d72600bf351eb300aee98b402500416cada89898e90df",
-          "Size": 35148
-        },
-        {
-          "Asset": "a0",
-          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/init.lua",
-          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/init.lua",
-          "Sha256": "6dbbdd49c622cc8e0184f00f8824b660d193aa04f993d1e1e3fdb38529d93adc",
-          "Size": 302774
-        },
-        {
-          "Asset": "a0",
-          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/interactionUI_ncpd_hotline.lua",
-          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/interactionUI_ncpd_hotline.lua",
-          "Sha256": "eb77362631f02955cc27bb758adb5cdad7967fb8612a6ef2bf186a5004dc1824",
-          "Size": 12216
-        },
-        {
-          "Asset": "a0",
-          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/LICENSE",
-          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/LICENSE",
-          "Sha256": "ebfd5f05db59b0d8d233c10967a546a3ee7635ff339be7a6688154cbf6215855",
-          "Size": 1069
-        },
-        {
-          "Asset": "a0",
-          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/Ref.lua",
-          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/Ref.lua",
-          "Sha256": "6ae5a3c3e470ad970c0de72d0a82e39a644ce65fc257701a958cc781e2dd9627",
-          "Size": 1278
-        },
-        {
-          "Asset": "a0",
-          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/sms.lua",
-          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/sms.lua",
-          "Sha256": "3740b242a322b73dddca9046383f66cc24ca443a2214b7ca056f573d8308c4fd",
-          "Size": 7252
-        },
-        {
-          "Asset": "a0",
-          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/game_base_relic/language/lang_pl_text.json",
-          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/game_base_relic/language/lang_pl_text.json",
-          "Sha256": "3af66efd28c2292990b6b47fbac5d6035d04b4af023c8f7dbf3f0e149ffca094",
-          "Size": 31973
-        },
-        {
-          "Asset": "a0",
-          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/game_base_relic/language/Readme.txt",
-          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/game_base_relic/language/Readme.txt",
-          "Sha256": "fd6f8ddbceffe9f5118eaba397282847684d9b0625ca965d8b6fb6d5cfd84e61",
-          "Size": 13090
-        },
-        {
-          "Asset": "a0",
-          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/game_base_relic/language/template_lang_en_text.json",
-          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/game_base_relic/language/template_lang_en_text.json",
-          "Sha256": "7e5d25e46ed6ea7e0560019c6a2498c2827bba115c0ea3fa6fea42a61f4b595b",
-          "Size": 22163
-        },
-        {
-          "Asset": "a0",
-          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/stopNCPD/init.lua",
-          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/stopNCPD/init.lua",
-          "Sha256": "60d9071cf992e819827df2ff5a91e6886990ca119089d8972c4b467e739df7fb",
-          "Size": 467
-        },
-        {
-          "Asset": "a0",
-          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/stopNCPD/mod_user_settings.json",
-          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/stopNCPD/mod_user_settings.json",
-          "Sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "Size": 2
-        },
-        {
-          "Asset": "a0",
-          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/stopNCPD/Stop NCPD End of Life.txt",
-          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/stopNCPD/Stop NCPD End of Life.txt",
-          "Sha256": "a76e0a0c0d9f13b261ebff25e2db71709994c950bc5a31b7f5e161294b6050cc",
-          "Size": 453
-        },
-        {
-          "Asset": "a0",
-          "Entry": "r6/scripts/NCPD_Hotline/ncpd_hotline_mod_reds_helper.reds",
-          "Path": "r6/scripts/NCPD_Hotline/ncpd_hotline_mod_reds_helper.reds",
-          "Sha256": "2aa8ed99cd85102802550ccbc67d3271b47edc815ca64f9d99b57f84b7b32fdd",
-          "Size": 2977
-        }
-      ],
-      "BlockedReason": "",
-      "ThirdPerson": "Confirmado em coop",
-      "ThirdPersonNotes": "Uso do pacote em coop confirmado por Douglas em 29/10/2026.",
-      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/8557",
-      "PhantomLibertyStatus": "not-required",
-      "PhantomLibertyNotes": "common_base_game_data.lua declara suporte ao jogoRelic/base ePhantomLiberty. Documentação descreve um problema específico somente se oDLC estiver instalado, confirmando seu caráter opcional.",
-      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/8557"
-    },
-    {
       "Id": "16-Cyberpsycho",
       "Name": "Cyberpsycho Encounters",
       "Version": "0.8.0",
@@ -14260,46 +14133,6 @@
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/29619?tab=files&file_id=159826"
     },
     {
-      "Id": "mod-17811",
-      "Name": "Realistic Map · 8K",
-      "Version": "1.0.0",
-      "Profile": "Complementos",
-      "GameVersion": "2.5",
-      "RequiresPL": false,
-      "RequiresRedmod": false,
-      "Immutable": false,
-      "Dependencies": [],
-      "Warning": "",
-      "Assets": [
-        {
-          "Id": "a0",
-          "Name": "Realistic Map 8K-17811-1-0-0-1750282678.zip",
-          "Sha256": "95602fb43a0ae73bf0c78f102258dcdea0f2c377729d4ac95d4d3b60eaefa0c5",
-          "Size": 64108949,
-          "Format": "zip",
-          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/17811?tab=files&file_id=111746",
-          "ModId": 17811,
-          "FileId": 111746
-        }
-      ],
-      "Files": [
-        {
-          "Asset": "a0",
-          "Entry": "archive/pc/mod/RealisticMap8K.archive",
-          "Path": "archive/pc/mod/RealisticMap8K.archive",
-          "Size": 64110592,
-          "Sha256": "78e2d9015912c99be8e7b354ba4365c45b4cf47bb8c1ac0e420a260be5fc9aba",
-          "UserData": false
-        }
-      ],
-      "ThirdPerson": "Compatível por escopo",
-      "ThirdPersonNotes": "Substitui a imagem do mapa; não altera corpo, câmera ou física. Somente uma variante: não misture 4K/8K/16K/32K. Foram relatados mapa escuro e desalinhamento em outras instalações; observar zoom, rotas e marcadores após instalar.",
-      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/17811?tab=files&file_id=111746",
-      "PhantomLibertyStatus": "unverified",
-      "PhantomLibertyNotes": "Nenhum requisito explícito de Phantom Liberty. A textura está em archive/pc/mod; cobertura de Dogtown e execução sem DLC não testadas.",
-      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/17811?tab=files&file_id=111746"
-    },
-    {
       "Id": "mod-3486",
       "Name": "Better Loot Markers",
       "Version": "1.4.1",
@@ -19022,73 +18855,6 @@
       ]
     },
     {
-      "Id": "mod-18084",
-      "Name": "Ripper Pants and Belt",
-      "Version": "1.2",
-      "Profile": "Complementos",
-      "GameVersion": "2.5",
-      "RequiresPL": false,
-      "RequiresRedmod": false,
-      "Immutable": false,
-      "Dependencies": [
-        "ArchiveXL",
-        "TweakXL",
-        "mod-6945",
-        "CET",
-        "mod-14210",
-        "mod-10437"
-      ],
-      "Description": "Calças em três comprimentos e 36 cores por comprimento; cinto em 40 cores para ambos os V.\n\nComo usar: Refits automáticos incluídos. Toggle em Thigh Left esconde bolsos e tiras. Física do cinto é um download opcional e não é recomendada com rig deform. Comprar em clothes – main store. Em NightCoop, houve crashes recorrentes ao receber um jogador equipado com Ripper Cargo Black. Troque por uma calça original no equipamento e no conjunto ativo do Equipment-EX antes de entrar no mundo.\n\nDependências: ArchiveXL, TweakXL, Equipment-EX, CET, raem's Atelier Store, The Community Palette Project.\n\nInstalação e arquivos conferidos.",
-      "Warning": "Refits automáticos incluídos. Toggle em Thigh Left esconde bolsos e tiras. Física do cinto é um download opcional e não é recomendada com rig deform. Comprar em clothes – main store. Em NightCoop, houve crashes recorrentes ao receber um jogador equipado com Ripper Cargo Black. Troque por uma calça original no equipamento e no conjunto ativo do Equipment-EX antes de entrar no mundo.",
-      "PhantomLibertyStatus": "not-required",
-      "PhantomLibertyNotes": "Sem exigência explícita de expansão; runtime sem DLC não testado.",
-      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/18084",
-      "NexusModId": 18084,
-      "NexusFileId": 151532,
-      "Assets": [
-        {
-          "Id": "a0",
-          "Name": "Ripper pants - Main File 18084 1.2 2026-07-09T20-08Z OCk3C5LI5.zip",
-          "Size": 47944944,
-          "Sha256": "1b777f045286f9914a7888324438709aa7e4fa890ff00dbc5ba1c514c503750e",
-          "Format": "zip",
-          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/18084?tab=files&file_id=151532",
-          "ModId": 18084,
-          "FileId": 151532
-        }
-      ],
-      "Files": [
-        {
-          "Asset": "a0",
-          "Entry": "archive/pc/mod/rm_legs_ripper.archive",
-          "Path": "archive/pc/mod/rm_legs_ripper.archive",
-          "Size": 48381952,
-          "Sha256": "c24bacb008671c0c5abe66acb71362519c754fa3e07298f3f0ec72f818e76bf6"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "archive/pc/mod/rm_legs_ripper.xl",
-          "Path": "archive/pc/mod/rm_legs_ripper.xl",
-          "Size": 9200,
-          "Sha256": "3f5afa9125de45965af5db1be5a273a8139e62fbca7ef9be77dea406d9fa2613"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "r6/tweaks/raem/rm_legs_ripper.yaml",
-          "Path": "r6/tweaks/raem/rm_legs_ripper.yaml",
-          "Size": 3939,
-          "Sha256": "728c3c291e3be8179a09e5b7d6bf7bd586b14b72d7467372b728e0ad3bf84357"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "r6/tweaks/raem/rm_legs_ripper_belt.yaml",
-          "Path": "r6/tweaks/raem/rm_legs_ripper_belt.yaml",
-          "Size": 2205,
-          "Sha256": "773afc2313304d9f9c762f8676af5bd8ca516769e92eba6180e66962b3add3f6"
-        }
-      ]
-    },
-    {
       "Id": "mod-10437",
       "Name": "The Community Palette Project",
       "Version": "1.1",
@@ -20121,6 +19887,122 @@
           "Sha256": "5a66701716c77c70e62408832da96b5b15a610e65deff33eecfad159a64d2f63"
         }
       ]
+    },
+    {
+      "Id": "mod-29182",
+      "Name": "Kerry Romance for Female V",
+      "Version": "17",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "Libera o romance com Kerry para V feminina. As novas falas são em inglês, com legendas em português. Compatibilidade com NightCoop ainda não testada.",
+      "Dependencies": [
+        "ArchiveXL"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertyNotes": "O pacote inclui textos EP1. O autor não documenta o funcionamento sem Phantom Liberty.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/29182?tab=files&file_id=171593",
+      "NexusModId": 29182,
+      "NexusFileId": 171593,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Main KerryRomanceFemV 29182 17 2026-10-31T15-28Z q7jg7f9Eu.zip",
+          "Size": 9723308,
+          "Sha256": "af7fdf3614c64247817080594b5ff4b36ef01790ef94639a4df44386566aa3cd",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/29182?tab=files&file_id=171593",
+          "ModId": 29182,
+          "FileId": 171593
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/#KerryRomanceFemV_Voicemaps.archive",
+          "Path": "archive/pc/mod/#KerryRomanceFemV_Voicemaps.archive",
+          "Size": 1081344,
+          "Sha256": "c55a8a4c5d6fc1d0fc4b755a777fdcc2a94c6725ef16557ff0875e22b01993cb",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/!!KerryRomanceFemV_Core.archive.xl",
+          "Path": "archive/pc/mod/!!KerryRomanceFemV_Core.archive.xl",
+          "Size": 1508,
+          "Sha256": "3ff807cdf9effe87568495e50778f461305b6473f76e0abce2619d18dff3e133",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/!!KerryRomanceFemV_Core.archive",
+          "Path": "archive/pc/mod/!!KerryRomanceFemV_Core.archive",
+          "Size": 8986624,
+          "Sha256": "09831aeb0458312eab03b5aaee183309a1176876955c510a125eda261ff9c0ca",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-14044",
+      "Name": "Actual Chrome Compression",
+      "Description": "Reduz o custo dos implantes ao equipar o Compressor de Cromo. Neste pacote, a instalação inclui More Cyberware Slots e a base Cyberware-EX.",
+      "Version": "1.0.0",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "Ao equipar o Compressor de Cromo, reduz a capacidade de ciberware usada de 5% a 30%, conforme o nível. Compatibilidade em jogo com 2.5 e NightCoop ainda não testada.",
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "mod-36802"
+      ],
+      "RequiresPL": true,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "required",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/14044",
+      "NexusModId": 14044,
+      "NexusFileId": 73859,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Actual Chrome Compression-14044-1-0-0-1712279585.zip",
+          "Size": 1908,
+          "Sha256": "340a2cdac96ffa4df5813cf0abd2a7e725096573368f5f20eaf326a7006c94ee",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/14044?tab=files&file_id=73859",
+          "ModId": 14044,
+          "FileId": 73859
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/Actual Chrome Compression.archive",
+          "Path": "archive/pc/mod/Actual Chrome Compression.archive",
+          "Size": 8192,
+          "Sha256": "92266007b54ac40e40c1c211d7ed5bac36214357f751d208dd64dce25c9e685c",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/Actual Chrome Compression.archive.xl",
+          "Path": "archive/pc/mod/Actual Chrome Compression.archive.xl",
+          "Size": 89,
+          "Sha256": "bb539f2badfa4f1ac3faf116d0507d3e6f020dfa65a269d0c7e94476edb074bf",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/Actual Chrome Compression/Actual Chrome Compression.yaml",
+          "Path": "r6/tweaks/Actual Chrome Compression/Actual Chrome Compression.yaml",
+          "Size": 1244,
+          "Sha256": "9fb39625da862ea401ed4bb0921dbda2e4e42a5a33378a9ffe5290ec599a5535",
+          "UserData": false
+        }
+      ]
     }
   ],
   "Excluded": [
@@ -20197,16 +20079,6 @@
       "Section": null,
       "Content": "{\"settings\":{\"weaponRiflesShakeInterpTypeZ\":2,\"weaponRiflesShakeIntensityRX\":0.015,\"weaponRiflesShakeFrequencyRX\":4,\"weaponRiflesShakeInterpTypeRX\":3,\"weaponRiflesShakeIntensityRY\":0.004,\"weaponRiflesShakeFrequencyRY\":4,\"weaponRiflesShakeInterpTypeRY\":2,\"weaponRiflesShakeIntensityRZ\":0.006,\"weaponRiflesShakeFrequencyRZ\":4,\"weaponRiflesShakeInterpTypeRZ\":3,\"weaponShotgunsShakeMasterIntensity\":1,\"weaponShotgunsShakeMasterFrequency\":1,\"weaponShotgunsShakeIntensityX\":0.004,\"weaponShotgunsShakeFrequencyX\":3.5,\"weaponShotgunsShakeInterpTypeX\":2,\"weaponShotgunsShakeIntensityY\":0.008,\"weaponShotgunsShakeFrequencyY\":3.5,\"weaponShotgunsShakeInterpTypeY\":3,\"weaponShotgunsShakeIntensityZ\":0.003,\"weaponShotgunsShakeFrequencyZ\":3.5,\"onFootShakeEnabled\":false,\"onFootShakeMinSpeed\":1,\"onFootShakeMaxSpeed\":8,\"onFootShakeCrouchReduction\":0.5,\"onFootShakeADSReduction\":0.3,\"onFootShakeSlidingIntensity\":0.4,\"onFootShakeSlidingFreqMult\":2,\"onFootShakeMasterIntensity\":1,\"windowAnimationDuration\":0.2,\"windowInterpolation\":\"easeOut\",\"adsResetCameraZRotation\":true,\"useGlobalPreset\":true,\"enableWeaponPresets\":true,\"disableInCutscenes\":false,\"enableUnarmedPresets\":true,\"debugMode\":false,\"enableADSPresets\":true,\"debugConsoleOutput\":false,\"useADSPresetsInVehicle\":true,\"debugStopSpawns\":false,\"onlyUnarmedFOV\":true,\"debugDisableCollisions\":false,\"passengerFOVMode\":\"none\",\"debugOverrideRestrictedSpawning\":false,\"passengerCustomFOV\":80,\"vehicleDataWindowOpen\":false,\"cameraDataWindowOpen\":false,\"freeLookEnabled\":true,\"fovStreamingFix\":true,\"toggleFreeLook\":false,\"onFootShakeFrequencyZ\":1.8,\"freeLookRestoreDuration\":1,\"weaponShotgunsShakeInterpTypeZ\":2,\"onFootShakeFrequencyRX\":1.8,\"freeLookMaxYaw\":90,\"weaponShotgunsShakeIntensityRX\":0.018,\"onFootShakeFrequencyRY\":1.8,\"freeLookMaxPitch\":45,\"onFootShakeFrequencyRZ\":1.8,\"freeLookSensitivity\":0.5,\"onFootShakeInterpTypeX\":2,\"freeLookNaturalHead\":true,\"onFootShakeInterpTypeZ\":2,\"weaponShotgunsShakeInterpTypeRX\":3,\"interpolationDuration\":0.5,\"freeLookNaturalHeadHorizontal\":0.15,\"weaponShotgunsShakeIntensityRY\":0.005,\"freeLookNaturalHeadRoll\":15,\"damageShakeEnabled\":false,\"freeLookMomentum\":true,\"damageShakeIntensity\":0.8,\"freeLookMomentumSmoothing\":0.15,\"damageShakeDuration\":0.4,\"freeLookMomentumDecay\":0.98,\"weaponShotgunsShakeInterpTypeRY\":2,\"freeLookMomentumDampening\":0.22,\"weaponShotgunsShakeIntensityRZ\":0.008,\"freeLookHorizonLimit\":true,\"damageShakeMasterFrequency\":1,\"freeLookNeutralPosition\":false,\"damageShakeIntensityX\":0.005,\"freeLookResetPitch\":false,\"freeLookCinematicCamera\":false,\"immersiveCameraEnabled\":false,\"damageShakeIntensityZ\":0.003,\"immersiveCameraShiftY\":-0.03,\"weaponFistsShakeMasterIntensity\":1,\"immersiveCameraShiftZ\":-0.25,\"damageShakeIntensityRY\":0.005,\"settingsPanelOpen\":false,\"developerWindowOpen\":false,\"damageShakeIntensityRZ\":0.012,\"presetManagerOpen\":false,\"immersiveCameraFOVChange\":0,\"damageShakeFrequencyX\":6,\"shakePreviewEnabled\":false,\"shakeFineSplitterPercent\":0.55,\"damageShakeFrequencyY\":6,\"weaponFistsShakeIntensityY\":0.004,\"damageShakeFrequencyZ\":6,\"weaponFistsShakeFrequencyY\":4,\"aggressiveRidingPresetModified\":false,\"responsiveDrivingPresetModified\":false,\"weaponFistsShakeInterpTypeY\":3,\"damageShakeFrequencyRY\":6,\"shakeSeedY\":0.73573903003308,\"shakeSeedZ\":0.42668680786097,\"shakeSeedRX\":0.56859228170254,\"shakeSeedRY\":0.11446190140255,\"shakeSeedRZ\":0.054892783198761,\"onFootShakePreset\":\"default\",\"onFootShakePresetModified\":false,\"damageShakeInterpTypeY\":3,\"damageShakePreset\":\"default\",\"immersiveCameraVerticalCurve\":\"SineIn\",\"originalDamageShakePreset\":\"default\",\"immersiveCameraLeanCurve\":\"Linear\",\"crashShakePresetModified\":false,\"damageShakeInterpTypeRY\":2,\"weaponFistsShakeInterpTypeRX\":3,\"damageShakeInterpTypeRZ\":3,\"weaponFistsShakeIntensityRY\":0.003,\"crashShakeEnabled\":false,\"immersiveCameraCrouchMultZ\":1.35,\"crashShakeIntensity\":1.2,\"weaponPistolsShakePreset\":\"default\",\"crashShakeDuration\":0.6,\"originalWeaponPistolsShakePreset\":\"default\",\"immersiveCameraCrouchBlendDuration\":0.3,\"crashShakeSpeedThreshold\":15,\"originalWeaponAutomaticShakePreset\":\"default\",\"immersiveCameraSmoothRestore\":true,\"crashShakeMaxIntensity\":2,\"originalWeaponRiflesShakePreset\":\"default\",\"weaponFistsShakeInterpTypeRZ\":3,\"crashShakeMasterIntensity\":1,\"originalWeaponShotgunsShakePreset\":\"default\",\"weaponFistsShakePreset\":\"default\",\"crashShakeMinRelativeDrop\":0.35,\"locomotionShakeJumpMasterFrequency\":1,\"firstEquipCameraEnabled\":false,\"weaponPistolsShakeMasterIntensity\":1,\"locomotionShakeJumpIntensityX\":0.003,\"crashShakeIntensityX\":0.008,\"locomotionShakeJumpFrequencyX\":4,\"reloadCameraPreview\":false,\"crashShakeIntensityY\":0.006,\"weaponPistolsShakeIntensityX\":0.002,\"locomotionShakeJumpIntensityY\":0.005,\"weaponPistolsShakeFrequencyX\":5,\"crashShakeIntensityRX\":0.015,\"weaponPistolsShakeInterpTypeX\":2,\"weaponPistolsShakeIntensityY\":0.004,\"reloadCameraPitch\":-21,\"locomotionShakeJumpIntensityZ\":0.008,\"weaponPistolsShakeFrequencyY\":5,\"reloadCameraYaw\":12.4,\"locomotionShakeJumpFrequencyZ\":4,\"weaponPistolsShakeInterpTypeY\":3,\"reloadCameraRoll\":4.1,\"locomotionShakeJumpInterpTypeZ\":2,\"crashShakeFrequencyY\":3,\"locomotionShakeJumpIntensityRX\":0.01,\"weaponPistolsShakeFrequencyZ\":5,\"crashShakeFrequencyZ\":3,\"locomotionShakeJumpFrequencyRX\":4,\"weaponPistolsShakeInterpTypeZ\":2,\"crashShakeFrequencyRX\":3,\"locomotionShakeJumpInterpTypeRX\":3,\"crashShakeFrequencyRY\":3,\"reloadCameraInterpolationEnter\":\"Cosine\",\"weaponPistolsShakeFrequencyRX\":5,\"reloadCameraInterpolationExit\":\"Cosine\",\"weaponPistolsShakeInterpTypeRX\":3,\"crashShakeInterpTypeX\":2,\"weaponPistolsShakeIntensityRY\":0.003,\"crashShakeInterpTypeY\":3,\"reloadCameraChance\":100,\"crashShakeInterpTypeZ\":2,\"weaponPistolsShakeFrequencyRY\":5,\"speedAffectsFOV\":false,\"weaponPistolsShakeInterpTypeRY\":2,\"fovCurveType\":\"Sine\",\"fovBikeMinSpeed\":30,\"weaponPistolsShakeFrequencyRZ\":5,\"fovBikeMaxSpeed\":350,\"weaponPistolsShakeInterpTypeRZ\":3,\"weaponAutomaticShakeMasterIntensity\":1,\"weaponPistolsShakeIntensity\":0.3,\"fovCarMinSpeed\":40,\"weaponAutomaticShakeMasterFrequency\":1,\"fovCarMaxSpeed\":250,\"weaponAutomaticShakeIntensityX\":0.002,\"fovCarMaxIncreasePercent\":0.25,\"weaponAutomaticShakeFrequencyX\":6,\"weaponPistolsShakeRecoilKick\":1.5,\"speedAffectsCameraShake\":false,\"weaponAutomaticShakeInterpTypeX\":2,\"vehicleWeaponCameraShake\":false,\"weaponAutomaticShakeIntensityY\":0.004,\"passengerCameraShake\":true,\"weaponAutomaticShakeFrequencyY\":6,\"weaponAutomaticShakeInterpTypeY\":3,\"weaponAutomaticShakeIntensityZ\":0.001,\"weaponAutomaticShakeFrequencyZ\":6,\"weaponAutomaticShakeInterpTypeZ\":2,\"weaponAutomaticShakeIntensityRX\":0.012,\"weaponAutomaticShakeFrequencyRX\":6,\"locomotionShakeDodgeFrequencyZ\":4,\"locomotionShakeDodgeInterpTypeZ\":2,\"locomotionShakeDodgeIntensityRX\":0.01,\"locomotionShakeDodgeFrequencyRX\":4,\"locomotionShakeDodgeInterpTypeRX\":3,\"locomotionShakeDodgeIntensityRY\":0.003,\"locomotionShakeLandingIntensity\":0.6,\"locomotionShakeDodgeFrequencyRY\":4,\"locomotionShakeLandingDuration\":0.35,\"locomotionShakeDodgeInterpTypeRY\":2,\"locomotionShakeDodgeIntensityRZ\":0.005,\"locomotionShakeDodgeFrequencyRZ\":4,\"locomotionShakeDodgeInterpTypeRZ\":3,\"locomotionShakeVaultMasterIntensity\":1,\"locomotionShakeJumpDuration\":0.2,\"locomotionShakeVaultMasterFrequency\":1,\"locomotionShakeDodgeIntensity\":0.3,\"locomotionShakeVaultIntensityX\":0.003,\"locomotionShakeDodgeDuration\":0.2,\"locomotionShakeVaultFrequencyX\":4,\"locomotionShakeVaultIntensity\":0.2,\"locomotionShakeVaultInterpTypeX\":2,\"locomotionShakeVaultDuration\":0.2,\"locomotionShakeVaultIntensityY\":0.005,\"locomotionShakeAirThrusterIntensity\":0.15,\"locomotionShakeVaultFrequencyY\":4,\"locomotionShakeVaultInterpTypeY\":3,\"locomotionShakeVaultIntensityZ\":0.008,\"locomotionShakeVaultFrequencyZ\":4,\"locomotionShakeVaultInterpTypeZ\":2,\"locomotionShakeVaultIntensityRX\":0.01,\"locomotionShakeVaultFrequencyRX\":4,\"locomotionShakeVaultInterpTypeRX\":3,\"locomotionShakeVaultIntensityRY\":0.003,\"locomotionShakeVaultFrequencyRY\":4,\"locomotionShakeVaultInterpTypeRY\":2,\"locomotionShakeVaultIntensityRZ\":0.005,\"locomotionShakeVaultFrequencyRZ\":4,\"locomotionShakeVaultInterpTypeRZ\":3,\"locomotionShakeAirThrusterMasterIntensity\":1,\"locomotionShakeAirThrusterMasterFrequency\":1,\"locomotionShakeAirThrusterIntensityX\":0.003,\"locomotionShakeAirThrusterFrequencyX\":4,\"locomotionShakeAirThrusterInterpTypeX\":2,\"locomotionShakeAirThrusterIntensityY\":0.005,\"locomotionShakeAirThrusterFrequencyY\":4,\"locomotionShakeAirThrusterInterpTypeY\":3,\"locomotionShakeAirThrusterIntensityZ\":0.008,\"locomotionShakeAirThrusterFrequencyZ\":4,\"locomotionShakeAirThrusterInterpTypeZ\":2,\"locomotionShakeAirThrusterIntensityRX\":0.01,\"locomotionShakeAirThrusterFrequencyRX\":4,\"locomotionShakeAirThrusterInterpTypeRX\":3,\"locomotionShakeAirThrusterIntensityRY\":0.003,\"locomotionShakeAirThrusterFrequencyRY\":4,\"locomotionShakeAirThrusterInterpTypeRY\":2,\"locomotionShakeAirThrusterIntensityRZ\":0.005,\"locomotionShakeAirThrusterFrequencyRZ\":4,\"locomotionShakeAirThrusterInterpTypeRZ\":3,\"weaponRiflesShakeRecoilDepth\":2,\"weaponRiflesShakeRecoilKick\":2.5,\"weaponShotgunsShakeIntensity\":0.3,\"weaponShotgunsShakeDuration\":0.25,\"weaponShotgunsShakeRecoilDepth\":3,\"weaponShotgunsShakeRecoilKick\":2,\"weaponFistsShakeIntensity\":0.3,\"locomotionShakeJumpIntensityRY\":0.003,\"locomotionShakeJumpFrequencyRY\":4,\"locomotionShakeJumpInterpTypeRY\":2,\"locomotionShakeJumpIntensityRZ\":0.005,\"locomotionShakeEnabled\":false,\"locomotionShakeJumpFrequencyRZ\":4,\"locomotionShakeLandingEnabled\":true,\"locomotionShakeLandingMasterIntensity\":1,\"locomotionShakeHardLandingEnabled\":true,\"locomotionShakeDodgeEnabled\":true,\"locomotionShakeLandingIntensityX\":0.003,\"locomotionShakeAirThrusterDuration\":0.15,\"locomotionShakeLandingFrequencyX\":4,\"locomotionShakeJumpFreqMult\":1.5,\"locomotionShakeLandingInterpTypeX\":2,\"locomotionShakeLandingFreqMult\":0.7,\"locomotionShakeLandingFrequencyY\":4,\"locomotionShakeHardLandingFreqMult\":0.5,\"locomotionShakeLandingInterpTypeY\":3,\"locomotionShakeDodgeFreqMult\":1.2,\"locomotionShakeLandingIntensityZ\":0.008,\"locomotionShakeVaultFreqMult\":1,\"locomotionShakeLandingFrequencyZ\":4,\"locomotionShakeAirThrusterFreqMult\":1.3,\"locomotionShakeLandingInterpTypeZ\":2,\"locomotionShakeLandingIntensityRX\":0.01,\"locomotionShakeLandingFrequencyRX\":4,\"locomotionShakeLandingInterpTypeRX\":3,\"locomotionShakeLandingIntensityRY\":0.003,\"aggressiveRidingMode\":false,\"locomotionShakeLandingFrequencyRY\":4,\"locomotionShakeLandingInterpTypeRY\":2,\"locomotionShakeLandingIntensityRZ\":0.005,\"locomotionShakeLandingFrequencyRZ\":4,\"locomotionShakeLandingInterpTypeRZ\":3,\"locomotionShakeHardLandingMasterIntensity\":1,\"locomotionShakeHardLandingMasterFrequency\":1,\"locomotionShakeHardLandingIntensityX\":0.005,\"locomotionShakeHardLandingFrequencyX\":3,\"baseFOV\":67.672747970764,\"locomotionShakeHardLandingInterpTypeX\":2,\"dynamicSteeringSensitivityMode\":false,\"locomotionShakeHardLandingIntensityY\":0.008,\"responsiveDrivingMode\":false,\"originalOnFootShakePreset\":\"default\",\"locomotionShakeHardLandingFrequencyY\":3,\"weaponFistsShakeInterpTypeRY\":2,\"reloadCameraWhileADS\":false,\"locomotionShakeHardLandingInterpTypeY\":3,\"immersiveADSPistols\":true,\"locomotionShakeHardLandingIntensityZ\":0.012,\"damageShakeIntensityRX\":0.015,\"originalCrashShakePreset\":\"default\",\"locomotionShakeHardLandingFrequencyZ\":3,\"reloadCameraFOV\":0,\"damageShakeInterpTypeRX\":3,\"locomotionShakeHardLandingInterpTypeZ\":2,\"onFootShakeMasterFrequency\":1,\"locomotionShakeHardLandingIntensityRX\":0.015,\"crashShakeIntensityRY\":0.008,\"crashShakeIntensityZ\":0.01,\"locomotionShakeHardLandingFrequencyRX\":3,\"locomotionShakeMasterFrequency\":1,\"responsiveDrivingSpeedDampening\":false,\"locomotionShakeHardLandingInterpTypeRX\":3,\"cornerLookAheadMode\":false,\"locomotionShakeHardLandingIntensityRY\":0.005,\"cornerLookAheadYaw\":0.69813170079773,\"shakeFocalDistance\":50,\"cornerLookAheadRoll\":15,\"shakeBikeMaxSpeed\":200,\"cornerLookAheadInterpolationDuration\":4,\"locomotionShakeHardLandingInterpTypeRY\":2,\"shakeSpeedCurve\":\"exponential\",\"locomotionShakeHardLandingIntensityRZ\":0.008,\"shakeIntensityX\":0.0020000000949949,\"shakeIntensityY\":0.0010000000474975,\"shakeIntensityZ\":0.0020000000949949,\"shakeIntensityRX\":0.0099999997764826,\"shakeIntensityRY\":0.0010000000474975,\"shakeIntensityRZ\":0.0099999997764826,\"shakeFrequencyX\":0.61000001430511,\"shakeFrequencyY\":3.7599999904633,\"shakeFrequencyZ\":1.0299999713898,\"shakeFrequencyRX\":2.2,\"shakeFrequencyRY\":4.4800000190735,\"shakeFrequencyRZ\":1.3300000429153,\"shakeInterpTypeX\":13,\"shakeInterpTypeY\":13,\"shakeInterpTypeZ\":13,\"shakeInterpTypeRX\":2,\"shakeInterpTypeRY\":13,\"locomotionShakeDodgeFrequencyX\":4,\"shakeLookAtConstraint\":true,\"shakeConstraintStrength\":0.95,\"locomotionShakeDodgeInterpTypeX\":2,\"immersiveADSOnHotkey\":false,\"locomotionShakeDodgeIntensityY\":0.005,\"immersiveADSHotkeyToggle\":false,\"vehicleWeaponFOV\":false,\"aggressiveMinSpeed\":20,\"aggressiveMaxSpeed\":75,\"aggressiveYPosLow\":0.05,\"aggressiveYPosHigh\":0.1,\"aggressiveZPosLow\":-0.03,\"aggressiveZPosHigh\":-0.06,\"aggressiveSpeedTransitionDuration\":0.8,\"aggressiveTurnResetDuration\":0.8,\"aggressiveTurnTransitionDuration\":2,\"aggressiveTurnEaseInDuration\":2.5,\"turnModifierPitch\":-5.7,\"turnModifierRoll\":-17.189,\"turnModifierHorizontalOffset\":0.15,\"turnModifierVertOffset\":-0.075,\"turnModifierDepthOffset\":-0.3,\"onFootShakeIntensityRY\":0.002,\"immersiveADSAutomatic\":false,\"responsiveDrivingHorizontalOffset\":-0.10000000149012,\"responsiveDrivingInterpolationDuration\":1,\"responsiveDrivingMaxSpeed\":75,\"responsiveDrivingMinSpeed\":10,\"responsiveDrivingResetDuration\":0.6,\"responsiveDrivingRoll\":5.73,\"responsiveDrivingVerticalOffset\":-0.015,\"responsiveDrivingPitch\":-4.384,\"responsiveDrivingYaw\":-2.257,\"responsiveDrivingMaxSpeedScale\":0.25,\"responsiveDrivingScaleWithSensitivity\":false,\"damageShakePresetModified\":false,\"adsDuration\":0.2,\"freeLookRestoreCurve\":\"OutQuad\",\"locomotionShakeHardLandingFrequencyRY\":3,\"weaponInVehicleFOVMode\":\"none\",\"weaponFistsShakeDuration\":0.25,\"useWeaponPresetInVehicle\":false,\"weaponFistsShakeRecoilDepth\":1,\"adsResetCameraFOV\":false,\"onFootShakeInterpTypeY\":3,\"adsResetCameraXPosition\":true,\"weaponFistsShakeRecoilKick\":1,\"adsResetCameraYPosition\":true,\"weaponAutomaticShakeIntensity\":0.3,\"adsResetCameraZPosition\":true,\"locomotionShakeJumpEnabled\":true,\"weaponAutomaticShakeDuration\":0.25,\"resetCameraOnVault\":true,\"shakeMasterIntensity\":1,\"weaponAutomaticShakeRecoilDepth\":1,\"immersiveCameraRestoreDuration\":0.5,\"shakePreset\":\"vibrations\",\"weaponAutomaticShakeRecoilKick\":1.2,\"bikePresetModified\":false,\"bikeShakePreset\":\"vibrations\",\"weaponRiflesShakeIntensity\":0.3,\"originalCarShakePreset\":\"vibrations\",\"carPresetModified\":false,\"weaponRiflesShakeDuration\":0.25,\"weaponPistolsShakeIntensityZ\":0.001,\"originalCarPassengerShakePreset\":\"Passenger\",\"passengerPresetModified\":false,\"carPassengerShakePreset\":\"Passenger\",\"weaponShotgunsShakeFrequencyRZ\":3.5,\"aggressiveRidingPreset\":\"racing\",\"shakeBikeMinSpeed\":15,\"responsiveDrivingPreset\":\"reactive\",\"damageShakeIntensityY\":0.004,\"weaponShotgunsShakeInterpTypeRZ\":3,\"cornerLookAheadMinSpeed\":10,\"locomotionShakeVaultEnabled\":true,\"weaponFistsShakeMasterFrequency\":1,\"locomotionShakeAirThrusterEnabled\":true,\"weaponFistsShakeFrequencyX\":4,\"weaponFistsShakeInterpTypeX\":2,\"onFootShakeIntensityZ\":0.002,\"weaponAutomaticShakeInterpTypeRY\":2,\"expandSliderRanges\":false,\"weaponFistsShakeIntensityZ\":0.001,\"damageShakeFrequencyRZ\":6,\"weaponFistsShakeFrequencyZ\":4,\"onFootShakeInterpTypeRY\":2,\"weaponAutomaticShakeIntensityRY\":0.003,\"alwaysFirstEquip\":false,\"weaponAutomaticShakeInterpTypeRX\":3,\"onFootShakeInterpTypeRZ\":3,\"damageShakeInterpTypeZ\":2,\"damageShakeMaxIntensity\":1.5,\"immersiveCameraFOVCurve\":\"Linear\",\"damageShakeMasterIntensity\":1,\"weaponFistsShakeFrequencyRY\":4,\"shakeCarMinSpeed\":25,\"modEnabled\":true,\"devSettingsSelectedCategory\":\"dynamic_fov\",\"devSettingsSplitterPercent\":0.18,\"resetCameraOnSlide\":true,\"cameraResetDuration\":0.35,\"weaponShotgunsShakePreset\":\"default\",\"reloadCameraEnabled\":false,\"originalWeaponFistsShakePreset\":\"default\",\"crashShakeMasterFrequency\":1,\"weaponPistolsShakeMasterFrequency\":1,\"reloadCameraHorizontal\":0,\"adsResetCameraXRotation\":true,\"reloadCameraVertical\":0.021,\"shakeMasterFrequency\":1,\"reloadCameraDepth\":-0.011,\"originalBikeShakePreset\":\"vibrations\",\"crashShakeIntensityRZ\":0.01,\"carShakePreset\":\"vibrations\",\"reloadCameraDuration\":0.45,\"reloadCameraRestoreDuration\":0.4,\"immersiveCameraCrouchMultLean\":1.5,\"crashShakeFrequencyRZ\":3,\"firstEquipCameraChance\":100,\"immersiveCameraLeanSpeed\":1,\"crashShakeInterpTypeRY\":2,\"immersiveCameraVerticalSpeed\":1,\"crashShakeInterpTypeRZ\":3,\"immersiveCameraDepthSpeed\":1,\"immersiveCameraProgressCurve\":\"Linear\",\"weaponFireShakeMasterIntensity\":1,\"immersiveCameraPitchOffset\":30,\"weaponFireShakeMasterFrequency\":1,\"immersiveCameraMaxPitch\":-90,\"fovBikeMaxIncreasePercent\":0.35,\"immersiveCameraLean\":-5,\"weaponPistolsShakeDuration\":0.25,\"weaponPistolsShakeRecoilDepth\":1.2,\"locomotionShakeLandingIntensityY\":0.005,\"locomotionShakeMasterIntensity\":1,\"shakeGlobalIntensityCap\":3,\"damageShakeFrequencyRX\":6,\"locomotionShakeJumpIntensity\":0.25,\"damageShakeInterpTypeX\":2,\"locomotionShakeHardLandingDuration\":0.5,\"immersiveCameraDepthCurve\":\"SineOut\",\"locomotionShakeHardLandingIntensity\":1.2,\"locomotionShakeDodgeIntensityZ\":0.008,\"locomotionShakeDodgeInterpTypeY\":3,\"locomotionShakeDodgeFrequencyY\":4,\"locomotionShakeHardLandingInterpTypeRZ\":3,\"locomotionShakeDodgeMasterFrequency\":1,\"locomotionShakeDodgeMasterIntensity\":1,\"shakeCarMaxSpeed\":300,\"cornerLookAheadResetDuration\":1,\"shakeSpeedSensitivity\":1,\"cornerLookAheadMaxSpeed\":120,\"cornerLookIntensityLow\":0.75,\"cornerLookIntensityHigh\":1,\"turnModifierTilt\":-5.73,\"dynamicSteeringMinSpeed\":10,\"dynamicSteeringMaxSpeed\":200,\"dynamicSteeringMaxSensitivity\":50,\"shakeInterpTypeRZ\":12,\"immersiveADSEnabled\":false,\"immersiveADSHotkeyDuration\":0.15,\"useImmersiveADSInVehicle\":true,\"immersiveADSRoll\":11.5,\"immersiveADSDepth\":0.15,\"weaponFireShakeEnabled\":false,\"weaponPistolsShakeIntensityRZ\":0.005,\"immersiveADSFOV\":0,\"crashShakeInterpTypeRX\":3,\"weaponPistolsShakeIntensityRX\":0.012,\"crashShakeFrequencyX\":3,\"locomotionShakeJumpInterpTypeY\":3,\"locomotionShakeJumpFrequencyY\":4,\"adsResetCameraYRotation\":true,\"locomotionShakeJumpInterpTypeX\":2,\"animationCameraModifierRequired\":false,\"weaponFistsShakePresetModified\":false,\"locomotionShakeJumpMasterIntensity\":1,\"weaponShotgunsShakePresetModified\":false,\"weaponRiflesShakePresetModified\":false,\"weaponFistsShakeFrequencyRZ\":4,\"weaponAutomaticShakePresetModified\":false,\"weaponFistsShakeIntensityRZ\":0.005,\"weaponPistolsShakePresetModified\":false,\"immersiveADSRifles\":false,\"vehicleCameraEnabled\":true,\"immersiveCameraCrouchMultY\":1.17,\"weaponCameraEnabled\":true,\"weaponFistsShakeFrequencyRX\":4,\"onFootCameraEnabled\":true,\"weaponFistsShakeIntensityRX\":0.012,\"tooltipsEnabled\":true,\"weaponFistsShakeInterpTypeZ\":2,\"scrollbarEnabled\":true,\"immersiveCameraFOVSpeed\":1,\"displayHorizontalFOV\":true,\"weaponAutomaticShakeFrequencyRY\":6,\"hideGuiInMenu\":false,\"shakeSeedX\":0.33933341140343,\"speedObserverThrottleEnabled\":false,\"locomotionShakeDodgeIntensityX\":0.003,\"weaponAutomaticShakeIntensityRZ\":0.005,\"speedObserverThrottleFrames\":6,\"weaponFistsShakeIntensityX\":0.002,\"weaponAutomaticShakeFrequencyRZ\":6,\"locomotionShakeHardLandingFrequencyRZ\":3,\"windowGridEnabled\":true,\"weaponAutomaticShakeInterpTypeRZ\":3,\"windowAnimationEnabled\":true,\"weaponRiflesShakeMasterIntensity\":1,\"windowGridUnits\":2,\"immersiveADSShotguns\":false,\"weaponShotgunsShakeFrequencyRY\":3.5,\"weaponRiflesShakeMasterFrequency\":1,\"onFootShakeInterpTypeRX\":3,\"freeLookNaturalHeadDepth\":-0.08,\"weaponRiflesShakeIntensityX\":0.003,\"weaponShotgunsShakeFrequencyRX\":3.5,\"onFootShakeFrequencyY\":1.8,\"weaponRiflesShakeFrequencyX\":4,\"onFootShakeFrequencyX\":1.8,\"onFootShakeIntensityRZ\":0.003,\"weaponRiflesShakeInterpTypeX\":2,\"onFootShakeIntensityRX\":0.008,\"weaponRiflesShakeIntensityY\":0.006,\"onFootShakeIntensityY\":0.006,\"onFootShakeIntensityX\":0.003,\"weaponRiflesShakeFrequencyY\":4,\"locomotionShakeLandingMasterFrequency\":1,\"locomotionShakeJumpInterpTypeRZ\":3,\"weaponRiflesShakeInterpTypeY\":3,\"crashShakePreset\":\"default\",\"weaponRiflesShakeIntensityZ\":0.002,\"weaponRiflesShakePreset\":\"default\",\"weaponAutomaticShakePreset\":\"default\",\"weaponRiflesShakeFrequencyZ\":4},\"version\":\"1.14.0\",\"cameraSettings\":{\"cameraXPosition\":0,\"steeringSensitivity\":100,\"cameraYRotation\":0,\"cameraZRotation\":0,\"cameraZPosition\":0,\"cameraFOV\":67.672747970764,\"cameraYPosition\":0,\"cameraXRotation\":0},\"format_version\":2,\"cameraSettingsTPP\":{\"cameraZoom\":30,\"cameraFOV\":70}}",
       "Sha256": "8938db677022a92ec5ec4047c40aa0df1899068007797a0097f07448a70375ba"
-    },
-    {
-      "Id": "defaults-hotline",
-      "ModId": "15-NCPDHotline",
-      "Version": "3.1.11",
-      "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/mod_user_settings.json",
-      "Format": "json",
-      "Section": null,
-      "Content": "{\"enableAutoMode\":false,\"useOpenHubCallTrigger\":true,\"lastLanguageSelected\":\"pt-br\",\"fileName\":\"mod_user_settings.json\",\"showWelcomeShard\":true}",
-      "Sha256": "80f7354d581cc754b76aa580eb0affe0b9b9f93e4ce7a5b53e4b7dfdbf509b68"
     }
   ]
 }

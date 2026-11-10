@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -10,17 +10,91 @@ internal sealed partial class GeneralModWindow {
     Button primaryAction;
     enum ModAction { None, Disable, ChooseDependency, Enable, Change, Install, Download }
 
+    static bool IsBigBody(GeneralModEntry mod) {
+        return mod.AlternativeGroup==GeneralModLibrary.BodyGroup&&mod.Id!=GeneralModLibrary.VanillaFeetId;
+    }
+
+    string ModDisplayName(GeneralModEntry mod) {
+        if(!IsBigBody(mod))return mod.Name;
+        GeneralAlternativeGroup group;
+        return state.List.AlternativeGroups.TryGetValue(GeneralModLibrary.BodyGroup,out group)
+            ?group.DisplayName??"Big Body":"Big Body";
+    }
+
+    GeneralModEntry BigBodyRepresentative(IEnumerable<GeneralModEntry> entries) {
+        var body=entries.Where(IsBigBody).ToList();
+        string preferred=state.BodyChoice==GeneralModLibrary.NaturalBody?GeneralModLibrary.EbbBody:state.BodyChoice;
+        return body.FirstOrDefault(mod=>mod.Id==preferred)??body.FirstOrDefault(IsActiveAlternative)??body.FirstOrDefault();
+    }
+
+    List<Work> BigBodyVersions(IEnumerable<GeneralModEntry> entries,bool dlc) {
+        var versions=new List<Work>();
+        foreach(var entry in entries.Where(IsBigBody)){
+            var variant=Selected(entry);
+            if(!IsActiveAlternative(entry)&&!state.ChosenVariants.ContainsKey(entry.Id))
+                variant=entry.Variants.FirstOrDefault(option=>option.Id==(dlc?"with-refit-dlc":"with-refit-base"))??variant;
+            if(!dlc&&variant.Id=="with-refit-dlc")
+                variant=entry.Variants.FirstOrDefault(option=>option.Id=="with-refit-base")??variant;
+            versions.Add(new Work{Entry=entry,Variant=variant,BodyChoice=entry.Id,SwitchAlternatives=true,SaveVariant=true});
+            // EBBN is a shape in the EBB + RB archive. A separate choice keeps the shared files under one owner.
+            if(entry.Id==GeneralModLibrary.EbbBody)
+                versions.Add(new Work{Entry=entry,Variant=variant.NaturalOption??variant,BodyChoice=GeneralModLibrary.NaturalBody,SwitchAlternatives=true,SaveVariant=true});
+        }
+        return versions.OrderBy(work=>work.BodyChoice==GeneralModLibrary.NaturalBody?2:work.BodyChoice==GeneralModLibrary.PushBody?1:0).ToList();
+    }
+
+        static string BodyChoiceLabel(Work work){
+        return BodyChoiceLabel(work.BodyChoice)??work.Variant.Name;
+    }
+
+    static string BodyChoiceLabel(string choice){
+        return choice==GeneralModLibrary.NaturalBody?"EBBN + RB":choice==GeneralModLibrary.PushBody?"EBBP + RB":choice==GeneralModLibrary.EbbBody?"EBB + RB":null;
+    }
+
+    string ActiveBodyChoice(GeneralModEntry entry){
+        return entry.Id==GeneralModLibrary.EbbBody&&state.BodyChoice==GeneralModLibrary.NaturalBody
+            ?GeneralModLibrary.NaturalBody:entry.Id;
+    }
+
+    void SelectBodyChoice(Work choice){
+        if(working||scanning||state.BodyChoice==choice.BodyChoice)return;
+        state.BodyChoice=choice.BodyChoice;
+        if(projectDraft==null)Persist();
+        else FinishProjectEdit();
+        DrawRows();
+        var row=grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(candidate=>candidate.Visible&&
+            candidate.Tag is Work&&((Work)candidate.Tag).BodyChoice==choice.BodyChoice);
+        if(row!=null)grid.CurrentCell=row.Cells["Name"];
+    }
+
     List<Work> SelectedJobs() {
         var jobs = Marked();
-        if (jobs.Count == 0 && FocusedEntry() != null) jobs.Add(MakeWork(FocusedEntry()));
+        var focused=FocusedEntry();
+        if(jobs.Count==0){
+            var child=grid.CurrentRow==null?null:grid.CurrentRow.Tag as Work;
+            if(focused!=null)jobs.Add(MakeWork(focused));
+            else if(child!=null&&child.BodyChoice!=null&&child.BodyChoice==state.BodyChoice)jobs.Add(child);
+        }
+        int index=jobs.FindIndex(work=>IsBigBody(work.Entry));
+        if(index>=0){
+            var entry=jobs[index].Entry;
+            var chosen=BigBodyVersions(new[]{entry},IsCyberpunk(state.Destination)&&GameEdition.HasPL(state.Destination))
+                .Single(work=>work.BodyChoice==ActiveBodyChoice(entry));
+            jobs[index]=chosen;
+            jobs.RemoveAll(work=>work.Entry.Id==GeneralModLibrary.VanillaFeetId||
+                chosen.Entry.Id!=GeneralModLibrary.EbbBody&&work.Entry.Id==GeneralModLibrary.EclipseTattooId);
+        }
         return jobs;
     }
 
     ModAction ActionFor(Work work, HashSet<string> selectedIds) {
-        if(GeneralModLibrary.NeedsDependencyVersion(work.Entry,work.Variant))return ModAction.ChooseDependency;
+
         string status;
         statuses.TryGetValue(work.Key, out status);
+        if(status==GeneralStatusPresentation.NexusManual)return ModAction.None;
+        if(GeneralModLibrary.NeedsDependencyVersion(work.Entry,work.Variant))return ModAction.ChooseDependency;
         bool active = GeneralStatusPresentation.Kind(status) == "installed";
+
         if (active) {
             if (work.Variant.CyberpunkId == null || !Recipe(work).Immutable) return ModAction.Disable;
             return ModAction.None;
@@ -49,7 +123,7 @@ internal sealed partial class GeneralModWindow {
         var actions = jobs.Select(work => new { Work = work, Action = ActionFor(work, ids) }).ToList();
         var command = actions.Count == 0 ? ModAction.None : actions.Max(item => item.Action);
         actionable = actions.Where(item => command == ModAction.Download
-            ? item.Action == ModAction.Download || item.Action == ModAction.Install
+            ? item.Action == ModAction.Download || item.Action == ModAction.Install || item.Work.BodyChoice!=null&&item.Action==ModAction.Change
             : command != ModAction.None && item.Action == command).Select(item => item.Work).ToList();
         return command;
     }
@@ -99,12 +173,12 @@ internal sealed partial class GeneralModWindow {
         bool cyberpunk = IsCyberpunk(root);
         var allFiles = Snapshot(root).ProjectDeletionFiles().ToList();
         var fixedIds = new HashSet<string>(jobs.Select(work => work.Variant.CyberpunkId).Where(id => id != null), StringComparer.Ordinal);
-        if (!cyberpunk) {
-            foreach (var file in Generic(root).ProjectDeletionFiles()) {
-                file.OwnerKeys = file.OwnerKeys.Select(WorkKeyFromReceipt).Distinct().ToList();
-                allFiles.Add(file);
-            }
-        } else {
+        var routedIds = new HashSet<string>(jobs.Where(work=>work.Variant.InstallRoutes.Count>0).Select(work=>work.Variant.CyberpunkId),StringComparer.Ordinal);
+        foreach (var file in Generic(root).ProjectDeletionFiles()) {
+            file.OwnerKeys = file.OwnerKeys.Select(WorkKeyFromReceipt).Distinct().ToList();
+            allFiles.Add(file);
+        }
+        if (cyberpunk) {
             var importOwners = state.CyberpunkImports.ToLookup(item => item.Value, item => WorkKeyFromReceipt(item.Key), StringComparer.Ordinal);
             var imports = Cyberpunk(root).ProjectDeletionFiles(null).ToList();
             foreach (var file in imports) {
@@ -114,8 +188,9 @@ internal sealed partial class GeneralModWindow {
                 allFiles.Add(file);
             }
             var fixedWork = jobs.Where(work => work.Variant.CyberpunkId != null).ToLookup(work => work.Variant.CyberpunkId);
+            bool stockEquipment = EquipmentExOptions.StockActive(catalog, root);
             foreach (var package in catalog.Packages) {
-                var recipe = package;
+                var recipe = EquipmentExOptions.Available(package) && stockEquipment ? EquipmentExOptions.Resolve(package,EquipmentExOptions.StockId) : package;
                 if (package.Id == NightCityDensity.ModId) {
                     var density = NightCityDensity.Read(package, root);
                     if (!density.CanApply && !fixedIds.Contains(package.Id)) continue;
@@ -124,14 +199,14 @@ internal sealed partial class GeneralModWindow {
                 }
                 var files = recipe.Files.Where(file => !file.UserData).ToList();
                 if (!files.Any(file => File.Exists(Safe.In(root, file.Path)))) continue;
-                if (!fixedIds.Contains(package.Id) && FixedData.Expand(catalog, package.Dependencies).Any(dep => fixedIds.Contains(dep.Id)))
+                if (!fixedIds.Contains(package.Id) && FixedData.Expand(catalog, recipe.Dependencies,stockEquipment).Any(dep => fixedIds.Contains(dep.Id)))
                     throw new IOException(T("Ainda usado por: ", "Still used by: ") + package.Name);
                 foreach (var file in files) {
                     string target = Safe.In(root, file.Path);
                     if (!File.Exists(target)) continue;
                     long size = new FileInfo(target).Length;
                     string hash = file.Sha256;
-                    bool owned = !recipe.Immutable && fixedIds.Contains(package.Id);
+                    bool owned = !recipe.Immutable && fixedIds.Contains(package.Id) && !routedIds.Contains(package.Id);
                     if (owned) {
                         hash = Safe.Hash(target);
                         if (!FpvCustomization.MatchesFile(file, size, hash))
@@ -142,6 +217,16 @@ internal sealed partial class GeneralModWindow {
                         OwnerKeys = owned ? fixedWork[package.Id].Select(work => work.Key).ToList() : new List<string> { package.Id }
                     });
                 }
+            }
+            foreach(var work in jobs.Where(work=>IsBigBody(work.Entry)&&GeneralModLibrary.IsHystBody(work.Entry.Id))){
+                if(allFiles.Any(file=>file.OwnerKeys.Contains(work.Key)))continue;
+                var verified=new List<InstalledSnapshotFile>();
+                var known=seed.Mods.FirstOrDefault(mod=>mod.Id==work.Entry.Id);
+                var active=InstalledSnapshot.DetectManualHyst(root,work.Entry,known,verified);
+                if(active==null||active.Id!=work.Variant.Id)continue;
+                allFiles.AddRange(verified.Select(file=>new ProjectDeleteFile{
+                    Path=file.Path, Hash=file.Sha256, Size=file.Size, Owned=true, OwnerKeys=new List<string>{work.Key}
+                }));
             }
         }
 
@@ -206,10 +291,11 @@ internal sealed partial class GeneralModWindow {
                             CheckHystBody(work, root);
                         if (work.Variant.CyberpunkId != null) {
                             var recipe = Recipe(work);
+                            if (EquipmentExOptions.Available(recipe)) recipe = ProfileRecipe(work);
                             if (GameEdition.NeedsPL(recipe) && !GameEdition.HasPL(root))
                                 throw new IOException(T("Requer Phantom Liberty.", "Requires Phantom Liberty."));
                             var batch = new HashSet<string>(jobs.Select(item => item.Variant.CyberpunkId), StringComparer.Ordinal);
-                            var missing = FixedData.Expand(catalog, recipe.Dependencies).FirstOrDefault(dependency =>
+                            var missing = FixedData.Expand(catalog, recipe.Dependencies,EquipmentExOptions.StockActive(catalog,root)).FirstOrDefault(dependency =>
                                 !batch.Contains(dependency.Id) && !FixedData.Scan(dependency, root).IsCorrect);
                             if (missing != null) throw new IOException(T("Ative primeiro: ", "Enable first: ") + missing.Name);
                         }
@@ -234,13 +320,16 @@ internal sealed partial class GeneralModWindow {
             foreach (var work in group) state.SnapshotReceipts.Remove(work.Key);
         }
         var standard = jobs.Except(snapshots).ToList();
-        var fixedIds = standard.Where(work => work.Variant.CyberpunkId != null && !disabled.Contains(work.Key))
+        var fixedIds = standard.Where(work => work.Variant.CyberpunkId != null && work.Variant.InstallRoutes.Count==0 && !disabled.Contains(work.Key))
             .Select(work => work.Variant.CyberpunkId).Distinct().ToArray();
         if (fixedIds.Length > 0) {
             if (!IsCyberpunk(root)) throw new IOException(T("Selecione a pasta do Cyberpunk 2077.", "Select the Cyberpunk 2077 folder."));
             notes.Add(Cyberpunk(root).DeactivateMany(fixedIds, Report, keepBackup: false));
         }
         bool cyberpunk = IsCyberpunk(root);
+        foreach(var work in standard.Where(item=>item.Variant.CyberpunkId!=null&&item.Variant.InstallRoutes.Count>0))
+            using(Cyberpunk(root).LockForRouteChange())
+                notes.Add(Generic(root).Remove(work.Receipt(0),disabled.Contains(work.Key),null,preserveExternal));
         foreach (var work in standard.Where(item => item.Variant.CyberpunkId == null)) {
             for (int index = work.Variant.Sources.Count - 1; index >= 0; index--) {
                 string key = work.Receipt(index);
@@ -265,8 +354,7 @@ internal sealed partial class GeneralModWindow {
             if(String.IsNullOrWhiteSpace(other.Destination)||!Directory.Exists(other.Destination))continue;
             string peerData=projectStore.DataPath(peer);
             var files=new InstalledSnapshotInstaller(other.Destination,peerData,catalog).ProjectDeletionFiles(true);
-            if(!IsCyberpunk(other.Destination))
-                files=files.Concat(new GeneralModInstaller(other.Destination,Path.Combine(peerData,"Instalacoes")).ProjectDeletionFiles(true));
+            files=files.Concat(new GeneralModInstaller(other.Destination,Path.Combine(peerData,"Instalacoes")).ProjectDeletionFiles(true));
             foreach(var file in files.Where(file=>GeneralInstallRoutes.External(file.Path)))
                 result.Add(GeneralInstallRoutes.Resolve(other.Destination,file.Path));
         }
@@ -283,6 +371,20 @@ internal sealed partial class GeneralModWindow {
                     return GeneralStatusPresentation.Kind(status) == "installed" || status == GeneralStatusPresentation.ManualBody;
                 });
             if (conflict != null) found.Add(conflict);
+        }
+        if(IsBigBody(incoming.Entry)){
+            var feet=state.List.Mods.FirstOrDefault(entry=>entry.Id==GeneralModLibrary.VanillaFeetId);
+            if(feet!=null){
+                var existing=MakeWork(feet);
+                if(GeneralStatusPresentation.Kind(Status(existing,root))=="installed")found.Add(existing);
+            }
+        }
+        if(IsBigBody(incoming.Entry)&&incoming.Entry.Id!="hyst-ebb-rb"&&found.Any(old=>old.Entry.Id=="hyst-ebb-rb")){
+            var eclipse=state.List.Mods.FirstOrDefault(entry=>entry.Id==GeneralModLibrary.EclipseTattooId);
+            if(eclipse!=null){
+                var tattoo=MakeWork(eclipse);
+                if(GeneralStatusPresentation.Kind(Status(tattoo,root))=="installed")found.Add(tattoo);
+            }
         }
         return found;
     }

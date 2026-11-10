@@ -27,7 +27,8 @@ public sealed partial class FixedInstaller {
             }
             if(present.Count==0)return "Os complementos selecionados não estão instalados. Nada foi alterado."+baseNote;
             var removing=new HashSet<string>(present.Select(m=>m.Id),StringComparer.Ordinal);
-            var outside=catalog.Packages.Where(m=>!selected.Contains(m.Id)&&FixedData.Expand(catalog,new[]{m.Id}).Any(d=>removing.Contains(d.Id)))
+            bool stockEquipment=EquipmentExOptions.StockActive(catalog,game);
+            var outside=catalog.Packages.Where(m=>!selected.Contains(m.Id)&&FixedData.Expand(catalog,new[]{m.Id},stockEquipment).Any(d=>removing.Contains(d.Id)))
                 .Where(m=>{var scan=FixedData.Scan(m,game);return scan.Correct+scan.Original+scan.Different>0||scan.State=="Não verificável";}).Select(m=>m.Name).ToList();
             if(outside.Count>0)throw new IOException("A seleção deixaria dependências faltando para: "+String.Join(", ",outside)+". Selecione esses mods também ou remova-os primeiro. Nenhum arquivo do lote foi removido.");
             if(!keepBackup){
@@ -50,7 +51,7 @@ public sealed partial class FixedInstaller {
             var receipt=new OnlineReceipt{Id=Guid.NewGuid().ToString("N"),CatalogId=catalog.Id,CreatedUtc=DateTime.UtcNow.ToString("o"),Status="desativando",Operation="deactivate",BackupLayout="flat-v1",Mods=present.Select(m=>m.Id).ToList()};
             string ledger=Safe.In(Data,receipt.Id+".json");Save(ledger,receipt);
             try {
-                BackupSaves(Safe.In(Data,"backups/"+receipt.Id+"/saves"));int moved=0;
+                BackupSaves();int moved=0;
                 foreach(var mod in present)foreach(var file in mod.Files.Where(f=>!f.UserData)) {
                     Closed();string source=Safe.In(game,file.Path);
                     if(!File.Exists(source)){if(Directory.Exists(source))throw new IOException("Uma pasta ocupa o arquivo do mod: "+file.Path);continue;}

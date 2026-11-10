@@ -1,4 +1,4 @@
-param([string]$VelopackBuildDirectory,[string]$NuGetPackages,[string]$DevelopmentBuildDirectory)
+﻿param([string]$VelopackBuildDirectory,[string]$NuGetPackages,[string]$DevelopmentBuildDirectory,[switch]$Dev)
 $ErrorActionPreference='Stop'
 if($VelopackBuildDirectory -and $DevelopmentBuildDirectory){throw 'Escolha uma edição para compilar.'}
 & (Join-Path $PSScriptRoot 'preparar-leitor.ps1')
@@ -26,6 +26,7 @@ $extensions += Join-Path $PSScriptRoot 'OnlineDiagnostics.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineDiagnosticsTests.cs'
 $extensions += Join-Path $PSScriptRoot 'HistoricalReceipts.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineRemoval.cs'
+$extensions += Join-Path $PSScriptRoot 'InstalledFileOwnership.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineExtraCleanup.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineExtraCleanupTests.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineRemovalTests.cs'
@@ -41,6 +42,7 @@ $extensions += Join-Path $PSScriptRoot 'OnlineBrowserDownloadProgressTests.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineUnifiedQueueTests.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineFacialInstallTests.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineUserDataTests.cs'
+$extensions += Join-Path $PSScriptRoot 'EquipmentExOptions.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineFPVCustom.cs'
 $extensions += Join-Path $PSScriptRoot 'VehicleCompatibility.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineFileApprovals.cs'
@@ -62,7 +64,7 @@ $extensions += Join-Path $PSScriptRoot 'OnlineDefaultsTests.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineDefaultsQueueTests.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineRemovedPackageTests.cs'
 $extensions += Join-Path $PSScriptRoot 'RetiredPackEntries.cs'
-$extensions += @('GeneralModLibrary.cs','GeneralInstallRoutes.cs','GeneralModLibraryV2Tests.cs','GeneralModDownload.cs','GeneralModInstaller.cs','GeneralModInstallerTests.cs','GeneralModEditor.cs','GeneralModAssociation.cs','DisabledMods.cs','GeneralModActions.cs','GeneralModWindow.cs','GeneralModRun.cs','GeneralModVerification.cs','GeneralModVerificationTests.cs','GeneralModTests.cs','GeneralModMenus.cs','GeneralModProgressTests.cs','GeneralModUiTests.cs','GeneralStyle.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
+$extensions += @('GeneralModLibrary.cs','GeneralInstallRoutes.cs','GeneralModLibraryV2Tests.cs','GeneralModDownload.cs','GeneralModInstaller.cs','GeneralRouteChanges.cs','GeneralModInstallerTests.cs','GeneralModEditor.cs','GeneralArchivePreview.cs','GeneralModAssociation.cs','DisabledMods.cs','GeneralModActions.cs','GeneralModWindow.cs','GeneralModRun.cs','GeneralModVerification.cs','GeneralModVerificationTests.cs','GeneralModTests.cs','GeneralModMenus.cs','GeneralModProgressTests.cs','GeneralModUiTests.cs','GeneralStyle.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += '/resource:'+(Join-Path $PSScriptRoot 'Assets\Jost.ttf')+',ModLoader.Jost.ttf'
 $extensions += Join-Path $PSScriptRoot 'BrowserDownloadBridge.cs'
 foreach($file in @('manifest.json','downloads.js')){
@@ -74,7 +76,7 @@ $extensions += '/resource:'+(Join-Path $PSScriptRoot 'Assets\Lucide.ttf')+',ModL
 $extensions += '/resource:'+(Join-Path $PSScriptRoot 'Assets\Lucide-LICENSE.txt')+',ModLoader.Lucide-LICENSE.txt'
 $extensions += Join-Path $PSScriptRoot 'GeneralFloatingTests.cs'
 $extensions += '/resource:'+(Join-Path $PSScriptRoot 'Assets\Jost-OFL.txt')+',ModLoader.Jost-OFL.txt'
-$extensions += @('GeneralRedesignTests.cs','GeneralScroll.cs','GeneralActionsMenu.cs','GeneralTableFilters.cs','GeneralTableDialogs.cs','GeneralTableDialogTests.cs','GeneralCategoryDeleteTests.cs','OnlineStorageTests.cs','OnlineStorageMaintenance.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
+$extensions += @('GeneralRedesignTests.cs','GeneralScroll.cs','GeneralActionsMenu.cs','GeneralTableFilters.cs','GeneralTableDialogs.cs','GeneralTableDialogTests.cs','GeneralCategoryDeleteTests.cs','OnlineStorageTests.cs','OnlineStorageMaintenance.cs','OnlineSaveBackups.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += @('GeneralP2PDeferred.cs','GeneralP2PDeferredTests.cs','GeneralP2PAcceptance.cs','GeneralP2PLifecycle.cs','GeneralP2PLifecycleTests.cs','GeneralP2PAutomaticTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += @('GeneralP2PPack.cs','GeneralP2PEngine.cs','P2PProcessJob.cs','GeneralP2PService.cs','GeneralSyncReview.cs','GeneralP2PDialog.cs','GeneralP2PTests.cs','GeneralP2PDiagnostics.cs','GeneralP2PDiagnosticDialog.cs','GeneralP2PDiagnosticTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += Join-Path $PSScriptRoot 'GeneralP2PUiTests.cs'
@@ -84,7 +86,7 @@ $extensions += @('GeneralBrand.cs','GeneralBrandTests.cs')|ForEach-Object {Join-
 $extensions += @('GeneralProjectStore.cs','GeneralProjectStoreTests.cs','GeneralProjectHome.cs','GeneralProjectHomeTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += @('GeneralMenuHost.cs','GeneralMenuHostTests.cs','GeneralPresetDraft.cs','GeneralPresetDraftTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += Join-Path $PSScriptRoot 'GeneralPopupStabilityTests.cs'
-$extensions += @('GeneralProjectDeletion.cs','GeneralProjectDeleteDialog.cs','GeneralProjectDeletionTests.cs','GeneralProjectsPanel.cs','GeneralProjectStorage.cs','GeneralNexusInfo.cs','GeneralProjectHubTests.cs','GeneralProjectHub.cs','GeneralAppPaths.cs','GeneralAppPathsTests.cs','GeneralStorageTests.cs','DownloadSourceIndex.cs','InstalledModpack.cs','GeneralNoCopyTests.cs','GeneralProjectCloneTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
+$extensions += @('GeneralProjectDeletion.cs','GeneralProjectDeleteDialog.cs','GeneralProjectDeletionTests.cs','GeneralProjectsPanel.cs','GeneralProjectStorage.cs','GeneralNexusInfo.cs','GeneralNexusManifest.cs','NexusManualScan.cs','InventoryLinkStore.cs','GeneralInventoryLinks.cs','InventoryLinkSuggestions.cs','InventoryLinkTests.cs','NexusManualScanTests.cs','GeneralProjectHubTests.cs','GeneralProjectHub.cs','GeneralAppPaths.cs','GeneralAppPathsTests.cs','GeneralStorageTests.cs','DownloadSourceIndex.cs','InstalledModpack.cs','GeneralNoCopyTests.cs','GeneralProjectCloneTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += @('ModVersionChoice.cs','ModVersionChoiceTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += @('GeneralAutomaticUpdate.cs','GeneralAutomaticUpdateTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += @('GeneralP2PSync.cs','NightCoopRelease.cs','NightCoopReleaseTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
@@ -107,8 +109,12 @@ if($VelopackBuildDirectory){
 }
 if($DevelopmentBuildDirectory){
     New-Item -ItemType Directory -Path $DevelopmentBuildDirectory -Force|Out-Null
-    $extensions+='/define:MODLOADER_DEV'
     $mainOutput=Join-Path $DevelopmentBuildDirectory 'LoaderDev.exe'
+}
+if($Dev -and !$VelopackBuildDirectory){throw 'Use -DevelopmentBuildDirectory para compilar o Dev portátil.'}
+if($Dev -or $DevelopmentBuildDirectory){
+    $extensions+='/define:MODLOADER_DEV'
+    if($Dev){$mainOutput=Join-Path $VelopackBuildDirectory 'LoaderDev.exe'}
 }
 & $compiler /nologo /target:winexe /main:OnlineProgram /platform:x64 /optimize+ /codepage:65001 ('/win32manifest:'+(Join-Path $shared 'app.manifest')) ('/out:'+$mainOutput) /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Core.dll /reference:System.Security.dll ('/reference:'+(Join-Path $framework 'System.Web.Extensions.dll')) ('/reference:'+(Join-Path $framework 'System.IO.Compression.dll')) ('/reference:'+(Join-Path $framework 'System.IO.Compression.FileSystem.dll')) (Join-Path $shared 'Installer.cs') (Join-Path $shared 'SelfTests.cs') (Join-Path $shared 'PackageIdentity.cs') (Join-Path $PSScriptRoot 'OnlineIdentity.cs') (Join-Path $PSScriptRoot 'OnlineCore.cs') (Join-Path $PSScriptRoot 'OnlineWindow.cs') (Join-Path $PSScriptRoot 'OnlineTests.cs') @extensions
 if($LASTEXITCODE -ne 0){throw 'Compilação falhou'}

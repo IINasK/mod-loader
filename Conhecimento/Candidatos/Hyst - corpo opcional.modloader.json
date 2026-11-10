@@ -10,14 +10,14 @@
     {
       "Id": "hyst-ebb-rb",
       "Name": "Hyst EBB + RB",
-      "Description": "Para V feminina. Busto menos projetado e quadril RB (Big Booty). Requer VTK Head 3.0+, ArchiveXL, Codeware e redscript. Há variantes com refits das roupas originais.",
+      "Description": "Para V feminina. Busto menos projetado e quadril RB (Big Booty). Requer VTK Head 3.0+, ArchiveXL, Codeware e redscript. O formato Natural (EBBN) já vem no corpo. Use o busto Grande e retire a roupa do torso para conferir o formato. Com roupa, a peça precisa oferecer o refit Natural. Há variantes com refits das roupas originais.",
       "Nsfw": true,
       "Category": "Melhorias do corpo",
       "DefaultVariant": "default",
       "Variants": [
         {
           "Id": "default",
-          "Name": "5.0.0 · Somente corpo",
+          "Name": "5.0.0 · Corpo com Natural (EBBN)",
           "Sources": [
             "https://www.nexusmods.com/cyberpunk2077/mods/4654?tab=files&file_id=170224"
           ],
