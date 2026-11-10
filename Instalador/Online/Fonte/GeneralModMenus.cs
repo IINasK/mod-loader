@@ -98,6 +98,7 @@ internal sealed partial class GeneralModWindow {
         if(String.Equals(state.Destination??"",destination,StringComparison.OrdinalIgnoreCase))return false;
         state.Destination=destination;
         gameInventory=new P2PSyncDifference[0];
+        nexusManual.Clear();
         statuses.Clear();statusDetails.Clear();progress.Clear();
         return true;
     }

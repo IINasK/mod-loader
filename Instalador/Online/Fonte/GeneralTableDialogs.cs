@@ -8,15 +8,16 @@ internal sealed class GeneralNameDialog : GeneralDialog {
     readonly TextBox input = new TextBox { Name = "NameInput", MaxLength = 120, Dock = DockStyle.Fill };
     internal string ResultName { get; private set; }
 
-    internal GeneralNameDialog(string title, string initialName,string description=null) : base(title) {
+    internal GeneralNameDialog(string title, string initialName,string description=null,string fieldLabel=null,int maxLength=120) : base(title) {
         ClientSize = new Size(500, description==null?220:300);
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(20, 8, 20, 20), ColumnCount = 1, RowCount = 3 };
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(description==null?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.Absolute,52));
         if(description!=null)layout.RowStyles.Add(new RowStyle(SizeType.Absolute,52));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.Controls.Add(GeneralModEditor.LabelFor(GeneralStyle.T("Nome *", "Name *")), 0, 0);
-        input.AccessibleName = GeneralStyle.T("Nome", "Name");
+        input.MaxLength=maxLength;
+        layout.Controls.Add(GeneralModEditor.LabelFor(fieldLabel??GeneralStyle.T("Nome *", "Name *")), 0, 0);
+        input.AccessibleName = fieldLabel??GeneralStyle.T("Nome", "Name");
         layout.Controls.Add(GeneralTableDialogLayout.Input(input), 0, 1);
         var commands = GeneralTableDialogLayout.Commands();
         var save = GeneralStyle.Button(GeneralStyle.T("Salvar", "Save"), () => {

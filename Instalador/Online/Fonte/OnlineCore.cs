@@ -92,10 +92,10 @@ public static class FixedData {
         var blocked=mods.FirstOrDefault(m=>!String.IsNullOrEmpty(m.BlockedReason));
         if(blocked!=null)throw new IOException(blocked.Name+" está retido: "+blocked.BlockedReason);
     }
-    public static List<FixedMod> Expand(FixedCatalog c,IEnumerable<string> selected) {
+    public static List<FixedMod> Expand(FixedCatalog c,IEnumerable<string> selected,bool stockEquipment=false) {
         var result=new List<FixedMod>(); var active=new HashSet<string>(); var done=new HashSet<string>();
         Action<string> visit=null;
-        visit=id=>{if(done.Contains(id))return;if(!active.Add(id))throw new IOException("Ciclo de dependências.");var m=c.Packages.SingleOrDefault(x=>x.Id==id);if(m==null)throw new IOException("Mod fora da lista fixa: "+(id??"<sem ID>")+". A referência não pertence ao catálogo desta versão.");foreach(string d in m.Dependencies)visit(d);active.Remove(id);done.Add(id);result.Add(NightCityDensity.Default(m));};
+        visit=id=>{if(done.Contains(id))return;if(!active.Add(id))throw new IOException("Ciclo de dependências.");var m=c.Packages.SingleOrDefault(x=>x.Id==id);if(m==null)throw new IOException("Mod fora da lista fixa: "+(id??"<sem ID>")+". A referência não pertence ao catálogo desta versão.");if(stockEquipment&&EquipmentExOptions.Available(m))m=EquipmentExOptions.Resolve(m,EquipmentExOptions.StockId);foreach(string d in m.Dependencies)visit(d);active.Remove(id);done.Add(id);result.Add(NightCityDensity.Default(m));};
         foreach(string id in selected)visit(id);return result;
     }
     public static ModScan Scan(FixedMod mod,string game,bool checkIncompatibilities=true,Func<string,string> readHash=null,bool logFiles=true) {
@@ -300,7 +300,7 @@ public sealed partial class FixedInstaller {
     void Closed(){if(fixture)return;foreach(var p in Process.GetProcessesByName("Cyberpunk2077")){p.Dispose();throw new IOException("Feche o jogo antes de instalar ou desfazer.");}}
     public string Install(IEnumerable<string> chosen,bool acceptPlan,Action<string> report,int failAfter=-1) {
         if(!acceptPlan)throw new IOException("Confirme o plano de instalação.");
-        var mods=FixedData.Expand(catalog,chosen).Select(m=>NightCityDensity.ForInstall(m,game)).ToList();if(mods.Count==0)throw new IOException("Marque pelo menos um mod.");
+        var ids=chosen.ToArray();var mods=FixedData.Expand(catalog,ids,!ids.Contains(EquipmentExOptions.ModId)&&EquipmentExOptions.StockActive(catalog,game)).Select(m=>NightCityDensity.ForInstall(m,game)).ToList();if(mods.Count==0)throw new IOException("Marque pelo menos um mod.");
         return InstallTransaction(mods,report,failAfter,false);
     }
     string InstallTransaction(List<FixedMod> mods,Action<string> report,int failAfter,bool localImport) {
@@ -384,6 +384,12 @@ public sealed partial class FixedInstaller {
         }
         bool disabling=r.Operation=="deactivate";
         if(r.BackupLayout!=null&&!(disabling?r.BackupLayout=="flat-v1":r.BackupLayout=="fpv-flat-v1"))throw new IOException("Formato de backup desconhecido no registro.");
+
+        if (r.Operation == EquipmentExOptions.Operation) {
+            EquipmentExOptions.ValidateReceipt(catalog, r);
+            foreach (var file in r.Files) Safe.In(game, file.Path);
+            return r;
+        }
         if(r.Operation=="density"){NightCityDensity.ValidateReceipt(catalog,r);return r;}
         if(r.Operation!=null&&r.Operation!="install"&&!disabling)throw new IOException("Operação desconhecida no registro.");
         var mods=HistoricalReceipts.Expand(catalog,r.Mods);
@@ -408,7 +414,7 @@ public sealed partial class FixedInstaller {
         }
     }
     string UndoReceipt(OnlineReceipt r,string ledger,Action<string> report) {
-        if(r.Operation=="density")return UndoDensity(r,ledger,report);
+        if(r.Operation=="density"||r.Operation==EquipmentExOptions.Operation)return UndoDensity(r,ledger,report);
         if(r.Operation=="deactivate"||r.Operation==ExtraResetOperation)return UndoDeactivation(r,ledger,report);
         int preserved=0;r.Status="desfazendo";Save(ledger,r);
         foreach(var f in r.Files.AsEnumerable().Reverse()){

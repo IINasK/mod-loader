@@ -26,7 +26,18 @@ public static partial class InstalledSnapshot {
         return paths.Take(2).Any(file=>File.Exists(Safe.In(root,HystArchiveRoot+file[0])));
     }
 
-    static GeneralModVariant ReadManualHyst(string root,GeneralModEntry mod,GeneralModEntry knownBody,bool includeDlc,List<InstalledSnapshotFile> files) {
+    internal static GeneralModVariant DetectManualHyst(string root,GeneralModEntry mod,GeneralModEntry knownBody,List<InstalledSnapshotFile> files=null,Func<string,string> hash=null) {
+        try {
+            if(!HasManualHystFiles(mod.Id,root))return null;
+            var verified=new List<InstalledSnapshotFile>();
+            var variant=ReadManualHyst(root,mod,knownBody,GameEdition.HasPL(root),verified,hash);
+            if(files!=null)files.AddRange(verified);
+            return variant;
+        }catch(IOException){return null;}
+        catch(UnauthorizedAccessException){return null;}
+    }
+
+    static GeneralModVariant ReadManualHyst(string root,GeneralModEntry mod,GeneralModEntry knownBody,bool includeDlc,List<InstalledSnapshotFile> files,Func<string,string> hash=null) {
         bool natural=mod.Id=="hyst-ebb-rb";
         if(HasManualHystFiles(natural?"hyst-ebbp-rb":"hyst-ebb-rb",root)||
             File.Exists(Safe.In(root,HystArchiveRoot+"Vanilla_ArchiveXL_FeetComponentsFV.archive")))
@@ -40,15 +51,15 @@ public static partial class InstalledSnapshot {
         if(variant==null||known==null||variant.CyberpunkId!=null||!variant.Sources.SequenceEqual(known.Sources,StringComparer.Ordinal))
             throw new IOException("A variante Hyst instalada manualmente não corresponde às fontes da versão no catálogo.");
         foreach(var file in paths.Take(dlcRefit?4:baseRefit?3:2))
-            files.Add(VerifiedManualHystFile(root,HystArchiveRoot+file[0],file[1]));
-        files.Add(VerifiedManualHystFile(root,HystScript,HystScriptHash));
+            files.Add(VerifiedManualHystFile(root,HystArchiveRoot+file[0],file[1],hash));
+        files.Add(VerifiedManualHystFile(root,HystScript,HystScriptHash,hash));
         return variant;
     }
 
-    static InstalledSnapshotFile VerifiedManualHystFile(string root,string relativePath,string expectedHash) {
+    static InstalledSnapshotFile VerifiedManualHystFile(string root,string relativePath,string expectedHash,Func<string,string> hash) {
         string path=Safe.In(root,relativePath);Safe.NoLinks(path);
         var info=new FileInfo(path);
-        if(!info.Exists||Safe.Hash(path)!=expectedHash)
+        if(!info.Exists||(hash??Safe.Hash)(path)!=expectedHash)
             throw new IOException("Arquivo do Hyst ausente ou diferente da versão conhecida: "+relativePath);
         return new InstalledSnapshotFile{Path=relativePath,Sha256=expectedHash,Size=info.Length,Kind="file"};
     }

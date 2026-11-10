@@ -65,7 +65,7 @@ internal sealed partial class GeneralModWindow {
             statusFilters!=null&&!statusFilters.Any(value=>StatusFilterKey(value)=="game-inventory"))
             return Enumerable.Empty<P2PSyncDifference>();
         var included=new HashSet<string>(state.List.Mods.SelectMany(mod=>mod.DetectedPaths),StringComparer.OrdinalIgnoreCase);
-        return gameInventory.Where(file=>!included.Contains(file.Path)&&
+        return DisplayedInventory().Where(file=>file.Kind=="found"&&!included.Contains(file.Path)&&
             (String.IsNullOrWhiteSpace(nameFilter)||(file.Mod??file.Path).IndexOf(nameFilter,StringComparison.CurrentCultureIgnoreCase)>=0)&&
             GeneralModSearch.Matches(searchTerms,file.Mod,file.Path,GameInventoryStatus));
     }
@@ -80,10 +80,10 @@ internal sealed partial class GeneralModWindow {
     bool ColumnAllows(GeneralModEntry mod){
         string raw=ListStatus(mod);
         return (categoryFilters==null||categoryFilters.Contains(mod.Category??""))&&
-            (variantFilters==null||variantFilters.Contains(Selected(mod).Name))&&(groupFilters==null||ModGroups(mod).Any(groupFilters.Contains))&&
+            (variantFilters==null||variantFilters.Contains(NexusVariantName(mod)))&&(groupFilters==null||ModGroups(mod).Any(groupFilters.Contains))&&
             (statusFilters==null||statusFilters.Any(value=>StatusFilterKey(value)==StatusFilterKey(GeneralStatusPresentation.Label(raw))))&&
             (String.IsNullOrWhiteSpace(nameFilter)||mod.Name.IndexOf(nameFilter,StringComparison.CurrentCultureIgnoreCase)>=0)&&
-            GeneralModSearch.Matches(searchTerms, new[]{mod.Nsfw?mod.Name+" NSFW Not Safe for Work":mod.Name,Selected(mod).Name,GeneralStatusPresentation.Label(raw)}
+            GeneralModSearch.Matches(searchTerms, new[]{mod.Nsfw?mod.Name+" NSFW Not Safe for Work":mod.Name,NexusVariantName(mod),GeneralStatusPresentation.Label(raw)}
                 .Concat(mod.Tags).Concat(ModGroups(mod)).ToArray());
     }
     void ShowColumnFilter(int column,bool groups=false){
@@ -103,16 +103,18 @@ internal sealed partial class GeneralModWindow {
         }
         if(column<1||column>3)return;
         string uncat=UncatName();
-        var values=column==1?new[]{uncat}.Concat(PresetCategories()).ToList():column==2?state.List.Mods.Select(mod=>Selected(mod).Name).Distinct().OrderBy(value=>value).ToList():
+        var values=column==1?new[]{uncat}.Concat(PresetCategories()).ToList():column==2?state.List.Mods.Select(NexusVariantName).Distinct().OrderBy(value=>value).ToList():
             new[]{T("Pendente","Pending"),T("Baixando","Downloading"),T("Download concluído","Download complete"),
                 T("Instalando","Installing"),T("Instalado","Installed"),
                 GeneralStatusPresentation.Label(GeneralStatusPresentation.OtherChoice),GeneralStatusPresentation.Label(GeneralStatusPresentation.ManualBody),
                 GeneralStatusPresentation.Label(GeneralStatusPresentation.Disabled),
                 GeneralStatusPresentation.Label(GeneralStatusPresentation.ChooseDependency),
                 T("Falha","Failed")}.ToList();
-        if(column==3&&gameInventory.Count>0)values.Add(GameInventoryStatus);
+        if(column==3&&gameInventory.Any(file=>file.Kind=="found"))values.Add(GameInventoryStatus);
         if(column==3&&statuses.Values.Contains(GeneralStatusPresentation.DetectedFiles))
             values.Add(GeneralStatusPresentation.Label(GeneralStatusPresentation.DetectedFiles));
+        if(column==3)foreach(var status in new[]{GeneralStatusPresentation.NexusManual,GeneralStatusPresentation.NexusAmbiguous})
+            if(statuses.Values.Contains(status))values.Add(GeneralStatusPresentation.Label(status));
         var current=column==1?categoryFilters:column==2?variantFilters:statusFilters;
         IEnumerable<string> selected=current==null?null:column==3?values.Where(value=>current.Any(item=>StatusFilterKey(item)==StatusFilterKey(value))):current.Select(value=>column==1&&value==""?uncat:value);
         using(var dialog=new GeneralColumnFilterDialog(column==1?T("Filtrar mods","Filter mods"):column==2?T("Filtrar variantes","Filter variants"):T("Filtrar situação","Filter status"),values,selected,nameFilter,column==1)){

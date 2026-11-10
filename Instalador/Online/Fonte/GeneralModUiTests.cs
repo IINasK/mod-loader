@@ -309,7 +309,11 @@ internal sealed partial class GeneralModWindow {
                             var groupName=AllControls(editor).OfType<TextBox>().Single(box=>box.Name=="AlternativeGroupName");
                             check(groupName.Visible&&groupName.MaxLength==18&&editor.GroupStyle.Color.StartsWith("#"),"Escolher outro mod libera o nome curto e a cor do grupo.");
                             var swatch=AllControls(editor).OfType<GeneralButton>().Single(button=>button.Name=="AlternativeGroupColor");
-                            check(swatch.Parent==groupName.Parent&&swatch.Left==groupName.Right&&swatch.ColorSwatch.HasValue&&
+                            var linked=AllControls(editor).OfType<Button>().Single(button=>button.Name=="AlternativeMod");
+                            var unlink=AllControls(editor).OfType<Button>().Single(button=>button.Name=="UnlinkAlternative");
+                            check(linked.Top==unlink.Top&&linked.Height==unlink.Height&&linked.Height==44,
+                                "Vincular e Desvincular ocupam a mesma linha compacta: "+linked.Bounds+" / "+unlink.Bounds);
+                            check(swatch.Parent==groupName.Parent&&swatch.Left==groupName.Right&&(swatch.ColorSwatch!=null)&&
                                 swatch.Bottom<=swatch.Parent.ClientSize.Height,"A amostra de cor fica dentro do campo do grupo.");
                             editor.AddRequiredMod(presetEntry);
                             var dependencies=AllControls(editor).OfType<FlowLayoutPanel>().Single(panel=>panel.Name=="DependencyChips");
@@ -317,8 +321,20 @@ internal sealed partial class GeneralModWindow {
                             check(chips.Count==2&&chips[0].Text==presetEntry.Name+" ×"&&chips[1].Name=="LinkDependency",
                                 "O vínculo vira um chip removível antes do botão de adicionar.");
                             var linkedScroll=AllControls(editor).OfType<GeneralScrollView>().Single(control=>control.Name=="ModEditorScroll");
-                            linkedScroll.ScrollTo(9999);Application.DoEvents();
-                            CaptureUi(editor,Path.Combine(root,"editor-dependencies-and-group.png"));
+                            linkedScroll.RefreshScroll();linkedScroll.ScrollTo(linkedScroll.Bar.Limit);Application.DoEvents();
+                            var groupBounds=groupName.RectangleToScreen(groupName.ClientRectangle);
+                            var bodyBounds=linkedScroll.RectangleToScreen(linkedScroll.ClientRectangle);
+                            check(Rectangle.Intersect(groupBounds,bodyBounds)==groupBounds&&
+                                dependencies.RectangleToScreen(dependencies.ClientRectangle).Top>=bodyBounds.Top,
+                                "Ao rolar até o fim, os vínculos e o grupo estão na área visível do editor: "+groupBounds+" / "+bodyBounds+
+                                " / "+dependencies.Bounds+" / "+linkedScroll.Content.Bounds+" / "+linkedScroll.Bar.Limit+".");
+                            var body=linkedScroll.Content;
+                            using(var bitmap=new Bitmap(body.Width,body.Height)){
+                                body.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));
+                                int top=Math.Max(0,-body.Top);
+                                using(var cropped=bitmap.Clone(new Rectangle(0,top,bitmap.Width,Math.Min(bitmap.Height-top,linkedScroll.Height)),bitmap.PixelFormat))
+                                    cropped.Save(Path.Combine(root,"editor-dependencies-and-group.png"));
+                            }
                             chips[0].PerformClick();
                             check(dependencies.Controls.OfType<Button>().Count()==1,"Remover um chip desfaz só aquela dependência.");
                             groupName.Text="Corpo leve";

@@ -84,26 +84,45 @@ public sealed partial class FixedInstaller {
         return paths;
     }
 
+    internal static string ModFolder(string path) {
+        foreach(string root in ExtraBundleRoots.Concat(ExtraFileRoots.Skip(1))) {
+            if(!InFolder(path,root))continue;
+            int child=path.IndexOf('/',root.Length+1);
+            return child<0?null:path.Substring(0,child);
+        }
+        return null;
+    }
+
+    internal IEnumerable<ModFileAnchor> CatalogAnchors() {
+        return catalog.Packages.SelectMany(mod=>NightCityDensity.KnownFiles(mod)
+            .Select(file=>new ModFileAnchor{Owner=mod.Id,Path=file.Path,Hash=file.Sha256}));
+    }
+
+    Dictionary<string,string> AssociatedExtras(IEnumerable<string> paths,IEnumerable<InstalledSnapshotFile> files) {
+        var anchors=files.Where(file=>file.Kind=="file").SelectMany(file=>file.Owners.Select(owner=>
+            new ModFileAnchor{Owner=owner.Split('/')[0],Path=file.Path,Hash=file.Sha256}));
+        return InstalledFileOwnership.FindAssociated(game,CatalogAnchors().Concat(anchors),ModFolder,paths);
+    }
     internal List<P2PSyncDifference> ReadUnlistedModFiles(IEnumerable<string> listedPaths) {
         var listed=new HashSet<string>(listedPaths,StringComparer.OrdinalIgnoreCase);
         var names=catalog.Packages.SelectMany(mod=>NightCityDensity.KnownFiles(mod).Select(file=>new{file.Path,mod.Name}))
             .GroupBy(item=>item.Path,StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group=>group.Key,group=>group.First().Name,StringComparer.OrdinalIgnoreCase);
-        return FindExtraPaths(true,false).Where(path=>SyncModPath(path)&&!listed.Contains(path)).Distinct(StringComparer.OrdinalIgnoreCase)
+        return FindExtraPaths(true,false).Where(path=>InstalledSnapshot.SafeGenericPath(path)&&!listed.Contains(path)).Distinct(StringComparer.OrdinalIgnoreCase)
             .Select(path=>new P2PSyncDifference{Kind="found",Path=path,Mod=names.ContainsKey(path)?names[path]:SyncExtraName(path)})
             .ToList();
     }
 
     internal List<OwnedChange> PlanExtraReset() {
-        return FindExtraPaths().Select(path => new OwnedChange { Path=path, Before=Safe.Hash(Safe.In(game,path)) }).ToList();
+        return FindExtraPaths().Where(path=>!RetiredPackEntries.LocalDronePath(path)&&!InstalledFileOwnership.PrivateState(path)).Select(path => new OwnedChange { Path=path, Before=Safe.Hash(Safe.In(game,path)) }).ToList();
     }
 
     internal static bool SyncModPath(string path) {
-        return !String.IsNullOrEmpty(path)&&ExtraFilePath(path)&&InstalledSnapshot.SafeGenericPath(path);
+        return !String.IsNullOrEmpty(path)&&!RetiredPackEntries.LocalDronePath(path)&&!InstalledFileOwnership.PrivateState(path)&&ExtraFilePath(path)&&InstalledSnapshot.SafeGenericPath(path);
     }
 
     static bool SyncBundlePath(string path) {
-        return !String.IsNullOrEmpty(path)&&InstalledSnapshot.SafeGenericPath(path)&&ExtraBundleRoots.Any(root=>
+        return !String.IsNullOrEmpty(path)&&!RetiredPackEntries.LocalDronePath(path)&&InstalledSnapshot.SafeGenericPath(path)&&ExtraBundleRoots.Any(root=>
             InFolder(path,root)&&path.IndexOf('/',root.Length+1)<0);
     }
 
@@ -127,9 +146,12 @@ public sealed partial class FixedInstaller {
         }
     }
 
-    internal Dictionary<string,string> ReadSyncInventory(IEnumerable<string> packagePaths,Action checkpoint=null) {
-        var included=new HashSet<string>(packagePaths,StringComparer.OrdinalIgnoreCase);
-        var paths=FindExtraPaths(true).Where(path=>SyncModPath(path)&&!included.Contains(path)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    internal Dictionary<string,string> ReadSyncInventory(IReadOnlyCollection<InstalledSnapshotFile> packageFiles,Action checkpoint=null) {
+        var included=new HashSet<string>(packageFiles.Select(file=>file.Path),StringComparer.OrdinalIgnoreCase);
+        var candidates=FindExtraPaths(true);
+        var associated=AssociatedExtras(candidates,packageFiles);
+        var paths=candidates.Where(path=>SyncModPath(path)&&!included.Contains(path)&&!associated.ContainsKey(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var empty=EmptySyncBundles().ToArray();
         if(paths.Length+empty.Length>InstalledSnapshot.MaxFiles)throw new IOException("Há mods demais fora do pacote para comparar.");
         var result=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
@@ -144,7 +166,8 @@ public sealed partial class FixedInstaller {
             .SelectMany(mod=>mod.Variants).Select(variant=>variant.CyberpunkId).Where(id=>id!=null),StringComparer.Ordinal);
         if(available.Any(GeneralModLibrary.IsHystBody))
             unavailable.Remove(GeneralModLibrary.VanillaFeetId);
-        var protectedPaths=host.Files.Select(file=>file.Path).Concat(host.SyncGameInventory.Keys);
+        var protectedPaths=host.Files.Select(file=>file.Path).Concat(host.SyncGameInventory.Keys)
+            .Concat(AssociatedExtras(FindExtraPaths(true),host.Files).Keys);
         return new HashSet<string>(protectedPaths.Concat(catalog.Packages.Where(mod=>mod.Immutable||unavailable.Contains(mod.Id))
             .SelectMany(NightCityDensity.KnownFiles).Select(file=>file.Path)),StringComparer.OrdinalIgnoreCase);
     }

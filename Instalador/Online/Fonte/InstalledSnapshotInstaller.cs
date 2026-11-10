@@ -180,6 +180,16 @@ public sealed partial class InstalledSnapshotInstaller {
         var ids=new HashSet<string>(manifest.List.Mods.Select(m=>m.Id),StringComparer.Ordinal);
         var paths=new HashSet<string>(manifest.Files.Where(f=>f.Kind=="file").Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
         var obsolete=receipts.Where(r=>r.Status=="installed").SelectMany(r=>r.Manifest.Files.Where(f=>f.Kind=="file"&&f.Owners.Any(o=>r.ActiveOwners.Contains(o)&&ids.Contains(o.Split('/')[0]))&&!paths.Contains(f.Path))).Where(f=>File.Exists(Target(f.Path))||Directory.Exists(Target(f.Path))).Select(f=>f.Path).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var stock = manifest.List.Mods.SelectMany(mod => mod.Variants)
+            .FirstOrDefault(variant => variant.CyberpunkId == EquipmentExOptions.ModId && variant.CyberpunkVariant == EquipmentExOptions.StockId);
+        if (stock != null) {
+            var equipment = catalog.Packages.Single(recipe => recipe.Id == EquipmentExOptions.ModId);
+            var original = EquipmentExOptions.Resolve(equipment, EquipmentExOptions.StockId);
+            var stockPaths = new HashSet<string>(original.Files.Select(file => file.Path), StringComparer.OrdinalIgnoreCase);
+            if (equipment.Files.Any(file => !stockPaths.Contains(file.Path) && (File.Exists(Target(file.Path)) || Directory.Exists(Target(file.Path)))))
+                throw new IOException(GeneralStyle.T("O pacote usa Equipment-EX sem WEAVE. Troque para Original no Mod Loader e tente novamente.",
+                    "This pack uses Equipment-EX without WEAVE. Switch to Stock in Mod Loader and try again."));
+        }
         if(obsolete.Count>0)new ModVersionDifference{Name=manifest.Name,Current=GeneralStyle.T("Outra versão registrada","Another recorded version"),Incoming=manifest.Name,CanReplace=false,Detail=GeneralStyle.T("A versão anterior contém arquivos que não fazem parte do novo pacote. Remova a versão anterior pelo gerenciador para evitar misturar versões. Nada foi apagado.","The previous version contains files absent from the new pack. Remove the previous version through the manager to avoid mixing versions. Nothing was deleted.")+"\r\n"+String.Join("\r\n",obsolete.Take(6))}.Require(choose);
         var changed=manifest.Files.Where(f=>f.Kind=="file"&&!f.ReuseLocal).GroupBy(f=>f.Path,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()).Where(f=>File.Exists(Target(f.Path))&&HashOrNull(Target(f.Path))!=f.Sha256).ToList();
         var expected=changed.ToDictionary(f=>f.Path,f=>HashOrNull(Target(f.Path)),StringComparer.OrdinalIgnoreCase);

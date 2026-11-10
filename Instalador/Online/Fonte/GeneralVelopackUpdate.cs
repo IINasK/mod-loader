@@ -5,9 +5,23 @@ using Velopack;
 using Velopack.Sources;
 
 internal static class GeneralVelopackUpdate {
+    static UpdateManager Manager(){
+        string repository="https://github.com/"+GeneralUpdateChecker.Repository;
+#if MODLOADER_DEV
+        return new UpdateManager(new SimpleWebSource(repository+"/releases/download/dev-preview/",timeout:5d/60));
+#else
+        return new UpdateManager(new GithubSource(repository,null,false));
+#endif
+    }
+#if MODLOADER_DEV
+    internal static string InstalledVersion(){
+        try{var version=Manager().CurrentVersion;return version==null?null:version.ToString();}
+        catch(Exception){return null;}
+    }
+#endif
     internal static void CheckAtStartup(){
         try{
-            var updates=new UpdateManager(new GithubSource("https://github.com/"+GeneralUpdateChecker.Repository,null,false));
+            var updates=Manager();
             if(!updates.IsInstalled)return;
             var check=updates.CheckForUpdatesAsync();
             if(Task.WhenAny(check,Task.Delay(TimeSpan.FromSeconds(5))).GetAwaiter().GetResult()!=check){

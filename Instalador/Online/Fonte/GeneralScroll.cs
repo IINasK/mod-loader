@@ -57,7 +57,10 @@ internal sealed class GeneralScrollView : Panel {
         var grid=content as DataGridView;if(grid!=null){grid.ScrollBars=ScrollBars.None;grid.Scroll+=(s,e)=>Queue();grid.RowsAdded+=(s,e)=>Queue();grid.RowsRemoved+=(s,e)=>Queue();grid.RowStateChanged+=(s,e)=>{if((e.StateChanged&DataGridViewElementStates.Visible)!=0)Queue();};}
         var list=content as ListBox;if(list!=null){list.HorizontalScrollbar=false;list.IntegralHeight=false;}
         bar.Changed=ScrollTo;content.HandleCreated+=(s,e)=>Attach();content.HandleDestroyed+=(s,e)=>{if(events!=null)events.ReleaseHandle();};content.TextChanged+=(s,e)=>Queue();content.FontChanged+=(s,e)=>Queue();content.Resize+=(s,e)=>Queue();
-        if(fitPanelContent)content.Layout+=(s,e)=>{if(!refreshing)Queue();};
+        if(fitPanelContent){
+            content.Layout+=(s,e)=>{if(!refreshing)Queue();};
+            content.VisibleChanged+=(s,e)=>Queue();
+        }
         viewport.Resize+=(s,e)=>RefreshScroll();HandleCreated+=(s,e)=>Attach();if(content.IsHandleCreated)Attach();
     }
     void Attach(){if(!content.IsHandleCreated)return;if(events!=null)events.ReleaseHandle();events=new NativeEvents(this,content.Handle);Queue();}
@@ -68,8 +71,15 @@ internal sealed class GeneralScrollView : Panel {
             int total=0,page=1,value=0;
             var grid=content as DataGridView;var list=content as ListBox;var text=content as TextBox;
             if(panelContent){
-                int measureWidth = reserveBarSpace ? ClientSize.Width - bar.Width : viewport.ClientSize.Width;
-                total = fitPanelContent ? content.GetPreferredSize(new Size(Math.Max(1, measureWidth), 0)).Height : content.MinimumSize.Height;
+                total=content.MinimumSize.Height;
+                if(fitPanelContent){
+                    int widthForLayout=Math.Max(1,reserveBarSpace?ClientSize.Width-bar.Width:viewport.ClientSize.Width);
+                    if(content.Width!=widthForLayout)content.Width=widthForLayout;
+                    content.PerformLayout();
+                    // A spanning table cell can inflate preferred height. Measure the laid-out fields.
+                    total=content.Controls.Cast<Control>().Where(child=>child.Visible)
+                        .Select(child=>child.Bottom+child.Margin.Bottom).DefaultIfEmpty(0).Max()+content.Padding.Bottom;
+                }
                 bar.WheelUnit=Math.Max(1,content.Font.Height);
                 page = Math.Max(1, viewport.ClientSize.Height);
                 value = Math.Min(Math.Max(0, -content.Top), Math.Max(0, total - page));

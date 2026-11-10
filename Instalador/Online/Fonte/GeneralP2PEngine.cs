@@ -16,7 +16,7 @@ internal sealed class P2PInvite {
     public string Kind, Device, Folder, ManifestHash, Name, Mode;
     public long Size;
     public bool Deferred, Automatic;
-    public string SuggestedFolder, RelayDevice;
+    public string SuggestedFolder, RelayDevice, Game;
     public bool PrivateFolder;
 
     static readonly string[] PersonalParts={
@@ -48,6 +48,14 @@ internal sealed class P2PInvite {
             .Any(folder=>path.Equals(folder,StringComparison.OrdinalIgnoreCase)||path.StartsWith(folder+"\\",StringComparison.OrdinalIgnoreCase));
         SuggestedFolder=PrivateFolder?null:path;
     }
+    internal const string CyberpunkGame="cyberpunk2077";
+    internal static string CyberpunkFolder(string path){
+        if(String.IsNullOrWhiteSpace(path))return null;
+        try{
+            string folder=WindowsFolderPicker.InstallationPath(path);
+            return File.Exists(Safe.In(folder,"bin/x64/Cyberpunk2077.exe"))?folder:null;
+        }catch(IOException){return null;}catch(UnauthorizedAccessException){return null;}
+    }
     internal string LocalSuggestedFolder(){
         if(!FolderSyntax(SuggestedFolder)||HasPersonalParts(SuggestedFolder))return null;
         string current=SuggestedFolder.Substring(0,3);
@@ -72,6 +80,8 @@ internal sealed class P2PInvite {
     }
     internal void Validate(){
         if(Mode!=null&&Mode!="installed-zip")throw new IOException("Formato de compartilhamento desconhecido.");
+        if(Game!=null&&(Kind!="offer"||Mode!="installed-zip"||(Game!=CyberpunkGame&&Game!="generic")))
+            throw new IOException("Jogo desconhecido no convite.");
         if(RelayDevice!=null&&(Kind!="offer"||Mode!="installed-zip"||!DeviceValid(RelayDevice)))
             throw new IOException("Identidade de relay inválida no convite.");
         if((PrivateFolder||SuggestedFolder!=null)&&(Kind!="offer"||Mode!="installed-zip"||

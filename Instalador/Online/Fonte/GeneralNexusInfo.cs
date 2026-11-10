@@ -47,7 +47,7 @@ internal sealed class GeneralNexusRequirement {
     internal bool Nsfw;
 }
 
-internal static class GeneralNexusInfo {
+internal static partial class GeneralNexusInfo {
     const string ApiHost = "https://api.nexusmods.com";
     const string ApiKeyVariable = "MOD_LOADER_NEXUS_API_KEY";
     const int MaxResponse = 4 * 1024 * 1024;
@@ -198,21 +198,26 @@ internal static class GeneralNexusInfo {
     }
 
     static string ReadJson(string route, string key, out HttpStatusCode status) {
+        return ReadJsonUrl(new Uri(ApiHost+route),key,out status,8000);
+    }
+
+    static string ReadJsonUrl(Uri uri,string key,out HttpStatusCode status,int timeout,bool preview=false) {
         status = 0;
-        var request = (HttpWebRequest)WebRequest.Create(ApiHost + route);
+        var request = (HttpWebRequest)WebRequest.Create(uri);
         request.UserAgent = "ModLoader/" + GeneralUpdateChecker.CurrentVersion;
         request.Headers["Application-Name"] = "Mod Loader";
         request.Headers["Application-Version"] = GeneralUpdateChecker.CurrentVersion;
         if (key != null) request.Headers["apikey"] = key;
         request.Accept = "application/json";
         request.AllowAutoRedirect = false;
-        request.Timeout = request.ReadWriteTimeout = 8000;
+        request.Timeout = request.ReadWriteTimeout = timeout;
         request.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
         try {
             using (var response = (HttpWebResponse)request.GetResponse()) {
                 status = response.StatusCode;
                 if (status != HttpStatusCode.OK || response.ContentLength > MaxResponse ||
-                    !(response.ContentType ?? "").StartsWith("application/json", StringComparison.OrdinalIgnoreCase)) return null;
+                    !(response.ContentType ?? "").StartsWith("application/json",StringComparison.OrdinalIgnoreCase)&&
+                    !(preview&&(response.ContentType??"").StartsWith("application/octet-stream",StringComparison.OrdinalIgnoreCase)))return null;
                 using (var input = response.GetResponseStream())
                 using (var reader = new StreamReader(input, Encoding.UTF8)) {
                     var text = new StringBuilder();

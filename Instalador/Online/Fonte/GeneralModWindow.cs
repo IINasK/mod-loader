@@ -239,6 +239,16 @@ internal sealed partial class GeneralModWindow : Form {
         GeneralMenuRenderer.Add(menu,T("Detalhes e variantes","Details and variants"),()=>OpenRowEditor(grid.CurrentRow));
         GeneralMenuRenderer.Add(menu,T("Abrir fonte no navegador","Open source in browser"),()=>Guard(()=>{var item=FocusedEntry();if(item!=null){var url=Selected(item).Sources.FirstOrDefault(GeneralModDownload.IsWebSource);if(url!=null)GeneralModDownload.OpenSource(url);}}));
         GeneralMenuRenderer.Add(menu,T("Tirar da lista","Remove from list"),()=>Guard(RemoveEntry));
+        var linkInventory=GeneralMenuRenderer.Add(menu,T("Vincular link do Nexus…","Link Nexus URL…"),()=>
+            SetInventorySource(grid.CurrentRow==null?null:grid.CurrentRow.Tag as P2PSyncDifference));
+        var splitInventory=GeneralMenuRenderer.Add(menu,T("Desfazer agrupamento ou vínculo","Undo grouping or link"),()=>Guard(()=>{
+            var group=SelectedInventoryLink();
+            if(group!=null&&CanEditInventory)UpdateInventoryLinks(links=>links.Groups.RemoveAll(item=>item.Id==group.Id));
+        }));
+        menu.Opening+=(s,e)=>{
+            linkInventory.Visible=CanEditInventory&&grid.CurrentRow!=null&&grid.CurrentRow.Tag is P2PSyncDifference;
+            splitInventory.Visible=CanEditInventory&&SelectedInventoryLink()!=null;
+        };
         menu.Items.Add(new ToolStripSeparator());
         var failureDetails=GeneralMenuRenderer.Add(menu,T("Ver erro da instalação","View installation error"),ShowFocusedFailure);
         failureDetails.Name="ViewInstallFailure";
@@ -253,6 +263,7 @@ internal sealed partial class GeneralModWindow : Form {
             if(e.Button==MouseButtons.Left&&e.ColumnIndex==0&&row.Tag is string)markBeforeMouseDown=Equals(row.Cells["Mark"].Value,true);
             if(e.Button==MouseButtons.Right)grid.CurrentCell=row.Cells["Name"];
         };
+        EnableInventoryDrag(grid);
         grid.ContextMenuStrip=menu;grid.Disposed+=(s,e)=>menu.Dispose();
         layout.Controls.Add(new GeneralScrollView(grid),0,5);
         grid.ScrollBars=ScrollBars.Horizontal;
@@ -331,15 +342,42 @@ internal sealed partial class GeneralModWindow : Form {
         var button=(GeneralButton)Command("",action,onlyIdle);button.IconKind=kind;button.AutoSize=false;button.MinimumSize=new Size(44,44);button.Size=new Size(44,44);button.AccessibleName=title;tips.SetToolTip(button,title);return button;
     }
     void EnableDrops(Control target){
-        target.AllowDrop=true;target.DragEnter+=(s,e)=>e.Effect=associationChoice!=null?DragDropEffects.None:e.Data.GetDataPresent(DataFormats.FileDrop)?DragDropEffects.Copy:DroppedText(e.Data)!=null?DragDropEffects.Link:DragDropEffects.None;
-        target.DragDrop+=(s,e)=>Guard(()=>{if(associationChoice!=null)return;if(e.Data.GetDataPresent(DataFormats.FileDrop))Drop((string[])e.Data.GetData(DataFormats.FileDrop));else ImportWebSources(DroppedText(e.Data));});
+        target.AllowDrop=true;
+        DragEventHandler showEffect=(s,e)=>e.Effect=e.Data.GetDataPresent(InventoryDragFormat)?InventoryDropEffect(target,e):
+            associationChoice!=null?DragDropEffects.None:e.Data.GetDataPresent(DataFormats.FileDrop)?DragDropEffects.Copy:
+            DroppedText(e.Data)!=null?DragDropEffects.Link:DragDropEffects.None;
+        target.DragEnter+=showEffect;
+        if(target==grid)target.DragOver+=showEffect;
+        target.DragDrop+=(s,e)=>Guard(()=>{
+            if(associationChoice!=null)return;
+            if(e.Data.GetDataPresent(InventoryDragFormat)){
+                if(InventoryDropEffect(target,e)==DragDropEffects.Move)
+                    MergeInventoryRows(inventoryDragKey,InventoryLinkStore.Key(InventoryRowAt(e.X,e.Y)));
+                return;
+            }
+            if(e.Data.GetDataPresent(DataFormats.FileDrop)){Drop((string[])e.Data.GetData(DataFormats.FileDrop));return;}
+            string text=DroppedText(e.Data);
+            var row=target==grid&&CanEditInventory?InventoryRowAt(e.X,e.Y):null;
+            if(row!=null&&text!=null&&GeneralNexusLink.Parse(text.Trim())!=null){DropInventorySource(row,text.Trim());return;}
+            ImportWebSources(text);
+        });
         foreach(Control child in target.Controls)EnableDrops(child);
     }
     void Guard(Action action){try{action();}catch(Exception ex){ShowError(ex);}}
     void ShowError(Exception ex){detail.Text=ex.Message;GeneralDialog.Message(this,ex.Message,T("Não foi possível concluir","Unable to complete"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}
     GeneralModEntry FocusedEntry(){string id=grid.CurrentRow==null?null:grid.CurrentRow.Tag as string;return id==null?null:state.List.Mods.FirstOrDefault(x=>x.Id==id);}
     IEnumerable<DataGridViewRow> ModRows(){return grid.Rows.Cast<DataGridViewRow>().Where(r=>r.Tag is string);}
-    GeneralModVariant Selected(GeneralModEntry entry){string id;return state.ChosenVariants.TryGetValue(entry.Id,out id)?entry.Variants.FirstOrDefault(v=>v.Id==id)??entry.Variants.First(v=>v.Id==entry.DefaultVariant):entry.Variants.First(v=>v.Id==entry.DefaultVariant);}
+    GeneralModVariant Selected(GeneralModEntry entry){
+        string id;
+        if(!state.ChosenVariants.TryGetValue(entry.Id,out id)&&GeneralModLibrary.IsHystBody(entry.Id)){
+            var installed=gameInventory.FirstOrDefault(file=>file.Kind=="verified-variant"&&file.ModId==entry.Id);
+            if(installed!=null)id=installed.VariantId;
+        }
+        NexusManualMatch detected;
+        if(id==null&&nexusManual.TryGetValue(entry.Id,out detected)&&entry.Variants.Contains(detected.Variant))
+            return detected.Variant;
+        return entry.Variants.FirstOrDefault(variant=>variant.Id==id)??entry.Variants.First(variant=>variant.Id==entry.DefaultVariant);
+    }
     static string Key(GeneralModEntry entry,GeneralModVariant variant){return entry.Id+"/"+variant.Id;}
     void Persist(){library.Save(CommittedProject());startupIssue=null;}
     string UncatName(){return state.List.UncategorizedName=="Sem categoria"?T("Sem categoria","Uncategorized"):state.List.UncategorizedName;}
@@ -379,7 +417,7 @@ internal sealed partial class GeneralModWindow : Form {
             bool collapsed=CategoryCollapsed(section);
             foreach(var m in members){
                 var v=Selected(m);string key=Key(m,v),status=ListStatus(m);int pct;bool hasProgress=progress.TryGetValue(key,out pct);
-                int i=grid.Rows.Add(marked.Contains(m.Id),m.Name,v.Name,GeneralStatusPresentation.Label(status),hasProgress?(object)pct:null,ModSpace(m));var row=grid.Rows[i];row.Tag=m.Id;row.Cells["Status"].ToolTipText=StatusDetail(key,status);
+                int i=grid.Rows.Add(marked.Contains(m.Id),m.Name,NexusVariantName(m),GeneralStatusPresentation.Label(status),hasProgress?(object)pct:null,ModSpace(m));var row=grid.Rows[i];row.Tag=m.Id;row.Cells["Status"].ToolTipText=StatusDetail(key,status);
                 row.Cells["Size"].ToolTipText=SpaceTip(m);
                 row.Cells["Name"].ToolTipText=String.Join("\n",new[]{m.Description,m.Tags.Count==0?null:"Tags · "+String.Join(", ",m.Tags)}
                     .Where(value=>!String.IsNullOrWhiteSpace(value)));
@@ -414,23 +452,28 @@ internal sealed partial class GeneralModWindow : Form {
             }
             if(!picking&&searchTerms.Length==0)AddSection("add",category,44).Visible=!collapsed;
         }
-        var inventory=VisibleGameInventory().GroupBy(file=>file.Mod??file.Path,StringComparer.OrdinalIgnoreCase).ToList();
+        var inventory=VisibleGameInventory().GroupBy(InventoryLinkStore.Key,StringComparer.OrdinalIgnoreCase).ToList();
         if(inventory.Count>0){
             if(grid.Rows.Count>0)AddSection("divider",null,23);
             AddSection("inventory",T("Fora do catálogo do projeto","Outside the project catalog"),54);
+            var inventoryMembers=DisplayedInventory().Where(file=>file.Kind=="found").ToLookup(InventoryLinkStore.Key,InventoryPaths);
+            var savedGroups=InventoryLinks.Groups.ToDictionary(group=>group.Id,StringComparer.Ordinal);
             foreach(var entry in inventory){
                 int index=grid.Rows.Add();
                 var row=grid.Rows[index];
                 row.Tag=entry.First();
                 row.Cells["Mark"]=new DataGridViewTextBoxCell();
                 row.ReadOnly=true;
-                row.Cells["Name"].Value=entry.Key;
-                row.Cells["Name"].ToolTipText=String.Join(Environment.NewLine,entry.Select(file=>file.Path).Take(8));
+                row.Cells["Name"].Value=entry.First().Mod??entry.First().Path;
+                var members=inventoryMembers[entry.Key];
+                InventoryLinkGroup group;savedGroups.TryGetValue(entry.Key,out group);
+                row.Cells["Name"].ToolTipText=String.Join(Environment.NewLine,members.Select(file=>file.Path).Take(12)
+                    .Concat(group==null||group.Source==null?Enumerable.Empty<string>():new[]{group.Source}));
                 row.Cells["Status"].Value=GameInventoryStatus;
                 row.Cells["Origin"].Value="?";
                 row.Cells["Origin"].ToolTipText=T(
-                    "Arquivos encontrados no jogo fora da lista deste projeto. A fonte e a versão ainda precisam ser confirmadas.",
-                    "Game files found outside this project's list. Their source and version still need confirmation.");
+                    "Arquivos encontrados no jogo. Arraste sobre outro item não identificado para agrupar.",
+                    "Game files found outside this project. Drag onto another unidentified item to group them.");
             }
         }
         if(!picking&&searchTerms.Length==0&&(visible.Count>0||statusFilters==null))AddSection("new",null,56);
@@ -700,10 +743,11 @@ internal sealed partial class GeneralModWindow : Form {
         if(working||scanning||!ConfirmProjectNavigation())return;
         string name=item.Mod??item.Path;
         var entry=NewEntry(name.Length<=300?name:name.Substring(0,300),null);
-        entry.DetectedPaths=gameInventory.Where(file=>String.Equals(file.Mod??file.Path,name,StringComparison.OrdinalIgnoreCase))
+        entry.DetectedPaths=InventoryRow(InventoryLinkStore.Key(item))
             .Select(file=>file.Path).Where(FixedInstaller.SyncModPath).Distinct(StringComparer.OrdinalIgnoreCase).Take(2000).ToList();
         if(entry.DetectedPaths.Count==0)return;
-        entry.Variants[0].Sources.Add("installed://"+entry.Id+"/"+entry.DefaultVariant);
+        var group=InventoryLinks.Groups.FirstOrDefault(value=>value.Id==item.InventoryGroupId);
+        entry.Variants[0].Sources.Add(group!=null&&group.Source!=null?group.Source:"installed://"+entry.Id+"/"+entry.DefaultVariant);
         await EditMod(entry,true);
     }
 
@@ -721,6 +765,9 @@ internal sealed partial class GeneralModWindow : Form {
                 "Arquivos detectados. Confira o pacote de origem para confirmar o mod completo.",
                 "Detected files. Check the original archive to confirm the complete mod.")+"\r\n"+
                 String.Join("\r\n",item.DetectedPaths.Take(8));
+            var companions=DisplayedInventory().Where(file=>file.Kind=="associated"&&file.ModId==item.Id).ToList();
+            if(companions.Count>0)info+="\r\n"+T("Arquivos locais associados", "Associated local files")
+                +" ("+companions.Count+")\r\n"+String.Join("\r\n",companions.Select(file=>file.Path).Take(8));
             using(var dialog=new GeneralModEditor(item,PresetCategories(),selected.Id,!fromInventory&&(!working||current!=null),
                 info,LookupSourceInfo,working?null:state.List.Mods,state.List,projectDraft:!working,
                 installationFolder:state.Destination,inventoryDraft:fromInventory,
@@ -795,7 +842,8 @@ internal sealed partial class GeneralModWindow : Form {
             state.List.Mods.Add(after);var active=state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);
             if(active!=null&&!active.ModIds.Contains(after.Id))active.ModIds.Add(after.Id);
         }
-        if(variant==after.DefaultVariant)state.ChosenVariants.Remove(after.Id);else state.ChosenVariants[after.Id]=variant;
+        if(variant==after.DefaultVariant&&!GeneralModLibrary.IsHystBody(after.Id))state.ChosenVariants.Remove(after.Id);
+        else state.ChosenVariants[after.Id]=variant;
         FinishProjectEdit();DrawRows();
     }
     sealed class CatalogDrop {
@@ -812,7 +860,7 @@ internal sealed partial class GeneralModWindow : Form {
         foreach (var work in candidates.Where(item => item.Variant.CyberpunkId != null)) {
             var recipe = Recipe(work);
             if (work.Variant.CyberpunkVariant != null)
-                recipe = NightCityDensity.Resolve(recipe, work.Variant.CyberpunkVariant);
+                recipe = ProfileRecipe(work);
             var asset = recipe.Assets.FirstOrDefault(item => item.Size == bytes && item.Sha256 == digest.Value);
             if (asset != null) fixedMatches.Add(new CatalogDrop { Work = work, Asset = asset });
         }
@@ -879,9 +927,9 @@ internal sealed partial class GeneralModWindow : Form {
             message += T("\n\nEstas alternativas serão desativadas após preparar os arquivos da nova versão. Elas não podem ficar ativas juntas.",
                 "\n\nThese alternatives will be disabled once the new files are ready. They cannot be active together.") +
                 "\n" + String.Join("\n", conflicts.Select(old => old.Entry.Name));
-        if (work.Variant.CyberpunkVariant != null && IsCyberpunk(root)) {
-            var density = await Task.Run(() => NightCityDensity.Read(Recipe(work), root));
-            if (density.CanApply && density.Id != "absent" && density.Id != work.Variant.CyberpunkVariant &&
+        if (IsCyberpunk(root) && (work.Variant.CyberpunkVariant != null || work.Variant.CyberpunkId != null && EquipmentExOptions.Available(Recipe(work)))) {
+            var recipe = Recipe(work); var equipment = EquipmentExOptions.Available(recipe); var target = equipment ? work.Variant.Id : work.Variant.CyberpunkVariant; var density = await Task.Run(() => equipment ? EquipmentExOptions.Read(recipe, root) : NightCityDensity.Read(recipe, root));
+            if (density.CanApply && density.Id != "absent" && density.Id != target &&
                 !(density.Id == "legacy-low" && work.Variant.CyberpunkVariant == "low")) {
                 message += T("\n\nSerá substituída a variante ativa: ", "\n\nThe active variant will be replaced: ") + density.Name;
                 work.DropDensity = density.Id;

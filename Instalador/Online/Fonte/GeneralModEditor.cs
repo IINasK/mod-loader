@@ -299,15 +299,19 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
             alternative = GeneralStyle.Button("", () => BeginLink(false));
             alternative.Name = "AlternativeMod";
             alternative.Dock = DockStyle.Fill;
+            alternative.AutoSize = false;
+            alternative.Height = 44;
             alternative.Enabled = options.Count > 0;
             editorTips.SetToolTip(alternative,T(
                 "Apenas um dos mods vinculados pode ficar ativo por vez.",
                 "Only one linked mod can be active at a time."));
             unlink = GeneralStyle.Button(T("Desvincular", "Unlink"), () => SetLinkedAlternative(null));
             unlink.Name = "UnlinkAlternative";
+            unlink.Dock = DockStyle.Fill;
             var pairing = new TableLayoutPanel {
-                Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, Margin = Padding.Empty
+                Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty
             };
+            pairing.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
             pairing.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             pairing.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             pairing.Controls.Add(alternative, 0, 0);
@@ -341,6 +345,8 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         AddEditorRow(layout, installNote);
         AddEditorRow(layout, usePending);
         AddEditorRow(layout, validation);
+        layout.RowCount++;
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         layout.SizeChanged += (s, e) => {
             ResizeFeedback(layout.ClientSize.Width-layout.Padding.Horizontal);
             sourceInfo.MaximumSize=new Size(Math.Max(1,layout.ClientSize.Width-layout.Padding.Horizontal-sourceInfo.Margin.Horizontal),0);

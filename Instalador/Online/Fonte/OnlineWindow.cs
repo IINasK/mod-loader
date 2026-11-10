@@ -702,6 +702,8 @@ static class OnlineProgram {
         if(args.Length==3&&args[0]=="--inspect"){string game=Path.GetFullPath(args[1]).TrimEnd('\\'),output=Path.GetFullPath(args[2]);if(output.StartsWith(game+"\\",StringComparison.OrdinalIgnoreCase))throw new IOException("O relatório deve ficar fora do jogo.");var report=c.Packages.Select(m=>FixedData.Scan(m,game)).ToList();string issue=null;try{FixedData.ValidateGame(game,c.Packages,c.GameFileVersion);}catch(IOException ex){issue=ex.Message;}Safe.WriteJson(output,new{GameVersion=FixedData.GameVersion(game),Build=FixedData.GameBuild(game),VersionAndRequirementsMatch=issue==null,Issue=issue,Mods=report});return 0;}
         if(args.Length==3&&args[0]=="--verify-local-sources"){OnlineTests.VerifySources(c,args[1],args[2]);return 0;}
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--self-test-inventory-links"){GeneralModWindow.RunInventoryLinkTests(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--self-test-nexus-preview"){GeneralModWindow.RunNexusPreviewTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-general"){GeneralModWindow.RunGeneralTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-clone"){GeneralModWindow.RunProjectCloneTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-header"){GeneralButtonPaintTests.Run(args[1]);GeneralModWindow.RunProjectHubTests(args[1]);return 0;}
@@ -730,7 +732,7 @@ static class OnlineProgram {
             using(var f=new GeneralModWindow(c,cache,Path.GetTempPath(),fixture))f.Preview(args[1]);return 0;
         }
         if(args.Length!=0)throw new IOException("Argumento não reconhecido. A instalação exige confirmação na interface.");
-        OnlineDiagnostics.Start(paths.Logs);string exeHash=null;try{if(OnlineDiagnostics.Enabled)exeHash=Safe.Hash(Application.ExecutablePath);}catch(Exception){}OnlineDiagnostics.Record("app.start",null,"Aplicativo iniciado com diagnóstico ativo.",new{AppVersion=GeneralUpdateChecker.CurrentVersion,Executable=Path.GetFileName(Application.ExecutablePath),ExecutableSha256=exeHash,Catalog=c.Id,CatalogSha256=OnlineIdentity.CatalogHash});
+        OnlineDiagnostics.Start(paths.Logs);string exeHash=null;try{if(OnlineDiagnostics.Enabled)exeHash=Safe.Hash(Application.ExecutablePath);}catch(Exception){}OnlineDiagnostics.Record("app.start",null,"Aplicativo iniciado com diagnóstico ativo.",new{AppVersion=GeneralAppPaths.Version,Executable=Path.GetFileName(Application.ExecutablePath),ExecutableSha256=exeHash,Catalog=c.Id,CatalogSha256=OnlineIdentity.CatalogHash});
 #if VELOPACK
         GeneralVelopackUpdate.CheckAtStartup();
 #else

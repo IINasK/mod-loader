@@ -17,9 +17,11 @@ internal sealed partial class GeneralModWindow {
     }
 
     ModAction ActionFor(Work work, HashSet<string> selectedIds) {
-        if(GeneralModLibrary.NeedsDependencyVersion(work.Entry,work.Variant))return ModAction.ChooseDependency;
+
         string status;
         statuses.TryGetValue(work.Key, out status);
+        if(status==GeneralStatusPresentation.NexusManual)return ModAction.None;
+        if(GeneralModLibrary.NeedsDependencyVersion(work.Entry,work.Variant))return ModAction.ChooseDependency;
         bool active = GeneralStatusPresentation.Kind(status) == "installed";
         if (active) {
             if (work.Variant.CyberpunkId == null || !Recipe(work).Immutable) return ModAction.Disable;
@@ -114,8 +116,9 @@ internal sealed partial class GeneralModWindow {
                 allFiles.Add(file);
             }
             var fixedWork = jobs.Where(work => work.Variant.CyberpunkId != null).ToLookup(work => work.Variant.CyberpunkId);
+            bool stockEquipment = EquipmentExOptions.StockActive(catalog, root);
             foreach (var package in catalog.Packages) {
-                var recipe = package;
+                var recipe = EquipmentExOptions.Available(package) && stockEquipment ? EquipmentExOptions.Resolve(package,EquipmentExOptions.StockId) : package;
                 if (package.Id == NightCityDensity.ModId) {
                     var density = NightCityDensity.Read(package, root);
                     if (!density.CanApply && !fixedIds.Contains(package.Id)) continue;
@@ -124,7 +127,7 @@ internal sealed partial class GeneralModWindow {
                 }
                 var files = recipe.Files.Where(file => !file.UserData).ToList();
                 if (!files.Any(file => File.Exists(Safe.In(root, file.Path)))) continue;
-                if (!fixedIds.Contains(package.Id) && FixedData.Expand(catalog, package.Dependencies).Any(dep => fixedIds.Contains(dep.Id)))
+                if (!fixedIds.Contains(package.Id) && FixedData.Expand(catalog, recipe.Dependencies,stockEquipment).Any(dep => fixedIds.Contains(dep.Id)))
                     throw new IOException(T("Ainda usado por: ", "Still used by: ") + package.Name);
                 foreach (var file in files) {
                     string target = Safe.In(root, file.Path);
@@ -206,10 +209,11 @@ internal sealed partial class GeneralModWindow {
                             CheckHystBody(work, root);
                         if (work.Variant.CyberpunkId != null) {
                             var recipe = Recipe(work);
+                            if (EquipmentExOptions.Available(recipe)) recipe = ProfileRecipe(work);
                             if (GameEdition.NeedsPL(recipe) && !GameEdition.HasPL(root))
                                 throw new IOException(T("Requer Phantom Liberty.", "Requires Phantom Liberty."));
                             var batch = new HashSet<string>(jobs.Select(item => item.Variant.CyberpunkId), StringComparer.Ordinal);
-                            var missing = FixedData.Expand(catalog, recipe.Dependencies).FirstOrDefault(dependency =>
+                            var missing = FixedData.Expand(catalog, recipe.Dependencies,EquipmentExOptions.StockActive(catalog,root)).FirstOrDefault(dependency =>
                                 !batch.Contains(dependency.Id) && !FixedData.Scan(dependency, root).IsCorrect);
                             if (missing != null) throw new IOException(T("Ative primeiro: ", "Enable first: ") + missing.Name);
                         }

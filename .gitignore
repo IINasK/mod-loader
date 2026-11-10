@@ -7,6 +7,7 @@
 !/AGENTS.md
 !/Build.ps1
 !/.github/workflows/release.yml
+!/.github/workflows/release-dev.yml
 !/Instalador/Fonte/*.cs
 !/Instalador/Fonte/*.ps1
 !/Instalador/Fonte/app.manifest

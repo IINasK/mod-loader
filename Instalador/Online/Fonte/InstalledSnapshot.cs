@@ -48,6 +48,7 @@ public static partial class InstalledSnapshot {
             if(!NightCityDensity.Supported(variant.CyberpunkVariant))throw new IOException("Densidade instalada não suportada para compartilhamento.");
             return NightCityDensity.Resolve(mod,variant.CyberpunkVariant);
         }
+        if (EquipmentExOptions.Available(mod)) return EquipmentExOptions.Resolve(mod, variant.CyberpunkVariant ?? EquipmentExOptions.WeaveId);
         if(variant.CyberpunkVariant!=null)throw new IOException("Variante fixa inválida.");
         return mod;
     }
@@ -65,7 +66,7 @@ public static partial class InstalledSnapshot {
         var entries=state.List.Mods.Where(m=>selected.Contains(m.Id)).Select(Clone).ToList();
         if(cyberpunk) {
             var fixedIds=entries.Select(m=>m.Variants.Single(v=>v.Id==Selected(state,m)).CyberpunkId).Where(id=>id!=null).ToList();
-            foreach(var dependency in FixedData.Expand(catalog,fixedIds)) {
+            foreach(var dependency in FixedData.Expand(catalog,fixedIds,EquipmentExOptions.StockActive(catalog,root))) {
                 if(entries.Any(m=>m.Variants.Single(v=>v.Id==Selected(state,m)).CyberpunkId==dependency.Id))continue;
                 entries.Add(Clone(seed.Mods.Single(m=>m.Id==dependency.Id)));
             }
@@ -91,6 +92,16 @@ public static partial class InstalledSnapshot {
                 var density=NightCityDensity.Read(catalog.Packages.Single(m=>m.Id==variant.CyberpunkId),root);
                 if(density.Id=="legacy-low"){variant=LegacyDensityVariant(catalog);mod.Variants.Add(variant);}
                 else {if(!NightCityDensity.Supported(density.Id)||density.Partial)throw new IOException(density.Detail);variant=mod.Variants.Single(v=>v.CyberpunkVariant==density.Id);}
+            }
+            if (cyberpunk && variant.CyberpunkId == EquipmentExOptions.ModId) {
+                var equipment = catalog.Packages.Single(recipe => recipe.Id == EquipmentExOptions.ModId);
+                if (EquipmentExOptions.Available(equipment)) {
+                    var option = EquipmentExOptions.Read(equipment, root);
+                    if (!option.CanApply || option.Partial || option.Id == "absent")
+                        throw new IOException(option.Detail ?? "Equipment-EX ausente ou incompleto.");
+                    variant = mod.Variants.SingleOrDefault(candidate => candidate.Id == option.Id)
+                        ?? Clone(seed.Mods.Single(entry => entry.Id == mod.Id).Variants.Single(candidate => candidate.Id == option.Id));
+                }
             }
             string work=Owner(mod,variant);
             var originalSources=variant.Sources.ToList();
@@ -135,6 +146,7 @@ public static partial class InstalledSnapshot {
                     }else files.AddRange(genericEngine.ExportSnapshotFiles(key,variant.InstallRoutes));
                 }
             }
+            if(cyberpunk && files.Any(RetiredPackEntries.LocalDroneFile)) continue;
             mod.Variants=new List<GeneralModVariant>{variant};mod.DefaultVariant=variant.Id;
             if(variant.CyberpunkId==null){variant.Sources=originalSources.Where(GeneralModDownload.IsWebSource).ToList();if(variant.Sources.Count==0)variant.Sources.Add("installed://"+mod.Id+"/"+variant.Id);}
             if(variant.SourceInfo!=null)variant.SourceInfo=variant.SourceInfo.Where(pair=>variant.Sources.Contains(pair.Key)&&GeneralModDownload.IsWebSource(pair.Key)).ToDictionary(pair=>pair.Key,pair=>pair.Value);
@@ -174,7 +186,7 @@ public static partial class InstalledSnapshot {
             var removed=new HashSet<string>(StringComparer.Ordinal);
             list.Mods.RemoveAll(mod=>{
                 var variant=mod.Variants[0];
-                if(variant.CyberpunkId==null||FixedData.Expand(catalog,new[]{variant.CyberpunkId}).All(recipe=>includedRecipes.Contains(recipe.Id)))return false;
+                if(variant.CyberpunkId==null||FixedData.Expand(catalog,new[]{variant.CyberpunkId},EquipmentExOptions.StockActive(catalog,root)).All(recipe=>includedRecipes.Contains(recipe.Id)))return false;
                 removed.Add(Owner(mod,variant));
                 return true;
             });
@@ -285,6 +297,8 @@ public static partial class InstalledSnapshot {
         var reserved=new HashSet<string>(catalog.Packages.SelectMany(NightCityDensity.KnownFiles).Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
         foreach(var file in manifest.Files) {
             if(file==null||file.Size<0||file.Size>MaxFileBytes||!FixedData.HashValid(file.Sha256)||file.Owners==null||file.Owners.Count==0||file.Owners.Count>1000||file.Owners.Distinct(StringComparer.Ordinal).Count()!=file.Owners.Count||file.Owners.Any(o=>!owners.ContainsKey(o))||!keys.Add(file.Path+"\n"+file.Section))throw new IOException("Arquivo instalado inválido ou repetido.");
+            if(manifest.Game=="cyberpunk2077"&&RetiredPackEntries.LocalDroneFile(file))
+                throw new IOException("O drone FPV é local e não faz parte do pacote compartilhado.");
             Safe.In(Path.GetTempPath(),file.Path);total+=file.Size;if(total>MaxTotalBytes)throw new IOException("Pacote instalado grande demais.");
             if(GeneralInstallRoutes.External(file.Path)){
                 if(manifest.Schema!=2||file.Kind!="file")throw new IOException("Destino externo não autorizado neste pacote.");

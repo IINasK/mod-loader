@@ -16,6 +16,9 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     string ExportPreset {get{return presets.SelectedIndex<=0?null:state.List.Presets[presets.SelectedIndex-1].Id;}}
     string[] ExportIds {get{return ExportPreset==null?state.List.Mods.Select(item=>item.Id).ToArray():state.List.Presets[presets.SelectedIndex-1].ModIds.ToArray();}}
     readonly bool autoStart;
+    readonly Func<Task<List<string>>> findCyberpunk;
+    int destinationRequest;
+    bool findingDestination;
     readonly TextBox output=new TextBox{ReadOnly=true,WordWrap=false,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,Name="p2p-output"};
     readonly TextBox input=new TextBox{WordWrap=false,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,MaxLength=12000,Name="p2p-input"};
     readonly TextBox destination=new TextBox{ReadOnly=true,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,Name="p2p-destination"};
@@ -88,8 +91,9 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         return decision.Task;
     }
 
-    internal GeneralP2PDialog(P2PService service,GeneralModState state,FixedCatalog catalog,bool autoStart=true):base(T("Modpack e compartilhamento","Modpack and sharing")){
+    internal GeneralP2PDialog(P2PService service,GeneralModState state,FixedCatalog catalog,bool autoStart=true,Func<Task<List<string>>> findCyberpunk=null):base(T("Modpack e compartilhamento","Modpack and sharing")){
         this.service=service;this.state=state;this.autoStart=autoStart;this.catalog=catalog;
+        this.findCyberpunk=findCyberpunk??(()=>Task.Run(()=>Discovery.Find()));
         var previousChoice=service.ChooseVersion;
         Func<ModVersionDifference,bool> versionChoice=difference=>GeneralVersionChoiceDialog.Ask(this,difference);
         service.ChooseVersion=versionChoice;
@@ -145,11 +149,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         body.Controls.Add(cardScroll,0,9);body.SetColumnSpan(cardScroll,2);
         cardStack.ClientSizeChanged+=(s,e)=>LayoutCards();
         output.TextChanged+=(s,e)=>UpdateActions();status.TextChanged+=(s,e)=>UpdateActions();
-        input.TextChanged+=(s,e)=>{
-            var incoming=IncomingInvite();
-            destination.Text=incoming==null?"":incoming.LocalSuggestedFolder()??"";
-            UpdateActions();
-        };
+        input.TextChanged+=async(s,e)=>await FindIncomingDestination();
         presets.SelectedIndexChanged+=(s,e)=>{if(this.autoStart)Run(PrepareLink);};
         timer.Tick+=async(s,e)=>await Poll();
         FormClosing+=(s,e)=>{if(busy)e.Cancel=true;};
@@ -215,12 +215,14 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         generate.Enabled=!busy&&!service.Installing&&ExportIds.Length!=0;
         presets.Enabled=!busy;
         copy.Enabled=!busy&&output.Text.StartsWith("ML-P2P1:",StringComparison.Ordinal)&&service.InvitationOpen(offer);
-        connect.Enabled=!busy&&!String.IsNullOrWhiteSpace(input.Text);
+        connect.Enabled=!busy&&!findingDestination&&!String.IsNullOrWhiteSpace(input.Text);
         choose.Enabled=!busy;
         var incoming=IncomingInvite();
         string hint="";
         if(incoming!=null&&destination.Text.Length==0){
-            if(incoming.PrivateFolder)hint=T("O anfitrião usa uma pasta pessoal. Escolha a pasta do jogo neste PC.",
+            if(findingDestination)hint=T("Procurando o Cyberpunk 2077 neste PC…","Looking for Cyberpunk 2077 on this PC…");
+            else if(IsCyberpunkOffer(incoming))hint=T("Escolha a pasta que contém o executável do Cyberpunk 2077.","Choose the folder that contains the Cyberpunk 2077 executable.");
+            else if(incoming.PrivateFolder)hint=T("O anfitrião usa uma pasta pessoal. Escolha a pasta do jogo neste PC.",
                 "The host uses a personal folder. Choose the game folder on this PC.");
             else if(incoming.SuggestedFolder!=null)hint=T("A pasta sugerida não está disponível neste PC. Escolha a pasta do jogo.",
                 "The suggested folder is not available on this PC. Choose the game folder.");
@@ -292,10 +294,46 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         try{var invite=P2PInvite.Decode(input.Text);return invite.Kind=="offer"?invite:null;}
         catch(IOException){return null;}
     }
+    bool IsCyberpunkOffer(P2PInvite invite){
+        return invite!=null&&(invite.Game==P2PInvite.CyberpunkGame||
+            (invite.Game==null&&state.TemplateId==GeneralProjectStore.CyberpunkTemplate));
+    }
+
+    async Task FindIncomingDestination(){
+        int request=++destinationRequest;
+        var incoming=IncomingInvite();
+        string suggested=incoming==null?null:incoming.LocalSuggestedFolder();
+        bool cyberpunk=IsCyberpunkOffer(incoming);
+        destination.Text=(cyberpunk
+            ? P2PInvite.CyberpunkFolder(state.Destination)??P2PInvite.CyberpunkFolder(suggested)
+            : suggested)??"";
+        findingDestination=cyberpunk&&destination.Text.Length==0;
+        UpdateActions();
+        if(!findingDestination)return;
+        string found=null;
+        try{
+            var folders=(await findCyberpunk()).Select(P2PInvite.CyberpunkFolder)
+                .Where(folder=>folder!=null).Distinct(StringComparer.OrdinalIgnoreCase).Take(2).ToArray();
+            if(folders.Length==1)found=folders[0];
+        }catch(Exception ex){OnlineDiagnostics.Record("p2p.destination.lookup",null,ex.GetType().Name);}
+        if(IsDisposed||request!=destinationRequest)return;
+        if(destination.Text.Length==0&&found!=null)destination.Text=found;
+        findingDestination=false;
+        UpdateActions();
+    }
+
+    string CheckedDestination(string path,P2PInvite incoming){
+        string folder=WindowsFolderPicker.InstallationPath(path);
+        if(IsCyberpunkOffer(incoming)&&P2PInvite.CyberpunkFolder(folder)==null)
+            throw new IOException(T("Escolha a pasta do Cyberpunk 2077 que contém bin\\x64\\Cyberpunk2077.exe.",
+                "Choose the Cyberpunk 2077 folder containing bin\\x64\\Cyberpunk2077.exe."));
+        return folder;
+    }
+
     void ChooseFolder(){
         string selected=WindowsFolderPicker.Choose(this,T("Pasta de instalação","Installation folder"),destination.Text);
         if(selected==null)return;
-        destination.Text=WindowsFolderPicker.InstallationPath(selected);
+        destination.Text=CheckedDestination(selected,IncomingInvite());
         UpdateActions();
     }
     async Task PrepareLink(){
@@ -328,7 +366,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         if(invite.Kind=="offer"){
             if(!Directory.Exists(destination.Text))ChooseFolder();
             if(!Directory.Exists(destination.Text))throw new IOException(T("Escolha a pasta de instalação.","Choose the installation folder."));
-            string target=WindowsFolderPicker.InstallationPath(destination.Text);
+            string target=CheckedDestination(destination.Text,invite);
             string prompt=invite.Schema==3?T("Comparar os mods do pacote ","Compare mods from the pack "):T("Receber e instalar o pacote ","Receive and install pack ");
             service.Notify();
             if(GeneralDialog.Message(this,prompt+invite.Name+T(" em:\n"," into:\n")+target+T("\n\nMantenha o jogo fechado. Configurações anteriores terão backup.","\n\nKeep the game closed. Previous settings will be backed up."),T("Conectar ao anfitrião","Connect to the host"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
@@ -338,7 +376,8 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
                 if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));
                 session=await Task.Run(()=>{
                     var accepted=service.Accept(code,target,true);
-                    if(!accepted.Completed&&(accepted.Held||accepted.Error!=null||!accepted.AutoInstall))service.RetryInstalled(accepted,target);
+                    if(!accepted.Completed&&(accepted.Held||accepted.Error!=null||!accepted.AutoInstall||
+                        !String.Equals(accepted.Destination,target,StringComparison.OrdinalIgnoreCase)))service.RetryInstalled(accepted,target);
                     return accepted;
                 });
             }catch(Exception ex){

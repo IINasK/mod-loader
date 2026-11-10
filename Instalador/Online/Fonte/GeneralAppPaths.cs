@@ -8,7 +8,14 @@ internal sealed class GeneralAppPaths {
     internal static readonly bool IsDevelopment=false;
 #endif
     internal static string ProductName {get{return IsDevelopment?"Mod Loader Dev":"Mod Loader";}}
-    internal static string WindowTitle {get{return ProductName+" "+GeneralUpdateChecker.CurrentVersion;}}
+    internal static string WindowTitle {get{return ProductName+" "+Version;}}
+    internal static string Version {get{
+#if VELOPACK && MODLOADER_DEV
+        return GeneralVelopackUpdate.InstalledVersion()??GeneralUpdateChecker.CurrentVersion;
+#else
+        return GeneralUpdateChecker.CurrentVersion;
+#endif
+    }}
     internal readonly string Data,Cache,Logs;
     internal GeneralAppPaths(string local,bool development=false){
         local=Path.GetFullPath(local);

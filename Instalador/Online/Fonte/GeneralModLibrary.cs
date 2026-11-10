@@ -197,6 +197,23 @@ public sealed class GeneralModLibrary {
         foreach (var entry in list.Mods) {
             GeneralModEntry trusted;
             if (!byId.TryGetValue(entry.Id, out trusted)) continue;
+            if (entry.Id == EquipmentExOptions.ModId && trusted.Variants.Any(v => v.Id == EquipmentExOptions.StockId)) {
+                var old = entry.Variants.SingleOrDefault(v => v.Id == EquipmentExOptions.WeaveId);
+                var stock = trusted.Variants.Single(v => v.Id == EquipmentExOptions.StockId);
+                var weave = trusted.Variants.Single(v => v.Id == EquipmentExOptions.WeaveId);
+                bool oldStock = old != null && old.Sources.SequenceEqual(stock.Sources, StringComparer.Ordinal);
+                bool official = oldStock || old != null && old.Sources.SequenceEqual(weave.Sources, StringComparer.Ordinal)
+                    || entry.Variants.Any(v => v.Id == stock.Id && v.Sources.SequenceEqual(stock.Sources, StringComparer.Ordinal));
+                if (oldStock) old.Sources = weave.Sources.ToList();
+                if (official) {
+                    foreach (var option in trusted.Variants) {
+                        var saved = entry.Variants.SingleOrDefault(v => v.Id == option.Id);
+                        if (saved == null) entry.Variants.Add(Safe.Json.Deserialize<GeneralModVariant>(Safe.Json.Serialize(option)));
+                        else if (saved.Sources.SequenceEqual(option.Sources, StringComparer.Ordinal)) saved.Name = option.Name;
+                    }
+                    if (entry.Name == "Equipment-EX + WEAVE") entry.Name = trusted.Name;
+                }
+            }
             foreach (var variant in entry.Variants) {
                 var original = trusted.Variants.FirstOrDefault(candidate => candidate.Id == variant.Id && candidate.Sources.SequenceEqual(variant.Sources, StringComparer.Ordinal));
                 if(original==null&&entry.Id=="NightCoop"&&variant.Sources.SequenceEqual(new[]{NightCoopRelease.PriorUrl})){
@@ -223,6 +240,14 @@ public sealed class GeneralModLibrary {
                 Category = IsFacialMod(mod.Id) || mod.Id == EclipseTattooId ? BodyCategory : fit??CyberpunkCategories[(int)ModCategories.CategoryOf(mod.Id, mod.Profile)],
                 DefaultVariant = mod.DensityProfiles == null ? "default" : "low"
             };
+            if (EquipmentExOptions.Available(mod)) {
+                entry.Name = "Equipment-EX";
+                var stock = EquipmentExOptions.Resolve(mod, EquipmentExOptions.StockId);
+                entry.Variants.Add(FromFixed(mod.Id, EquipmentExOptions.WeaveId, "Com WEAVE (padrão)", mod.Assets, null));
+                entry.Variants.Add(FromFixed(mod.Id, EquipmentExOptions.StockId, "Original (sem WEAVE)", stock.Assets, EquipmentExOptions.StockId));
+                list.Mods.Add(entry);
+                continue;
+            }
             if (mod.DensityProfiles == null) {
                 entry.Variants.Add(FromFixed(mod.Id, "default", "Principal", mod.Assets, null));
             } else {

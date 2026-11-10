@@ -22,7 +22,8 @@ internal sealed class P2PSyncComparison {
 }
 
 internal sealed class P2PSyncDifference {
-    public string Kind, Mod, Path;
+    internal string InventoryGroupId;
+    public string Kind, Mod, Path, ModId, VariantId;
 }
 
 internal sealed partial class P2PService {
@@ -111,7 +112,7 @@ internal sealed partial class P2PService {
                       inspectProgress:(done,total,item)=>session.SyncProgress=new P2PSyncProgress{Done=done,Total=total,Item=item});
                     if(preview.Game=="cyberpunk2077"){
                         session.SyncProgress=new P2PSyncProgress{Item="Arquivos do jogo fora do pacote"};
-                        preview.SyncGameInventory=new FixedInstaller(installedCatalog,source.Destination,installedFixture).ReadSyncInventory(preview.Files.Select(file=>file.Path),()=>{
+                        preview.SyncGameInventory=new FixedInstaller(installedCatalog,source.Destination,installedFixture).ReadSyncInventory(preview.Files,()=>{
                             if(disposed||session.Discarded)throw new OperationCanceledException();
                         });
                     }
