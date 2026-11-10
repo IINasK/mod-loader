@@ -15,6 +15,7 @@ internal sealed class GeneralProjectHome : Form {
     readonly GeneralMenuHost menus=new GeneralMenuHost();
     GeneralModWindow sharingWindow;
     GeneralP2PDialog sharingDialog;
+    bool exitApproved,waitingForInstallation;
     string ReceiveData {get{return Path.Combine(store.Root,"P2P-Inbox");}}
     ListBox saved;
     LinkLabel update;
@@ -31,7 +32,8 @@ internal sealed class GeneralProjectHome : Form {
         StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;Build();Disposed+=(s,e)=>{
             savedTips.Dispose();menus.Dispose();
             foreach(var service in sharing.Values)try{service.Dispose();}catch(Exception){}
-        };FormClosing+=(s,e)=>{if(DeletingProject)e.Cancel=true;};
+        };
+        FormClosing+=CloseHome;
         Shown+=(s,e)=>RefreshStorageSize();
         if(!fixture)Shown+=async(s,e)=>await RestoreSharing();
 #if !VELOPACK
@@ -131,8 +133,16 @@ internal sealed class GeneralProjectHome : Form {
                 var restored=store.Load(project);
                 using(var window=new GeneralModWindow(catalog,cache,store.DataPath(project),fixture?restored:null)){
                     window.AttachProject(store,project);
-                    if(!fixture){sharingWindow=window;window.AttachSharingHome(this);}
-                    window.Shown+=(s,e)=>{window.Refresh();Hide();};window.ShowDialog();action=window.ProjectAction;
+                    sharingWindow=window;
+                    window.AttachSharingHome(this);
+                    window.Shown+=(s,e)=>{window.Refresh();Hide();};
+                    window.ShowDialog();
+                    action=window.ProjectAction;
+                }
+                if(action==null){
+                    exitApproved=true;
+                    Close();
+                    return;
                 }
                 if(action=="new"||action=="import"||action=="import-project"){ShowHome();project=action=="new"?CreateProject(false):ImportProject();}
                 else project=action=="ready"?CreateProject(true):action!=null&&action.StartsWith("project/",StringComparison.Ordinal)?store.Read().Projects.FirstOrDefault(item=>item.Id==action.Substring(8)):null;
@@ -140,6 +150,37 @@ internal sealed class GeneralProjectHome : Form {
         }
         ShowHome();
     }
+    internal bool InstallingTransfer {get{return sharing.Values.Any(service=>service.Installing);}}
+
+    internal bool ConfirmTransferExit(Form owner,bool localWork=false){
+        if(!localWork&&!sharing.Values.Any(service=>service.HasActiveTransfers))return true;
+        return AskTransferExit(owner);
+    }
+
+    internal static bool AskTransferExit(Form owner){
+        return GeneralDialog.Message(owner,T(
+            "Há uma transferência ou operação em andamento. Ao fechar, transferências serão interrompidas e o Mod Loader aguardará qualquer gravação em andamento terminar.",
+            "A transfer or operation is in progress. Closing interrupts transfers and lets any file writes in progress finish."),
+            T("Fechar o Mod Loader","Close Mod Loader"),MessageBoxButtons.YesNo,MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2,null,null,T("Fechar","Close"),T("Continuar no app","Keep working"))==DialogResult.Yes;
+    }
+
+    void CloseHome(object sender,FormClosingEventArgs e){
+        if(DeletingProject){e.Cancel=true;return;}
+        if(!exitApproved&&!ConfirmTransferExit(this)){e.Cancel=true;return;}
+        exitApproved=true;
+        if(!InstallingTransfer)return;
+        e.Cancel=true;
+        if(waitingForInstallation)return;
+        waitingForInstallation=true;
+        CloseAfterInstallation();
+    }
+
+    async void CloseAfterInstallation(){
+        while(!IsDisposed&&InstallingTransfer)await Task.Delay(200);
+        if(!IsDisposed)Close();
+    }
+
     internal void DetachSharingWindow(GeneralModWindow window){
         if(sharingWindow==window)sharingWindow=null;
     }
@@ -301,7 +342,12 @@ internal sealed partial class GeneralModWindow {
         UpdateTableTitle();
     }
     bool BuiltInProject {get{return project!=null&&!String.IsNullOrEmpty(project.TemplateId);}}
-    void BackToProjects(){if(working||scanning)return;Close();}
+    void BackToProjects(){if(!working&&!scanning)CloseProjectFor("home");}
+
+    void CloseProjectFor(string action){
+        ProjectAction=action;
+        Close();
+    }
     void ProjectCommand(string action){
         if(working||scanning)return;
         if(BuiltInProject&&(action=="export"||action=="import"||action=="delete-project"))return;
@@ -325,6 +371,6 @@ internal sealed partial class GeneralModWindow {
             if(GeneralDialog.Message(this,T("Excluir este projeto da lista de projetos salvos? Mods instalados, registros e backups serão preservados.","Remove this project from saved projects? Installed mods, records and backups will be preserved.")+"\n\n"+project.Name,T("Excluir projeto","Delete project"),MessageBoxButtons.OKCancel,MessageBoxIcon.Warning)!=DialogResult.OK)return;
             projectStore.Delete(project);
         }
-        ProjectAction=action;Close();if(!IsDisposed&&Visible)ProjectAction=null;
+        CloseProjectFor(action);
     }
 }

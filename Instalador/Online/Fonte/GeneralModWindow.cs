@@ -81,21 +81,61 @@ internal sealed partial class GeneralModWindow : Form {
         if(state.SelectedPreset==null&&state.List.Presets.Any(p=>p.Id=="all"))state.SelectedPreset="all";
         Text=GeneralAppPaths.WindowTitle;Icon=ModLoaderBrand.AppIcon;ClientSize=new Size(1240,820);MinimumSize=new Size(1000,680);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
         BuildInterface();
-        FormClosing+=(s,e)=>{
-            if(associationChoice!=null){e.Cancel=true;associationChoice.TrySetResult(null);return;}
-            if(working){RequestSkip();normal.Clear();priority.Clear();e.Cancel=true;detail.Text=T("Aguarde a operação atual terminar antes de fechar.","Wait for the current operation to finish before closing.");}
-            else if(scanning){RequestSkip();e.Cancel=true;}
-            else if(!ConfirmProjectNavigation())e.Cancel=true;
-        };
+        FormClosing+=CloseModWindow;
         Disposed+=(s,e)=>menus.Dispose();
         Shown+=(s,e)=>RefreshStorageSize();
         if(fixture==null)Shown+=async(s,e)=>{
 #if !VELOPACK
             CheckUpdatesOnStartup();
 #endif
-            await Scan();if(!IsDisposed)await ResumeP2P();
+            await Scan();if(!IsDisposed&&!exitApproved)await ResumeP2P();
         };
     }
+    bool exitApproved,waitingToExit;
+
+    bool FinishingOperations {get{
+        return working||scanning||associationChoice!=null||
+            (sharingHome!=null?sharingHome.InstallingTransfer:p2p!=null&&p2p.Installing);
+    }}
+
+    void CloseModWindow(object sender,FormClosingEventArgs e){
+        if(ProjectAction!=null){
+            e.Cancel=working||scanning||!ConfirmProjectNavigation();
+            if(e.Cancel)ProjectAction=null;
+            return;
+        }
+        if(!exitApproved){
+            bool transferAccepted=sharingHome!=null?sharingHome.ConfirmTransferExit(this,working||scanning):
+                !(working||scanning||p2p!=null&&p2p.HasActiveTransfers)||GeneralProjectHome.AskTransferExit(this);
+            if(!transferAccepted){e.Cancel=true;return;}
+            if(associationChoice!=null&&GeneralDialog.Message(this,T(
+                "Descartar as alterações do editor aberto e fechar o Mod Loader?",
+                "Discard the changes in the open editor and close Mod Loader?"),
+                T("Alterações não salvas","Unsaved changes"),MessageBoxButtons.YesNo,MessageBoxIcon.Question,
+                MessageBoxDefaultButton.Button2)!=DialogResult.Yes){e.Cancel=true;return;}
+            if(!ConfirmProjectNavigation()){e.Cancel=true;return;}
+            exitApproved=true;
+            if(associationChoice!=null)associationChoice.TrySetResult(null);
+            if(working){
+                if(current!=null)skipRequests.Add(current);
+                RequestSkip();
+                normal.Clear();
+                priority.Clear();
+            }
+        }
+        if(!FinishingOperations)return;
+        e.Cancel=true;
+        if(waitingToExit)return;
+        waitingToExit=true;
+        detail.Text=T("Concluindo a operação para fechar…","Finishing the operation before closing…");
+        CloseAfterOperations();
+    }
+
+    async void CloseAfterOperations(){
+        while(!IsDisposed&&FinishingOperations)await Task.Delay(200);
+        if(!IsDisposed)Close();
+    }
+
     void BuildInterface(){
         GeneralStyle.UseTheme(state.Theme);GeneralStyle.Language=state.Language??"pt";
         SuspendLayout();
@@ -732,7 +772,7 @@ internal sealed partial class GeneralModWindow : Form {
                     if(linked!=null){
                         if(dependency)dialog.AddRequiredMod(linked);else dialog.SetLinkedAlternative(linked);
                     }
-                    if(IsDisposed)return;
+                    if(IsDisposed||exitApproved)return;
                 }
                 if(answer!=DialogResult.OK)return;
                 if(existing&&item.Variants.Any(old=>state.SnapshotReceipts.ContainsKey(Key(item,old))&&

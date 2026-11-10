@@ -146,6 +146,50 @@ internal sealed partial class GeneralModWindow {
                             }
                             if(failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
                             check(home.Visible&&home.Controls.Find("EmptyProjects",true).Length==1&&before==Safe.Hash(Path.Combine(store.DataPath(remaining),"lista.json")),"Voltar pelo menu do editor restaura a Home e preserva os dados do projeto padrão.");
+                            var transfer=home.SharingService(Path.Combine(root,"exit-share"));
+                            var send=new P2PSession{Sender=true};
+                            transfer.Sessions.Add(send);
+                            check(!transfer.HasActiveTransfers,"Convite sem destinatário não impede sair.");
+                            send.Peer="test-recipient";
+                            check(transfer.HasActiveTransfers,"Envio com destinatário exige confirmação de saída.");
+
+                            using(var closeProject=new Timer{Interval=30})
+                            using(var answerTransfer=new Timer{Interval=30}){
+                                int transferPrompts=0,draftPrompts=0;
+                                answerTransfer.Tick+=(ss,ee)=>{
+                                    var prompt=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(form=>form.Text=="Fechar o Mod Loader");
+                                    if(prompt==null)return;
+                                    transferPrompts++;
+                                    prompt.Complete(transferPrompts==1?DialogResult.No:DialogResult.Yes);
+                                };
+                                closeProject.Tick+=(ss,ee)=>{
+                                    var window=Application.OpenForms.OfType<GeneralModWindow>().FirstOrDefault();
+                                    if(window==null)return;
+                                    closeProject.Stop();
+                                    try{
+                                        window.BeginProjectEdit();
+                                        window.state.List.Mods.First().Tags.Add("salvar ao fechar");
+                                        window.testProjectSaveChoice=()=>{draftPrompts++;return DialogResult.Yes;};
+                                        answerTransfer.Start();
+                                        window.Close();
+                                        check(window.Visible&&!home.Visible&&draftPrompts==0,
+                                            "Cancelar a saída mantém o projeto aberto e evita salvar antes da decisão.");
+                                        window.Close();
+                                    }catch(Exception ex){
+                                        failure=ex;
+                                        send.Completed=true;
+                                        window.testProjectSaveChoice=()=>DialogResult.No;
+                                        window.Close();
+                                    }
+                                };
+                                closeProject.Start();
+                                home.OpenRequested(remaining);
+                                answerTransfer.Stop();
+                                if(failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+                                check(home.IsDisposed&&transferPrompts==2&&draftPrompts==1&&
+                                    store.Load(remaining).List.Mods.First().Tags.Contains("salvar ao fechar"),
+                                    "Confirmar o X salva o rascunho e encerra o aplicativo sem voltar à Home ou perguntar novamente.");
+                            }
                             completed=true;
                         }catch(Exception ex){failure=ex;}finally{Application.ExitThread();}
                     };Application.Run(home);
