@@ -150,9 +150,8 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         editorTips.SetToolTip(nsfw,T("Conteúdo adulto","Not Safe for Work"));
         SetAdult(adultOverride??entry.Nsfw);
 
-        groupTitle=new TableLayoutPanel { Name="VariantGroupTitle",Dock=DockStyle.Fill,AutoSize=true,Margin=new Padding(3,0,3,3),ColumnCount=2,RowCount=1 };
+        groupTitle=new TableLayoutPanel { Name="VariantGroupTitle",Dock=DockStyle.Fill,AutoSize=true,Margin=new Padding(3,0,3,3),ColumnCount=1,RowCount=1 };
         groupTitle.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-        groupTitle.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         groupName.Text=initialEntry.Name;
         groupName.AccessibleName=T("Nome do grupo","Group name");
         editorTips.SetToolTip(groupName,T("Dê dois cliques para editar o nome do grupo.","Double-click to edit the group name."));
@@ -166,13 +165,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         var groupField=FieldFor(groupName,false);
         groupField.Margin=Padding.Empty;
         groupTitle.Controls.Add(groupField,0,0);
-        if(initialEntry.Nsfw){
-            var badge=LabelFor("NSFW");
-            badge.Font=GeneralStyle.Font(10,true);
-            badge.Anchor=AnchorStyles.Left;
-            badge.Margin=new Padding(12,0,3,0);
-            groupTitle.Controls.Add(badge,1,0);
-        }
+
         AddEditorRow(layout,groupTitle);
         variants.AccessibleName = fixedChoices?T("Versão do corpo","Body version"):T("Fonte · nome da versão", "Source · version name");
         variants.Margin = new Padding(3, 0, 3, 8);
@@ -374,7 +367,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
             field.TextChanged += (s, e) => ValidateInputs();
         GeneralStyle.Apply(this, GeneralStyle.Dark);
 
-        if(groupTitle.Controls.Count>1)groupTitle.Controls[1].ForeColor=GeneralStyle.Danger;
+
         Action sizeActions=()=>{
             bool nexusSelected=!attachment&&GeneralNexusLink.Parse(sources.Text.Trim())!=null;
             quickFill.Visible=nexusSelected;

@@ -241,6 +241,22 @@ internal sealed partial class GeneralModWindow {
                 .SequenceEqual(new[]{GeneralModLibrary.EbbBody,GeneralModLibrary.PushBody,GeneralModLibrary.NaturalBody}),
                 "A gaveta mostra três escolhas de corpo e mantém Togglable Feet fora dela.");
             var optionRows=form.grid.Rows.Cast<DataGridViewRow>().Where(row=>row.Tag is Work).ToList();
+            var bodyOptions=optionRows.Select(row=>(Work)row.Tag).ToList();
+            var nsfwBefore=bodyOptions.Select(work=>work.Variant.Nsfw).ToArray();
+            var inactive=bodyOptions.First(work=>work.BodyChoice!=form.ActiveBodyChoice(bodyRows[0]));
+            foreach(var work in bodyOptions)work.Variant.Nsfw=work==inactive;
+            form.DrawRows();
+            check(Equals(form.ModRows().Single(row=>Equals(row.Cells["Name"].Value,"Big Body")).Cells["Name"].Tag,true)&&
+                form.grid.Rows.Cast<DataGridViewRow>().Where(row=>row.Tag is Work&&Equals(row.Cells["Name"].Tag,true))
+                    .Select(row=>((Work)row.Tag).BodyChoice).SequenceEqual(new[]{inactive.BodyChoice}),
+                "Uma opção NSFW inativa marca a gaveta e somente a linha daquela versão.");
+            inactive.Variant.Nsfw=false;
+            form.DrawRows();
+            check(Equals(form.ModRows().Single(row=>Equals(row.Cells["Name"].Value,"Big Body")).Cells["Name"].Tag,false),
+                "A gaveta sem opções NSFW não recebe o selo.");
+            for(int i=0;i<bodyOptions.Count;i++)bodyOptions[i].Variant.Nsfw=nsfwBefore[i];
+            form.DrawRows();
+            optionRows=form.grid.Rows.Cast<DataGridViewRow>().Where(row=>row.Tag is Work).ToList();
             check(optionRows.All(row=>Equals(row.Cells["Origin"].Value,"Mod Loader")&&row.Cells["Size"].Value.ToString()!="—")&&
                 optionRows.Count(row=>Equals(row.Cells["Status"].Tag,true))==1&&
                 new[]{"Name","Variant","Size"}.All(column=>optionRows.Single(row=>Equals(row.Cells["Status"].Tag,true)).Cells[column].Style.Font.Bold)&&
@@ -301,6 +317,8 @@ internal sealed partial class GeneralModWindow {
             check(picker.Items.Cast<string>().SequenceEqual(new[]{"EBB + RB","EBBP + RB","EBBN + RB"})&&title.Visible&&
                 EditorField<TextBox>(editor,"groupName").Text=="Big Body"&&((TableLayoutPanel)title.Parent).GetRow(title)<((TableLayoutPanel)title.Parent).GetRow(picker.Parent),
                 "O título Big Body aparece acima do seletor, com as três escolhas da gaveta.");
+            check(title.Controls.Count==1&&EditorField<GeneralButton>(editor,"nsfw").BareInk==GeneralStyle.Danger,
+                "O título do grupo fica sem selo no editor e a marcação permanece no nome do mod.");
             check(source.Text==current.Variant.Sources[0],"EBB apresenta o link do próprio perfil.");
             description.Text="Descrição exclusiva EBB";
             editor.MergeSourceTags(new[]{"Tag EBB"});

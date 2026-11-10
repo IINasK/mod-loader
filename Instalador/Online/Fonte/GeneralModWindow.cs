@@ -489,6 +489,7 @@ internal sealed partial class GeneralModWindow : Form {
                 int i=grid.Rows.Add(marked.Contains(m.Id),picking?m.Name:ModDisplayName(m),NexusVariantName(m),GeneralStatusPresentation.Label(InstallationStatus(m,status)),hasProgress?(object)pct:null,ModSpace(m));var row=grid.Rows[i];row.Tag=m.Id;row.Cells["Status"].ToolTipText=TableStatusDetail(m,key,status);
                 row.Cells["Size"].ToolTipText=SpaceTip(m);
                 row.Cells["Name"].ToolTipText=v.Description??m.Description;
+                row.Cells["Name"].Tag=GeneralModLibrary.BodyOption(state.BodyChoice,m,v).Nsfw??m.Nsfw;
                 var origin=row.Cells["Origin"];
                 origin.Value="Mod Loader";
                 origin.ToolTipText=v.CyberpunkId==null
@@ -568,6 +569,7 @@ internal sealed partial class GeneralModWindow : Form {
         cell.Tag=versions;
         cell.Style.Padding=new Padding(10,0,30,0);
         cell.ToolTipText=T("Mostrar ou ocultar outras versões","Show or hide other versions");
+        parent.Cells["Name"].Tag=versions.Any(work=>work.Variant.Nsfw??work.Entry.Nsfw);
         if(!expandedVersions.Contains(DrawerKey(entry)))return;
         bool body=IsBigBody(entry);
         parent.Cells["Mark"].Tag="body-branch";
@@ -579,6 +581,7 @@ internal sealed partial class GeneralModWindow : Form {
             string status=chosen?T("Selecionado","Selected"):T("Não selecionado","Not selected");
             var row=grid.Rows[grid.Rows.Add(null,name,label,status,null,BodyOptionSpace(work))];
             row.Tag=work;
+            row.Cells["Name"].Tag=work.Variant.Nsfw??work.Entry.Nsfw;
             row.Height=36;
             row.ReadOnly=true;
             row.Cells["Mark"].Tag=index==versions.Count-1?CategoryBranch.Last:CategoryBranch.Middle;
@@ -797,14 +800,7 @@ internal sealed partial class GeneralModWindow : Form {
             var value=selected==0?System.Windows.Forms.VisualStyles.CheckBoxState.UncheckedNormal:selected==rows.Count?System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal:System.Windows.Forms.VisualStyles.CheckBoxState.MixedNormal;
             CheckBoxRenderer.DrawCheckBox(e.Graphics,new Point(e.CellBounds.Left+16,e.CellBounds.Top+(e.CellBounds.Height-14)/2),value);e.Handled=true;return;
         }
-        if(e.RowIndex<0||e.ColumnIndex!=1)return;
-        var row=grid.Rows[e.RowIndex];
-        var child=row.Tag as Work;
-        string id=row.Tag as string;
-        if(id==null&&child==null)return;
-        var mod=child!=null?child.Entry:state.List.Mods.Single(m=>m.Id==id);
-        var variant=child==null?GeneralModLibrary.BodyOption(state.BodyChoice,mod,Selected(mod)):child.Variant;
-        if(!(variant.Nsfw??mod.Nsfw))return;
+        if(e.RowIndex<0||e.ColumnIndex!=1||!Equals(grid.Rows[e.RowIndex].Cells["Name"].Tag,true))return;
         string name=Convert.ToString(e.FormattedValue);
         e.PaintBackground(e.ClipBounds,true);
         var box=e.CellBounds;box.Inflate(-10,0);
