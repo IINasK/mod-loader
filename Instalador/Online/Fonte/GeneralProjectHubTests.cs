@@ -191,7 +191,14 @@ internal sealed partial class GeneralModWindow {
             }
         }
     }
-    static void TestDescriptionWheel(Form editor,TextBox description,GeneralScrollView descriptionView,Action<bool,string> check){
+    static void ClickScrollableField(Control field){
+        field.Focus();
+        var point=new IntPtr((4<<16)|4);
+        SendUiMouseMessage(field.Handle,0x0201,new IntPtr(1),point);
+        SendUiMouseMessage(field.Handle,0x0202,IntPtr.Zero,point);
+    }
+
+    static void TestDescriptionWheel(GeneralModEditor editor,TextBox description,GeneralScrollView descriptionView,Action<bool,string> check){
         if(SystemInformation.MouseWheelScrollLines==0)return;
         var page=AllControls(editor).OfType<GeneralScrollView>().Single(view=>view.Name=="ModEditorScroll");
         int previous=page.Bar.Value;
@@ -208,10 +215,20 @@ internal sealed partial class GeneralModWindow {
         description.Text=original;
         descriptionView.RefreshScroll();
         descriptionView.ScrollTo(0);
+        description.Focus();
+        page.ScrollTo(0);
+        wheel(-notch);
+        check(descriptionView.Bar.Value==0&&page.Bar.Value>0,
+            "Focar a descrição sem clicar mantém a roda no editor.");
+        page.ScrollTo(page.Bar.Limit);
+        wheel(-notch);
+        check(descriptionView.Bar.Value==0&&page.Bar.Value==page.Bar.Limit,
+            "No fim do editor, a caixa sem clique continua parada mesmo quando pode rolar.");
+        ClickScrollableField(description);
         page.ScrollTo(0);
         wheel(-notch);
         check(descriptionView.Bar.Value>0&&page.Bar.Value==0,
-            "Uma descrição longa usa primeiro a sua própria rolagem.");
+            "Após clicar, uma descrição longa usa primeiro a sua própria rolagem.");
         descriptionView.ScrollTo(descriptionView.Bar.Limit);
         wheel(-notch);
         check(descriptionView.Bar.Value==descriptionView.Bar.Limit&&page.Bar.Value>0,
@@ -224,6 +241,35 @@ internal sealed partial class GeneralModWindow {
         wheel(notch);
         check(descriptionView.Bar.Value==0&&page.Bar.Value<page.Bar.Limit,
             "No início da descrição, a roda para cima move o editor.");
+        EditorField<TextBox>(editor,"modName").Focus();
+        description.Focus();
+        page.ScrollTo(0);
+        wheel(-notch);
+        check(descriptionView.Bar.Value==0&&page.Bar.Value>0,
+            "Sair do campo desativa a rolagem interna até um novo clique.");
+        page.ScrollTo(previous);
+    }
+
+    static void TestArchiveTreeWheel(GeneralModEditor editor,GeneralArchiveDestinations destinations,Action<bool,string> check){
+        if(SystemInformation.MouseWheelScrollLines==0)return;
+        var tree=(ListBox)destinations.Controls.Find("ArchiveFileTree",true).Single();
+        var treeView=(GeneralScrollView)tree.Parent.Parent;
+        var page=AllControls(editor).OfType<GeneralScrollView>().Single(view=>view.Name=="ModEditorScroll");
+        int previous=page.Bar.Value;
+        var paths=Enumerable.Range(0,40).Select(index=>"mods/file"+index+".txt");
+        destinations.ShowPreview(GeneralArchivePreview.Load(null,null,paths,false));
+        treeView.RefreshScroll();
+        var notch=new IntPtr(-SystemInformation.MouseWheelScrollDelta<<16);
+        page.ScrollTo(0);
+        SendUiMouseMessage(tree.Handle,0x020a,notch,IntPtr.Zero);
+        check(treeView.Bar.Limit>0&&treeView.Bar.Value==0&&page.Bar.Value>0,
+            "Sem clicar, a roda sobre a árvore de destinos move o editor.");
+        ClickScrollableField(tree);
+        page.ScrollTo(0);
+        SendUiMouseMessage(tree.Handle,0x020a,notch,IntPtr.Zero);
+        check(treeView.Bar.Value>0&&page.Bar.Value==0,
+            "Clicar na árvore de destinos habilita sua rolagem interna.");
+        destinations.ShowPreview(null);
         page.ScrollTo(previous);
     }
 
@@ -299,6 +345,7 @@ internal sealed partial class GeneralModWindow {
                     "Description keeps its own scrollbar and grows on command from its resize grip.");
                 CaptureUi(editor,Path.Combine(root,"editor-themed-controls.png"));
                 TestDescriptionWheel(editor,description,descriptionView,check);
+                TestArchiveTreeWheel(editor,destinations,check);
                 input.Text="Preferida editada";
                 picker.Toggle();
                 var popup=picker.OpenPopup;

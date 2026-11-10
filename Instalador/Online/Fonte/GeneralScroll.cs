@@ -51,7 +51,7 @@ internal sealed class GeneralScrollView : Panel {
     readonly Control content;
     readonly bool panelContent,reserveBarSpace,fitPanelContent;
     NativeEvents events;
-    bool queued,refreshing;
+    bool queued,refreshing,wheelActivated;
     internal Control Content {get{return content;}}
     internal GeneralScrollBar Bar {get{return bar;}}
     [DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr handle,int message,IntPtr first,IntPtr second);
@@ -63,6 +63,9 @@ internal sealed class GeneralScrollView : Panel {
         var grid=content as DataGridView;if(grid!=null){grid.ScrollBars=ScrollBars.None;grid.Scroll+=(s,e)=>Queue();grid.RowsAdded+=(s,e)=>Queue();grid.RowsRemoved+=(s,e)=>Queue();grid.RowStateChanged+=(s,e)=>{if((e.StateChanged&DataGridViewElementStates.Visible)!=0)Queue();};}
         var list=content as ListBox;if(list!=null){list.HorizontalScrollbar=false;list.IntegralHeight=false;}
         bar.Changed=ScrollTo;content.HandleCreated+=(s,e)=>Attach();content.HandleDestroyed+=(s,e)=>{if(events!=null)events.ReleaseHandle();};content.TextChanged+=(s,e)=>Queue();content.FontChanged+=(s,e)=>Queue();content.Resize+=(s,e)=>Queue();
+        content.MouseDown+=ActivateWheel;
+        bar.MouseDown+=ActivateWheel;
+        Leave+=(s,e)=>wheelActivated=false;
         if(fitPanelContent){
             content.Layout+=(s,e)=>{if(!refreshing)Queue();};
             content.VisibleChanged+=(s,e)=>Queue();
@@ -134,18 +137,31 @@ internal sealed class GeneralScrollView : Panel {
         else if(text!=null){int current=(int)SendMessage(text.Handle,0x00ce,IntPtr.Zero,IntPtr.Zero);SendMessage(text.Handle,0x00b6,IntPtr.Zero,(IntPtr)(value-current));}
         RefreshScroll();
     }
+    void ActivateWheel(object sender,MouseEventArgs e){
+        if(e.Button==MouseButtons.Left)wheelActivated=true;
+    }
+
+    GeneralScrollView OuterView(){
+        for(Control owner=Parent;owner!=null;owner=owner.Parent){
+            var view=owner as GeneralScrollView;
+            if(view!=null)return view;
+        }
+        return null;
+    }
+
     internal bool RouteWheel(int delta){
         if(delta==0||SystemInformation.MouseWheelScrollLines==0)return false;
-        for(Control owner=this;owner!=null;owner=owner.Parent){
-            var view=owner as GeneralScrollView;
-            if(view==null)continue;
-            view.RefreshScroll();
-            var scroll=view.bar;
-            if(!scroll.Visible||(delta>0?scroll.Value==0:scroll.Value==scroll.Limit))continue;
-            scroll.Wheel(delta);
-            return true;
+        var outer=OuterView();
+        if(outer==null||(wheelActivated&&ContainsFocus)){
+            RefreshScroll();
+            if(bar.Visible&&(delta>0?bar.Value>0:bar.Value<bar.Limit)){
+                bar.Wheel(delta);
+                return true;
+            }
         }
-        return false;
+        if(outer==null)return false;
+        outer.RouteWheel(delta);
+        return true;
     }
 
     protected override void Dispose(bool disposing){if(disposing&&events!=null)events.ReleaseHandle();base.Dispose(disposing);}
