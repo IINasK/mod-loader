@@ -285,7 +285,8 @@ internal sealed partial class GeneralModWindow : Form {
         var menu=GeneralMenuRenderer.Create();
         GeneralMenuRenderer.Add(menu,T("Detalhes e variantes","Details and variants"),()=>OpenRowEditor(grid.CurrentRow));
         GeneralMenuRenderer.Add(menu,T("Abrir fonte no navegador","Open source in browser"),()=>Guard(()=>{var item=FocusedEntry();if(item!=null){var url=Selected(item).Sources.FirstOrDefault(GeneralModDownload.IsWebSource);if(url!=null)GeneralModDownload.OpenSource(url);}}));
-        GeneralMenuRenderer.Add(menu,T("Tirar da lista","Remove from list"),()=>Guard(RemoveEntry));
+        var removeEntry=GeneralMenuRenderer.Add(menu,T("Tirar da lista","Remove from list"),()=>Guard(RemoveEntry));
+        menu.Opening+=(s,e)=>{var focused=FocusedEntry();removeEntry.Visible=focused!=null&&!IsBigBody(focused);};
         var linkInventory=GeneralMenuRenderer.Add(menu,T("Vincular link do Nexus…","Link Nexus URL…"),()=>
             SetInventorySource(grid.CurrentRow==null?null:grid.CurrentRow.Tag as P2PSyncDifference));
         var splitInventory=GeneralMenuRenderer.Add(menu,T("Desfazer agrupamento ou vínculo","Undo grouping or link"),()=>Guard(()=>{
@@ -448,13 +449,20 @@ internal sealed partial class GeneralModWindow : Form {
             var segment=ProjectCoverage().FirstOrDefault(item=>String.Equals(item.Category,coverageFilter.Category,StringComparison.OrdinalIgnoreCase));
             allowed=new HashSet<string>(segment==null?new string[0]:segment.ModIds,StringComparer.Ordinal);
         }
-        return state.List.Mods.Where(m=>(allowed==null||allowed.Contains(m.Id))&&ColumnAllows(m)).ToList();
+        var candidates=state.List.Mods.Where(m=>allowed==null||allowed.Contains(m.Id)).ToList();
+        var body=BigBodyRepresentative(candidates);
+        return candidates.Where(m=>(!IsBigBody(m)||m==body)&&ColumnAllows(m)).ToList();
     }
     void DrawRows(){
         if(grid==null)return;string old=grid.CurrentRow==null?null:grid.CurrentRow.Tag as string;
         int scroll=grid.FirstDisplayedScrollingRowIndex;drawing=true;hoveredRow=-1;grid.Rows.Clear();
         var visible=VisibleMods();var groups=new List<string>();
         bool picking=associationChoice!=null;
+        var bodyRow=picking?null:visible.FirstOrDefault(IsBigBody);
+        if(bodyRow!=null&&state.List.Mods.Any(mod=>IsBigBody(mod)&&marked.Contains(mod.Id))){
+            marked.RemoveWhere(id=>id!=bodyRow.Id&&state.List.Mods.Any(mod=>mod.Id==id&&IsBigBody(mod)));
+            marked.Add(bodyRow.Id);
+        }
         var alternativeGroups=state.List.Mods.Where(mod=>mod.AlternativeGroup!=null)
             .GroupBy(mod=>mod.AlternativeGroup).Where(group=>group.Count()>1)
             .ToDictionary(group=>group.Key,group=>group.FirstOrDefault(mod=>GeneralStatusPresentation.Kind(ListStatus(mod))=="installed")
@@ -475,7 +483,7 @@ internal sealed partial class GeneralModWindow : Form {
             bool collapsed=CategoryCollapsed(section);
             foreach(var m in members){
                 var v=Selected(m);string key=Key(m,v),status=ListStatus(m);int pct;bool hasProgress=progress.TryGetValue(key,out pct);
-                int i=grid.Rows.Add(marked.Contains(m.Id),m.Name,NexusVariantName(m),GeneralStatusPresentation.Label(status),hasProgress?(object)pct:null,ModSpace(m));var row=grid.Rows[i];row.Tag=m.Id;row.Cells["Status"].ToolTipText=StatusDetail(key,status);
+                int i=grid.Rows.Add(marked.Contains(m.Id),picking?m.Name:ModDisplayName(m),NexusVariantName(m),GeneralStatusPresentation.Label(status),hasProgress?(object)pct:null,ModSpace(m));var row=grid.Rows[i];row.Tag=m.Id;row.Cells["Status"].ToolTipText=StatusDetail(key,status);
                 row.Cells["Size"].ToolTipText=SpaceTip(m);
                 row.Cells["Name"].ToolTipText=String.Join("\n",new[]{m.Description,m.Tags.Count==0?null:"Tags · "+String.Join(", ",m.Tags)}
                     .Where(value=>!String.IsNullOrWhiteSpace(value)));
@@ -490,7 +498,7 @@ internal sealed partial class GeneralModWindow : Form {
                 }
                 var groupBadges=new List<KeyValuePair<string,Color>>();
                 GeneralAlternativeGroup group;GeneralModEntry active;
-                if(m.AlternativeGroup!=null&&alternativeGroups.TryGetValue(m.AlternativeGroup,out active)&&state.List.AlternativeGroups.TryGetValue(m.AlternativeGroup,out group))
+                if(!IsBigBody(m)&&m.AlternativeGroup!=null&&alternativeGroups.TryGetValue(m.AlternativeGroup,out active)&&state.List.AlternativeGroups.TryGetValue(m.AlternativeGroup,out group))
                     groupBadges.Add(new KeyValuePair<string,Color>(group.Name??GeneralModLibrary.GroupDefaultName(m.AlternativeGroup),
                         GroupBadgeColor(ColorTranslator.FromHtml(group.Color),m==active)));
                 foreach(string compatibility in m.CompatibilityGroups.Concat(v.CompatibilityGroups).Distinct(StringComparer.OrdinalIgnoreCase))
@@ -810,7 +818,14 @@ internal sealed partial class GeneralModWindow : Form {
     void OpenRowEditor(DataGridViewRow row){
         if(row==null)return;
         var id=row.Tag as string;
-        if(id!=null)Edit(state.List.Mods.Single(mod=>mod.Id==id));
+        if(id!=null){
+            var mod=state.List.Mods.Single(item=>item.Id==id);
+            if(IsBigBody(mod)&&!scanning&&!working){
+                bool canceled;
+                var chosen=ChooseBigBody(state.List.Mods,state.Destination,out canceled);
+                if(chosen!=null)EditBodyOption(chosen);
+            }else Edit(mod);
+        }
         else if(row.Tag is P2PSyncDifference)EditDetectedMod((P2PSyncDifference)row.Tag);
     }
 
@@ -827,11 +842,12 @@ internal sealed partial class GeneralModWindow : Form {
     }
 
     async void Edit(GeneralModEntry item){await EditMod(item);}
-    async Task EditMod(GeneralModEntry item,bool fromInventory=false){
+    async void EditBodyOption(Work body){await EditMod(body.Entry,initialVariant:body.Variant);}
+    async Task EditMod(GeneralModEntry item,bool fromInventory=false,GeneralModVariant initialVariant=null){
         if(scanning||associationChoice!=null)return;
         if((current!=null&&current.Entry.Id==item.Id)||(priorityCurrent!=null&&priorityCurrent.Entry.Id==item.Id)){detail.Text=T("Aguarde esta operação terminar antes de editar suas fontes.","Wait for this operation to finish before editing its sources.");return;}
         try{
-            bool existing=state.List.Mods.Contains(item);var selected=Selected(item);
+            bool existing=state.List.Mods.Contains(item);var selected=initialVariant??Selected(item);
             string info=T("Destino: ","Destination: ")+(state.Destination??T("Escolha uma pasta na tela principal.","Choose a folder on the main screen."));
             var recipe=catalog.Packages.FirstOrDefault(m=>m.Id==selected.CyberpunkId);if(recipe!=null)info=T("Versão do pacote: ","Package version: ")+recipe.Version+"   ·   "+info;
             string pack=ActivePreset!=null?ActivePreset.Name:project==null?null:project.Name;
@@ -861,7 +877,7 @@ internal sealed partial class GeneralModWindow : Form {
                     dialog.Result.Variants.Any(replacement=>replacement.Id==old.Id&&!GeneralInstallRoutes.Same(old.InstallRoutes,replacement.InstallRoutes))))
                     throw new IOException(T("Desinstale a versão recebida antes de mudar seu destino.","Uninstall the received version before changing its destination."));
                 BeginProjectEdit();
-                if(working)dialog.Result.AlternativeGroup=item.AlternativeGroup;
+                if(working||IsBigBody(item))dialog.Result.AlternativeGroup=item.AlternativeGroup;
                 else{
                     GeneralModLibrary.AssociateAlternative(dialog.Result,dialog.LinkedAlternative);
                     if(dialog.Result.AlternativeGroup!=null&&dialog.GroupStyle!=null)
@@ -1089,7 +1105,7 @@ internal sealed partial class GeneralModWindow : Form {
     }
 
     void RemoveEntry(){
-        var item=FocusedEntry();if(item==null||working||scanning)return;
+        var item=FocusedEntry();if(item==null||IsBigBody(item)||working||scanning)return;
         if(GeneralDialog.Message(this,T("Tirar da lista sem desinstalar?","Remove from the list without uninstalling?")+"\n"+item.Name,T("Tirar da lista","Remove from list"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
         BeginProjectEdit();
         state.List.Mods.Remove(item);state.ChosenVariants.Remove(item.Id);foreach(var p in state.List.Presets)p.ModIds.Remove(item.Id);marked.Remove(item.Id);FinishProjectEdit();DrawRows();

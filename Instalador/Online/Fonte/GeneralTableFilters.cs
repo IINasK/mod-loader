@@ -91,7 +91,7 @@ internal sealed partial class GeneralModWindow {
     }
     IEnumerable<string> ModGroups(GeneralModEntry mod){
         GeneralAlternativeGroup group;
-        if(mod.AlternativeGroup!=null&&state.List.AlternativeGroups.TryGetValue(mod.AlternativeGroup,out group))
+        if(!IsBigBody(mod)&&mod.AlternativeGroup!=null&&state.List.AlternativeGroups.TryGetValue(mod.AlternativeGroup,out group))
             yield return group.Name??GeneralModLibrary.GroupDefaultName(mod.AlternativeGroup);
         foreach(string value in mod.CompatibilityGroups.Concat(Selected(mod).CompatibilityGroups))
             yield return value;
@@ -102,8 +102,8 @@ internal sealed partial class GeneralModWindow {
         return (categoryFilters==null||categoryFilters.Contains(mod.Category??""))&&
             (variantFilters==null||variantFilters.Contains(NexusVariantName(mod)))&&(groupFilters==null||ModGroups(mod).Any(groupFilters.Contains))&&
             (statusFilters==null||statusFilters.Any(value=>StatusFilterKey(value)==StatusFilterKey(GeneralStatusPresentation.Label(raw))))&&
-            (String.IsNullOrWhiteSpace(nameFilter)||mod.Name.IndexOf(nameFilter,StringComparison.CurrentCultureIgnoreCase)>=0)&&
-            GeneralModSearch.Matches(searchTerms, new[]{mod.Nsfw?mod.Name+" NSFW Not Safe for Work":mod.Name,NexusVariantName(mod),GeneralStatusPresentation.Label(raw)}
+            (String.IsNullOrWhiteSpace(nameFilter)||(ModDisplayName(mod)+" "+mod.Name).IndexOf(nameFilter,StringComparison.CurrentCultureIgnoreCase)>=0)&&
+            GeneralModSearch.Matches(searchTerms, new[]{ModDisplayName(mod),mod.Nsfw?mod.Name+" NSFW Not Safe for Work":mod.Name,NexusVariantName(mod),GeneralStatusPresentation.Label(raw)}
                 .Concat(mod.Tags).Concat(ModGroups(mod)).ToArray());
     }
     void ShowColumnFilter(int column,bool groups=false){

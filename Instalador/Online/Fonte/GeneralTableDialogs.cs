@@ -105,17 +105,19 @@ internal sealed class GeneralPresetActionsDialog : GeneralDialog {
 internal sealed class GeneralModAlternativeDialog : GeneralDialog {
     internal string SelectedId { get; private set; }
 
-    internal GeneralModAlternativeDialog(IReadOnlyList<GeneralModEntry> entries)
-        : base(GeneralStyle.T("Escolher uma versão","Choose one version")) {
+    internal GeneralModAlternativeDialog(IReadOnlyList<GeneralModEntry> entries,string title=null,int suggested=-1)
+        : base(title??GeneralStyle.T("Escolher uma versão","Choose one version")) {
         Name="ModAlternativeChoice";ClientSize=new Size(680,445);
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Padding=new Padding(20,8,20,20)};
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute,48));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.Controls.Add(GeneralModEditor.LabelFor(GeneralStyle.T(
+        layout.Controls.Add(GeneralModEditor.LabelFor(title==null?GeneralStyle.T(
             "Estes mods são alternativas. Escolha uma versão para esta instalação.",
-            "These mods are alternatives. Choose one version for this installation.")),0,0);
+            "These mods are alternatives. Choose one version for this installation."):GeneralStyle.T(
+            "Escolha o corpo. A troca desabilita a versão ativa e seus complementos incompatíveis.",
+            "Choose the body. Switching disables the active version and its incompatible add-ons.")),0,0);
         var options=new GeneralPicker{Name="AlternativeChoices",Dock=DockStyle.Fill,DropDownStyle=ComboBoxStyle.DropDownList};
         foreach(var entry in entries)options.Items.Add(entry.Name);
         layout.Controls.Add(options,0,1);
@@ -126,9 +128,10 @@ internal sealed class GeneralModAlternativeDialog : GeneralDialog {
             SelectedId=entries[options.SelectedIndex].Id;Complete(DialogResult.OK);
         },true);
         use.Name="UseAlternative";use.Enabled=false;
-        var skip=GeneralStyle.Button(GeneralStyle.T("Pular grupo","Skip group"),()=>{SelectedId="";Complete(DialogResult.OK);});
+        var skip=GeneralStyle.Button(title==null?GeneralStyle.T("Pular grupo","Skip group"):GeneralStyle.T("Pular mod","Skip mod"),()=>{SelectedId="";Complete(DialogResult.OK);});
         var cancel=GeneralStyle.Button(GeneralStyle.T("Cancelar","Cancel"),()=>Complete(DialogResult.Cancel));
         options.SelectedIndexChanged+=(s,e)=>{use.Enabled=options.SelectedIndex>=0;};
+        options.SelectedIndex=suggested;
         text.Text=String.Join("\r\n\r\n",entries.Select(entry=>entry.Name+(String.IsNullOrWhiteSpace(entry.Description)?"":"\r\n"+entry.Description)));
         buttons.Controls.Add(use);buttons.Controls.Add(skip);buttons.Controls.Add(cancel);
         layout.Controls.Add(buttons,0,3);Content.Controls.Add(layout);CancelButton=cancel;

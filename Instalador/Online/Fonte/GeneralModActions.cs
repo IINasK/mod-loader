@@ -10,6 +10,46 @@ internal sealed partial class GeneralModWindow {
     Button primaryAction;
     enum ModAction { None, Disable, ChooseDependency, Enable, Change, Install, Download }
 
+    static bool IsBigBody(GeneralModEntry mod) {
+        return mod.AlternativeGroup==GeneralModLibrary.BodyGroup&&
+            (mod.Id==GeneralModLibrary.VanillaFeetId||GeneralModLibrary.IsHystBody(mod.Id));
+    }
+
+    static string ModDisplayName(GeneralModEntry mod) {
+        return IsBigBody(mod)?"Big Body":mod.Name;
+    }
+
+    GeneralModEntry BigBodyRepresentative(IEnumerable<GeneralModEntry> entries) {
+        var body=entries.Where(IsBigBody).ToList();
+        return body.FirstOrDefault(IsActiveAlternative)??body.FirstOrDefault(mod=>mod.Id==GeneralModLibrary.VanillaFeetId)??body.FirstOrDefault();
+    }
+
+    List<Work> BigBodyVersions(IEnumerable<GeneralModEntry> entries,bool dlc) {
+        return entries.Where(IsBigBody).Select(entry=>{
+            var current=Selected(entry);
+            if(GeneralModLibrary.IsHystBody(entry.Id)&&!IsActiveAlternative(entry)&&!state.ChosenVariants.ContainsKey(entry.Id))
+                current=entry.Variants.FirstOrDefault(variant=>variant.Id==(dlc?"with-refit-dlc":"with-refit-base"))??current;
+            if(!dlc&&current.Id=="with-refit-dlc")
+                current=entry.Variants.FirstOrDefault(variant=>variant.Id=="with-refit-base")??current;
+            return new Work{Entry=entry,Variant=current,SwitchAlternatives=true,SaveVariant=true};
+        }).ToList();
+    }
+
+    Work ChooseBigBody(IEnumerable<GeneralModEntry> entries,string root,out bool canceled) {
+        var versions=BigBodyVersions(entries,IsCyberpunk(root)&&GameEdition.HasPL(root));
+        var active=BigBodyRepresentative(versions.Select(work=>work.Entry));
+        var labels=versions.Select(work=>new GeneralModEntry{
+            Id=work.Entry.Id,Name=work.Entry.Id==GeneralModLibrary.VanillaFeetId
+                ?T("Corpo padrão · Togglable Feet","Vanilla body · Togglable Feet")
+                :work.Entry.Id=="hyst-ebb-rb"?"Hyst EBB + RB · Natural (EBBN)":"Hyst EBBP + RB · Push-Up",
+            Description=(work.Entry.Id==GeneralModLibrary.VanillaFeetId?"":work.Variant.Name+"\r\n")+work.Entry.Description
+        }).ToList();
+        using(var dialog=new GeneralModAlternativeDialog(labels,"Big Body",versions.FindIndex(work=>work.Entry==active))){
+            canceled=dialog.ShowDialog(this)!=DialogResult.OK;
+            return canceled?null:versions.FirstOrDefault(work=>work.Entry.Id==dialog.SelectedId);
+        }
+    }
+
     List<Work> SelectedJobs() {
         var jobs = Marked();
         if (jobs.Count == 0 && FocusedEntry() != null) jobs.Add(MakeWork(FocusedEntry()));
@@ -23,6 +63,8 @@ internal sealed partial class GeneralModWindow {
         if(status==GeneralStatusPresentation.NexusManual)return ModAction.None;
         if(GeneralModLibrary.NeedsDependencyVersion(work.Entry,work.Variant))return ModAction.ChooseDependency;
         bool active = GeneralStatusPresentation.Kind(status) == "installed";
+        if(IsBigBody(work.Entry)&&(active||status==GeneralStatusPresentation.ManualBody))
+            return ModAction.Change;
         if (active) {
             if (work.Variant.CyberpunkId == null || !Recipe(work).Immutable) return ModAction.Disable;
             return ModAction.None;
@@ -145,6 +187,16 @@ internal sealed partial class GeneralModWindow {
                         OwnerKeys = owned ? fixedWork[package.Id].Select(work => work.Key).ToList() : new List<string> { package.Id }
                     });
                 }
+            }
+            foreach(var work in jobs.Where(work=>IsBigBody(work.Entry)&&GeneralModLibrary.IsHystBody(work.Entry.Id))){
+                if(allFiles.Any(file=>file.OwnerKeys.Contains(work.Key)))continue;
+                var verified=new List<InstalledSnapshotFile>();
+                var known=seed.Mods.FirstOrDefault(mod=>mod.Id==work.Entry.Id);
+                var active=InstalledSnapshot.DetectManualHyst(root,work.Entry,known,verified);
+                if(active==null||active.Id!=work.Variant.Id)continue;
+                allFiles.AddRange(verified.Select(file=>new ProjectDeleteFile{
+                    Path=file.Path, Hash=file.Sha256, Size=file.Size, Owned=true, OwnerKeys=new List<string>{work.Key}
+                }));
             }
         }
 
@@ -287,6 +339,13 @@ internal sealed partial class GeneralModWindow {
                     return GeneralStatusPresentation.Kind(status) == "installed" || status == GeneralStatusPresentation.ManualBody;
                 });
             if (conflict != null) found.Add(conflict);
+        }
+        if(IsBigBody(incoming.Entry)&&incoming.Entry.Id!="hyst-ebb-rb"&&found.Any(old=>old.Entry.Id=="hyst-ebb-rb")){
+            var eclipse=state.List.Mods.FirstOrDefault(entry=>entry.Id==GeneralModLibrary.EclipseTattooId);
+            if(eclipse!=null){
+                var tattoo=MakeWork(eclipse);
+                if(GeneralStatusPresentation.Kind(Status(tattoo,root))=="installed")found.Add(tattoo);
+            }
         }
         return found;
     }

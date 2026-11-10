@@ -66,7 +66,7 @@ public sealed class GeneralModLibrary {
     };
     internal const string BodyCategory = "Melhorias do corpo";
     internal const string VanillaFeetId = "mod-7049";
-    const string BodyGroup = "hyst-femv-body";
+    internal const string BodyGroup = "hyst-femv-body";
     internal const string EclipseTattooId = "mod-33230";
     internal static bool IsHystBody(string id) { return id == "hyst-ebb-rb" || id == "hyst-ebbp-rb"; }
     internal static bool IsFacialMod(string id) { return id.StartsWith("face-", StringComparison.Ordinal); }
@@ -131,7 +131,9 @@ public sealed class GeneralModLibrary {
         if(!list.Mods.Any(mod=>IsHystBody(mod.Id)))return false;
         var ungrouped=list.Mods.Where(mod=>(mod.Id==VanillaFeetId||IsHystBody(mod.Id))&&mod.AlternativeGroup!=BodyGroup).ToList();
         foreach(var mod in ungrouped)mod.AlternativeGroup=BodyGroup;
-        return ungrouped.Count!=0;
+        var feet=list.Mods.FirstOrDefault(mod=>mod.Id==VanillaFeetId&&mod.Category!=BodyCategory);
+        if(feet!=null)feet.Category=BodyCategory;
+        return ungrouped.Count!=0||feet!=null;
     }
 
     internal static bool GroupColorAvailable(GeneralModList list,string groupId,string color) {

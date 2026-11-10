@@ -293,51 +293,53 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
             AddEditorRow(layout, dependencyChips);
             dependencyChips.Controls.Add(addDependency);
 
-            var groupLabel = LabelFor(T("Grupo de alternativas", "Alternative group"));
-            groupLabel.Margin = new Padding(3, 10, 3, 3);
-            AddEditorRow(layout, groupLabel);
-            alternative = GeneralStyle.Button("", () => BeginLink(false));
-            alternative.Name = "AlternativeMod";
-            alternative.Dock = DockStyle.Fill;
-            alternative.AutoSize = false;
-            alternative.Height = 44;
-            alternative.Enabled = options.Count > 0;
-            editorTips.SetToolTip(alternative,T(
-                "Apenas um dos mods vinculados pode ficar ativo por vez.",
-                "Only one linked mod can be active at a time."));
-            unlink = GeneralStyle.Button(T("Desvincular", "Unlink"), () => SetLinkedAlternative(null));
-            unlink.Name = "UnlinkAlternative";
-            unlink.Dock = DockStyle.Fill;
-            var pairing = new TableLayoutPanel {
-                Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty
-            };
-            pairing.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
-            pairing.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            pairing.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            pairing.Controls.Add(alternative, 0, 0);
-            pairing.Controls.Add(unlink, 1, 0);
-            AddEditorRow(layout, pairing);
-            groupColor = (GeneralButton)GeneralStyle.Button("", ChooseGroupColor);
-            groupColor.Name = "AlternativeGroupColor";
-            groupColor.AccessibleName = T("Cor do grupo", "Group color");
-            groupColor.Bare = true;
-            groupColor.AutoSize = false;
-            groupColor.Margin = Padding.Empty;
-            var groupField = EditorField(T("Nome do grupo", "Group name"), groupName);
-            var groupSurface = (GeneralSurface)groupField.Controls[1];
-            groupSurface.Padding = new Padding(14, 4, 14, 4);
-            groupSurface.AutoSize = false;
-            groupSurface.Controls.Remove(groupName);
-            var groupRow = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
-            groupName.Dock = DockStyle.None;
-            groupRow.Controls.Add(groupName);
-            groupRow.Controls.Add(groupColor);
-            groupRow.Layout += (s,e) => LayoutInlineAction(groupRow, groupName, groupColor, 38);
-            groupSurface.Controls.Add(groupRow);
-            groupFields = groupField;
-            AddEditorRow(layout, groupFields);
-            groupName.TextChanged += (s, e) => ValidateInputs();
-            SetLinkedAlternative(options.FirstOrDefault(other => entry.AlternativeGroup != null && other.AlternativeGroup == entry.AlternativeGroup));
+            if(entry.AlternativeGroup!=GeneralModLibrary.BodyGroup){
+                var groupLabel = LabelFor(T("Grupo de alternativas", "Alternative group"));
+                groupLabel.Margin = new Padding(3, 10, 3, 3);
+                AddEditorRow(layout, groupLabel);
+                alternative = GeneralStyle.Button("", () => BeginLink(false));
+                alternative.Name = "AlternativeMod";
+                alternative.Dock = DockStyle.Fill;
+                alternative.AutoSize = false;
+                alternative.Height = 44;
+                alternative.Enabled = options.Count > 0;
+                editorTips.SetToolTip(alternative,T(
+                    "Apenas um dos mods vinculados pode ficar ativo por vez.",
+                    "Only one linked mod can be active at a time."));
+                unlink = GeneralStyle.Button(T("Desvincular", "Unlink"), () => SetLinkedAlternative(null));
+                unlink.Name = "UnlinkAlternative";
+                unlink.Dock = DockStyle.Fill;
+                var pairing = new TableLayoutPanel {
+                    Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty
+                };
+                pairing.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
+                pairing.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+                pairing.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+                pairing.Controls.Add(alternative, 0, 0);
+                pairing.Controls.Add(unlink, 1, 0);
+                AddEditorRow(layout, pairing);
+                groupColor = (GeneralButton)GeneralStyle.Button("", ChooseGroupColor);
+                groupColor.Name = "AlternativeGroupColor";
+                groupColor.AccessibleName = T("Cor do grupo", "Group color");
+                groupColor.Bare = true;
+                groupColor.AutoSize = false;
+                groupColor.Margin = Padding.Empty;
+                var groupField = EditorField(T("Nome do grupo", "Group name"), groupName);
+                var groupSurface = (GeneralSurface)groupField.Controls[1];
+                groupSurface.Padding = new Padding(14, 4, 14, 4);
+                groupSurface.AutoSize = false;
+                groupSurface.Controls.Remove(groupName);
+                var groupRow = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
+                groupName.Dock = DockStyle.None;
+                groupRow.Controls.Add(groupName);
+                groupRow.Controls.Add(groupColor);
+                groupRow.Layout += (s,e) => LayoutInlineAction(groupRow, groupName, groupColor, 38);
+                groupSurface.Controls.Add(groupRow);
+                groupFields = groupField;
+                AddEditorRow(layout, groupFields);
+                groupName.TextChanged += (s, e) => ValidateInputs();
+                SetLinkedAlternative(options.FirstOrDefault(other => entry.AlternativeGroup != null && other.AlternativeGroup == entry.AlternativeGroup));
+            }
         }
 
         installNote = LabelFor(installInfo ?? "");

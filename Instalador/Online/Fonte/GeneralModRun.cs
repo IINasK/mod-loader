@@ -12,7 +12,7 @@ internal sealed partial class GeneralModWindow {
     sealed class Work {
         internal GeneralModEntry Entry;
         internal GeneralModVariant Variant;
-        internal bool Ended,Applied,SwitchAlternatives,DependencyQueue;
+        internal bool Ended,Applied,SwitchAlternatives,DependencyQueue,SaveVariant;
         internal HashSet<string> DropConflicts;
         internal string DropDensity;
         internal double Fraction;
@@ -403,8 +403,21 @@ internal sealed partial class GeneralModWindow {
                 return;
             }
             List<Work> jobs;
-            var command=ClassifyJobs(SelectedJobs(),out jobs);
+            var selection=SelectedJobs();
+            var command=ClassifyJobs(selection,out jobs);
             if(command==ModAction.None)return;
+            if(jobs.Any(work=>IsBigBody(work.Entry))){
+                var preset=ActivePreset;
+                bool canceled;
+                var chosen=ChooseBigBody(state.List.Mods.Where(mod=>preset==null||preset.ModIds.Contains(mod.Id)),Root(),out canceled);
+                if(canceled)return;
+                jobs.RemoveAll(work=>IsBigBody(work.Entry));
+                if(chosen!=null){
+                    if(chosen.Entry.Id!="hyst-ebb-rb")jobs.RemoveAll(work=>work.Variant.CyberpunkId==GeneralModLibrary.EclipseTattooId);
+                    jobs.Add(chosen);
+                }
+                if(command==ModAction.Disable||command==ModAction.Enable)command=ModAction.Change;
+            }
             if(command==ModAction.ChooseDependency){await EditMod(jobs[0].Entry);return;}
             if(command==ModAction.Disable||command==ModAction.Enable){
                 await ToggleMods(jobs,Root(),command==ModAction.Enable);
@@ -424,10 +437,11 @@ internal sealed partial class GeneralModWindow {
 
             if(command==ModAction.Change){
                 foreach(var work in jobs)work.SwitchAlternatives=work.Entry.AlternativeGroup!=null;
-                if(jobs.Any(work=>work.SwitchAlternatives)&&GeneralDialog.Message(this,
+                if(jobs.Any(work=>work.SwitchAlternatives&&!IsBigBody(work.Entry))&&GeneralDialog.Message(this,
                     T("Desabilitar a versão ativa depois de preparar a substituta?","Disable the active version after the replacement is ready?"),
                     T("Mudar versão","Change version"),MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
             }
+            jobs=WithLinkedDependencies(jobs);
             var pending=new List<Work>();
             List<string> downloads;
             scanning=true;Busy(true);next.Visible=false;
@@ -455,6 +469,38 @@ internal sealed partial class GeneralModWindow {
         }
         return jobs.Where(work=>!excluded.Contains(work.Entry.Id)).ToList();
     }
+    List<Work> WithLinkedDependencies(List<Work> selected){
+        if(!selected.Any(work=>work.Variant.RequiredMods.Count>0))return selected;
+        var jobs=selected.ToDictionary(work=>work.Entry.Id,StringComparer.Ordinal);
+        var visiting=new HashSet<string>(StringComparer.Ordinal);
+        var resolved=new HashSet<string>(StringComparer.Ordinal);
+        var ordered=new List<Work>();
+        Action<Work> visit=null;
+        visit=work=>{
+            if(resolved.Contains(work.Entry.Id))return;
+            if(!visiting.Add(work.Entry.Id))
+                throw new IOException(T("Dependências circulares em ","Circular dependencies for ")+work.Entry.Name);
+            foreach(string id in work.Variant.RequiredMods){
+                Work required;
+                if(!jobs.TryGetValue(id,out required)){
+                    var entry=state.List.Mods.FirstOrDefault(mod=>mod.Id==id);
+                    if(entry==null)throw new IOException(T("Dependência ausente da lista: ","Dependency missing from the list: ")+id);
+                    if(entry.AlternativeGroup!=null&&jobs.Values.Any(job=>job.Entry.Id!=id&&job.Entry.AlternativeGroup==entry.AlternativeGroup))
+                        throw new IOException(T("A versão escolhida conflita com a dependência: ","The selected version conflicts with the dependency: ")+entry.Name);
+                    required=MakeWork(entry);
+                    required.DependencyQueue=true;
+                    jobs.Add(id,required);
+                }
+                visit(required);
+            }
+            visiting.Remove(work.Entry.Id);
+            resolved.Add(work.Entry.Id);
+            ordered.Add(work);
+        };
+        foreach(var work in selected)visit(work);
+        return ordered;
+    }
+
     List<string> PlanSelected(List<Work> selected,string root,List<Work> pending){
         var reads=new ScanReads(this,root);
         var known=new Dictionary<string,FixedMod>();
@@ -462,7 +508,7 @@ internal sealed partial class GeneralModWindow {
         foreach(var work in selected){
             string status=Status(work,root,reads);
             if(status==GeneralStatusPresentation.Disabled){
-                if(work.SwitchAlternatives)pending.Add(work);
+                if(work.SwitchAlternatives||work.DependencyQueue)pending.Add(work);
                 continue;
             }
             if(work.Variant.CyberpunkId==null){
@@ -567,7 +613,14 @@ internal sealed partial class GeneralModWindow {
             detail.Text=T("Outra alternativa deste grupo já está na fila.","Another alternative from this group is already queued.");
             return;
         }
-        ConfirmAndEnqueue(new List<Work>{MakeWork(entry)},Root(),new string[0],true);
+        string root=Root();
+        var requested=MakeWork(entry);
+        if(IsBigBody(entry)){
+            bool canceled;
+            requested=ChooseBigBody(state.List.Mods,root,out canceled);
+            if(requested==null)return;
+        }
+        ConfirmAndEnqueue(WithLinkedDependencies(new List<Work>{requested}),root,new string[0],true);
     }
 
     async void Enqueue(IEnumerable<Work> jobs,bool urgent){
@@ -608,7 +661,7 @@ internal sealed partial class GeneralModWindow {
                 try{GeneralInstallRoutes.CheckFolders(root,work.Variant.InstallRoutes);}
                 catch(DirectoryNotFoundException ex){RowStatus(work,"Pulado",null,work.Entry.Name+": "+ex.Message);return;}
             }
-            if(SnapshotInstalled(work,root)){RowStatus(work,"Instalado",100);return;}
+            if(SnapshotInstalled(work,root)){RememberInstalledVariant(work);RowStatus(work,"Instalado",100);return;}
             if(await Task.Run(()=>MatchesNexusInstallation(work,root))){
                 RowStatus(work,GeneralStatusPresentation.NexusManual);
                 return;
@@ -674,11 +727,7 @@ internal sealed partial class GeneralModWindow {
                 work.Entry.Tags.Add("Instalado pela fila");
                 Persist();
             }
-            if(work.DropConflicts!=null&&!Object.ReferenceEquals(Selected(work.Entry),work.Variant)){
-                if(work.Variant.Id==work.Entry.DefaultVariant&&!GeneralModLibrary.IsHystBody(work.Entry.Id))state.ChosenVariants.Remove(work.Entry.Id);
-                else state.ChosenVariants[work.Entry.Id]=work.Variant.Id;
-                Persist();DrawRows();
-            }
+            RememberInstalledVariant(work);
             completed=true;
             RowStatus(work,"Instalado",100,work.Entry.Name+T(": instalado e conferido.",": installed and verified."));
             OnlineDiagnostics.Record("general.install.complete",work.Entry.Id,"Instalação conferida.",new{Variant=work.Variant.Id});
@@ -705,6 +754,13 @@ internal sealed partial class GeneralModWindow {
             RefreshStorageSize();work.Ended=true;operationFinished++;UpdateFlow(null,"");skipRequests.Remove(work);Stage(work,"work.end");
         }
     }
+    void RememberInstalledVariant(Work work){
+        if((work.DropConflicts==null&&!work.SaveVariant)||Object.ReferenceEquals(Selected(work.Entry),work.Variant))return;
+        if(work.Variant.Id==work.Entry.DefaultVariant&&!GeneralModLibrary.IsHystBody(work.Entry.Id))state.ChosenVariants.Remove(work.Entry.Id);
+        else state.ChosenVariants[work.Entry.Id]=work.Variant.Id;
+        Persist();DrawRows();
+    }
+
     void CheckCompatibilityGroups(Work work,string root,List<Work> conflicts,IReadOnlyList<Work> enabling=null){
         if(work.Variant.CompatibilityGroups.Count==0&&work.Variant.RequiredMods.Count==0)return;
         var reads=new ScanReads(this,root);

@@ -230,6 +230,45 @@ internal sealed partial class GeneralModWindow {
             check(storedBody.Variants.Single(variant => variant.Id == "default").Name.Contains("Natural (EBBN)") &&
                 storedBody.Variants.Single(variant => variant.Id == "with-refit-base").Name == "Meu refit",
                 "A opção Natural aparece em um projeto oficial antigo sem alterar nomes personalizados.");
+            var bodyRows=form.VisibleMods().Where(IsBigBody).ToList();
+            check(bodyRows.Count==1&&ModDisplayName(bodyRows[0])=="Big Body",
+                "A tabela mostra o Big Body em uma única linha.");
+            var baseVersions=form.BigBodyVersions(form.state.List.Mods,false);
+            var dlcVersions=form.BigBodyVersions(form.state.List.Mods,true);
+            check(baseVersions.Count==3&&baseVersions.Any(work=>work.Entry.Id==GeneralModLibrary.VanillaFeetId)&&
+                baseVersions.Where(work=>GeneralModLibrary.IsHystBody(work.Entry.Id)).All(work=>work.Variant.Id=="with-refit-base"&&work.Variant.Sources.Count==2)&&
+                dlcVersions.Where(work=>GeneralModLibrary.IsHystBody(work.Entry.Id)).All(work=>work.Variant.Id=="with-refit-dlc"&&work.Variant.Sources.Count==3),
+                "Big Body oferece as três opções e usa os refits corretos com ou sem a expansão.");
+            bool sawBodyPicker=false;
+            Exception bodyPickerFailure=null;
+            using(var timer=new System.Windows.Forms.Timer{Interval=25}){
+                timer.Tick+=(s,e)=>{
+                    var picker=Application.OpenForms.OfType<GeneralModAlternativeDialog>().FirstOrDefault();
+                    if(picker==null)return;
+                    timer.Stop();
+                    try{
+                        var choices=AllControls(picker).OfType<GeneralPicker>().Single(control=>control.Name=="AlternativeChoices");
+                        sawBodyPicker=choices.Items.Count==3&&choices.Items.Cast<object>().Any(value=>value.ToString().Contains("Natural (EBBN)"));
+                        choices.SelectedIndex=choices.Items.Cast<object>().ToList().FindIndex(value=>value.ToString().Contains("Push-Up"));
+                        AllControls(picker).OfType<Button>().Single(button=>button.Name=="UseAlternative").PerformClick();
+                    }catch(Exception ex){bodyPickerFailure=ex;picker.Close();}
+                };
+                timer.Start();
+                bool canceled;
+                var bodyChoice=form.ChooseBigBody(form.state.List.Mods,root,out canceled);
+                if(bodyPickerFailure!=null)throw new IOException("Falha no teste do seletor Big Body.",bodyPickerFailure);
+                check(sawBodyPicker&&!canceled&&bodyChoice!=null&&bodyChoice.Entry.Id=="hyst-ebbp-rb"&&bodyChoice.SwitchAlternatives,
+                    "O pop-up do Big Body lista três versões e confirma a opção Push-Up.");
+            }
+            var baseNatural=baseVersions.Single(work=>work.Entry.Id=="hyst-ebb-rb");
+            var basePush=baseVersions.Single(work=>work.Entry.Id=="hyst-ebbp-rb");
+            baseNatural.Variant.RequiredMods.Add("ArchiveXL");
+            basePush.Variant.RequiredMods.Add("Codeware");
+            var linked=form.WithLinkedDependencies(new List<Work>{baseNatural});
+            check(linked.Select(work=>work.Entry.Id).SequenceEqual(new[]{"ArchiveXL","hyst-ebb-rb"}),
+                "A fila prepara apenas os vínculos da versão selecionada, com a dependência primeiro.");
+            baseNatural.Variant.RequiredMods.Clear();
+            basePush.Variant.RequiredMods.Clear();
             form.ProjectCommand("new");check(form.ProjectAction=="new","Novo projeto retorna à Home sem substituir a lista atual.");await Task.CompletedTask;
         });
         Safe.WriteJson(Path.Combine(root,"resultado-project-home.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});
