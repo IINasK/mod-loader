@@ -40,7 +40,7 @@ internal sealed partial class GeneralModWindow : Form {
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
 
     [Flags]
-    enum CategoryBranch { Middle=0, First=1, Last=2 }
+    enum CategoryBranch { Middle=0, First=1, Last=2, Continuation=4 }
 
     sealed class SectionRow {
         internal string Kind,Category,Size;
@@ -604,6 +604,8 @@ internal sealed partial class GeneralModWindow : Form {
         if(!expandedVersions.Contains(DrawerKey(entry)))return;
         bool body=IsBigBody(entry);
         parent.Cells["Mark"].Tag="body-branch";
+        var categoryBranch=parent.Cells["CategoryIndent"].Tag as CategoryBranch?;
+        bool continues=categoryBranch.HasValue&&(categoryBranch.Value&CategoryBranch.Last)==0;
         for(int index=0;index<versions.Count;index++){
             var work=versions[index];
             string name=VersionDisplayName(work);
@@ -619,6 +621,7 @@ internal sealed partial class GeneralModWindow : Form {
             row.Height=36;
             row.ReadOnly=true;
             row.Cells["Mark"].Tag=index==versions.Count-1?CategoryBranch.Last:CategoryBranch.Middle;
+            if(continues)row.Cells["CategoryIndent"].Tag=CategoryBranch.Continuation;
             var textColor=chosen?GeneralStyle.Foreground:GeneralStyle.Muted;
             foreach(string column in new[]{"Name","Variant","Size"}){
                 var style=row.Cells[column].Style;
@@ -767,6 +770,10 @@ internal sealed partial class GeneralModWindow : Form {
             graphics.SmoothingMode=SmoothingMode.AntiAlias;
             using(var pen=new Pen(Color.FromArgb(160,GeneralStyle.Line)))
             using(var elbow=new GraphicsPath()){
+                if(branch==CategoryBranch.Continuation){
+                    graphics.DrawLine(pen,spine,bounds.Top,spine,bounds.Bottom);
+                    return;
+                }
                 if(last)elbow.AddLine(spine,start,spine,center-radius);
                 else graphics.DrawLine(pen,spine,start,spine,bounds.Bottom);
                 elbow.AddArc(spine,center-2*radius,2*radius,2*radius,180,-90);

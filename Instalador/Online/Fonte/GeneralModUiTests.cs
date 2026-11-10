@@ -434,11 +434,24 @@ internal sealed partial class GeneralModWindow {
         var mod=NewEntry("Gaveta de versões",original);
         mod.Variants.Add(new GeneralModVariant{Id="second",Name="Versão 2",Sources=new List<string>{alternate}});
         mod.Variants.Add(new GeneralModVariant{Id="broken",Name="Versão inválida",Sources=new List<string>{invalid}});
-        form.state.List.Mods.Add(mod);
+        var sibling=NewEntry("Próximo item da categoria",original);
+        form.state.List.Mods.AddRange(new[]{mod,sibling});
         var first=form.MakeWork(mod);
         form.Generic(game).Install(original,first.Receipt(0),null);
         await form.Scan();
         form.ToggleVersions(form.ModRows().Single(row=>Equals(row.Tag,mod.Id)));
+        Func<List<DataGridViewRow>> children=()=>form.grid.Rows.Cast<DataGridViewRow>()
+            .Where(row=>row.Tag is Work&&((Work)row.Tag).Entry==mod).ToList();
+        var expanded=children();
+        check(expanded.Count==3&&expanded.All(row=>Equals(row.Cells["CategoryIndent"].Tag,CategoryBranch.Continuation)),
+            "O traço da categoria atravessa a gaveta aberta até o próximo item.");
+        var parent=form.ModRows().Single(row=>Equals(row.Tag,mod.Id));
+        form.grid.FirstDisplayedScrollingRowIndex=parent.Index;
+        CaptureUi(form,Path.Combine(root,"category-branch-continuation.png"));
+        form.state.List.Mods.Remove(sibling);
+        form.DrawRows();
+        check(children().All(row=>row.Cells["CategoryIndent"].Tag==null),
+            "A última gaveta da categoria termina no próprio item principal.");
 
         Func<string,Work> choose=id=>{
             var row=form.grid.Rows.Cast<DataGridViewRow>().Single(item=>item.Tag is Work&&
