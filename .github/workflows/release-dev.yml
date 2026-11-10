@@ -43,7 +43,7 @@ jobs:
           $fixture = New-Item -ItemType Directory "$work/test"
           $installed = Join-Path $work 'Installed'
           $install = Start-Process -FilePath "$work/Release/Mod-Loader-Dev-Setup.exe" -ArgumentList '--silent', '--installto', ('"' + $installed + '"') -PassThru -Wait -WindowStyle Hidden
-          if ($install.ExitCode -ne 0 -or !(Test-Path "$installed/LoaderDev.exe") -or !(Test-Path "$installed/current/sq.version")) {
+          if ($install.ExitCode -ne 0 -or !(Test-Path "$installed/Update.exe") -or !(Test-Path "$installed/current/LoaderDev.exe") -or !(Test-Path "$installed/current/sq.version")) {
             throw 'O Setup não criou a instalação Dev esperada.'
           }
           foreach ($test in @('paths','updates')) {
