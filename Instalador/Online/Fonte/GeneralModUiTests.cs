@@ -445,9 +445,39 @@ internal sealed partial class GeneralModWindow {
         var expanded=children();
         check(expanded.Count==3&&expanded.All(row=>Equals(row.Cells["CategoryIndent"].Tag,CategoryBranch.Continuation)),
             "O traço da categoria atravessa a gaveta aberta até o próximo item.");
-        var parent=form.ModRows().Single(row=>Equals(row.Tag,mod.Id));
-        form.grid.FirstDisplayedScrollingRowIndex=parent.Index;
-        CaptureUi(form,Path.Combine(root,"category-branch-continuation.png"));
+        string originalTheme=form.state.Theme;
+        foreach(string theme in new[]{"light","light-red","dark","black"}){
+            form.state.Theme=theme;
+            form.BuildInterface();
+            form.RebuildPresets();
+            var parent=form.ModRows().Single(row=>Equals(row.Tag,mod.Id));
+            var following=form.ModRows().Single(row=>Equals(row.Tag,sibling.Id));
+            expanded=children();
+            form.grid.FirstDisplayedScrollingRowIndex=parent.Index;
+            form.grid.ClearSelection();
+            form.PerformLayout();Application.DoEvents();
+            form.SetHover(expanded[0].Index);
+            check(expanded[0].InheritedStyle.BackColor==GeneralStyle.Selection,"Hover visível nas variantes: "+theme);
+            form.SetHover(-1);
+            int indent=form.grid.Columns["CategoryIndent"].Index;
+            var start=form.grid.GetCellDisplayRectangle(indent,parent.Index,false);
+            var child=form.grid.GetCellDisplayRectangle(indent,expanded[0].Index,false);
+            var end=form.grid.GetCellDisplayRectangle(indent,following.Index,false);
+            using(var rendered=new Bitmap(form.grid.Width,form.grid.Height)){
+                form.grid.DrawToBitmap(rendered,new Rectangle(Point.Empty,rendered.Size));
+                check(rendered.GetPixel(child.X+4,child.Y+4).ToArgb()==GeneralStyle.DrawerSurface.ToArgb()&&
+                    rendered.GetPixel(start.X+4,start.Y+4).ToArgb()==GeneralStyle.Surface.ToArgb()&&
+                    rendered.GetPixel(end.X+4,end.Y+4).ToArgb()==GeneralStyle.Surface.ToArgb(),
+                    "Só as linhas filhas ganham fundo de gaveta e recuperam a cor depois do hover: "+theme);
+                check(Enumerable.Range(start.Bottom-1,end.Y-start.Bottom+6).All(y=>
+                    rendered.GetPixel(start.X+10,y)!=rendered.GetPixel(start.X+4,y)),
+                    "O traço pintado atravessa as emendas até o próximo item: "+theme);
+            }
+            CaptureUi(form,Path.Combine(root,"variant-drawer-"+theme+".png"));
+        }
+        form.state.Theme=originalTheme;
+        form.BuildInterface();
+        form.RebuildPresets();
         form.state.List.Mods.Remove(sibling);
         form.DrawRows();
         check(children().All(row=>row.Cells["CategoryIndent"].Tag==null),

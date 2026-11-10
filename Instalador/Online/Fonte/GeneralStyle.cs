@@ -33,6 +33,7 @@ internal static class GeneralStyle {
     }
     internal static Color Background {get{return ColorTranslator.FromHtml(BlackTheme?"#090909":Dark?"#15121d":"#ffffff");}}
     internal static Color Surface {get{return ColorTranslator.FromHtml(BlackTheme?"#1b1b1b":Dark?"#242032":"#ffffff");}}
+    internal static Color DrawerSurface {get{return ColorTranslator.FromHtml(BlackTheme?"#242424":Dark?"#2e293e":RedTheme?"#fcf5f6":"#f8f5fc");}}
     internal static Color Foreground {get{return ColorTranslator.FromHtml(BlackTheme?"#f2f2f2":Dark?"#ece8f6":RedTheme?"#2b2326":"#221d33");}}
     internal static Color Muted {get{return ColorTranslator.FromHtml(BlackTheme?"#bcbcbc":Dark?"#b9b1cf":RedTheme?"#756167":"#625b7c");}}
     internal static Color Accent {get{return ColorTranslator.FromHtml(BlackTheme?"#eeeeee":Dark?"#b8a4ff":RedTheme?"#d92e42":"#5b3fd8");}}

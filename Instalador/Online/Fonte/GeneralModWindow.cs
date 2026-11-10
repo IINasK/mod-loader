@@ -620,6 +620,7 @@ internal sealed partial class GeneralModWindow : Form {
             row.Cells["Name"].Tag=work.Variant.Nsfw??work.Entry.Nsfw;
             row.Height=36;
             row.ReadOnly=true;
+            row.DefaultCellStyle.BackColor=GeneralStyle.DrawerSurface;
             row.Cells["Mark"].Tag=index==versions.Count-1?CategoryBranch.Last:CategoryBranch.Middle;
             if(continues)row.Cells["CategoryIndent"].Tag=CategoryBranch.Continuation;
             var textColor=chosen?GeneralStyle.Foreground:GeneralStyle.Muted;
@@ -883,8 +884,11 @@ internal sealed partial class GeneralModWindow : Form {
         int old=hoveredRow;hoveredRow=row;
         foreach(int at in new[]{old,row}){
             if(at<0||at>=grid.RowCount)continue;
-            var section=grid.Rows[at].Tag as SectionRow;if(section!=null&&section.Kind=="divider")continue;
-            grid.Rows[at].DefaultCellStyle.BackColor=at==hoveredRow?GeneralStyle.Selection:GeneralStyle.Surface;grid.InvalidateRow(at);
+            var item=grid.Rows[at];
+            var section=item.Tag as SectionRow;if(section!=null&&section.Kind=="divider")continue;
+            Color resting=item.Tag is Work?GeneralStyle.DrawerSurface:GeneralStyle.Surface;
+            item.DefaultCellStyle.BackColor=at==hoveredRow?GeneralStyle.Selection:resting;
+            grid.InvalidateRow(at);
         }
         grid.Cursor=row>=0&&row<grid.RowCount?Cursors.Hand:Cursors.Default;
     }
