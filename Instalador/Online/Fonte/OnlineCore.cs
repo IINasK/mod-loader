@@ -109,7 +109,7 @@ public static class FixedData {
             foreach(var f in mod.Files.Where(f=>!f.UserData)) {
                 string p=Safe.In(game,f.Path);
                 if(!File.Exists(p)) { if(Directory.Exists(p)) s.Different++; else s.Missing++;if(logFiles)OnlineDiagnostics.Record("scan.file",mod.Id,"Arquivo não encontrado.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,Present=false}); }
-                else {var info=new FileInfo(p);string hash=(info.Length==f.Size||VehicleCompatibility.HasUpgrade(f)||NightCoopRelease.IsUpgradeTarget(f)||f.CanonicalSha256!=null||(f.Patch!=null&&info.Length==f.Patch.SourceSize))?(readHash==null?Safe.Hash(p):readHash(p)):null;bool correct=FpvCustomization.MatchesFile(f,info.Length,hash)&&!FpvCustomization.IsOriginal(f,info.Length,hash);bool original=FpvCustomization.IsOriginal(f,info.Length,hash);if(correct)s.Correct++;else if(original)s.Original++;else s.Different++;if(logFiles||!correct)OnlineDiagnostics.Record("scan.file",mod.Id,correct?"Arquivo conferido.":original?"Versão anterior reconhecida; correção disponível.":"Arquivo divergente.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,ActualSize=info.Length,ActualSha256=hash,WrittenUtc=info.LastWriteTimeUtc.ToString("o"),Present=true,Correct=correct,OfficialOriginal=original});}
+                else {var info=new FileInfo(p);string hash=(info.Length==f.Size||FpvCustomization.IsWeaveUpgrade(f)||VehicleCompatibility.HasUpgrade(f)||NightCoopRelease.IsUpgradeTarget(f)||f.CanonicalSha256!=null||(f.Patch!=null&&info.Length==f.Patch.SourceSize))?(readHash==null?Safe.Hash(p):readHash(p)):null;bool correct=FpvCustomization.MatchesFile(f,info.Length,hash)&&!FpvCustomization.IsOriginal(f,info.Length,hash);bool original=FpvCustomization.IsOriginal(f,info.Length,hash);if(correct)s.Correct++;else if(original)s.Original++;else s.Different++;if(logFiles||!correct)OnlineDiagnostics.Record("scan.file",mod.Id,correct?"Arquivo conferido.":original?"Versão anterior reconhecida; correção disponível.":"Arquivo divergente.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,ActualSize=info.Length,ActualSha256=hash,WrittenUtc=info.LastWriteTimeUtc.ToString("o"),Present=true,Correct=correct,OfficialOriginal=original});}
             }
             bool migrateNightCoop=mod.Id=="NightCoop"&&s.Original>0;
             s.State=migrateNightCoop&&s.Different==0?"Atualização disponível":s.Different>0?"Diferente/alterado":s.Missing==0?(s.Original>0?"Setup NASK disponível":"Instalado correto"):s.Correct+s.Original==0?"Não instalado":"Parcial";
@@ -419,7 +419,7 @@ public sealed partial class FixedInstaller {
                 if(current!=null&&current!=f.After){preserved++;continue;}
                 string backup=UpgradeBackup(r,f.Path);
                 if(!File.Exists(backup)||Safe.Hash(backup)!=f.Before){preserved++;continue;}
-                RestoreUpgrade(backup,p,f.Before,current);report("FPV original restaurado: "+f.Path);
+                RestoreUpgrade(backup,p,f.Before,current);report("Arquivo original restaurado: "+f.Path);
             }else{
                 if(current==null)continue;
                 if(!f.Applied||current!=f.After){preserved++;continue;}

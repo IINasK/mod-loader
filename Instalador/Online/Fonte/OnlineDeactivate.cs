@@ -59,11 +59,34 @@ public sealed partial class FixedInstaller {
         if(receipt.Operation=="deactivate"||receipt.Operation=="density")return;
         var removing=new HashSet<string>(receipt.Files.Where(f=>f.Before==null&&f.Applied&&File.Exists(Safe.In(game,f.Path))&&Safe.Hash(Safe.In(game,f.Path))==f.After).Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
         var components=catalog.Packages.Where(m=>m.Files.Any(f=>removing.Contains(f.Path))).Select(m=>m.Id).ToList();
+        // A verified rollback can leave stock Equipment-EX installed without WEAVE or its new dependencies.
+        var equipment=catalog.Packages.SingleOrDefault(m=>m.Id=="mod-6945");
+        var script=equipment==null?null:equipment.Files.SingleOrDefault(FpvCustomization.IsWeaveUpgrade);
+        var replacement=script==null?null:receipt.Files.SingleOrDefault(f=>f.Path==script.Path&&f.Applied&&FpvCustomization.UpgradePair(script,f.Before,f.After));
+        bool restoresStock=replacement!=null&&File.Exists(Safe.In(game,script.Path))&&Safe.Hash(Safe.In(game,script.Path))==replacement.After&&
+            File.Exists(UpgradeBackup(receipt,script.Path))&&Safe.Hash(UpgradeBackup(receipt,script.Path))==replacement.Before&&
+            equipment.Files.Where(f=>f!=script).All(f=>{
+                string path=Safe.In(game,f.Path);
+                if(f.Asset==script.Asset)return removing.Contains(f.Path)||!File.Exists(path)&&!Directory.Exists(path);
+                return !removing.Contains(f.Path)&&File.Exists(path)&&Safe.Hash(path)==f.Sha256;
+            });
+        if(restoresStock)components.Remove(equipment.Id);
         foreach(var m in catalog.Packages) {
-            if(!FixedData.Expand(catalog,new[]{m.Id}).Any(d=>d.Id!=m.Id&&components.Contains(d.Id)))continue;
+            if(!UndoDependencies(m,restoresStock).Any(d=>components.Contains(d)))continue;
             var scan=FixedData.Scan(m,game);
             if(scan.State=="Não verificável"||m.Files.Any(f=>!removing.Contains(f.Path)&&(File.Exists(Safe.In(game,f.Path))||Directory.Exists(Safe.In(game,f.Path)))))
                 throw new IOException("Desfazer retiraria uma dependência de "+m.Name+". Desative esse mod primeiro; seus arquivos foram preservados.");
+        }
+    }
+    IEnumerable<string> UndoDependencies(FixedMod mod,bool stockEquipment) {
+        if(!stockEquipment){foreach(var d in FixedData.Expand(catalog,new[]{mod.Id}))if(d.Id!=mod.Id)yield return d.Id;yield break;}
+        var seen=new HashSet<string>(StringComparer.Ordinal);
+        var pending=new Stack<string>(mod.Dependencies.Where(d=>mod.Id!="mod-6945"||d!="mod-30726"));
+        while(pending.Count>0){
+            string id=pending.Pop();if(!seen.Add(id))continue;
+            yield return id;
+            foreach(string d in catalog.Packages.Single(m=>m.Id==id).Dependencies)
+                if(id!="mod-6945"||d!="mod-30726")pending.Push(d);
         }
     }
     string UndoDeactivation(OnlineReceipt r,string ledger,Action<string> report) {

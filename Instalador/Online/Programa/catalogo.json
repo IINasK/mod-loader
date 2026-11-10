@@ -10996,9 +10996,515 @@
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/25807\nhttps://www.nexusmods.com/cyberpunk2077/mods/25807?tab=files&file_id=129210"
     },
     {
+      "Id": "mod-32312",
+      "Name": "RedFunctions",
+      "Version": "0.16.0",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "NightCoop",
+        "redscript"
+      ],
+      "Description": "Funções nativas e controle de dependências para mods redscript. Usa o RED4ext existente.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "RedFunctions 32312 0.16.0 2026-11-09T23-46Z cB3xB01yc.zip",
+          "Sha256": "82d1afdf072b6722d7c44a6e1bb9b902f02bae313c7d797bd4bd542c04f27d5d",
+          "Size": 5852727,
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/32312?tab=files&file_id=176262",
+          "ModId": 32312,
+          "FileId": 176262
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "red4ext/plugins/RedFunctions/RedFunctions.dll",
+          "Path": "red4ext/plugins/RedFunctions/RedFunctions.dll",
+          "Size": 24576,
+          "Sha256": "51b86a1da83041496543a4b2b0d438d137c3ab324d5f559e85c9f7dcc5a9c2b9"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "red4ext/plugins/RedFunctions/builds/RedFunctions_2_31.dll",
+          "Path": "red4ext/plugins/RedFunctions/builds/RedFunctions_2_31.dll",
+          "Size": 701952,
+          "Sha256": "d11c8ff68d58961baabf542f2ac55c29327e4a45f14da942b259834abf207869"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "red4ext/plugins/RedFunctions/builds/RedFunctions_2_50.dll",
+          "Path": "red4ext/plugins/RedFunctions/builds/RedFunctions_2_50.dll",
+          "Size": 702976,
+          "Sha256": "15d48d78f3bc9cc70abab2462a071a6949dc962ebce99d08b5467b4fdfb59337"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "red4ext/plugins/RedFunctions/LICENSE.md",
+          "Path": "red4ext/plugins/RedFunctions/LICENSE.md",
+          "Size": 2685,
+          "Sha256": "7cd0a5df106e7e69cda0bd08114ad0487e870c6bef12dbaf43c6929095f034b7"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "red4ext/plugins/RedFunctions/tweakdb_names.dvns",
+          "Path": "red4ext/plugins/RedFunctions/tweakdb_names.dvns",
+          "Size": 5113057,
+          "Sha256": "dd8996619199bfa975dd9ec0dac06310a342bc1aa0e6ab2c256b2f9bd2b0f6cf"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "red4ext/plugins/RedRequire/RedRequire.dll",
+          "Path": "red4ext/plugins/RedRequire/RedRequire.dll",
+          "Size": 586752,
+          "Sha256": "8651066b2b366ab2373391e844433f7485109e8aab817f0fbd14c8c3d12e5eda"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "red4ext/plugins/RedRequire/LICENSE.md",
+          "Path": "red4ext/plugins/RedRequire/LICENSE.md",
+          "Size": 1211,
+          "Sha256": "e48435231782c0e819ebf97a8874c42a79dcc80c4b58f78aad7cfdf597f35346"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedFunctions/RedFunctions.reds",
+          "Path": "r6/scripts/RedFunctions/RedFunctions.reds",
+          "Size": 3258,
+          "Sha256": "90152d810920d2da28cf035a473f0f7f1ed32e15c226789fb389e626ac9ab7f3"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedFunctions/RedFunctions_Api0_14_2.reds",
+          "Path": "r6/scripts/RedFunctions/RedFunctions_Api0_14_2.reds",
+          "Size": 241,
+          "Sha256": "6e9a39080a63b1d306e93395806c4c7ad813f38549982d5b2ccfc3410dd3b06a"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedFunctions/RedFunctions_EngineConfig.reds",
+          "Path": "r6/scripts/RedFunctions/RedFunctions_EngineConfig.reds",
+          "Size": 2545,
+          "Sha256": "f815a94fc053bf2b5bc2fd289f9789fee19098b4d6ca31eefc32b5b85e8f44cb"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedFunctions/RedFunctions_Json.reds",
+          "Path": "r6/scripts/RedFunctions/RedFunctions_Json.reds",
+          "Size": 4663,
+          "Sha256": "79db37a1340c263a3090c6f5b7be4d2927c12b15655d0182af03b354c08bdf30"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedFunctions/RedFunctions_Storage.reds",
+          "Path": "r6/scripts/RedFunctions/RedFunctions_Storage.reds",
+          "Size": 1685,
+          "Sha256": "625c3429d86c5043928da19328a4383c8c4cd6389bb4a5ee0d47145890db65ed"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/storages/RedscriptConfigFramework/RedFunctions.card.json",
+          "Path": "r6/storages/RedscriptConfigFramework/RedFunctions.card.json",
+          "Size": 232,
+          "Sha256": "012dba88f8158e962f9cc66347e0ebc23f8ed0ab849153e1a8fac2e04f72d98a"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/storages/RedscriptConfigFramework/RedFunctions.docs.txt",
+          "Path": "r6/storages/RedscriptConfigFramework/RedFunctions.docs.txt",
+          "Size": 28676,
+          "Sha256": "25e57616fb254a6c8180ba5868b82369397f02b35dd1866d75746be058757153"
+        }
+      ],
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/32312?tab=files&file_id=176262"
+    },
+    {
+      "Id": "mod-30726",
+      "Name": "Redscript Configuration Framework",
+      "Version": "3.2.2",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "Dependencies": [
+        "NightCoop",
+        "redscript",
+        "Codeware",
+        "InputLoader",
+        "mod-32312"
+      ],
+      "Description": "Configurações em jogo para mods redscript. Requer RedFunctions, Input Loader e Codeware.",
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Redscript Config Framework 30726 3.2.2 2026-11-07T18-43Z 2w0lw1dbN.zip",
+          "Sha256": "c9823f8e33abc2551a858bdca485eb164092506849e99898f6cf23cdd21d0300",
+          "Size": 250850,
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/30726?tab=files&file_id=175099",
+          "ModId": 30726,
+          "FileId": 175099
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "r6/input/dvrcf.xml",
+          "Path": "r6/input/dvrcf.xml",
+          "Size": 2506,
+          "Sha256": "6f0c2fb519ff94174fab3f5664d7280bd2e447a3e68eb1a967f574a92fdc77b9"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_Api3_2_1.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_Api3_2_1.reds",
+          "Size": 287,
+          "Sha256": "544c77ca04da41dbdbe0b1184012325f21b9036cd377e83900f1596db2478f37"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_BBCode.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_BBCode.reds",
+          "Size": 14568,
+          "Sha256": "234bac39d8ce651a7bef1c162cc8c182889e979a9b63b839dee57debe48bb8ae"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_Cards.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_Cards.reds",
+          "Size": 1797,
+          "Sha256": "ad0a5a8064ba14d2165b759c9c47cca471930e79dbff80b359103ccb8592866b"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_DocImage.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_DocImage.reds",
+          "Size": 3509,
+          "Sha256": "bedf8a2bb1096d79e8b9728fecdf2938a13db8aa61083f3a81b4ef01a05a7cd3"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_Docs.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_Docs.reds",
+          "Size": 1912,
+          "Sha256": "f18e1880315c4ed524a47e12cdf34dd4b4c9cb188da080195f498f83ed8bbde6"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_HostedPopup.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_HostedPopup.reds",
+          "Size": 6830,
+          "Sha256": "4d36c3372c05f33568f012e40d993f85e052bc43aec6e6e961f450896505668e"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_Hub.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_Hub.reds",
+          "Size": 9042,
+          "Sha256": "dc114570af71625230d163b537c440b186577d6b99f523ceec2caace80f8eb67"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_HubPopup.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_HubPopup.reds",
+          "Size": 321493,
+          "Sha256": "b5e586a744ecbcea07c3907954b8dfba1ddff548ac0cc286a410b17a0aab399d"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_Input.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_Input.reds",
+          "Size": 547,
+          "Sha256": "b2a734a85f71ba4a17498d0a0d9e2e1c2ffb86c7d24d58ae8fd415fe921b3108"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_InputBridge.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_InputBridge.reds",
+          "Size": 5706,
+          "Sha256": "1fdf4baeb8e2189d7b0009b3ccfda3671b0cbc4c5e45f3c46967fe64aae506d2"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_JsonLoader.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_JsonLoader.reds",
+          "Size": 907,
+          "Sha256": "e5d00df4042b85256728dcc6ff476d842087ca7ee653dbfaf5d426f0495c1093"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_JsonProvider.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_JsonProvider.reds",
+          "Size": 5792,
+          "Sha256": "9733860d8ed6f4965bc8e3d89dd88c9d4181c667ac6c50540001659ed1dfe57b"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_ModSettingsBridge.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_ModSettingsBridge.reds",
+          "Size": 7554,
+          "Sha256": "ac795d797fef1d82b0d846aa78afe6498d620f0b198923129432b3dede68b564"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_OptionsProvider.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_OptionsProvider.reds",
+          "Size": 20070,
+          "Sha256": "63bf3b7cc018f421aed4d54e5b3c35764ddddf008768f5015ca267bd8decb9e2"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_Pregame.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_Pregame.reds",
+          "Size": 12908,
+          "Sha256": "d03249867fbcfdbe257074c6efb27c1be23bca13286a3b458d42434fa828f93d"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_Presets.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_Presets.reds",
+          "Size": 7358,
+          "Sha256": "5debbe84ccbed5e40190168e947a63c3869e5e19ec86fee3d1578dd7056cae55"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_Provider.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_Provider.reds",
+          "Size": 1316,
+          "Sha256": "97f492549dd17acb5f49b2145858a0659272bcc61df9cfa48d6c0f0c4f0a751e"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_RedLogger.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_RedLogger.reds",
+          "Size": 6724,
+          "Sha256": "5b8dea76a4a5b7df32a6d360ee15bc7a398d681002e95a9509b163eea7a5f110"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_Registry.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_Registry.reds",
+          "Size": 5653,
+          "Sha256": "4828dba95b4f9a5025f488ed19d620c7cb44c38a7561ec255b5983eae48b80a4"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_Schema.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_Schema.reds",
+          "Size": 9462,
+          "Sha256": "35338c225c9af37f9d1e20ba1d6ef85dd9e76a17aaf9906251f34b04588e8d5e"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_SchemaCache.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_SchemaCache.reds",
+          "Size": 12036,
+          "Sha256": "47e667f15a39ff1836e4b40848a4973c687e72642c922654d15361c2ca47fdae"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_SearchText.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_SearchText.reds",
+          "Size": 7942,
+          "Sha256": "fcb74b9b57f9b0d3f27c0e7c55a8dab21b8dc2ef3d54b6242e4a0859aa64af5f"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_Settings.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_Settings.reds",
+          "Size": 13457,
+          "Sha256": "99aa1dfd4f86a664313a769a8af11044deae24eff5dcb6ffabefcb920ded0ae5"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/DVRCF_Store.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/DVRCF_Store.reds",
+          "Size": 14793,
+          "Sha256": "1da1f9e18bb4e78cf9a59ef5787503ca510e2a44ec9d1041df249dd3b8c60b74"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/Arabic.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/Arabic.reds",
+          "Size": 16669,
+          "Sha256": "c0ee071309768f64324aaa9c65f17319129cf386db3d4538f556468627d07766"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/ChineseSimplified.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/ChineseSimplified.reds",
+          "Size": 16692,
+          "Sha256": "2166e46f2ceb977652cb3ee3568356d302b350c6baa6fea966d1154731fe6419"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/ChineseTraditional.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/ChineseTraditional.reds",
+          "Size": 16694,
+          "Sha256": "ac783dbe9c401b17eee6efd9a0f5e550c052bb6a34974f1ead9f625384f7d5e0"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/Czech.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/Czech.reds",
+          "Size": 16667,
+          "Sha256": "6f1e00b5e97696d21febdf45a19dec3678ee9b14f535d153f41bd9f0b506700e"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/English.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/English.reds",
+          "Size": 16628,
+          "Sha256": "20afc6a73ac3970ac59296903010db1f286067b8a1e5eb0f5e1b7b280d98639b"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/French.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/French.reds",
+          "Size": 16669,
+          "Sha256": "94988129241757f986330072874c701ba58612b6e312afa3dd083866cb4bc66b"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/German.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/German.reds",
+          "Size": 16669,
+          "Sha256": "0aa74dacbcdea88ae2db844e472b4d7ffc91201fe69b9d45af69e6da8d43256d"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/Hungarian.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/Hungarian.reds",
+          "Size": 16675,
+          "Sha256": "bc9fec5e44c136ada6dd36160eadd490cb66c0885bd2aea8b1de0bee9c691ad7"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/Italian.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/Italian.reds",
+          "Size": 16671,
+          "Sha256": "eaea7fa319b1b0b95438b930d08d6b27ff227ac0f8648717c5555c1b73b91e0a"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/Japanese.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/Japanese.reds",
+          "Size": 16673,
+          "Sha256": "aea72ccb11f54dae6b7b429bbbc11c4f7fec198b82a75b2f166ecbe39a5ce1b5"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/Korean.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/Korean.reds",
+          "Size": 16669,
+          "Sha256": "d02310c4a277bf2993d1554cd03a4082b3bec8018dbb678ffdb09ecc3a1d70c8"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/Polish.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/Polish.reds",
+          "Size": 16669,
+          "Sha256": "8ccd831954bb891e27a8e1ca6a624c8c6335e76fb31e226e4a1a7db17a7f2c3c"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/Portuguese.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/Portuguese.reds",
+          "Size": 16677,
+          "Sha256": "f691921def7e6e3ebcf4fbe4794784068942472634435d686960d19bfe266651"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/Provider.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/Provider.reds",
+          "Size": 1482,
+          "Sha256": "7d8a7300d5288e1d71c080280347ed751b887b0fe4e4d89205787776932de902"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/Russian.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/Russian.reds",
+          "Size": 16671,
+          "Sha256": "1219021d3021e889052aef24e0f774ddb4598b08a336ae1201ea307bbcb05997"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/Spanish.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/Spanish.reds",
+          "Size": 16671,
+          "Sha256": "f3743e6015bafc72a4b27a5ef0a4cac8e64838186646854aa438f4dd68e42ace"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/SpanishLatam.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/SpanishLatam.reds",
+          "Size": 16691,
+          "Sha256": "d9b8a875b6e3a3d23ca74fa7ece8eabc5b06ac825a627af753c3040c78fbc188"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/Thai.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/Thai.reds",
+          "Size": 16665,
+          "Sha256": "c1a92d6939613a9d884a6c9840adefd0c6a0f049cdd051f776d2fe6316724e7c"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/Turkish.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/Turkish.reds",
+          "Size": 16671,
+          "Sha256": "8aefe58134513bf9ca411806383388e081f51adfa1d9fdde6f388bd31174777c"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/RedscriptConfigFramework/translations/Ukrainian.reds",
+          "Path": "r6/scripts/RedscriptConfigFramework/translations/Ukrainian.reds",
+          "Size": 16675,
+          "Sha256": "c2d5fcbee34f10044b493fc252a441ca8521814a89d03524264527fa3538bac2"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/storages/RedscriptConfigFramework/RedscriptConfigFramework.card.json",
+          "Path": "r6/storages/RedscriptConfigFramework/RedscriptConfigFramework.card.json",
+          "Size": 140,
+          "Sha256": "b53ca6f921545daeece25c62bd7b188c8ef54c2185fe4adc359ecc2d14ecc419"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/storages/RedscriptConfigFramework/RedscriptConfigFramework.docs.txt",
+          "Path": "r6/storages/RedscriptConfigFramework/RedscriptConfigFramework.docs.txt",
+          "Size": 31633,
+          "Sha256": "dfd4408e6be23f61e1b9a264408981762f681a500e0e2fd8d336ca717ab5486b"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "red4ext/plugins/RedRCFInput/LICENSE.md",
+          "Path": "red4ext/plugins/RedRCFInput/LICENSE.md",
+          "Size": 1524,
+          "Sha256": "0d9852804e03774093dfc384d73d27b8f00f9c9b5f17048cbd6176b657e4f749"
+        },
+        {
+          "Asset": "a0",
+          "Entry": "red4ext/plugins/RedRCFInput/RedRCFInput.dll",
+          "Path": "red4ext/plugins/RedRCFInput/RedRCFInput.dll",
+          "Size": 107520,
+          "Sha256": "63f08bb70be1f44108d7c70cf2b5d88281adae55cec9975cb28e23d9afaf9524"
+        }
+      ],
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/30726?tab=files&file_id=175099"
+    },
+    {
       "Id": "mod-6945",
-      "Name": "Equipment-EX",
-      "Version": "1.2.10",
+      "Name": "Equipment-EX + WEAVE",
+      "Version": "1.2.10 + 1.6.2",
       "Profile": "Complementos",
       "GameVersion": "2.5",
       "RequiresPL": false,
@@ -11009,9 +11515,10 @@
         "redscript",
         "ArchiveXL",
         "Codeware",
-        "TweakXL"
+        "TweakXL",
+        "mod-30726"
       ],
-      "Warning": "Gerencia roupas e guarda-roupa. O instalador preserva backups.",
+      "Warning": "A atualização do Equipment-EX substitui apenas o script original reconhecido e preserva os trajes salvos.",
       "Assets": [
         {
           "Id": "a0",
@@ -11022,6 +11529,16 @@
           "Url": "https://www.nexusmods.com/cyberpunk2077/mods/6945?tab=files&file_id=168539",
           "ModId": 6945,
           "FileId": 168539
+        },
+        {
+          "Id": "weave",
+          "Name": "WEAVE Equipment EX Extension 28273 1.6.2 2026-11-01T03-29Z gMz5Mu2cA.zip",
+          "Sha256": "2fc59c841fa019a34a24b0804a605a083f0c3dec9e10c91c90082a9e5a4ad84a",
+          "Size": 358473,
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/28273?tab=files&file_id=171864",
+          "ModId": 28273,
+          "FileId": 171864
         }
       ],
       "Files": [
@@ -11055,26 +11572,272 @@
         },
         {
           "Asset": "a0",
-          "Entry": "r6/scripts/EquipmentEx/EquipmentEx.reds",
-          "Path": "r6/scripts/EquipmentEx/EquipmentEx.reds",
-          "Size": 171731,
-          "Sha256": "71ec975363def6b9296ffdd65ec6e9d2c4f5bc5ab06a461a9cde93f6f7f6a398"
-        },
-        {
-          "Asset": "a0",
           "Entry": "r6/scripts/EquipmentEx/LICENSE",
           "Path": "r6/scripts/EquipmentEx/LICENSE",
           "Size": 1090,
           "Sha256": "abbe8d2050ded0d446f3a8b3b8efe3a35b0f392392f61d75f49fe59bd56d84e1"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/EquipmentEx/EquipmentEx.reds",
+          "Path": "r6/scripts/EquipmentEx/EquipmentEx.reds",
+          "Size": 439623,
+          "Sha256": "d02c890d619d2a02aacf04e3d50dfcaf0f46d07c7e4850e2f0a292508d6af437"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/Arabic.reds",
+          "Path": "r6/scripts/WEAVE/Localization/Arabic.reds",
+          "Size": 32221,
+          "Sha256": "0b2d595e022fc1fee21dc3b26b6078f645d775284ffe9b2e5fecc48619af5a98"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/ChineseSimplified.reds",
+          "Path": "r6/scripts/WEAVE/Localization/ChineseSimplified.reds",
+          "Size": 24285,
+          "Sha256": "acc8dd9a4c17419b86e77491f2cd247a02bb0e1b868ff96976b257eac9e32857"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/ChineseTraditional.reds",
+          "Path": "r6/scripts/WEAVE/Localization/ChineseTraditional.reds",
+          "Size": 22967,
+          "Sha256": "6d7c5fb148e576f564a54ac2fef86a090725f26851ef539991176838db3e1af6"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/Czech.reds",
+          "Path": "r6/scripts/WEAVE/Localization/Czech.reds",
+          "Size": 27254,
+          "Sha256": "dae342b03bdaf963011b47e78c9228d58ed1d81fa22520016ed480332ff32c28"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/English.reds",
+          "Path": "r6/scripts/WEAVE/Localization/English.reds",
+          "Size": 24077,
+          "Sha256": "602237e31b45f5495b496dcae518eab447edf2a6aa611c53d57345426a703dcd"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/French.reds",
+          "Path": "r6/scripts/WEAVE/Localization/French.reds",
+          "Size": 28338,
+          "Sha256": "34114a4299beda33938708e6e053a6474401ec2e134b279c5ba5e0932c4c0050"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/German.reds",
+          "Path": "r6/scripts/WEAVE/Localization/German.reds",
+          "Size": 27539,
+          "Sha256": "66ed4209e524e5c24ffcd2c481da24aeb9f6b6361a66293827a43ff32e677967"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/Hungarian.reds",
+          "Path": "r6/scripts/WEAVE/Localization/Hungarian.reds",
+          "Size": 27946,
+          "Sha256": "e93cab7d2a5ca0c976aece445c3a877cae198b3e0e2fcaff4d04b775f014e7d9"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/Italian.reds",
+          "Path": "r6/scripts/WEAVE/Localization/Italian.reds",
+          "Size": 27535,
+          "Sha256": "de3b15585c5e13e980094cb71dd8d028e52cfa4741d3534d9ecd216f5cca1426"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/Japanese.reds",
+          "Path": "r6/scripts/WEAVE/Localization/Japanese.reds",
+          "Size": 30663,
+          "Sha256": "c3b0bc4c1d5ffc3c0f9501c4960ddf314ee66a909f23c1212092e184487fa588"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/Korean.reds",
+          "Path": "r6/scripts/WEAVE/Localization/Korean.reds",
+          "Size": 27884,
+          "Sha256": "d8a45427970aad829cc23ba5ced23b096b5d5682538b4dd9d2846a2b00ed3773"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/LocalizationProvider.reds",
+          "Path": "r6/scripts/WEAVE/Localization/LocalizationProvider.reds",
+          "Size": 1179,
+          "Sha256": "ee9fe0fc8ce95acd1314b49077daaa98ab1d9568c75f198c8c4c564fd76faf1c"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/Polish.reds",
+          "Path": "r6/scripts/WEAVE/Localization/Polish.reds",
+          "Size": 26952,
+          "Sha256": "df1750f0ef2731ffe9f11934f028b0a9d1fcc194f1d46ff8a561d1b5e2aef712"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/Portuguese.reds",
+          "Path": "r6/scripts/WEAVE/Localization/Portuguese.reds",
+          "Size": 27397,
+          "Sha256": "c1b16fa23382adefc17c29eb6bea3cf114a81e975169245754a3d8660b80aa04"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/Russian.reds",
+          "Path": "r6/scripts/WEAVE/Localization/Russian.reds",
+          "Size": 37555,
+          "Sha256": "38ad3b6aacbab0b0b74746f704aeb61a6ea2f0bdd088e858a8c8158d52a32472"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/Spanish.reds",
+          "Path": "r6/scripts/WEAVE/Localization/Spanish.reds",
+          "Size": 27827,
+          "Sha256": "be221b29ce6b6ccda8f1bd487f7138e54f28c3fdf2765962e77f9c598377fddd"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/Thai.reds",
+          "Path": "r6/scripts/WEAVE/Localization/Thai.reds",
+          "Size": 47548,
+          "Sha256": "9f1132a8a78e2a810ba96c55cd4b44a114453ebe2fa45756bc6e8b52529a0c37"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/Turkish.reds",
+          "Path": "r6/scripts/WEAVE/Localization/Turkish.reds",
+          "Size": 26984,
+          "Sha256": "7fbcfbe770d88a268dce952a2889d7649ae7a0e0e88e2c2ee899145fc6c78a29"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/Localization/Ukrainian.reds",
+          "Path": "r6/scripts/WEAVE/Localization/Ukrainian.reds",
+          "Size": 36872,
+          "Sha256": "d5aeb0d86eec769bace19fe95c7554fa4cace7c4c061af5e0c0e5d8459936763"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/WEAVE_AutoTag.reds",
+          "Path": "r6/scripts/WEAVE/WEAVE_AutoTag.reds",
+          "Size": 2536,
+          "Sha256": "7ed91873659c68cb38a3beacac85363d9f69bda598ba3765a0cd94fe11d2981a"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/WEAVE_AutoTagDB.reds",
+          "Path": "r6/scripts/WEAVE/WEAVE_AutoTagDB.reds",
+          "Size": 92279,
+          "Sha256": "4d2b092aac86972c38698d471ed4ef161f2e68273039bbc1392a2403672e97f6"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/WEAVE_AutoTagDBCache.reds",
+          "Path": "r6/scripts/WEAVE/WEAVE_AutoTagDBCache.reds",
+          "Size": 3295,
+          "Sha256": "e9ece75653276831ad9025a3709bad22f5cce406271b8eec55b7506a3e4d4a45"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/WEAVE_AutoTagEngine.reds",
+          "Path": "r6/scripts/WEAVE/WEAVE_AutoTagEngine.reds",
+          "Size": 66026,
+          "Sha256": "8ebcc632597c57857c56f4c18978fc3d17cb1977268e46cf798752c335ad150c"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/WEAVE_AutoTagScorer.reds",
+          "Path": "r6/scripts/WEAVE/WEAVE_AutoTagScorer.reds",
+          "Size": 22051,
+          "Sha256": "6ac0f31095c6c23cd151c362981044dc18b90ee7de1b35cd1ceb41764a15cdf5"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/WEAVE_BrandDB.reds",
+          "Path": "r6/scripts/WEAVE/WEAVE_BrandDB.reds",
+          "Size": 16042,
+          "Sha256": "d50302ffd7bac14ff5334533a31f65b6d22e3b90cd63891046dfd5cbfaf155d6"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/WEAVE_Config.reds",
+          "Path": "r6/scripts/WEAVE/WEAVE_Config.reds",
+          "Size": 2905,
+          "Sha256": "9b9e9a48791699722d9af0721ee96a28d8d4d0d9e02f260370037441721d4d8c"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/WEAVE_ItemAdder.reds",
+          "Path": "r6/scripts/WEAVE/WEAVE_ItemAdder.reds",
+          "Size": 79884,
+          "Sha256": "924793da6bc22fca35d6edc88aebc2eb78e117084f028c968163fa9062a4146a"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/WEAVE_Logger.reds",
+          "Path": "r6/scripts/WEAVE/WEAVE_Logger.reds",
+          "Size": 1508,
+          "Sha256": "b3434b64fa866eb83958b153dcf46f55490c0bb8edf1ea125e4b879bba098cde"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/WEAVE_Module.reds",
+          "Path": "r6/scripts/WEAVE/WEAVE_Module.reds",
+          "Size": 103,
+          "Sha256": "08f3ac917e6f45e054951242098b61ed308c4375948b471437e980b3e74efa8b"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/WEAVE_OutfitSync.reds",
+          "Path": "r6/scripts/WEAVE/WEAVE_OutfitSync.reds",
+          "Size": 16339,
+          "Sha256": "15f5a294b5945173e52cda10c280fecf9ed2e223f1b6f6e7e11ebdb3f73e4d0c"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/WEAVE_RCFProvider.reds",
+          "Path": "r6/scripts/WEAVE/WEAVE_RCFProvider.reds",
+          "Size": 16689,
+          "Sha256": "0d0ab0f7cee88a6007c4e0b2edcf9c958206500a4385ad6b9d1be846213e2557"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/scripts/WEAVE/WEAVE_TagManager.reds",
+          "Path": "r6/scripts/WEAVE/WEAVE_TagManager.reds",
+          "Size": 83315,
+          "Sha256": "bcfa00303482422fb8650fa41be0b7950418f99c06f60dc3acdb5e979a39a934"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/storages/RedscriptConfigFramework/WEAVE.card.json",
+          "Path": "r6/storages/RedscriptConfigFramework/WEAVE.card.json",
+          "Size": 296,
+          "Sha256": "b28445d9598908cbe329e018a6bf1d69aa91a72ce75bde5c175f209347ab96c9"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "r6/storages/RedscriptConfigFramework/WEAVE.docs.txt",
+          "Path": "r6/storages/RedscriptConfigFramework/WEAVE.docs.txt",
+          "Size": 52532,
+          "Sha256": "2d57fe79a7cf660b95e8d27d2268bc7deaaa36c3c2a8b964bc6196b63747e706"
+        },
+        {
+          "Asset": "weave",
+          "Entry": "archive/pc/mod/WEAVE.archive",
+          "Path": "archive/pc/mod/WEAVE.archive",
+          "Size": 28672,
+          "Sha256": "fb542975ef7ed593cf95971626aae00a7a4607879808f3b0df0e0715db527dc4"
         }
       ],
       "BlockedReason": "",
-      "ThirdPerson": "Confirmado em coop",
-      "ThirdPersonNotes": "Uso do pacote em coop confirmado por Douglas em 29/10/2026.",
-      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/6945?tab=files&file_id=168539",
+      "ThirdPerson": "Não verificado",
+      "ThirdPersonNotes": "Guarda-roupa testado em jogo pelo usuário. A correção de sincronização de roupas no NightCoop não foi confirmada.",
+      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/28273?tab=files&file_id=171864",
       "PhantomLibertyStatus": "not-required",
-      "PhantomLibertyNotes": "Opera em customizacoes/recursos do jogador-base ou fornece modelos/itens proprios. Nao ha DLC na documentacao e nao ha caminhoEP1 obrigatorio nos textos fixos conferidos. Isto nao depende apenas da ausencia da palavraDLC; o escopo e os recursos-base foram revistos. Arquivos.archive permanecem opacos nesta revisao, portanto nao e prova exaustiva de resolucao de todos os recursos internos.",
-      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/6945\nhttps://www.nexusmods.com/cyberpunk2077/mods/6945?tab=files&file_id=168539"
+      "PhantomLibertyNotes": "A extensão opera no guarda-roupa do jogo base; nenhum requisito de Phantom Liberty ou REDmod indicado pelo autor.",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/28273?tab=files&file_id=171864",
+      "Description": "Guarda-roupa expandido, com nomes de trajes, filtros e perfis do WEAVE."
     },
     {
       "Id": "mod-2987",

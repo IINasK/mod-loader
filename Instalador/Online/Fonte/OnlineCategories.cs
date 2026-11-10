@@ -15,7 +15,7 @@ internal static class ModCategories {
     static readonly Dictionary<string, ClothingFit> clothing = new Dictionary<string, ClothingFit>(StringComparer.Ordinal);
 
     static ModCategories() {
-        Add(ModCategory.Core, "mod-10437 mod-34403 CET redscript ArchiveXL TweakXL Codeware InputLoader ModSettings Audioware Utilities2077 NativeSettings RadioExt mod-5266 mod-6945 mod-2987 mod-28744 mod-7049 mod-9429");
+        Add(ModCategory.Core, "mod-10437 mod-34403 CET redscript ArchiveXL TweakXL Codeware InputLoader ModSettings Audioware Utilities2077 NativeSettings RadioExt mod-5266 mod-6945 mod-30726 mod-32312 mod-2987 mod-28744 mod-7049 mod-9429");
         Add(ModCategory.Essentials, "NightCoop");
         Add(ModCategory.Gameplay, "mod-36378 mod-35886 mod-17811 mod-3486 mod-30316 mod-30304 mod-7299 mod-36802 mod-36203 mod-35667 mod-12681");
         Add(ModCategory.Stores, "mod-14210 mod-4454 mod-4805 mod-11964 mod-5114 mod-14299 mod-8704 mod-20058 mod-8183 mod-13870 mod-18890 mod-12637 mod-6505 mod-6985 mod-27357 mod-27599 mod-16645 mod-37000");
