@@ -1,9 +1,9 @@
-{
+﻿{
   "Schema": 1,
-  "CheckedOn": "2026-11-07",
+  "CheckedOn": "2026-11-10",
   "CatalogId": "cp25-fixed-20261028",
-  "BaselineCatalogSha256": "30893825cee091022eee8335b86e702c2695a82e6c0b92e41da61ca7cb31d37c",
-  "Count": 158,
+  "BaselineCatalogSha256": "e8b3bfa2d97353cc6bf6bfde53bb0c2e7a540f6863b282df2155a19627417b59",
+  "Count": 157,
   "Profiles": {
     "WithPL": {
       "Total": 158,
@@ -13343,102 +13343,6 @@
         "BasePoses": 15,
         "PoseRecords": 15,
         "EP1Paths": true,
-        "ModCodeExecuted": false,
-        "ArchivesDecompiled": false
-      }
-    },
-    {
-      "Id": "mod-35353",
-      "Name": "NETGVNNER - FL00R SHXT POSE PACK",
-      "FixedVersion": "1",
-      "GameVersion": "2.5",
-      "Category": "Modo foto",
-      "Function": "Pacote de 36 poses femininas de chão para o modo foto. O YAML contém 56 registros únicos:36 poses-base e20 variações, incluindo opções para corpos específicos.",
-      "HowToUse": [
-        "Abrir o modo foto > poses > categoria NETGVNNER - FL00R SHXT.",
-        "As poses foram pensadas para sapatos de plataforma; salto fino ou solado baixo pode alterar o contato com o chão.",
-        "Para as poses armadas aparecerem, o autor pede uma pistola no inventário.",
-        "Mantendo o corpo padrão, começar pelas variações sem marcação ANGEL/EBB; os nomes das variações não obrigam a instalar esses corpos."
-      ],
-      "Dependencies": [
-        {
-          "Id": "ArchiveXL",
-          "Name": "ArchiveXL",
-          "FixedVersion": "v1.28.6"
-        },
-        {
-          "Id": "TweakXL",
-          "Name": "TweakXL",
-          "FixedVersion": "v1.12.0"
-        }
-      ],
-      "AuthorRequirements": [
-        "ArchiveXL e TweakXL declarados pelo autor; Easy Photomode Poses é ferramenta de criação, não dependência runtime demonstrada"
-      ],
-      "GenderAndBody": "Conjunto feminino de animações; não altera corpo padrão",
-      "KnownConflictsAndLimits": [
-        "Candidato compatível pelas dependências declaradas e pelo escopo dos arquivos. Sem referência EP1 nos textos conferidos; ausência de DLC é inferência estática, não teste runtime.\r\n\r\n- ArchiveXL e TweakXL são explicitamente declarados pelo autor; versões mínimas não informadas.\r\n- O arquivo informa que foi gerado com Easy Photomode Poses; esse programa de criação não é uma dependência runtime demonstrada.\r\n- O autor alerta deformações/clipping com rigs corporais.\r\n- Nenhum conflito de destino encontrado com o catálogo ou com EXtra; ambos acrescentam animações à entidade feminina de modo foto. Compatibilidade interna de archives e sincronização coop não foram executadas.\r\n- O YAML usa CategoryName com inicial maiúscula. Não foi verificada a aceitação dessa propriedade pelo TweakXL1.12.0 em runtime; observar seu log num futuro teste, sem alterar o arquivo do autor.\r\n- O autor proíbe modificar, converter e redistribuir o pacote; esta ficha contém somente metadados e resumo.\r\n\r\nSincronização em coop não demonstrada. Nenhum arquivo do jogo, corpo, loader ou save foi alterado."
-      ],
-      "PhantomLiberty": {
-        "Status": "not-required",
-        "Required": false,
-        "Evidence": "Fontes do autor e inspeção estática dos pacotes originais",
-        "Notes": "Sem exigência de expansão nas fontes e textos auditados; classificação documental/estática, sem teste de jogo sem DLC.",
-        "Sources": [
-          "https://www.nexusmods.com/cyberpunk2077/mods/35353?tab=description",
-          "https://www.nexusmods.com/cyberpunk2077/mods/35353?tab=files"
-        ],
-        "RuntimeWithoutDLCValidated": false,
-        "WithoutDLCProfileEligible": true
-      },
-      "Blocked": false,
-      "BlockedReason": "",
-      "CoopEvidence": "Não executado em coop; relato anterior sobre outros mods não estendido",
-      "CoopStatusFromExistingCatalog": "Conjunto feminino de animações; não altera corpo padrão",
-      "CoopNotesFromExistingCatalog": "Pacote de 36 poses femininas de chão para o modo foto. O YAML contém 56 registros únicos:36 poses-base e20 variações, incluindo opções para corpos específicos.\r\n\r\nAbrir o modo foto > poses > categoria NETGVNNER - FL00R SHXT.\r\n\r\nAs poses foram pensadas para sapatos de plataforma; salto fino ou solado baixo pode alterar o contato com o chão.\r\n\r\nPara as poses armadas aparecerem, o autor pede uma pistola no inventário.\r\n\r\nMantendo o corpo padrão, começar pelas variações sem marcação ANGEL/EBB; os nomes das variações não obrigam a instalar esses corpos.\r\n\r\nCandidato compatível pelas dependências declaradas e pelo escopo dos arquivos. Sem referência EP1 nos textos conferidos; ausência de DLC é inferência estática, não teste runtime.\r\n\r\n- ArchiveXL e TweakXL são explicitamente declarados pelo autor; versões mínimas não informadas.\r\n- O arquivo informa que foi gerado com Easy Photomode Poses; esse programa de criação não é uma dependência runtime demonstrada.\r\n- O autor alerta deformações/clipping com rigs corporais.\r\n- Nenhum conflito de destino encontrado com o catálogo ou com EXtra; ambos acrescentam animações à entidade feminina de modo foto. Compatibilidade interna de archives e sincronização coop não foram executadas.\r\n- O YAML usa CategoryName com inicial maiúscula. Não foi verificada a aceitação dessa propriedade pelo TweakXL1.12.0 em runtime; observar seu log num futuro teste, sem alterar o arquivo do autor.\r\n- O autor proíbe modificar, converter e redistribuir o pacote; esta ficha contém somente metadados e resumo.\r\n\r\nSincronização em coop não demonstrada. Nenhum arquivo do jogo, corpo, loader ou save foi alterado.",
-      "Assets": [
-        {
-          "Name": "NETGVNNER - FL00R SHXT 35353 1 2026-10-26T13-04Z k8Iw8mmuE.zip",
-          "ModId": 35353,
-          "FileId": 168808,
-          "Size": 151429,
-          "Sha256": "d49b5902c8ab73ab11a67953b6518ffe21c0793e4d70f947ba3ea3babfca7bd3",
-          "OfficialUrl": "https://www.nexusmods.com/cyberpunk2077/mods/35353?tab=files&file_id=168808"
-        }
-      ],
-      "Files": [
-        {
-          "RelativeInstallPath": "r6/tweaks/NETGVNNER/NETGVNNER_FL00R_SHXT.yaml",
-          "Size": 19480,
-          "Sha256": "b2dde4e87317e91b131f889b35e1bfcdd9a53571157777c93e8f27ffe9e08a69"
-        },
-        {
-          "RelativeInstallPath": "archive/pc/mod/NETGVNNER_FL00R_SHXT.archive",
-          "Size": 155648,
-          "Sha256": "222d2b33dd6c223efe63bea26ab1ef53d1fb4be00488543f45920231d44c1bda"
-        },
-        {
-          "RelativeInstallPath": "archive/pc/mod/NETGVNNER_FL00R_SHXT.xl",
-          "Size": 180,
-          "Sha256": "ec6268bfc88bd6ceb9beb3944ba35d116a0a63ec4897756c42dd856ba38c4f05"
-        }
-      ],
-      "Sources": [
-        "https://www.nexusmods.com/cyberpunk2077/mods/35353?tab=description",
-        "https://www.nexusmods.com/cyberpunk2077/mods/35353?tab=files",
-        "https://www.nexusmods.com/cyberpunk2077/mods/35353?tab=files&file_id=168808"
-      ],
-      "CheckedOn": "2026-10-30",
-      "EvidenceGroup": "Integracao-4-mods-20261030",
-      "Limitations": [
-        "Incluído no instalador para teste; não instalado no jogo nesta integração.",
-        "Integridade dos arquivos não comprova funcionamento em coop ou ausência de clipping."
-      ],
-      "DocumentationSummary": "Pacote de 36 poses femininas de chão para o modo foto. O YAML contém 56 registros únicos:36 poses-base e20 variações, incluindo opções para corpos específicos.",
-      "StaticInspection": {
-        "BasePoses": 36,
-        "PoseRecords": 56,
-        "EP1Paths": false,
         "ModCodeExecuted": false,
         "ArchivesDecompiled": false
       }

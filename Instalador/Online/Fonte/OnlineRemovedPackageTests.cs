@@ -10,11 +10,11 @@ internal static class OnlineRemovedPackageTests {
         string root=Path.Combine(parent,"retirada-pacote-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
         var checks=new List<string>();Action<bool,string> check=(ok,message)=>{if(!ok)throw new IOException(message);checks.Add(message);};
         var catalog=FixedData.Load();
-        check(catalog.Packages.Count==163&&!catalog.Packages.Any(mod=>mod.Id==RetiredPackEntries.DroneId),"Receita retirada; demais 163 componentes permanecem.");
+        check(catalog.Packages.Count==162&&!catalog.Packages.Any(mod=>mod.Id==RetiredPackEntries.DroneId),"Receita retirada; demais 162 componentes permanecem.");
         check(!catalog.Packages.Any(mod=>mod.Id=="mod-12572")&&catalog.Packages.Single(mod=>mod.Id=="mod-34403").Dependencies.SequenceEqual(new[]{"CET"}),"Stockings collection retired and reporter uses the existing CET without replacing the base.");
         check(!catalog.Packages.Any(m=>m.Id==RetiredPackEntries.RadioId)&&!catalog.Packages.SelectMany(m=>m.Dependencies).Contains(RetiredPackEntries.RadioId),"Spot On Radio retirado sem dependencias pendentes.");
-        var retired=new[]{RetiredPackEntries.Map8KId,RetiredPackEntries.RipperPantsId};
-        var hashes=new[]{RetiredPackEntries.Map8KHash,RetiredPackEntries.RipperPantsHash};
+        var retired=new[]{RetiredPackEntries.Map8KId,RetiredPackEntries.RipperPantsId,RetiredPackEntries.PoseId};
+        var hashes=new[]{RetiredPackEntries.Map8KHash,RetiredPackEntries.RipperPantsHash,RetiredPackEntries.PoseHash};
         var original=GeneralModLibrary.Seed(catalog,new ModImportItem[0]);
         check(original.Mods.All(mod=>!retired.Contains(mod.Id))&&
             original.Presets.All(preset=>!preset.ModIds.Intersect(retired).Any())&&
@@ -36,6 +36,8 @@ internal static class OnlineRemovedPackageTests {
                 "archive/pc/mod/rm_legs_ripper.archive","archive/pc/mod/rm_legs_ripper.xl",
                 "r6/tweaks/raem/rm_legs_ripper.yaml","r6/tweaks/raem/rm_legs_ripper_belt.yaml"
             }),"Recibos antigos continuam reconhecendo todos os arquivos aposentados.");
+        check(history.Single(mod=>mod.Id==RetiredPackEntries.PoseId).Files.Count==3&&!catalog.Packages.Any(mod=>mod.Id==RetiredPackEntries.PoseId),"O pacote de poses sai da lista ativa sem perder a identificação dos três arquivos em recibos antigos.");
+        check(HistoricalReceipts.CleanupAnchors(catalog).Any(file=>file.Owner==RetiredPackEntries.HotlineId&&file.Path.EndsWith("stopNCPD/init.lua"))&&!HistoricalReceipts.CleanupAnchors(new FixedCatalog{Id="outro-jogo"}).Any(),"NCPD é identificado por assinaturas anteriores confiáveis, sem aplicar essas identidades a outros jogos.");
         var radioList=new GeneralModList{Mods=new List<GeneralModEntry>{Entry(RetiredPackEntries.RadioId,"https://www.nexusmods.com/cyberpunk2077/mods/34305"),Entry("mapped-radio","https://www.nexusmods.com/cyberpunk2077/mods/34305",RetiredPackEntries.RadioId),Entry("custom-radio","https://www.nexusmods.com/cyberpunk2077/mods/34305")}};
         RetiredPackEntries.Remove(radioList);check(radioList.Mods.Count==1&&radioList.Mods[0].Id=="custom-radio"&&RetiredPackEntries.PreparedArchive(new ModImportItem{Kind="Arquivo",Sha256=RetiredPackEntries.RadioArchiveHash}),"Receita e mapeamento antigos sao retirados, ZIP conhecido nao reaparece automaticamente e uma escolha custom explicita permanece editavel.");
         var accessories=catalog.Packages.Single(mod=>mod.Id=="mod-12637");check(accessories.Files.Count==2&&accessories.Files.Any(file=>file.Path.EndsWith("voidwear-accessories.reds"))&&!accessories.Files.Any(file=>file.Path.EndsWith("voidwear-casual.reds")||file.Path.EndsWith("voidwear-tacticool.reds")),"Only the two requested VOIDWEAR stores are omitted; accessories remain available.");

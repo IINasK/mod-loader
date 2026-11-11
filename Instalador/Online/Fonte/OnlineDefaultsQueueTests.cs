@@ -31,7 +31,7 @@ public static class OnlineDefaultsQueueTests {
         check(catalog.Packages.All(m=>FixedData.Scan(m,clean).IsCorrect)&&!ModDefaults.Needs(catalog,drive.Id,clean),"Instalação normal usa a fila existente e aplica padrão depois dos arquivos");
         string failed=OnlineTests.Fixture(root,"failed");bool refused=false;try{new FixedInstaller(catalog,cache,failed,null,true).Install(new[]{drive.Id},true,s=>{},1);}catch(IOException){refused=true;}
         check(refused&&!File.Exists(Safe.In(failed,Ini)),"Falha durante cópia não deixa padrão de mod não instalado");
-        var embedded=FixedData.Load();check(embedded.Defaults.Count==7&&embedded.Packages.Count==163,"Sete padrões sem FPV preservam os 163 registros ativos");
+        var embedded=FixedData.Load();check(embedded.Defaults.Count==7&&embedded.Packages.Count==162,"Sete padrões sem FPV preservam os 162 registros ativos");
         var defaults=embedded.Defaults.Single(d=>d.ModId=="mod-33954");var values=Safe.Json.Deserialize<Dictionary<string,string>>(defaults.Content);
         check(values["steerNormalPct"]=="75"&&values["steerSportPct"]=="50"&&values["steerGentlePct"]=="65"&&values["steeringSmoothing"]=="false","Steering atual exportado exatamente como salvo pelo usuário");
         check(!embedded.Defaults.Any(d=>d.Path.Contains("SpotOnRadio")||d.Path.Contains("RadioExt")||d.Path.Contains("immersive_third_person")),"Credenciais de rádio, corpo e estado do ITP não são exportados");

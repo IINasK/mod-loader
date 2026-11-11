@@ -213,7 +213,7 @@ public sealed partial class FixedInstaller {
 
     // Only exact recorded paths and hashes prove ownership; folder names and companions do not.
     Dictionary<string,string> SyncOwnership(string appData) {
-        var anchors=CatalogAnchors().ToList();
+        var anchors=CatalogAnchors().Concat(HistoricalReceipts.CleanupAnchors(catalog)).ToList();
         Action<Func<IEnumerable<ProjectDeleteFile>>> add=read=>{
             try {
                 var recorded=read().Where(file=>file.OwnerKeys!=null&&file.OwnerKeys.Count>0&&FixedData.HashValid(file.Hash))

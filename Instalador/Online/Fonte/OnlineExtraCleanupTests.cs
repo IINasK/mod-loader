@@ -79,6 +79,20 @@ static class OnlineExtraCleanupTests {
         engine.Undo(_=>{});
         check(proven.All(file=>Safe.Hash(Safe.In(game,file.Path))==file.Before)&&unknown.All(path=>File.ReadAllText(Safe.In(game,path))==path),
             "Desfazer restaura exatamente os arquivos movidos, sem tocar nos desconhecidos.");
+        const string oldSetting="bin/x64/plugins/cyber_engine_tweaks/mods/stopNCPD/mod_user_settings.json";
+        const string oldLog="bin/x64/plugins/cyber_engine_tweaks/mods/stopNCPD/stopNCPD.log";
+        string historicalGame=OnlineTests.Fixture(root,"historical"),historicalData=Safe.In(root,"historical-data");
+        Put(historicalGame,oldSetting,"{}");Put(historicalGame,oldLog,"generated locally");
+        var officialCatalog=Safe.Json.Deserialize<FixedCatalog>(Safe.Json.Serialize(FixedData.Load()));
+        officialCatalog.GameFileVersion=catalog.GameFileVersion;
+        var official=new FixedInstaller(officialCatalog,historicalGame,true);
+        var historical=official.PlanSyncExtras(host,appData:historicalData);
+        var oldFile=historical.Where(extra=>extra.Proven).SelectMany(extra=>extra.Files).Single(file=>file.Path==oldSetting);
+        check(historical.Where(extra=>!extra.Proven).SelectMany(extra=>extra.Files).Any(file=>file.Path==oldLog),
+            "O NCPD manual é reconhecido pela assinatura do pacote anterior, mas seu log gerado continua desconhecido.");
+        official.ApplySyncCleanup(new List<OwnedChange>{oldFile},host,new string[0],_=>{},historicalData);
+        check(!File.Exists(Safe.In(historicalGame,oldSetting))&&File.ReadAllText(Safe.In(historicalGame,oldLog))=="generated locally",
+            "Sincronizar retira o NCPD comprovado sem ampliar a autorização aos resíduos da mesma pasta.");
         Safe.WriteJson(Safe.In(root,"resultado-protecao-sincronizacao.json"),new{Passed=true,Tests=checks,RealGameTouched=false});
     }
 

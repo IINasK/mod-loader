@@ -11,6 +11,7 @@ internal static class RetiredPackEntries {
     internal const string Map8KId="mod-17811", RipperPantsId="mod-18084";
     internal const string Map8KHash="95602fb43a0ae73bf0c78f102258dcdea0f2c377729d4ac95d4d3b60eaefa0c5";
     internal const string RipperPantsHash="1b777f045286f9914a7888324438709aa7e4fa890ff00dbc5ba1c514c503750e";
+    internal const string PoseId="mod-35353", PoseHash="d49b5902c8ab73ab11a67953b6518ffe21c0793e4d70f947ba3ea3babfca7bd3";
     internal const string DroneId="mod-31642";
     internal const string DroneArchiveHash="6f0114f760f0d37d109f006955cc435d16a97b22a92c1987ec93a018b2183467";
     static readonly string[] DroneFolders={
@@ -29,10 +30,10 @@ internal static class RetiredPackEntries {
     }
 
     static readonly HashSet<string> RetiredIds=new HashSet<string>(EmptyStoreIds.Concat(new[]{
-        HotlineId,DroneId,RadioId,"mod-12572",Map8KId,RipperPantsId
+        HotlineId,DroneId,RadioId,"mod-12572",Map8KId,RipperPantsId,PoseId
     }),StringComparer.Ordinal);
     static readonly HashSet<string> RetiredHashes=new HashSet<string>(EmptyStoreHashes.Concat(new[]{
-        HotlineHash,DroneArchiveHash,RadioArchiveHash,Map8KHash,RipperPantsHash
+        HotlineHash,DroneArchiveHash,RadioArchiveHash,Map8KHash,RipperPantsHash,PoseHash
     }),StringComparer.Ordinal);
     static readonly HashSet<string> RetiredArchiveIds=new HashSet<string>(RetiredHashes.Select(hash=>"file-"+hash),StringComparer.Ordinal);
 
