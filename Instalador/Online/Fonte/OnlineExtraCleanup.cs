@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -8,9 +8,10 @@ using System.Windows.Forms;
 
 internal sealed class P2PSyncExtra {
     internal string Name;
+    internal bool Proven;
     internal OwnedChange[] Files;
     public override string ToString(){
-        return Name+" · "+(Files.Length==1&&Files[0].Before==null
+        return Name+(Proven?"":" · "+GeneralStyle.T("Origem desconhecida — preservado","Unknown origin — preserved"))+" · "+(Files.Length==1&&Files[0].Before==null
             ?GeneralStyle.T("pasta vazia","empty folder")
             :Files.Length+" "+GeneralStyle.T("arquivo(s)","file(s)"));
     }
@@ -114,8 +115,10 @@ public sealed partial class FixedInstaller {
             .ToList();
     }
 
-    internal List<OwnedChange> PlanExtraReset() {
-        return FindExtraPaths().Where(path=>!RetiredPackEntries.LocalDronePath(path)&&!InstalledFileOwnership.PrivateState(path)).Select(path => new OwnedChange { Path=path, Before=Safe.Hash(Safe.In(game,path)) }).ToList();
+    internal List<OwnedChange> PlanExtraReset(string appData=null) {
+        var ownership=SyncOwnership(appData);
+        return FindExtraPaths().Where(path=>SyncModPath(path)).Select(path=>new OwnedChange{Path=path,Before=Safe.Hash(Safe.In(game,path))})
+            .Where(file=>ownership.ContainsKey(file.Path+"\n"+file.Before)).ToList();
     }
 
     internal static bool SyncModPath(string path) {
@@ -208,20 +211,59 @@ public sealed partial class FixedInstaller {
         return SyncBundlePath(path,true)&&!keep.Contains(path)&&!keep.Any(file=>InFolder(file,path));
     }
 
-    internal P2PSyncExtra[] PlanSyncExtras(InstalledSnapshotManifest host,Action checkpoint=null) {
+    // Only exact recorded paths and hashes prove ownership; folder names and companions do not.
+    Dictionary<string,string> SyncOwnership(string appData) {
+        var anchors=CatalogAnchors().ToList();
+        Action<Func<IEnumerable<ProjectDeleteFile>>> add=read=>{
+            try {
+                var recorded=read().Where(file=>file.OwnerKeys!=null&&file.OwnerKeys.Count>0&&FixedData.HashValid(file.Hash))
+                    .Select(file=>new ModFileAnchor{Path=file.Path,Hash=file.Hash,Owner=String.Join(" + ",file.OwnerKeys.OrderBy(key=>key))}).ToArray();
+                anchors.AddRange(recorded);
+            } catch(IOException) { OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo indisponível; arquivos sem outra prova serão preservados."); }
+              catch(UnauthorizedAccessException) { OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo inacessível; arquivos sem outra prova serão preservados."); }
+        };
+        if(appData!=null){
+            add(()=>new GeneralModInstaller(game,Path.Combine(appData,"Instalacoes")).ProjectDeletionFiles());
+            add(()=>new InstalledSnapshotInstaller(game,appData,catalog,fixture).ProjectDeletionFiles());
+        }
+        if(Directory.Exists(Data)){
+            foreach(string path in AllReceiptPaths().Where(path=>!String.Equals(Path.GetDirectoryName(path),Safe.In(Data,"limpezas"),StringComparison.OrdinalIgnoreCase))){
+                try {
+                    var receipt=ReadReceipt(path);
+                    if(receipt.Status!="instalado"||receipt.Mods.Count==0||
+                        receipt.Operation!=null&&receipt.Operation!="install"&&receipt.Operation!=LocalModPackage.ReceiptOperation)continue;
+                    anchors.AddRange(receipt.Files.Where(file=>file.Applied&&!file.Reverted&&!file.UndoStarted&&FixedData.HashValid(file.After))
+                        .Select(file=>new ModFileAnchor{Path=file.Path,Hash=file.After,Owner=String.Join(" + ",receipt.Mods.OrderBy(id=>id))}));
+                } catch(IOException) { OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo inválido; arquivos sem outra prova serão preservados."); }
+                  catch(UnauthorizedAccessException) { OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo inacessível; arquivos sem outra prova serão preservados."); }
+            }
+        }
+        return anchors.Where(file=>!String.IsNullOrEmpty(file.Path)&&!GeneralInstallRoutes.External(file.Path)&&FixedData.HashValid(file.Hash))
+            .GroupBy(file=>file.Path+"\n"+file.Hash,StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group=>group.Key,group=>String.Join(" + ",group.Select(file=>file.Owner).Distinct().OrderBy(id=>id)),StringComparer.OrdinalIgnoreCase);
+    }
+
+    internal P2PSyncExtra[] PlanSyncExtras(InstalledSnapshotManifest host,Action checkpoint=null,string appData=null) {
         if(host.SyncGameInventory==null)return new P2PSyncExtra[0];
         var keep=SyncProtectedPaths(host);
         var paths=FindExtraPaths(true).Where(path=>SyncCleanupPath(path,keep)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var empty=EmptySyncBundles(true).Where(path=>SyncCleanupBundle(path,keep)).ToArray();
         if(paths.Length+empty.Length>ExtraResetLimit)throw new IOException("Há arquivos extras demais para revisar nesta sincronização.");
-        var names=catalog.Packages.SelectMany(mod=>NightCityDensity.KnownFiles(mod).Select(file=>new{file.Path,mod.Name}))
-            .GroupBy(item=>item.Path,StringComparer.OrdinalIgnoreCase).ToDictionary(group=>group.Key,group=>group.First().Name,StringComparer.OrdinalIgnoreCase);
-        var files=new List<OwnedChange>();
-        foreach(string path in paths){if(checkpoint!=null)checkpoint();files.Add(new OwnedChange{Path=path,Before=Safe.Hash(Safe.In(game,path))});}
-        return files.GroupBy(file=>{string name;return names.TryGetValue(file.Path,out name)?name:SyncExtraName(file.Path);},StringComparer.OrdinalIgnoreCase)
-            .Select(group=>new P2PSyncExtra{Name=group.Key,Files=group.ToArray()})
+        var ownership=SyncOwnership(appData);
+        var names=catalog.Packages.ToDictionary(mod=>mod.Id,mod=>mod.Name,StringComparer.Ordinal);
+        var files=new List<P2PSyncExtra>();
+        foreach(string path in paths){
+            if(checkpoint!=null)checkpoint();
+            string hash=Safe.Hash(Safe.In(game,path)),owner;
+            bool proven=ownership.TryGetValue(path+"\n"+hash,out owner);
+            string name=proven&&names.ContainsKey(owner)?names[owner]:SyncExtraName(path);
+            files.Add(new P2PSyncExtra{Name=name,Proven=proven,Files=new[]{new OwnedChange{Path=path,Before=hash}}});
+        }
+        // Unknown files stay separate even when their folder has the name of a registered mod.
+        return files.GroupBy(extra=>extra.Name+"\n"+extra.Proven,StringComparer.OrdinalIgnoreCase)
+            .Select(group=>new P2PSyncExtra{Name=group.First().Name,Proven=group.First().Proven,Files=group.SelectMany(extra=>extra.Files).ToArray()})
             .Concat(empty.Select(path=>new P2PSyncExtra{Name=Path.GetFileName(path),Files=new[]{new OwnedChange{Path=path}}}))
-            .OrderBy(extra=>extra.Name,StringComparer.OrdinalIgnoreCase).ToArray();
+            .OrderByDescending(extra=>extra.Proven).ThenBy(extra=>extra.Name).ToArray();
     }
 
     static string SyncExtraName(string path) {
@@ -233,15 +275,30 @@ public sealed partial class FixedInstaller {
         return stem.EndsWith(".archive",StringComparison.OrdinalIgnoreCase)?Path.GetFileNameWithoutExtension(stem):stem;
     }
 
-    internal void ApplySyncCleanup(List<OwnedChange> approved,InstalledSnapshotManifest host,IEnumerable<string> installedPaths,Action<string> report) {
+    static bool SyncCleanupFolder(string path) {
+        return !String.IsNullOrEmpty(path)&&!RetiredPackEntries.LocalDronePath(path)&&InstalledSnapshot.SafeGenericPath(path)&&
+            CleanupBundleRoots.Any(root=>InFolder(path,root));
+    }
+
+    static IEnumerable<string> SyncParentFolders(string file) {
+        for(int slash=file.LastIndexOf('/');slash>0;slash=file.LastIndexOf('/',slash-1)){
+            string parent=file.Substring(0,slash);
+            if(!SyncCleanupFolder(parent))yield break;
+            yield return parent;
+        }
+    }
+
+    internal void ApplySyncCleanup(List<OwnedChange> approved,InstalledSnapshotManifest host,IEnumerable<string> installedPaths,Action<string> report,string appData=null) {
         if(approved==null||approved.Count==0)return;
         if(host.SyncGameInventory==null||approved.Count>ExtraResetLimit)throw new IOException("A comparação dos mods extras não está disponível.");
         var keep=SyncProtectedPaths(host);
         keep.UnionWith(installedPaths);
-        if(approved.Any(file=>file==null||!SyncCleanupEntry(file.Path,file.Before)||
-            !(file.Before==null?SyncCleanupBundle(file.Path,keep):SyncCleanupPath(file.Path,keep)))||
+        var ownership=SyncOwnership(appData);
+        if(approved.Any(file=>file==null||file.Before==null||!SyncCleanupEntry(file.Path,file.Before)||
+            !ownership.ContainsKey(file.Path+"\n"+file.Before)||
+            !SyncCleanupPath(file.Path,keep))||
             approved.Select(file=>file.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=approved.Count)
-            throw new IOException("A seleção contém arquivos protegidos ou inválidos.");
+            throw new IOException("A seleção contém arquivos protegidos ou sem vínculo comprovado. Compare os mods novamente.");
         ApplyExtraCleanup(()=>{
             var current=new List<OwnedChange>();
             foreach(var file in approved){
@@ -252,16 +309,16 @@ public sealed partial class FixedInstaller {
                 current.Add(new OwnedChange{Path=file.Path,Before=file.Before});
             }
             return current;
-        },report,sync:true,emptyShells:()=>approved.Where(file=>file.Before!=null)
-            .Select(file=>ModFolder(file.Path)).Where(bundle=>SyncCleanupBundle(bundle,keep)).Distinct(StringComparer.OrdinalIgnoreCase)
-            .Where(bundle=>EmptySyncTree(Safe.In(game,bundle)))
-            .Select(bundle=>new OwnedChange{Path=bundle}).ToArray());
+        },report,sync:true,emptyShells:()=>approved.SelectMany(file=>SyncParentFolders(file.Path))
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderByDescending(path=>path.Length)
+            .Where(path=>!keep.Contains(path)&&!keep.Any(file=>InFolder(file,path))&&EmptyDirectory(Safe.In(game,path)))
+            .Select(path=>new OwnedChange{Path=path}));
     }
 
-    internal string ApplyExtraReset(List<OwnedChange> approved,Action<string> report) {
+    internal string ApplyExtraReset(List<OwnedChange> approved,Action<string> report,string appData=null) {
         if(approved==null||approved.Count==0)return "Nenhum mod fora da lista encontrado.";
         return ApplyExtraCleanup(()=>{
-            var current=PlanExtraReset();
+            var current=PlanExtraReset(appData);
             if(!current.Select(f=>f.Path+"|"+f.Before).SequenceEqual(approved.Select(f=>f.Path+"|"+f.Before),StringComparer.OrdinalIgnoreCase))
                 throw new IOException("Os arquivos mudaram após a conferência. Abra a limpeza novamente para revisar a lista atual.");
             return current;
@@ -272,7 +329,7 @@ public sealed partial class FixedInstaller {
         return change.Before==null?EmptySyncTree(path):File.Exists(path)&&Safe.Hash(path)==change.Before;
     }
 
-    string ApplyExtraCleanup(Func<List<OwnedChange>> plan,Action<string> report,bool sync=false,Func<OwnedChange[]> emptyShells=null) {
+    string ApplyExtraCleanup(Func<List<OwnedChange>> plan,Action<string> report,bool sync=false,Func<IEnumerable<OwnedChange>> emptyShells=null) {
         Closed();
         Directory.CreateDirectory(Data);
         using (var mutex = new FileStream(Safe.In(Data,"operacao.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None)) {
@@ -333,7 +390,7 @@ public sealed partial class FixedInstaller {
             throw new IOException("Registro de limpeza inválido.");
         foreach (var file in receipt.Files) {
             if (file == null || String.IsNullOrEmpty(file.Path) || !unique.Add(file.Path) || file.After!=null
-                || (file.Before==null?(receipt.BackupLayout!="flat-v2"||!SyncBundlePath(file.Path,true)):
+                || (file.Before==null?(receipt.BackupLayout!="flat-v2"||!SyncCleanupFolder(file.Path)):
                     !ExtraFilePath(file.Path)||!FixedData.HashValid(file.Before)))
                 throw new IOException("Arquivo fora do escopo da limpeza.");
             Safe.In(game, file.Path);

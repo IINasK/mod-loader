@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -207,7 +207,7 @@ internal sealed partial class P2PService {
         if(cyberpunk&&preview.SyncGameInventory!=null){
             Action checkpoint=()=>{if(disposed||session.Discarded)throw new OperationCanceledException();};
             if(report!=null)report(0,0,"Mods fora do pacote");
-            extras=new FixedInstaller(installedCatalog,destination,installedFixture).PlanSyncExtras(preview,checkpoint);
+            extras=new FixedInstaller(installedCatalog,destination,installedFixture).PlanSyncExtras(preview,checkpoint,installedData);
             foreach(var item in preview.SyncGameInventory){
                 checkpoint();
                 string path=Safe.In(destination,item.Key);
@@ -233,7 +233,7 @@ internal sealed partial class P2PService {
         if(choice==null||choice.Full||choice.PreviewHash!=hash||installed.Game!="cyberpunk2077")
             throw new IOException("Refaça a comparação antes de remover mods extras.");
         new FixedInstaller(installedCatalog,session.Destination,installedFixture)
-            .ApplySyncCleanup(session.SyncCleanup,preview,installed.Files.Select(file=>file.Path),message=>session.Stage=message);
+            .ApplySyncCleanup(session.SyncCleanup,preview,installed.Files.Select(file=>file.Path),message=>session.Stage=message,installedData);
         OnlineDiagnostics.Record("p2p.sync.cleanup.complete",null,"Extras confirmados guardados no backup local.",new{Files=session.SyncCleanup.Count});
         session.SyncCleanup=null;
     }
@@ -309,7 +309,7 @@ internal sealed partial class P2PService {
             ReadSyncPreview(session,Engine.Device,out hash);
             if(hash!=comparison.PreviewHash||!String.Equals(session.Destination,comparison.Destination,StringComparison.OrdinalIgnoreCase))throw new IOException("A lista do anfitrião mudou. Confira os mods novamente.");
             selected=selected??new int[0];
-            if((full&&selected.Length!=0)||selected.Distinct().Count()!=selected.Length||selected.Any(index=>index<0||index>=comparison.Extras.Length))
+            if((full&&selected.Length!=0)||selected.Distinct().Count()!=selected.Length||selected.Any(index=>index<0||index>=comparison.Extras.Length||!comparison.Extras[index].Proven))
                 throw new IOException("A seleção de mods extras é inválida.");
             var cleanup=selected.SelectMany(index=>comparison.Extras[index].Files).ToList();
             session.SyncCleanup=cleanup.Count==0?null:cleanup;

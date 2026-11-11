@@ -1162,8 +1162,8 @@ internal sealed partial class GeneralModWindow {
         try{
             var engine=Cyberpunk(root);
             if(clean){
-                var plan=await Task.Run(()=>engine.PlanExtraReset());
-                if(plan.Count==0){detail.Text="Nenhum arquivo fora do pacote Cyberpunk foi encontrado.";return;}
+                var plan=await Task.Run(()=>engine.PlanExtraReset(data));
+                if(plan.Count==0){detail.Text="Nenhum arquivo extra com vínculo comprovado foi encontrado. Os desconhecidos foram preservados.";return;}
                 using(var review=new GeneralDialog(T("Revisar arquivos fora do pacote Cyberpunk","Review files outside the Cyberpunk pack")){ClientSize=new Size(820,475),RequiresDecision=true}){
                     var layout=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(20,8,20,20),ColumnCount=1,RowCount=2};
                     layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -1178,7 +1178,7 @@ internal sealed partial class GeneralModWindow {
                     if(review.ShowDialog(this)!=DialogResult.OK)return;
                 }
                 if(GeneralDialog.Message(this,"Retirar os "+plan.Count+" arquivos listados? Eles serão guardados para desfazer a operação.","Confirmar limpeza",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
-                detail.Text=await Task.Run(()=>engine.ApplyExtraReset(plan,Report));
+                detail.Text=await Task.Run(()=>engine.ApplyExtraReset(plan,Report,data));
             }else{
                 if(GeneralDialog.Message(this,"Desfazer a última operação do Cyberpunk?","Confirmar reversão",MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
                 detail.Text=await Task.Run(()=>engine.Undo(Report));

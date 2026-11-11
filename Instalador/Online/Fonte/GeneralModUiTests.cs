@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -523,8 +523,9 @@ internal sealed partial class GeneralModWindow {
     }
 
     static void TestSyncRemovalReview(GeneralModWindow owner,string root,Action<bool,string> check){
-        var extras=new[]{new P2PSyncExtra{Name="Extra 1",Files=new[]{new OwnedChange{Path="r6/tweaks/one.yaml"}}},
-            new P2PSyncExtra{Name="Extra 2",Files=new[]{new OwnedChange{Path="r6/tweaks/two.yaml"}}}};
+        var extras=new[]{new P2PSyncExtra{Name="Extra 1",Proven=true,Files=new[]{new OwnedChange{Path="r6/tweaks/one.yaml"}}},
+            new P2PSyncExtra{Name="Extra 2",Proven=true,Files=new[]{new OwnedChange{Path="r6/tweaks/two.yaml"}}},
+            new P2PSyncExtra{Name="cache",Files=new[]{new OwnedChange{Path="r6/scripts/cache/runtime.reds"}}}};
         using(var review=new GeneralSyncReviewDialog(new P2PSyncComparison{Extras=extras}))
         using(var timer=new Timer{Interval=40}){
             review.Show(owner);
@@ -534,7 +535,10 @@ internal sealed partial class GeneralModWindow {
             var remove=buttons.Single(button=>button.Name=="RemoveSelectedSyncExtras");
             check(review.SelectedExtras.Length==0&&!remove.Enabled,"A revisão começa sem itens autorizados para remoção.");
             all.PerformClick();
-            check(review.SelectedExtras.SequenceEqual(new[]{0,1})&&remove.Enabled,"Selecionar todos inclui cada mod extra.");
+            check(review.SelectedExtras.SequenceEqual(new[]{0,1})&&remove.Enabled,"Selecionar todos inclui só os extras comprovados, preservando a pasta cache desconhecida.");
+            var choices=AllControls(review).OfType<CheckedListBox>().Single();
+            choices.SetItemChecked(2,true);
+            check(!choices.GetItemChecked(2)&&review.SelectedExtras.SequenceEqual(new[]{0,1}),"Nem o clique individual autoriza remover um item sem vínculo comprovado.");
             all.PerformClick();
             check(review.SelectedExtras.Length==0&&!remove.Enabled,"Desmarcar todos retorna ao estado seguro.");
             all.PerformClick();

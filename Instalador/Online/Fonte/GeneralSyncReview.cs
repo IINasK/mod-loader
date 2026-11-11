@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -8,7 +8,7 @@ internal sealed class GeneralSyncReviewDialog : GeneralDialog {
     readonly CheckedListBox choices = new CheckedListBox {
         Name = "SyncExtraMods", Dock = DockStyle.Fill, CheckOnClick = true, IntegralHeight = false
     };
-    internal int[] SelectedExtras { get { return choices.CheckedIndices.Cast<int>().ToArray(); } }
+    internal int[] SelectedExtras { get { return choices.CheckedIndices.Cast<int>().Where(index=>((P2PSyncExtra)choices.Items[index]).Proven).ToArray(); } }
 
     internal GeneralSyncReviewDialog(P2PSyncComparison comparison)
         : base(T("Mods extras neste PC", "Extra mods on this PC")) {
@@ -24,15 +24,15 @@ internal sealed class GeneralSyncReviewDialog : GeneralDialog {
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         choices.Items.AddRange(comparison.Extras.Cast<object>().ToArray());
         var selectAll = GeneralStyle.Button(T("Selecionar todos", "Select all"), () => {
-            bool check = choices.CheckedItems.Count < choices.Items.Count;
+            bool check = SelectedExtras.Length < comparison.Extras.Count(extra=>extra.Proven);
             choices.BeginUpdate();
-            try { for (int index = 0; index < choices.Items.Count; index++) choices.SetItemChecked(index, check); }
+            try { for (int index = 0; index < choices.Items.Count; index++) choices.SetItemChecked(index, check&&comparison.Extras[index].Proven); }
             finally { choices.EndUpdate(); }
         });
         selectAll.Name = "SelectAllSyncExtras";
         selectAll.Anchor = AnchorStyles.Left;
         selectAll.Margin = new Padding(0, 0, 0, 8);
-        selectAll.Visible = choices.Items.Count > 0;
+        selectAll.Visible = comparison.Extras.Any(extra=>extra.Proven);
         layout.Controls.Add(selectAll, 0, 0);
         var surface = new GeneralSurface { Dock = DockStyle.Fill, Padding = new Padding(12), Margin = Padding.Empty };
         if (choices.Items.Count > 0) surface.Controls.Add(new GeneralScrollView(choices));
@@ -54,9 +54,10 @@ internal sealed class GeneralSyncReviewDialog : GeneralDialog {
         ((GeneralButton)remove).Destructive = true;
         remove.Enabled = false;
         choices.ItemCheck += (s, e) => {
+            if(!comparison.Extras[e.Index].Proven){e.NewValue=CheckState.Unchecked;return;}
             int count = choices.CheckedItems.Count + (e.NewValue == CheckState.Checked ? 1 : -1);
             remove.Enabled = count > 0;
-            selectAll.Text = count == choices.Items.Count ? T("Desmarcar todos", "Clear all") : T("Selecionar todos", "Select all");
+            selectAll.Text = count == comparison.Extras.Count(extra=>extra.Proven) ? T("Desmarcar todos", "Clear all") : T("Selecionar todos", "Select all");
         };
         commands.Controls.Add(remove);
         commands.Controls.Add(keep);
