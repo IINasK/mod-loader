@@ -346,8 +346,10 @@ internal sealed partial class GeneralModWindow {
             for(int i=0;i<works.Count;i++){
                 var work=works[i];
                 scanCurrent=work;
-                currentProgress.Caption=work.Entry.Name+" · "+T("Verificando","Checking");
-                currentProgress.Value=0;currentProgress.Indeterminate=true;currentProgress.NotApplicable=false;
+                if(!loadingPreset) {
+                    currentProgress.Caption=work.Entry.Name+" · "+T("Verificando","Checking");
+                    currentProgress.Value=0;currentProgress.Indeterminate=true;currentProgress.NotApplicable=false;
+                }
                 Stage(work,"scan.begin");
                 string found=await pending.Dequeue();
                 if(scheduled<works.Count)pending.Enqueue(verify(works[scheduled++]));
@@ -370,7 +372,7 @@ internal sealed partial class GeneralModWindow {
                 totalProgress.Value=100*operationFinished/operationTotal;
                 if(operationFinished%8==0)await Task.Yield();
             }
-            if(works.Count>0){
+            if(works.Count>0&&!loadingPreset){
                 var last=works[works.Count-1];currentProgress.Indeterminate=false;
                 ShowWorkCaption(last,statuses[last.Key]);
                 currentProgress.Value=statuses[last.Key]=="Instalado"?100:0;

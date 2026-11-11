@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.Drawing;
@@ -219,7 +219,21 @@ internal sealed class GeneralProgress : Control {
     internal event Action<PackCoverageSegment> SegmentActivated;
     readonly ToolTip segmentTip=new ToolTip{UseAnimation=false,UseFading=false};
     internal int Value {get{return value;}set{this.value=Math.Max(0,Math.Min(100,value));Invalidate();}}
-    internal bool Indeterminate, NotApplicable;
+    internal bool NotApplicable;
+    Timer pulse;
+    internal bool Indeterminate {
+        get{return pulse!=null&&pulse.Enabled;}
+        set {
+            if(value&&pulse==null) {
+                pulse=new Timer{Interval=45};
+                pulse.Tick+=(s,e)=>Invalidate();
+            }
+            if(pulse!=null&&pulse.Enabled!=value) {
+                pulse.Enabled=value;
+                Invalidate();
+            }
+        }
+    }
     internal string Caption;
     internal GeneralProgress(){Height=37;SetStyle(ControlStyles.UserPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);}
     RectangleF Track {get{return new RectangleF(0,27,Math.Max(1,Width-1),6);}}
@@ -265,7 +279,7 @@ internal sealed class GeneralProgress : Control {
         var segment=SegmentAt(e.Location);
         if(segment!=null)SegmentActivated(segment);
     }
-    protected override void Dispose(bool disposing){if(disposing)segmentTip.Dispose();base.Dispose(disposing);}
+    protected override void Dispose(bool disposing){if(disposing){segmentTip.Dispose();if(pulse!=null)pulse.Dispose();}base.Dispose(disposing);}
     protected override void OnPaint(PaintEventArgs e){
         var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;
         using(var font=GeneralStyle.Font(10.5f))TextRenderer.DrawText(g,Caption??"",font,new Rectangle(0,0,Width-52,23),GeneralStyle.Muted,TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
@@ -277,7 +291,8 @@ internal sealed class GeneralProgress : Control {
             float x=0,total=Segments.Sum(s=>(float)s.Count);foreach(var segment in Segments){float part=track.Width*segment.Count/total;using(var brush=new SolidBrush(segment.Color))g.FillRectangle(brush,x,track.Y,part+.5f,track.Height);x+=part;}g.Restore(saved);return;
         }
         float width=track.Width*(Indeterminate ? .16f : Value/100f);
-        if(width>0)using(var path=GeneralStyle.Round(new RectangleF(0,27,width,6),3))using(var brush=new SolidBrush(GeneralStyle.Accent))g.FillPath(brush,path);
+        float indicatorX=Indeterminate?(track.Width-width)*((1f-(float)Math.Cos((Environment.TickCount&Int32.MaxValue)%1800*Math.PI/900))/2f):0;
+        if(width>0)using(var path=GeneralStyle.Round(new RectangleF(indicatorX,27,width,6),3))using(var brush=new SolidBrush(GeneralStyle.Accent))g.FillPath(brush,path);
     }
 }
 

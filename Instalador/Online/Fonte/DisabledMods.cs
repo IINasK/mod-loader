@@ -54,7 +54,7 @@ internal sealed class DisabledMods {
         return null;
     }
 
-    internal void Disable(Dictionary<string, List<DisabledModFile>> plan, bool compress=false, ISet<string> retainedPaths=null) {
+    internal void Disable(Dictionary<string, List<DisabledModFile>> plan, bool compress=false, ISet<string> retainedPaths=null, Action<int,int> progress=null) {
         using (Lock()) {
             var entries = Read();
             if (plan.Keys.Any(entries.ContainsKey)) throw new IOException("A seleção já contém mods desativados.");
@@ -67,7 +67,9 @@ internal sealed class DisabledMods {
             foreach (var pair in plan) entries.Add(pair.Key, pair.Value);
             Safe.WriteJson(index, entries);
             try {
+                int completed=0;
                 foreach (var file in files) {
+                    if(progress!=null)progress(completed++,files.Length);
                     checkClosed();
                     string target = GamePath(file), blob = Stored(file);
                     if(retainedPaths!=null&&retainedPaths.Contains(target)){

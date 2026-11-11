@@ -43,7 +43,12 @@ internal static class GeneralPresetTests {
         var engine=new GeneralPresetDeployment(game,data);var result=engine.Apply("a","one",new[]{first},new[]{first,second});
         check(File.Exists(Path.Combine(game,"mods/a.txt"))&&!File.Exists(Path.Combine(game,"mods/b.txt")),"Loading suspends only files absent from the desired preset.");
         check(result.Active.Count==1&&result.Issues.Count==0,"A complete load records its actual active set.");
-        result=engine.Apply("b","two",new[]{second},new[]{first,second});
+        var stages=new List<Tuple<string,int,int>>();
+        result=engine.Apply("b","two",new[]{second},new[]{first,second},
+            (stage,done,total)=>stages.Add(Tuple.Create(stage,done,total)));
+        int saving=stages.FindIndex(step=>step.Item1.Contains("desativados")&&step.Item3==1);
+        int activating=stages.FindIndex(step=>step.Item1.Contains("second")&&step.Item3==1);
+        check(saving>=0&&activating>saving,"Progress reports counted file storage before counted mod activation.");
         check(!File.Exists(Path.Combine(game,"mods/a.txt"))&&File.ReadAllText(Path.Combine(game,"mods/b.txt"))=="second","The next preset restores the stored variant without downloading.");
         long blobs=Directory.GetFiles(data,"*.zip",SearchOption.AllDirectories).Length;
         for(int i=0;i<5;i++){engine.Apply("a","one",new[]{first},new[]{first,second});engine.Apply("b","two",new[]{second},new[]{first,second});}
@@ -190,7 +195,12 @@ internal sealed partial class GeneralModWindow {
                 form.preset.Toggle();
             }
             Safe.WriteJson(Path.Combine(root,"preset-popup.json"),placements);
-            await form.LoadPreset();
+            var loading=form.LoadPreset();
+            check(form.currentProgress.Caption.Contains("preset")&&form.currentProgress.Indeterminate,
+                "The footer takes over immediately while the preset is being checked.");
+            await loading;
+            check(form.currentProgress.Caption.StartsWith("Preset carregado")&&form.currentProgress.Value==100&&!form.currentProgress.Indeterminate,
+                "The footer keeps the result after the list refresh.");
             check(File.Exists(Path.Combine(game,"mods/a.txt"))&&!File.Exists(Path.Combine(game,"mods/b.txt")),"The actual window loads the selected preset using generic installation receipts.");
             check(!form.NeedsPresetLoad&&form.state.AppliedPreset=="a","After loading, normal mod actions become available.");
             form.preset.SelectedIndex=2;

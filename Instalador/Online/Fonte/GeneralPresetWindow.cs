@@ -148,7 +148,12 @@ internal sealed partial class GeneralModWindow {
         foreach(var work in desiredWorks.Where(w=>w.Entry.AlternativeGroup!=null))ActivePreset.AlternativeChoices[work.Entry.AlternativeGroup]=work.Entry.Id;
         var universe=PresetUniverse().ToArray();
         loadingPreset=scanning=true;Busy(true);next.Visible=false;
-        detail.Text=T("Conferindo preset…","Checking preset…");
+        ShowPresetProgress(T("Conferindo preset","Checking preset"),0,0);
+        detail.Text=ActivePreset.Name;
+        var updates=new Progress<Tuple<string,int,int>>(step=>{
+            if(!IsDisposed&&loadingPreset)ShowPresetProgress(step.Item1,step.Item2,step.Item3);
+        });
+        var progress=(IProgress<Tuple<string,int,int>>)updates;
         try {
             var result=await Task.Run(()=>{
                 DateTime lastCheck=DateTime.MinValue;
@@ -157,21 +162,43 @@ internal sealed partial class GeneralModWindow {
                 var receipts=PresetReceipts(root).ToArray();
                 var desired=desiredWorks.Select(w=>PresetPackageFor(w,root,receipts,disabled)).ToList();
                 var packages=desired.Concat(universe.Select(w=>PresetPackageFor(w,root,receipts,disabled))).GroupBy(p=>p.Key).Select(g=>g.First()).ToList();
-                var discovered=packages.GroupBy(p=>p.ModId).Select(g=>g.FirstOrDefault(p=>PackageMatches(p,root))??g.First()).ToList();
+                var groups=packages.GroupBy(p=>p.ModId).ToArray();
+                var discovered=new List<PresetPackage>(groups.Length);
+                string checking=T("Conferindo mods","Checking mods");
+                foreach(var group in groups) {
+                    progress.Report(Tuple.Create(checking,discovered.Count,groups.Length));
+                    discovered.Add(group.FirstOrDefault(p=>PackageMatches(p,root))??group.First());
+                }
+                progress.Report(Tuple.Create(T("Preparando a troca","Preparing the switch"),0,0));
                 var shared=PresetSharedPaths(root,receipts);
                 using(var fixedLock=IsCyberpunk(root)?Cyberpunk(root).LockForRouteChange():null)
-                using(Generic(root).ProjectDeletionLock())return engine.Apply(selected,fingerprint,desired,discovered,(name,done,total)=>{
-                    if(IsDisposed)return;
-                    BeginInvoke((Action)(()=>{if(IsDisposed)return;detail.Text=T("Carregando: ","Loading: ")+name;currentProgress.Value=total==0?0:100*done/total;}));
-                },shared);
+                using(Generic(root).ProjectDeletionLock())return engine.Apply(selected,fingerprint,desired,discovered,
+                    (stage,done,total)=>progress.Report(Tuple.Create(stage,done,total)),shared);
             });
             state.AppliedPreset=selected;state.AppliedPresetFingerprint=fingerprint;Persist();
             presetIssues=result.Issues;presetProtected=new HashSet<string>(result.Protected.Keys,StringComparer.Ordinal);
             detail.Text=result.Issues.Count==0?T("Preset carregado.","Preset loaded."):T("Carregado com exceções — clique para detalhes.","Loaded with exceptions — click for details.");
             UpdatePresetIssueLink();
+            scanning=false;
+            ShowPresetProgress(T("Atualizando a lista do preset","Refreshing the preset list"),0,0);
+            await Scan();
+            RefreshStorageSize();
+            RenderPresetResult();
+            ShowPresetProgress(result.Issues.Count==0?T("Preset carregado","Preset loaded"):
+                T("Preset carregado com exceções","Preset loaded with exceptions"),1,1);
+        }catch {
+            ShowPresetProgress(T("Carregamento interrompido","Preset load interrupted"),0,0);
+            currentProgress.Indeterminate=false;
+            currentProgress.NotApplicable=true;
+            currentProgress.Invalidate();
+            throw;
         }finally{loadingPreset=scanning=false;Busy(false);RefreshPrimaryAction();}
-        await Scan();RefreshStorageSize();
-        RenderPresetResult();
+    }
+    void ShowPresetProgress(string stage,int done,int total) {
+        currentProgress.NotApplicable=false;
+        currentProgress.Indeterminate=total==0;
+        currentProgress.Caption=total==0?stage+"…":done==total?stage:stage+" · "+done+" / "+total;
+        currentProgress.Value=total>0?100*done/total:0;
     }
     void RenderPresetResult() {
         if(presetIssues.Count>0){detail.Text=T("Carregado com exceções — clique para detalhes.","Loaded with exceptions — click for details.");UpdatePresetIssueLink();}

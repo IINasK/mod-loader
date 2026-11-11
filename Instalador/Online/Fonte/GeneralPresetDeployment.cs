@@ -133,19 +133,42 @@ internal sealed class GeneralPresetDeployment {
                 if(proven!=null)p.Files=GeneralPresetProfiles.Copy(proven.Files);
             }
             // Never replace an existing baseline with current bytes: that would hide external changes.
-            foreach(var package in inventory.Where(p=>p.Files.Count>0&&!cached.ContainsKey(p.StorageKey))) {
+            var activeHashes=new Dictionary<string,HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            Action<PresetPackage> indexPackage=package=>{
+                foreach(var file in package.Files) {
+                    string target=Target(file);
+                    HashSet<string> hashes;
+                    if(!activeHashes.TryGetValue(target,out hashes))activeHashes.Add(target,hashes=new HashSet<string>(StringComparer.Ordinal));
+                    hashes.Add(file.Hash);
+                }
+            };
+            foreach(var package in state.Active)indexPackage(package);
+            var candidates=inventory.Where(p=>p.Files.Count>0&&!cached.ContainsKey(p.StorageKey)).ToList();
+            string validating=GeneralStyle.T("Validando instalações","Validating installations");
+            for(int index=0;index<candidates.Count;index++) {
+                if(progress!=null)progress(validating,index,candidates.Count);
+                var package=candidates[index];
                 var previous=state.Active.FirstOrDefault(p=>p.Key==package.Key);
                 if(previous!=null){previous.Group=package.Group;previous.Name=package.Name;previous.RequiredMods=package.RequiredMods;continue;}
-                if(package.Files.All(Matches)&&!state.Active.Any(p=>p.Files.Any(f=>package.Files.Any(n=>SameTarget(n,f)&&n.Hash!=f.Hash))))state.Active.Add(package);
+                if(!package.Files.All(Matches))continue;
+                bool conflict=package.Files.Any(file=>{
+                    HashSet<string> hashes;
+                    return activeHashes.TryGetValue(Target(file),out hashes)&&(hashes.Count>1||!hashes.Contains(file.Hash));
+                });
+                if(!conflict){state.Active.Add(package);indexPackage(package);}
             }
             state.Issues.Clear();
-            foreach(var package in state.Active) {
+            string checkingActive=GeneralStyle.T("Verificando arquivos ativos","Checking active files");
+            for(int index=0;index<state.Active.Count;index++) {
+                if(progress!=null)progress(checkingActive,index,state.Active.Count);
+                var package=state.Active[index];
                 if(package.Files.Any(f=>!Matches(f)))state.Protected[package.ModId]=GeneralStyle.T("alterado fora do Mod Loader; mantido sem alterações.","changed outside Mod Loader; left unchanged.");
             }
             foreach(var package in inventory.Where(p=>p.Files.Count>0&&!state.Active.Any(a=>a.Key==p.Key)&&!cached.ContainsKey(p.StorageKey))) {
                 if(package.Files.Any(f=>File.Exists(Target(f)))&&package.Files.Any(f=>!Matches(f))&&
                     !state.Active.Any(a=>a.ModId==package.ModId))state.Protected[package.ModId]=GeneralStyle.T("arquivos existentes não correspondem ao registro; preservados.","existing files differ from the record; preserved.");
             }
+            if(progress!=null)progress(GeneralStyle.T("Preparando a troca","Preparing the switch"),0,0);
             var held=new HashSet<string>(state.Protected.Keys,StringComparer.Ordinal);
             foreach(var package in state.Active.Where(p=>p.Immutable||sharedPaths!=null&&p.Files.Any(f=>sharedPaths.Contains(Target(f))))) {
                 held.Add(package.ModId);
@@ -204,19 +227,26 @@ internal sealed class GeneralPresetDeployment {
             try {
                 var desiredFiles=keep.Concat(incoming).SelectMany(p=>p.Files).ToList();
                 if(Checkpoint!=null)Checkpoint("prepared");
-                if(outgoing.Count>0)storage.Disable(Plan(outgoing),true,SamePaths(keep,desiredFiles));
+                if(outgoing.Count>0) {
+                    string saving=GeneralStyle.T("Guardando arquivos desativados","Storing disabled files");
+                    if(progress!=null)progress(saving,0,0);
+                    storage.Disable(Plan(outgoing),true,SamePaths(keep,desiredFiles),
+                        (filesDone,fileCount)=>{if(progress!=null)progress(saving,filesDone,fileCount);});
+                }
                 if(Checkpoint!=null)Checkpoint("disabled");
                 int done=0;foreach(var package in incoming) {
-                    checkClosed();if(progress!=null)progress(package.Name,done,incoming.Count);
+                    checkClosed();
+                    if(progress!=null)progress(GeneralStyle.T("Ativando ","Activating ")+package.Name,done,incoming.Count);
                     journal.Created[package.StorageKey]=package.Files.Where(f=>!File.Exists(Target(f))).Select(f=>f.Path).ToList();
                     Safe.WriteJson(journalFile,journal);
                     storage.Enable(new[]{package.StorageKey},()=>{if(Checkpoint!=null)Checkpoint("restoring");});done++;
                     if(Checkpoint!=null)Checkpoint("enabled");
-                    if(progress!=null)progress(package.Name,done,incoming.Count);
+                    if(progress!=null&&done<incoming.Count)progress(GeneralStyle.T("Ativando mods","Activating mods"),done,incoming.Count);
                 }
                 state.Active=keep.Concat(incoming).ToList();state.Preset=preset;state.Fingerprint=fingerprint;
                 Safe.WriteJson(stateFile,state);File.Delete(journalFile);return state;
             }catch {
+                if(progress!=null)progress(GeneralStyle.T("Restaurando a combinação anterior","Restoring previous selection"),0,0);
                 RecoverCore();throw;
             }
         }
