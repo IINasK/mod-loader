@@ -101,7 +101,7 @@ internal sealed partial class GeneralModWindow : Form {
     bool exitApproved,waitingToExit;
 
     bool FinishingOperations {get{
-        return working||scanning||associationChoice!=null||
+        return working||scanning||loadingPreset||associationChoice!=null||
             (sharingHome!=null?sharingHome.InstallingTransfer:p2p!=null&&p2p.Installing);
     }}
 
@@ -122,6 +122,7 @@ internal sealed partial class GeneralModWindow : Form {
                 MessageBoxDefaultButton.Button2)!=DialogResult.Yes){e.Cancel=true;return;}
             if(!ConfirmProjectNavigation()){e.Cancel=true;return;}
             exitApproved=true;
+            if(loadingPreset)CancelPresetLoad();
             if(associationChoice!=null)associationChoice.TrySetResult(null);
             if(working){
                 if(current!=null)skipRequests.Add(current);
@@ -1320,7 +1321,13 @@ internal sealed partial class GeneralModWindow : Form {
         var scope=PresetEditScope(item,true);if(!scope.HasValue)return;
         BeginProjectEdit();GeneralPresetProfiles.Remove(state,item.Id,scope.Value);marked.Remove(item.Id);FinishProjectEdit();DrawRows();
     }
-    void Busy(bool value){foreach(var control in idle)control.Enabled=!value;if(totalProgress!=null)totalProgress.Enabled=!value;if(next!=null){next.Visible=working||scanning;next.Enabled=working||scanning;}UpdatePresetCommands();RefreshPrimaryAction();}
+    void Busy(bool value){if(primaryAction is GeneralButton)((GeneralButton)primaryAction).ShowActivity=value&&(loadingPreset||working);foreach(var control in idle)control.Enabled=!value;if(totalProgress!=null)totalProgress.Enabled=!value;UpdateOperationButton();UpdatePresetCommands();RefreshPrimaryAction();}
+    void UpdateOperationButton(){
+        if(next==null)return;
+        next.Text=loadingPreset?T("Cancelar troca","Cancel switch"):T("Pular mod","Skip mod");
+        next.Visible=loadingPreset?presetCancellation!=null:working||scanning;
+        next.Enabled=loadingPreset?presetCancellation!=null&&!presetCancellation.IsCancellationRequested:working||scanning;
+    }
     internal void Preview(string path){
         ShowInTaskbar=false;StartPosition=FormStartPosition.Manual;Location=new Point(-30000,-30000);Show();Application.DoEvents();PerformLayout();
         using(var bmp=new Bitmap(Width,Height)){DrawToBitmap(bmp,new Rectangle(0,0,Width,Height));bmp.Save(path,System.Drawing.Imaging.ImageFormat.Png);}Close();

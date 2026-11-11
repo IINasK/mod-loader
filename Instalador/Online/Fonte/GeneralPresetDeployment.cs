@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 internal sealed class PresetPackage {
@@ -123,14 +124,16 @@ internal sealed class GeneralPresetDeployment {
         storage.Enable(journal.Outgoing.Select(p=>p.StorageKey));
         Safe.WriteJson(stateFile,journal.Before);File.Delete(journalFile);
     }
-    internal static TResult[] CheckPackages<TPackage,TResult>(IList<TPackage> packages,Func<TPackage,TResult> verify,Action<int,int> progress) {
+    internal static int VerificationWorkers {get{return Math.Max(1,Math.Min(8,Environment.ProcessorCount/2));}}
+    internal static TResult[] CheckPackages<TPackage,TResult>(IList<TPackage> packages,Func<TPackage,TResult> verify,Action<int,int> progress,CancellationToken cancellation=default(CancellationToken)) {
+        cancellation.ThrowIfCancellationRequested();
         var results=new TResult[packages.Count];
         if(packages.Count==0)return results;
 
         var progressLock=new object();
         int completed=0;
         if(progress!=null)progress(0,packages.Count);
-        var options=new ParallelOptions{MaxDegreeOfParallelism=Math.Max(1,Math.Min(4,Environment.ProcessorCount/2))};
+        var options=new ParallelOptions{MaxDegreeOfParallelism=VerificationWorkers,CancellationToken=cancellation};
         try {
             Parallel.For(0,packages.Count,options,index=>{
                 results[index]=verify(packages[index]);
@@ -142,7 +145,9 @@ internal sealed class GeneralPresetDeployment {
         }
         return results;
     }
-    internal PresetDeploymentState Apply(string preset,string fingerprint,IEnumerable<PresetPackage> wanted,IEnumerable<PresetPackage> discovered,Action<string,int,int> progress=null,ISet<string> sharedPaths=null) {
+    internal PresetDeploymentState Apply(string preset,string fingerprint,IEnumerable<PresetPackage> wanted,IEnumerable<PresetPackage> discovered,Action<string,int,int> progress=null,ISet<string> sharedPaths=null,
+        CancellationToken cancellation=default(CancellationToken)) {
+        cancellation.ThrowIfCancellationRequested();
         using(Lock()) {
             RecoverCore();var state=Read();var desired=wanted.ToList();Validate(desired);
             var inventory=discovered.ToList();Validate(inventory);
@@ -167,7 +172,7 @@ internal sealed class GeneralPresetDeployment {
             var activeByKey=state.Active.ToDictionary(package=>package.Key,StringComparer.Ordinal);
             string validating=GeneralStyle.T("Validando instalações","Validating installations");
             var verified=CheckPackages(candidates,package=>activeByKey.ContainsKey(package.Key)||package.Files.All(Matches),
-                (done,total)=>{if(progress!=null)progress(validating,done,total);});
+                (done,total)=>{if(progress!=null)progress(validating,done,total);},cancellation);
             for(int index=0;index<candidates.Count;index++) {
                 if(!verified[index])continue;
                 var package=candidates[index];
@@ -182,7 +187,7 @@ internal sealed class GeneralPresetDeployment {
             state.Issues.Clear();
             string checkingActive=GeneralStyle.T("Verificando arquivos ativos","Checking active files");
             var changedFiles=CheckPackages(state.Active,package=>package.Files.Any(f=>!Matches(f)),
-                (done,total)=>{if(progress!=null)progress(checkingActive,done,total);});
+                (done,total)=>{if(progress!=null)progress(checkingActive,done,total);},cancellation);
             for(int index=0;index<state.Active.Count;index++) {
                 var package=state.Active[index];
                 if(changedFiles[index])state.Protected[package.ModId]=GeneralStyle.T("alterado fora do Mod Loader; mantido sem alterações.","changed outside Mod Loader; left unchanged.");
@@ -212,6 +217,7 @@ internal sealed class GeneralPresetDeployment {
             var incoming=eligible.Where(p=>!state.Active.Any(a=>a.Key==p.Key)).ToList();
             // A protected or unknown destination blocks the affected incoming mod, not the whole preset.
             foreach(var p in incoming.ToArray()) {
+                cancellation.ThrowIfCancellationRequested();
                 bool validDestination=true;
                 try{foreach(var f in p.Files)GeneralInstallRoutes.Resolve(root,f.Path,true);}catch(DirectoryNotFoundException){validDestination=false;}
                 if(!validDestination){incoming.Remove(p);state.Issues.Add(p.Name+GeneralStyle.T(": destino indisponível.",": destination unavailable."));continue;}
@@ -243,6 +249,7 @@ internal sealed class GeneralPresetDeployment {
             foreach(var f in outgoing.SelectMany(p=>p.Files).GroupBy(f=>f.Hash).Select(g=>g.First()))reserve(stateFile,checked(f.Size+65536));
             foreach(var f in incoming.SelectMany(p=>p.Files).GroupBy(f=>f.Path,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()))reserve(Target(f),checked(f.Size+65536));
             foreach(var needed in space)if(FreeBytes(needed.Key)<needed.Value)throw new IOException(GeneralStyle.T("Espaço insuficiente para carregar o preset: ","Insufficient space to load preset: ")+needed.Key);
+            cancellation.ThrowIfCancellationRequested();
             // Persist discoveries and protections before the first mutation, then journal the whole transition.
             Safe.WriteJson(stateFile,state);
             var journal=new PresetDeploymentJournal{Before=GeneralPresetProfiles.Copy(state),Outgoing=outgoing,Incoming=incoming};
@@ -250,22 +257,32 @@ internal sealed class GeneralPresetDeployment {
             try {
                 var desiredFiles=keep.Concat(incoming).SelectMany(p=>p.Files).ToList();
                 if(Checkpoint!=null)Checkpoint("prepared");
+                cancellation.ThrowIfCancellationRequested();
                 if(outgoing.Count>0) {
                     string saving=GeneralStyle.T("Guardando arquivos desativados","Storing disabled files");
                     if(progress!=null)progress(saving,0,0);
                     storage.Disable(Plan(outgoing),true,SamePaths(keep,desiredFiles),
-                        (filesDone,fileCount)=>{if(progress!=null)progress(saving,filesDone,fileCount);});
+                        (filesDone,fileCount)=>{
+                            cancellation.ThrowIfCancellationRequested();
+                            if(progress!=null)progress(saving,filesDone,fileCount);
+                        });
                 }
                 if(Checkpoint!=null)Checkpoint("disabled");
                 int done=0;foreach(var package in incoming) {
+                    cancellation.ThrowIfCancellationRequested();
                     checkClosed();
                     if(progress!=null)progress(GeneralStyle.T("Ativando ","Activating ")+package.Name,done,incoming.Count);
                     journal.Created[package.StorageKey]=package.Files.Where(f=>!File.Exists(Target(f))).Select(f=>f.Path).ToList();
                     Safe.WriteJson(journalFile,journal);
-                    storage.Enable(new[]{package.StorageKey},()=>{if(Checkpoint!=null)Checkpoint("restoring");});done++;
+                    storage.Enable(new[]{package.StorageKey},()=>{
+                        if(Checkpoint!=null)Checkpoint("restoring");
+                        cancellation.ThrowIfCancellationRequested();
+                    });
+                    done++;
                     if(Checkpoint!=null)Checkpoint("enabled");
                     if(progress!=null&&done<incoming.Count)progress(GeneralStyle.T("Ativando mods","Activating mods"),done,incoming.Count);
                 }
+                cancellation.ThrowIfCancellationRequested();
                 state.Active=keep.Concat(incoming).ToList();state.Preset=preset;state.Fingerprint=fingerprint;
                 Safe.WriteJson(stateFile,state);File.Delete(journalFile);return state;
             }catch {

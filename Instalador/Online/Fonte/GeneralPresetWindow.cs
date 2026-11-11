@@ -8,6 +8,14 @@ using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
     bool loadingPreset;
+    System.Threading.CancellationTokenSource presetCancellation;
+
+    void CancelPresetLoad() {
+        if(presetCancellation==null||presetCancellation.IsCancellationRequested)return;
+        presetCancellation.Cancel();
+        UpdateOperationButton();
+        ShowPresetProgress(T("Cancelando troca","Cancelling switch"),0,0);
+    }
     string PresetFingerprint {
         get {
             if(ActivePreset==null)return null;
@@ -147,32 +155,45 @@ internal sealed partial class GeneralModWindow {
         var desiredWorks=PresetWorks().ToArray();
         foreach(var work in desiredWorks.Where(w=>w.Entry.AlternativeGroup!=null))ActivePreset.AlternativeChoices[work.Entry.AlternativeGroup]=work.Entry.Id;
         var universe=PresetUniverse().ToArray();
-        loadingPreset=scanning=true;Busy(true);next.Visible=false;
+        var cancellation=new System.Threading.CancellationTokenSource();
+        var token=cancellation.Token;
+        presetCancellation=cancellation;
+        loadingPreset=scanning=true;Busy(true);
         ShowPresetProgress(T("Conferindo preset","Checking preset"),0,0);
         detail.Text=ActivePreset.Name;
         var updates=new Progress<Tuple<string,int,int>>(step=>{
-            if(!IsDisposed&&loadingPreset)ShowPresetProgress(step.Item1,step.Item2,step.Item3);
+            if(!IsDisposed&&presetCancellation==cancellation&&!cancellation.IsCancellationRequested)
+                ShowPresetProgress(step.Item1,step.Item2,step.Item3);
         });
         var progress=(IProgress<Tuple<string,int,int>>)updates;
+        var elapsed=System.Diagnostics.Stopwatch.StartNew();
+        long discoveryMs=0,applyMs=0;
         try {
             var result=await Task.Run(()=>{
                 DateTime lastCheck=DateTime.MinValue;
                 var engine=new GeneralPresetDeployment(root,data,()=>{if((DateTime.UtcNow-lastCheck).TotalSeconds>=1){EnsurePresetGameClosed(root);lastCheck=DateTime.UtcNow;}});
                 var disabled=DisabledAt(root).Read();
                 var receipts=PresetReceipts(root).ToArray();
+                token.ThrowIfCancellationRequested();
                 var desired=desiredWorks.Select(w=>PresetPackageFor(w,root,receipts,disabled)).ToList();
-                var packages=desired.Concat(universe.Select(w=>PresetPackageFor(w,root,receipts,disabled))).GroupBy(p=>p.Key).Select(g=>g.First()).ToList();
+                var wantedKeys=new HashSet<string>(desired.Select(p=>p.Key),StringComparer.Ordinal);
+                var packages=desired.Concat(universe.Where(w=>!wantedKeys.Contains(PresetRecipeKey(w)))
+                    .Select(w=>PresetPackageFor(w,root,receipts,disabled))).ToList();
                 var groups=packages.GroupBy(p=>p.ModId).ToArray();
                 string checking=T("Conferindo mods","Checking mods");
                 var discovered=GeneralPresetDeployment.CheckPackages(groups,
-                    group=>group.FirstOrDefault(p=>PackageMatches(p,root))??group.First(),
-                    (done,total)=>progress.Report(Tuple.Create(checking,done,total)));
+                    group=>group.FirstOrDefault(p=>{token.ThrowIfCancellationRequested();return PackageMatches(p,root);})??group.First(),
+                    (done,total)=>progress.Report(Tuple.Create(checking,done,total)),token);
                 progress.Report(Tuple.Create(T("Preparando a troca","Preparing the switch"),0,0));
                 var shared=PresetSharedPaths(root,receipts);
+                discoveryMs=elapsed.ElapsedMilliseconds;
                 using(var fixedLock=IsCyberpunk(root)?Cyberpunk(root).LockForRouteChange():null)
                 using(Generic(root).ProjectDeletionLock())return engine.Apply(selected,fingerprint,desired,discovered,
-                    (stage,done,total)=>progress.Report(Tuple.Create(stage,done,total)),shared);
+                    (stage,done,total)=>progress.Report(Tuple.Create(stage,done,total)),shared,token);
             });
+            presetCancellation=null;
+            UpdateOperationButton();
+            applyMs=elapsed.ElapsedMilliseconds-discoveryMs;
             state.AppliedPreset=selected;state.AppliedPresetFingerprint=fingerprint;Persist();
             presetIssues=result.Issues;presetProtected=new HashSet<string>(result.Protected.Keys,StringComparer.Ordinal);
             detail.Text=result.Issues.Count==0?T("Preset carregado.","Preset loaded."):T("Carregado com exceções — clique para detalhes.","Loaded with exceptions — click for details.");
@@ -182,15 +203,32 @@ internal sealed partial class GeneralModWindow {
             await Scan();
             RefreshStorageSize();
             RenderPresetResult();
+            OnlineDiagnostics.Record("general.preset.complete",null,"Carregamento de preset concluído.",
+                new{Preset=selected,Workers=GeneralPresetDeployment.VerificationWorkers,DiscoveryMs=discoveryMs,ApplyMs=applyMs,
+                    RefreshMs=elapsed.ElapsedMilliseconds-discoveryMs-applyMs,TotalMs=elapsed.ElapsedMilliseconds,
+                    ActiveMods=result.Active.Count,Issues=result.Issues.Count});
             ShowPresetProgress(result.Issues.Count==0?T("Preset carregado","Preset loaded"):
                 T("Preset carregado com exceções","Preset loaded with exceptions"),1,1);
+        }catch(OperationCanceledException) {
+            if(!cancellation.IsCancellationRequested)throw;
+            presetCancellation=null;
+            detail.Text=T("Troca cancelada. A combinação anterior foi mantida.","Switch cancelled. The previous selection was kept.");
+            ShowPresetProgress(T("Troca cancelada","Switch cancelled"),0,0);
+            currentProgress.Indeterminate=false;
+            currentProgress.NotApplicable=true;
+            currentProgress.Invalidate();
         }catch {
             ShowPresetProgress(T("Carregamento interrompido","Preset load interrupted"),0,0);
             currentProgress.Indeterminate=false;
             currentProgress.NotApplicable=true;
             currentProgress.Invalidate();
             throw;
-        }finally{loadingPreset=scanning=false;Busy(false);RefreshPrimaryAction();}
+        }finally{
+            presetCancellation=null;
+            cancellation.Dispose();
+            loadingPreset=scanning=false;
+            Busy(false);RefreshPrimaryAction();
+        }
     }
     void ShowPresetProgress(string stage,int done,int total) {
         currentProgress.NotApplicable=false;

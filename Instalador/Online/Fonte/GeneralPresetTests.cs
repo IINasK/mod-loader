@@ -94,6 +94,19 @@ internal static class GeneralPresetTests {
         File.WriteAllText(pending,journalCopy);
         crash=new GeneralPresetDeployment(crashGame,crashData);crash.Recover();
         check(File.Exists(Path.Combine(crashGame,"old.bin"))&&!File.Exists(Path.Combine(crashGame,"new.bin"))&&off.Read().ContainsKey(next.StorageKey),"Recovery removes only partially restored bytes and retains the cached version.");
+        // Cancel twice from different write checkpoints, reopening from the same saved state each time.
+        foreach(string stopAt in new[]{"disabled","restoring"}) {
+            using(var cancel=new System.Threading.CancellationTokenSource()) {
+                crash.Checkpoint=phase=>{if(phase==stopAt)cancel.Cancel();};
+                bool cancelled=false;
+                try{crash.Apply("new","new",new[]{next},new[]{old,next},cancellation:cancel.Token);}
+                catch(OperationCanceledException){cancelled=true;}
+                crash=new GeneralPresetDeployment(crashGame,crashData);
+                check(cancelled&&!crash.RecoveryPending&&crash.Read().Preset=="old"&&
+                    File.ReadAllText(Path.Combine(crashGame,"old.bin"))=="old"&&!File.Exists(Path.Combine(crashGame,"new.bin")),
+                    "Cancellation at "+stopAt+" restores the previous preset and allows another attempt.");
+            }
+        }
         File.WriteAllText(Path.Combine(crashGame,"new.bin"),"new");
         var collision=crash.Apply("new","new",new[]{next},new[]{old,next});
         check(File.Exists(Path.Combine(crashGame,"new.bin"))&&collision.Issues.Count>0&&!collision.Active.Any(p=>p.Key==next.Key),"Identical bytes at an unknown destination are preserved without adopting ownership.");
@@ -198,11 +211,18 @@ internal sealed partial class GeneralModWindow {
                 form.preset.Toggle();
             }
             Safe.WriteJson(Path.Combine(root,"preset-popup.json"),placements);
+            var interrupted=form.LoadPreset();
+            check(form.next.Visible&&form.next.Enabled&&form.next.Text=="Cancelar troca","The switch exposes a separate cancel action.");
+            form.next.PerformClick();
+            await interrupted;
+            check(!form.next.Visible&&form.NeedsPresetLoad&&form.currentProgress.Caption.Contains("cancelada")&&
+                File.Exists(Path.Combine(game,"mods/a.txt"))&&File.Exists(Path.Combine(game,"mods/b.txt")),
+                "Cancelling from the window leaves both original files intact and allows a new attempt.");
             var loading=form.LoadPreset();
-            check(form.currentProgress.Caption.Contains("preset")&&form.currentProgress.Indeterminate,
+            check(form.currentProgress.Caption.Contains("preset")&&form.currentProgress.Indeterminate&&((GeneralButton)form.primaryAction).ShowActivity,
                 "The footer takes over immediately while the preset is being checked.");
             await loading;
-            check(form.currentProgress.Caption.StartsWith("Preset carregado")&&form.currentProgress.Value==100&&!form.currentProgress.Indeterminate,
+            check(form.currentProgress.Caption.StartsWith("Preset carregado")&&form.currentProgress.Value==100&&!form.currentProgress.Indeterminate&&!((GeneralButton)form.primaryAction).ShowActivity,
                 "The footer keeps the result after the list refresh.");
             check(File.Exists(Path.Combine(game,"mods/a.txt"))&&!File.Exists(Path.Combine(game,"mods/b.txt")),"The actual window loads the selected preset using generic installation receipts.");
             check(!form.NeedsPresetLoad&&form.state.AppliedPreset=="a","After loading, normal mod actions become available.");
@@ -228,7 +248,37 @@ internal sealed partial class GeneralModWindow {
             var manifest=InstalledSnapshot.Inspect(form.state,new[]{a.Id},FixedData.Load(),data,false);
             var other=manifest.Project.Presets.Single(p=>p.Id=="b");
             check(other.AlternativeChoices["variants"]==b.Id&&other.Configurations[b.Id].Variants[0].Sources.All(GeneralModDownload.IsInstalledSource),"P2P metadata keeps another preset's choices without exposing a local download path.");
-            Safe.WriteJson(Path.Combine(root,"ui-result.json"),new{Passed=true,Checks=passed});
+            using(var cancellation=new System.Threading.CancellationTokenSource()) {
+                form.presetCancellation=cancellation;
+                form.loadingPreset=form.scanning=true;
+                form.Busy(true);
+                using(var timer=new Timer{Interval=30}) {
+                    timer.Tick+=(sender,args)=>{
+                        var dialog=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(d=>d.Text=="Fechar o Mod Loader");
+                        if(dialog==null)return;
+                        timer.Stop();
+                        AllControls(dialog).OfType<Button>().Single(button=>button.Text=="Fechar").PerformClick();
+                    };
+                    timer.Start();
+                    form.Close();
+                }
+                check(cancellation.IsCancellationRequested&&!form.IsDisposed&&form.waitingToExit,
+                    "Confirming window close requests cancellation and waits for the worker.");
+                form.presetCancellation=null;
+                form.loadingPreset=form.scanning=false;
+                form.Busy(false);
+            }
         });
+        var reopened=new GeneralModLibrary(Path.Combine(data,"lista.json")).Load();
+        TestForm(FixedData.Load(),reopened,data,root,async form=>{
+            form.preset.SelectedIndex=2;
+            var retry=form.LoadPreset();
+            form.next.PerformClick();
+            await retry;
+            check(form.state.AppliedPreset=="a"&&form.NeedsPresetLoad&&
+                File.Exists(Path.Combine(game,"mods/a.txt"))&&!File.Exists(Path.Combine(game,"mods/b.txt")),
+                "Reopening, starting another switch and cancelling again keeps the applied files and choice.");
+        });
+        Safe.WriteJson(Path.Combine(root,"ui-result.json"),new{Passed=true,Checks=passed});
     }
 }

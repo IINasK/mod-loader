@@ -80,7 +80,7 @@ internal sealed partial class GeneralModWindow {
     }
     List<Work> Marked(){return ModRows().Where(r=>marked.Contains((string)r.Tag)).Select(r=>MakeWork(state.List.Mods.Single(m=>m.Id==(string)r.Tag))).ToList();}
     void Stage(Work work,string phase){if(testMode&&testStage!=null)testStage(work.Key,phase);}
-    void RequestSkip(){var work=scanning?scanCurrent:priorityCurrent??current;if(work!=null)skipRequests.Add(work);}
+    void RequestSkip(){if(loadingPreset){CancelPresetLoad();return;}var work=scanning?scanCurrent:priorityCurrent??current;if(work!=null)skipRequests.Add(work);}
     void CheckSkip(Work work){if(skipRequests.Contains(work))throw new OperationCanceledException();}
     void UpdateFlow(Work work,string status,int? percent=null){
         if(work!=null){

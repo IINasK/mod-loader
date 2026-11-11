@@ -184,6 +184,30 @@ internal sealed class GeneralButton : Button {
     internal bool Primary,Destructive,Bare;
     internal string IconKind;
     internal Color? BareInk;
+    Timer activityTimer;
+    readonly System.Diagnostics.Stopwatch activityClock=new System.Diagnostics.Stopwatch();
+    internal bool ShowActivity {
+        get{return activityClock.IsRunning;}
+        set {
+            if(value==activityClock.IsRunning)return;
+            if(value&&!SystemInformation.HighContrast) {
+                if(activityTimer==null) {
+                    activityTimer=new Timer{Interval=42};
+                    activityTimer.Tick+=(s,e)=>{if(Visible)Invalidate();};
+                }
+                activityClock.Restart();
+                activityTimer.Start();
+            }else {
+                activityClock.Reset();
+                if(activityTimer!=null)activityTimer.Stop();
+            }
+            Invalidate();
+        }
+    }
+    protected override void Dispose(bool disposing) {
+        if(disposing&&activityTimer!=null)activityTimer.Dispose();
+        base.Dispose(disposing);
+    }
     internal GeneralButton(){SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.Opaque,true);BackColor=GeneralStyle.Background;Cursor=Cursors.Hand;FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;UseVisualStyleBackColor=false;}
     public override Size GetPreferredSize(Size proposedSize){
         var size=base.GetPreferredSize(proposedSize);
@@ -209,7 +233,22 @@ internal sealed class GeneralButton : Button {
             LucideIcons.Draw(g,IconKind,new Rectangle(x,y,20,20),ink);
             if(!String.IsNullOrEmpty(Text))textRect=new Rectangle(42,0,Width-52,Height);
         }
-        TextRenderer.DrawText(g,Text,Font,textRect,ink,TextFormatFlags.VerticalCenter|(TextAlign==ContentAlignment.MiddleLeft?TextFormatFlags.Left:TextFormatFlags.HorizontalCenter)|TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine);
+        var flags=TextFormatFlags.VerticalCenter|(TextAlign==ContentAlignment.MiddleLeft?TextFormatFlags.Left:TextFormatFlags.HorizontalCenter)|
+            TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine;
+        TextRenderer.DrawText(g,Text,Font,textRect,ink,flags);
+        if(ShowActivity&&!String.IsNullOrEmpty(Text)&&textRect.Width>0) {
+            int x=textRect.Left-24+(int)((textRect.Width+48)*(activityClock.ElapsedMilliseconds%1900)/1900);
+            var highlight=GeneralStyle.Dark?Color.White:GeneralStyle.Primary;
+            for(int offset=-18;offset<18;offset+=4) {
+                int mix=72-3*Math.Abs(offset+2);
+                var brighter=Color.FromArgb(ink.R+(highlight.R-ink.R)*mix/100,
+                    ink.G+(highlight.G-ink.G)*mix/100,ink.B+(highlight.B-ink.B)*mix/100);
+                var saved=g.Save();
+                g.IntersectClip(Rectangle.Intersect(textRect,new Rectangle(x+offset,0,4,Height)));
+                TextRenderer.DrawText(g,Text,Font,textRect,brighter,flags|TextFormatFlags.PreserveGraphicsClipping);
+                g.Restore(saved);
+            }
+        }
     }
 }
 
