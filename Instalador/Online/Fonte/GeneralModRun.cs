@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -230,8 +230,10 @@ internal sealed partial class GeneralModWindow {
         if(GeneralModLibrary.NeedsDependencyVersion(work.Entry,work.Variant))return GeneralStatusPresentation.ChooseDependency;
         bool exists=reads==null?!String.IsNullOrEmpty(root)&&Directory.Exists(root):reads.Exists;
         bool cyberpunk=reads==null?IsCyberpunk(root):reads.Cyberpunk;
-        if(exists&&(reads==null?DisabledAt(root).Read().ContainsKey(work.Key):reads.Disabled.Value.Contains(work.Key)))
-            return GeneralStatusPresentation.Disabled;
+        if(exists){
+            var off=reads==null?new HashSet<string>(DisabledAt(root).Read().Keys,StringComparer.Ordinal):reads.Disabled.Value;
+            if(off.Contains(PresetRecipeKey(work))||ActivePreset==null&&off.Contains(work.Key))return GeneralStatusPresentation.Disabled;
+        }
         Func<string,string> hash=reads==null?null:(Func<string,string>)reads.Hash;
         string snapshot;
         if(exists&&work.Variant.CyberpunkId!="NightCoop"&&work.Variant.CyberpunkId!=EquipmentExOptions.ModId&&TryWorkSnapshot(work,root,out snapshot)){
@@ -441,6 +443,7 @@ internal sealed partial class GeneralModWindow {
                 await Scan();
                 return;
             }
+            if(NeedsPresetLoad){await LoadPreset();return;}
             List<Work> jobs;
             var selection=SelectedJobs();
             var command=ClassifyJobs(selection,out jobs);
@@ -644,7 +647,7 @@ internal sealed partial class GeneralModWindow {
     }
 
     void ConfirmUrgentInstall(GeneralModEntry entry,string bodyChoice=null){
-        if(GeneralModLibrary.NeedsDependencyVersion(entry,Selected(entry)))return;
+        if(NeedsPresetLoad){detail.Text=T("Carregue o preset antes de instalar os mods.","Load the preset before installing mods.");return;}if(GeneralModLibrary.NeedsDependencyVersion(entry,Selected(entry)))return;
         if(entry.AlternativeGroup!=null&&normal.Concat(priority).Concat(new[]{current,priorityCurrent}).Any(work=>
             work!=null&&work.Entry.Id!=entry.Id&&work.Entry.AlternativeGroup==entry.AlternativeGroup)){
             detail.Text=T("Outra alternativa deste grupo já está na fila.","Another alternative from this group is already queued.");
@@ -683,6 +686,7 @@ internal sealed partial class GeneralModWindow {
         bool incomingStarted=false, completed=false;
         try{
             skipRequests.Remove(work);
+            if(presetProtected.Contains(work.Entry.Id))throw new IOException(T("Mod alterado fora do Mod Loader; mantido sem alterações.","Mod changed outside Mod Loader; left unchanged."));
             if(GeneralModLibrary.NeedsDependencyVersion(work.Entry,work.Variant)){
                 RowStatus(work,GeneralStatusPresentation.ChooseDependency);
                 return;
@@ -694,7 +698,7 @@ internal sealed partial class GeneralModWindow {
                 try{GeneralInstallRoutes.CheckFolders(root,work.Variant.InstallRoutes);}
                 catch(DirectoryNotFoundException ex){RowStatus(work,"Pulado",null,work.Entry.Name+": "+ex.Message);return;}
             }
-            if(SnapshotInstalled(work,root)){RememberInstalledVariant(work);RowStatus(work,"Instalado",100);return;}
+            if(SnapshotInstalled(work,root)){await TrackPresetInstall(work,root);RememberInstalledVariant(work);RowStatus(work,"Instalado",100);return;}
             if(work.SaveVariant&&work.BodyChoice!=null&&await Task.Run(()=>IsSharedBodySwitch(work,Status(work,root)))){
                 RememberInstalledVariant(work);RowStatus(work,"Instalado",100);return;
             }
@@ -703,6 +707,7 @@ internal sealed partial class GeneralModWindow {
                 return;
             }
             var conflicts=await Task.Run(()=>ConflictingAlternatives(work,root));
+            if(conflicts.Any(old=>presetProtected.Contains(old.Entry.Id)))throw new IOException(T("A versão em uso está protegida por alterações externas.","The current version is protected because it was changed externally."));
             if(conflicts.Count>0&&!work.SwitchAlternatives&&
                 (work.DropConflicts==null||!work.DropConflicts.IsSupersetOf(conflicts.Select(old=>old.Key))))
                 throw new IOException(T("Use Mudar versão para trocar: ","Use Change version to switch: ")+conflicts[0].Entry.Name);
@@ -712,7 +717,7 @@ internal sealed partial class GeneralModWindow {
             if(conflicts.Any(old=>GeneralModLibrary.IsHystBody(old.Entry.Id)))
                 await Task.Run(()=>PlanDisable(conflicts,root,work.Entry.Id));
             List<DisabledModFile> cachedFiles;
-            bool cached=(await Task.Run(()=>store.Read())).TryGetValue(work.Key,out cachedFiles);
+            string cachedKey=PresetStoredKey(work,root);bool cached=(await Task.Run(()=>store.Read())).TryGetValue(cachedKey,out cachedFiles);
             bool restoredIncoming=false;
             if(!cached&&work.Variant.Sources.Any(GeneralModDownload.IsInstalledSource))
                 throw new IOException(T("Este mod veio de um pacote instalado. Para reparar, receba um novo pacote do remetente.","This mod came from an installed pack. Receive a new pack from the sender to repair it."));
@@ -735,7 +740,7 @@ internal sealed partial class GeneralModWindow {
             try {
                 if(cached){
                     await change();
-                    await Task.Run(()=>store.Enable(new[]{work.Key}));
+                    await Task.Run(()=>store.Enable(new[]{cachedKey}));
                     restoredIncoming=true;
                     incomingStarted=true;
                 }else if(work.Variant.CyberpunkId!=null)
@@ -753,7 +758,7 @@ internal sealed partial class GeneralModWindow {
             if(switchFailure!=null){
                 if(suspended.Count>0){
                     if(restoredIncoming){
-                        await Task.Run(()=>store.Disable(new Dictionary<string,List<DisabledModFile>>{{work.Key,cachedFiles}},compress:true));
+                        await Task.Run(()=>store.Disable(new Dictionary<string,List<DisabledModFile>>{{cachedKey,cachedFiles}},compress:true));
                     }else if(incomingStarted&&work.Applied){
                         await Task.Run(()=>RemoveManagedWorks(new List<Work>{work},root,new HashSet<string>()));
                         Persist();
@@ -772,7 +777,7 @@ internal sealed partial class GeneralModWindow {
             foreach(var old in suspended.Where(old=>IsBigBody(old.Entry)&&old.Entry.Id!=work.Entry.Id))
                 state.ChosenVariants[old.Entry.Id]=old.Variant.Id;
             RememberInstalledVariant(work);
-            completed=true;
+            await TrackPresetInstall(work,root);completed=true;
             RowStatus(work,"Instalado",100,work.Entry.Name+T(": instalado e conferido.",": installed and verified."));
             OnlineDiagnostics.Record("general.install.complete",work.Entry.Id,"Instalação conferida.",new{Variant=work.Variant.Id});
         }catch(ModVersionKeptException ex){RowStatus(work,"Versão mantida",null,ex.Message);OnlineDiagnostics.Record("general.version.kept",work.Entry.Id,ex.Message);}
@@ -810,6 +815,7 @@ internal sealed partial class GeneralModWindow {
         if(work.Variant.Id==work.Entry.DefaultVariant&&!GeneralModLibrary.IsHystBody(work.Entry.Id))state.ChosenVariants.Remove(work.Entry.Id);
         else state.ChosenVariants[work.Entry.Id]=work.Variant.Id;
         if(work.BodyChoice!=null)state.BodyChoice=work.BodyChoice;
+        if(ActivePreset!=null&&work.Entry.AlternativeGroup!=null)ActivePreset.AlternativeChoices[work.Entry.AlternativeGroup]=work.Entry.Id;
         if(pendingVersion!=null&&SameVersion(work,pendingVersion))pendingVersion=null;
         Persist();DrawRows();
     }
@@ -1124,7 +1130,7 @@ internal sealed partial class GeneralModWindow {
     IEnumerable<string> UninstallSelection(){
         foreach(var row in ModRows()){
             string id=(string)row.Tag;
-            if(!row.Visible||!marked.Contains(id))continue;
+            if(!row.Visible||!marked.Contains(id)||presetProtected.Contains(id))continue;
             string status=row.Cells["Status"].Tag as string;
             if(GeneralStatusPresentation.Kind(status)=="installed"||status==GeneralStatusPresentation.Disabled)yield return id;
         }
@@ -1144,8 +1150,9 @@ internal sealed partial class GeneralModWindow {
                 string result=await Task.Run(()=>{
                     var store=DisabledAt(root);
                     var disabled=new HashSet<string>(store.Read().Keys,StringComparer.Ordinal);
-                    string notes=RemoveManagedWorks(jobs,root,disabled);
-                    store.Discard(jobs.Select(work=>work.Key));
+                    foreach(var work in jobs.Where(work=>disabled.Contains(PresetRecipeKey(work))))disabled.Add(work.Key);string notes=RemoveManagedWorks(jobs,root,disabled);
+                    store.Discard(jobs.Select(work=>PresetStoredKey(work,root)));
+                    if(state.AppliedPreset!=null)new GeneralPresetDeployment(root,data,()=>EnsureGameClosed(root)).RecordRemoval(jobs.Select(PresetRecipeKey));
                     return notes;
                 });
                 Persist();                detail.Text=result;

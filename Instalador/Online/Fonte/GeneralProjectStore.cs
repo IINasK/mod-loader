@@ -105,6 +105,7 @@ internal sealed class GeneralProjectStore {
                 DownloadFolder = index.DownloadFolder,
                 SelectedPreset = list.Presets.Count == 0 ? null : list.Presets[0].Id
             };
+            GeneralPresetProfiles.Project(state);
             new GeneralModLibrary(Path.Combine(data, "lista.json")).Save(state);
             index.Projects.Add(project);
             Write(index);
@@ -135,7 +136,7 @@ internal sealed class GeneralProjectStore {
             if(skipped.Count>0){
                 string group=index.Language=="en"?"Not installed":"Não instalados";
                 if(!list.Categories.Contains(group,StringComparer.OrdinalIgnoreCase))list.Categories.Add(group);
-                foreach(var mod in list.Mods.Where(mod=>skipped.Contains(mod.Id)))mod.Category=group;
+                foreach(var mod in list.Mods.Concat(list.Presets.Where(p=>p.Configurations!=null).SelectMany(p=>p.Configurations.Values)).Where(mod=>skipped.Contains(mod.Id)))mod.Category=group;
                 foreach(var preset in list.Presets.Where(preset=>preset.ModIds.Any(skipped.Contains)))
                     if(!preset.Categories.Contains(group,StringComparer.OrdinalIgnoreCase))preset.Categories.Add(group);
             }
@@ -153,7 +154,9 @@ internal sealed class GeneralProjectStore {
                         state.ChosenVariants[choice.Key]=choice.Value;
                 }
             }
-            BindReceivedVariants(state,manifest,session.ReceiptId);
+            var receivedDefinitions=state.List.Mods.ToDictionary(m=>m.Id,StringComparer.Ordinal);
+            GeneralPresetProfiles.Project(state);
+            BindReceivedVariants(state,manifest,session.ReceiptId,receivedDefinitions);
             if(!String.Equals(Path.GetFullPath(sourceData),data,StringComparison.OrdinalIgnoreCase))
                 source.CopyReceivedRecognition(session.ReceiptId,data);
             new GeneralModLibrary(Path.Combine(data,"lista.json")).Save(state);
@@ -162,11 +165,19 @@ internal sealed class GeneralProjectStore {
         }
     }
 
-    internal static void BindReceivedVariants(GeneralModState state,InstalledSnapshotManifest manifest,string receipt){
+    internal static void BindReceivedVariants(GeneralModState state,InstalledSnapshotManifest manifest,string receipt,Dictionary<string,GeneralModEntry> receivedDefinitions=null){
         var entries=state.List.Mods.ToDictionary(mod=>mod.Id,StringComparer.Ordinal);
         foreach(var mod in manifest.List.Mods){
             GeneralModEntry entry;
-            if(!entries.TryGetValue(mod.Id,out entry)||!entry.Variants.Any(variant=>variant.Id==mod.DefaultVariant))continue;
+            if(!entries.TryGetValue(mod.Id,out entry))continue;
+            if(!entry.Variants.Any(variant=>variant.Id==mod.DefaultVariant)){
+                GeneralModEntry source;
+                if(receivedDefinitions==null||!receivedDefinitions.TryGetValue(mod.Id,out source))continue;
+                var sent=mod.Variants.Single();
+                var alternate=source.Variants.FirstOrDefault(v=>v.Id==sent.Id&&GeneralModLibrary.SamePayload(v,sent));
+                if(alternate==null)continue;
+                entry.Variants.Add(GeneralPresetProfiles.Copy(alternate));
+            }
             state.SnapshotReceipts[mod.Id+"/"+mod.DefaultVariant]=receipt;
             if(entry.DefaultVariant==mod.DefaultVariant)state.ChosenVariants.Remove(mod.Id);
             else state.ChosenVariants[mod.Id]=mod.DefaultVariant;

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -11,6 +11,8 @@ internal sealed class ProjectDeleteFile {
     internal long Size;
     internal bool Owned, ReplacesPrevious;
     internal List<string> OwnerKeys;
+    internal List<GeneralInstallRoute> InstallRoutes;
+    internal Dictionary<string,GeneralModVariant> OwnerRecipes;
 }
 internal sealed class ProjectDeletePlan {
     internal GeneralProject Project;
@@ -157,7 +159,7 @@ public sealed partial class GeneralModInstaller {
         Safe.NoLinks(records);if(!Directory.Exists(records))yield break;
         foreach(string path in Directory.GetFiles(records,"*.json")){
             Safe.NoLinks(path);var record=ReadRecord(path,inspection);if(record==null)continue;
-            foreach(var file in record.Files)yield return new ProjectDeleteFile{Path=file.Path,Hash=file.Sha256,Size=file.Size,Owned=file.Owned,ReplacesPrevious=file.Before!=null,OwnerKeys=new List<string>{record.Key}};
+            foreach(var file in record.Files)yield return new ProjectDeleteFile{Path=file.Path,Hash=file.Sha256,Size=file.Size,Owned=file.Owned,ReplacesPrevious=file.Before!=null,OwnerKeys=new List<string>{record.Key},InstallRoutes=record.InstallRoutes};
         }
     }
 }
@@ -173,9 +175,10 @@ public sealed partial class InstalledSnapshotInstaller {
         foreach(var receipt in AllReceipts(inspection)){
             if(receipt.Status!="installed")continue;
             var owners=receipt.Manifest.Files.GroupBy(payload=>payload.Path,StringComparer.OrdinalIgnoreCase).ToDictionary(group=>group.Key,group=>group.SelectMany(payload=>payload.Owners).Where(receipt.ActiveOwners.Contains).Distinct().ToList(),StringComparer.OrdinalIgnoreCase);
+            var recipes=receipt.Manifest.List.Mods.ToDictionary(m=>InstalledSnapshot.Owner(m,m.Variants.Single()),m=>m.Variants.Single());
             foreach(var file in receipt.Files.Where(file=>file.Applied&&!file.Reverted)){
                 List<string> keys;if(!owners.TryGetValue(file.Path,out keys)||keys.Count==0)continue;
-                yield return new ProjectDeleteFile{Path=file.Path,Hash=file.After,Size=file.Size,Owned=file.Owned&&file.Before==null,ReplacesPrevious=file.Before!=null,OwnerKeys=keys};
+                yield return new ProjectDeleteFile{Path=file.Path,Hash=file.After,Size=file.Size,Owned=file.Owned&&file.Before==null,ReplacesPrevious=file.Before!=null,OwnerKeys=keys,OwnerRecipes=recipes};
             }
         }
     }

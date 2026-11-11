@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -36,7 +36,7 @@ internal sealed partial class GeneralModWindow {
                 string status;
                 return statuses.TryGetValue(work.Key,out status)&&InstalledVersion(status);
             });
-            if(active!=null)variant=entry.Variants.Single(option=>option.Id==active.Variant.Id);
+            if(!state.ChosenVariants.ContainsKey(entry.Id)&&active!=null)variant=entry.Variants.Single(option=>option.Id==active.Variant.Id);
             else if(!state.ChosenVariants.ContainsKey(entry.Id)){
                 var saved=entry.Variants.FirstOrDefault(option=>{
                     string status;
@@ -83,10 +83,22 @@ internal sealed partial class GeneralModWindow {
 
     void SelectVersion(Work choice){
         if(working||scanning||associationChoice!=null)return;
+        if(SameVersion(MakeWork(choice.Entry),choice)&&(choice.Entry.AlternativeGroup==null||
+            (ActivePreset!=null?PresetWorks().Any(w=>w.Entry.Id==choice.Entry.Id):IsActiveAlternative(choice.Entry))))return;
+        var scope=PresetEditScope(choice.Entry);if(!scope.HasValue)return;
+        GeneralPresetProfiles.Capture(state);
+        foreach(var p in state.List.Presets.Where(p=>p.ModIds.Contains(choice.Entry.Id)&&(scope.Value||p.Id==state.SelectedPreset))){
+            if(!p.Configurations[choice.Entry.Id].Variants.Any(v=>v.Id==choice.Variant.Id))continue;
+            p.VariantChoices[choice.Entry.Id]=choice.Variant.Id;
+            if(choice.Entry.AlternativeGroup!=null)p.AlternativeChoices[choice.Entry.AlternativeGroup]=choice.Entry.Id;
+            if(choice.BodyChoice!=null)p.BodyChoice=choice.BodyChoice;
+        }
+        state.ChosenVariants[choice.Entry.Id]=choice.Variant.Id;if(choice.BodyChoice!=null)state.BodyChoice=choice.BodyChoice;
+        Persist();
         pendingVersion=choice;
         choice.SwitchAlternatives=true;
         choice.SaveVariant=true;
-        grid.Invalidate();
+        DrawRows();
         RefreshPrimaryAction();
     }
 
@@ -123,6 +135,7 @@ internal sealed partial class GeneralModWindow {
     }
 
     ModAction ActionFor(Work work, HashSet<string> selectedIds) {
+        if(presetProtected.Contains(work.Entry.Id))return ModAction.None;
 
         string status;
         statuses.TryGetValue(work.Key, out status);
@@ -176,6 +189,7 @@ internal sealed partial class GeneralModWindow {
             primaryAction.Enabled=true;
             return;
         }
+        if(NeedsPresetLoad){primaryAction.Text=T("Carregar preset","Load preset");primaryAction.Enabled=ActivePreset!=null;return;}
         List<Work> ignored;
         var action = ClassifyJobs(SelectedJobs(), out ignored);
         primaryAction.Text = action == ModAction.Disable ? T("Desabilitar", "Disable")
@@ -359,7 +373,7 @@ internal sealed partial class GeneralModWindow {
                             if (missing != null) throw new IOException(T("Ative primeiro: ", "Enable first: ") + missing.Name);
                         }
                     }
-                    store.Enable(jobs.Select(work => work.Key));
+                    store.Enable(jobs.Select(work => PresetStoredKey(work,root)));
                 } else store.Disable(PlanDisable(jobs, root));
             });
             detail.Text = enable ? T("Mods reativados.", "Mods enabled.") : T("Mods desabilitados.", "Mods disabled.");

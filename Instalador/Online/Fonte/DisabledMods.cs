@@ -54,7 +54,7 @@ internal sealed class DisabledMods {
         return null;
     }
 
-    internal void Disable(Dictionary<string, List<DisabledModFile>> plan, bool compress=false) {
+    internal void Disable(Dictionary<string, List<DisabledModFile>> plan, bool compress=false, ISet<string> retainedPaths=null) {
         using (Lock()) {
             var entries = Read();
             if (plan.Keys.Any(entries.ContainsKey)) throw new IOException("A seleção já contém mods desativados.");
@@ -70,6 +70,12 @@ internal sealed class DisabledMods {
                 foreach (var file in files) {
                     checkClosed();
                     string target = GamePath(file), blob = Stored(file);
+                    if(retainedPaths!=null&&retainedPaths.Contains(target)){
+                        if(!File.Exists(blob)) {
+                            if(compress)PackVerified(target,ZipPath(file),file);else CopyVerified(target,blob,file);
+                        }
+                        continue;
+                    }
                     if (!Matches(target, file)) throw Conflict(file);
                     if (!File.Exists(blob) && compress) {
                         PackVerified(target, ZipPath(file), file);
@@ -93,14 +99,14 @@ internal sealed class DisabledMods {
         }
     }
 
-    internal void Enable(IEnumerable<string> keys) {
+    internal void Enable(IEnumerable<string> keys,Action afterCopy=null) {
         using (Lock()) {
             var entries = Read();
-            Restore(entries, keys.Where(entries.ContainsKey).ToArray());
+            Restore(entries, keys.Where(entries.ContainsKey).ToArray(),afterCopy);
         }
     }
 
-    void Restore(Dictionary<string, List<DisabledModFile>> entries, string[] keys) {
+    void Restore(Dictionary<string, List<DisabledModFile>> entries, string[] keys,Action afterCopy=null) {
         var files = Unique(keys.SelectMany(key => entries[key]));
         foreach (var file in files) {
             string path = GamePath(file);
@@ -118,6 +124,7 @@ internal sealed class DisabledMods {
                 }
                 CopyVerified(Stored(file), path, file);
                 restored.Add(file);
+                if(afterCopy!=null)afterCopy();
             }
             Drop(entries, keys);
         } catch {
@@ -200,8 +207,8 @@ internal sealed class DisabledMods {
         }finally{File.Delete(staging);}
     }
 
-    static DisabledModFile[] Unique(IEnumerable<DisabledModFile> files) {
-        return files.GroupBy(file => file.Path, StringComparer.OrdinalIgnoreCase).Select(group => {
+    DisabledModFile[] Unique(IEnumerable<DisabledModFile> files) {
+        return files.GroupBy(GamePath, StringComparer.OrdinalIgnoreCase).Select(group => {
             var file = group.First();
             if (group.Any(other => other.Hash != file.Hash || other.Size != file.Size)) throw Conflict(file);
             return file;

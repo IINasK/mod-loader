@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -122,10 +122,10 @@ internal sealed partial class P2PService {
         var preset=copy.List.Presets.SingleOrDefault(item=>item.Id==presetId);
         if(preset==null)throw new IOException("O preset escolhido para este envio não existe mais.");
         var chosen=new System.Collections.Generic.HashSet<string>(ids,StringComparer.Ordinal);
-        copy.SelectedPreset=presetId;
+        copy.SelectedPreset=presetId;GeneralPresetProfiles.Project(copy);
         copy.List.Mods.RemoveAll(item=>!chosen.Contains(item.Id));
         preset.ModIds=copy.List.Mods.Select(item=>item.Id).ToList();
-        copy.List.Presets=new System.Collections.Generic.List<GeneralModPreset>{preset};
+        copy.List.Presets=new System.Collections.Generic.List<GeneralModPreset>{preset};GeneralPresetProfiles.Prune(copy.List);
         return copy;
     }
     internal static string ReadyTag(string key,string id,string hash,long size){

@@ -43,7 +43,11 @@ internal static class RetiredPackEntries {
         var removed=new HashSet<string>(list.Mods.Where(mod=>RetiredIds.Contains(mod.Id)||RetiredArchiveIds.Contains(mod.Id)||
             mod.Variants.Any(variant=>RetiredIds.Contains(variant.CyberpunkId))).Select(mod=>mod.Id),StringComparer.Ordinal);
         list.Mods.RemoveAll(mod=>removed.Contains(mod.Id));
-        foreach(var preset in list.Presets)preset.ModIds.RemoveAll(removed.Contains);
+        foreach(var preset in list.Presets) {
+            preset.ModIds.RemoveAll(removed.Contains);
+            if(preset.Configurations!=null)foreach(string id in preset.Configurations.Keys.Where(removed.Contains).ToArray())preset.Configurations.Remove(id);
+            if(preset.VariantChoices!=null)foreach(string id in preset.VariantChoices.Keys.Where(removed.Contains).ToArray())preset.VariantChoices.Remove(id);
+        }
         return removed;
     }
     internal static void Remove(GeneralModState state){

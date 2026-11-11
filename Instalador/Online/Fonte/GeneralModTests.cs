@@ -255,7 +255,7 @@ internal sealed partial class GeneralModWindow {
         GeneralUpdatesTests.Run(root);GeneralAutomaticUpdateTests.Run(root);ModVersionChoiceTests.Run(root);RunPresetIsolationTests(root);
         GeneralBrandTests.Run(root);
         GeneralProjectStoreTests.Run(root);RunProjectHomeTests(root);RunProjectDeletionTests(root);RunProjectHubTests(root);GeneralAppPathsTests.Run(root);RunStorageTests(root);RunNoCopyTests(root);RunProjectCloneTests(root);
-        GeneralMenuHostTests.Run(root);RunPresetDraftTests(root);
+        GeneralMenuHostTests.Run(root);RunPresetDraftTests(root);GeneralPresetTests.Run(root);RunPresetLoadingTests(root);
         GeneralPopupStabilityTests.Run(root);RunProjectSearchTests(root);
         Safe.WriteJson(Path.Combine(root,"resultado-loader-geral.json"),new{Passed=true,Tests=checks,ArchiveChecks=archiveChecks,LibraryChecks=libraryChecks,RealGameTouched=false,NetworkUsed=false});
     }

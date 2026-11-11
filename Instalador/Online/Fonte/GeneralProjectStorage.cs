@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -6,8 +6,8 @@ using System.Diagnostics;
 using System.Windows.Forms;
 
 internal sealed class GeneralStorageSize {
-    internal long Mods,Total,Cache,Retained;
-    internal string ProjectCacheDirectory;
+    internal long Mods,Total,Cache,Retained,Inactive;
+    internal string ProjectCacheDirectory,InactiveDirectory;
     internal int ModCount,Identified;
     internal readonly Dictionary<string,long> ModBytes=new Dictionary<string,long>(StringComparer.Ordinal);
     internal readonly Dictionary<string,HashSet<string>> ModFiles=new Dictionary<string,HashSet<string>>(StringComparer.Ordinal);
@@ -28,9 +28,10 @@ internal sealed class GeneralStorageSize {
         return value.ToString(unit==0?"0":"0.##")+" "+SizeUnits[unit];
     }
     internal static string RetainedText(GeneralStorageSize size){return GeneralStyle.T("Pacotes antigos: ","Old packages: ")+Format(size.Retained);}
+    internal static string InactiveText(GeneralStorageSize size){return GeneralStyle.T("Mods desativados: ","Disabled mods: ")+Format(size.Inactive);}
     internal static string ProjectCacheText(GeneralStorageSize size){return GeneralStyle.T("Cache do projeto: ","Project cache: ")+Format(size.Cache);}
-    internal static string ProjectText(GeneralStorageSize size){return GeneralStyle.T("Mods: ","Mods: ")+Format(size.Mods)+"   ·   "+GeneralStyle.T("Total do projeto: ","Project total: ")+Format(size.Total)+"   ·   "+ProjectCacheText(size)+(size.Retained>0?"   ·   "+RetainedText(size):"")+(size.Unavailable>0?GeneralStyle.T(" (parcial)"," (partial)"):"");}
-    internal static string HomeText(GeneralStorageSize size){return GeneralStyle.T("Medidos: ","Measured: ")+size.Identified+"/"+size.ModCount+"   ·   "+GeneralStyle.T("Projetos com arquivos: ","Projects with files: ")+size.WithFiles+" / "+size.Projects+"   ·   "+GeneralStyle.T("Mods: ","Mods: ")+Format(size.Mods)+"   ·   "+GeneralStyle.T("Total: ","Total: ")+Format(size.Total)+"   ·   "+GeneralStyle.T("Cache: ","Cache: ")+Format(size.Cache)+(size.Retained>0?"   ·   "+RetainedText(size):"")+(size.Unavailable>0?GeneralStyle.T(" (parcial)"," (partial)"):"");}
+    internal static string ProjectText(GeneralStorageSize size){return GeneralStyle.T("Mods: ","Mods: ")+Format(size.Mods)+"   ·   "+GeneralStyle.T("Total do projeto: ","Project total: ")+Format(size.Total)+"   ·   "+ProjectCacheText(size)+(size.Inactive>0?"   ·   "+InactiveText(size):"")+(size.Retained>0?"   ·   "+RetainedText(size):"")+(size.Unavailable>0?GeneralStyle.T(" (parcial)"," (partial)"):"");}
+    internal static string HomeText(GeneralStorageSize size){return GeneralStyle.T("Medidos: ","Measured: ")+size.Identified+"/"+size.ModCount+"   ·   "+GeneralStyle.T("Projetos com arquivos: ","Projects with files: ")+size.WithFiles+" / "+size.Projects+"   ·   "+GeneralStyle.T("Mods: ","Mods: ")+Format(size.Mods)+"   ·   "+GeneralStyle.T("Total: ","Total: ")+Format(size.Total)+"   ·   "+GeneralStyle.T("Cache: ","Cache: ")+Format(size.Cache)+(size.Inactive>0?"   ·   "+InactiveText(size):"")+(size.Retained>0?"   ·   "+RetainedText(size):"")+(size.Unavailable>0?GeneralStyle.T(" (parcial)"," (partial)"):"");}
 }
 internal sealed class GeneralStorageLabel : LinkLabel {
     readonly DownloadCache cache;
@@ -50,6 +51,9 @@ internal sealed class GeneralStorageLabel : LinkLabel {
         Links.Clear();
         Text=size==null?GeneralStyle.T("Espaço indisponível","Size unavailable"):home?GeneralStorageSize.HomeText(size):GeneralStorageSize.ProjectText(size);
         if(size==null)return;
+        if(!home&&size.InactiveDirectory!=null&&size.Inactive>0){
+            string disabled=GeneralStorageSize.InactiveText(size);int at=Text.LastIndexOf(disabled,StringComparison.Ordinal);if(at>=0)Links.Add(at,disabled.Length,size.InactiveDirectory);
+        }
         if(!home&&size.ProjectCacheDirectory!=null){
             string link=GeneralStorageSize.ProjectCacheText(size);
             Links.Add(Text.LastIndexOf(link,StringComparison.Ordinal),link.Length,size.ProjectCacheDirectory);
@@ -122,7 +126,13 @@ internal static class GeneralProjectStorage {
 
 
             }catch(IOException){result.Unavailable++;}catch(UnauthorizedAccessException){result.Unavailable++;}
-            WalkProject(data,project.Legacy,overhead,sizes,errors);if(projectFiles.Count>0)result.WithFiles++;
+            WalkProject(data,project.Legacy,overhead,sizes,errors);
+            string offRoot=Path.GetFullPath(Path.Combine(data,"Cache","Off")).TrimEnd('\\')+"\\";
+            var disabledFiles=overhead.Where(path=>path.StartsWith(offRoot,StringComparison.OrdinalIgnoreCase)).ToArray();
+            result.Inactive+=disabledFiles.Sum(path=>sizes[path]);
+            if(selected!=null&&disabledFiles.Length>0)result.InactiveDirectory=offRoot.TrimEnd('\\');
+            foreach(string path in disabledFiles){overhead.Remove(path);total.Add(path);}
+            if(projectFiles.Count>0)result.WithFiles++;
         }
         if(selected==null){Add(Path.Combine(store.Root,"projects.json"),overhead,sizes,errors);
             if(cache.RetainedRoot!=null)try{foreach(string file in DownloadCache.RetainedDownloadFiles(cache.RetainedRoot))Add(file,retained,sizes,errors);}catch(IOException){errors.Add(cache.RetainedRoot);}catch(UnauthorizedAccessException){errors.Add(cache.RetainedRoot);}

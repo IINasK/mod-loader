@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -211,6 +211,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         sourceLayout.Controls.Add(copySource,1,0);
         editorTips.SetToolTip(copySource,copySource.AccessibleName);
         AddEditorRow(layout,sourceField);
+        AddEditorRow(layout,presetMembershipRow);
         sourceInfo.Font = GeneralStyle.Font(10);
         sourceInfo.Dock = DockStyle.Top;
         sourceInfo.Margin = new Padding(3, 4, 3, 8);

@@ -65,7 +65,7 @@ $extensions += Join-Path $PSScriptRoot 'OnlineDefaultsTests.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineDefaultsQueueTests.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineRemovedPackageTests.cs'
 $extensions += Join-Path $PSScriptRoot 'RetiredPackEntries.cs'
-$extensions += @('GeneralModLibrary.cs','GeneralInstallRoutes.cs','GeneralModLibraryV2Tests.cs','GeneralModDownload.cs','GeneralModInstaller.cs','GeneralRouteChanges.cs','GeneralModInstallerTests.cs','GeneralModEditor.cs','GeneralArchivePreview.cs','GeneralModAssociation.cs','DisabledMods.cs','GeneralModActions.cs','GeneralModWindow.cs','GeneralModRun.cs','GeneralModVerification.cs','GeneralModVerificationTests.cs','GeneralModTests.cs','GeneralModMenus.cs','GeneralModProgressTests.cs','GeneralModUiTests.cs','GeneralStyle.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
+$extensions += @('GeneralPresetProfiles.cs','GeneralPresetDeployment.cs','GeneralPresetWindow.cs','GeneralPresetTests.cs','GeneralModLibrary.cs','GeneralInstallRoutes.cs','GeneralModLibraryV2Tests.cs','GeneralModDownload.cs','GeneralModInstaller.cs','GeneralRouteChanges.cs','GeneralModInstallerTests.cs','GeneralModEditor.cs','GeneralArchivePreview.cs','GeneralModAssociation.cs','DisabledMods.cs','GeneralModActions.cs','GeneralModWindow.cs','GeneralModRun.cs','GeneralModVerification.cs','GeneralModVerificationTests.cs','GeneralModTests.cs','GeneralModMenus.cs','GeneralModProgressTests.cs','GeneralModUiTests.cs','GeneralStyle.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += '/resource:'+(Join-Path $PSScriptRoot 'Assets\Jost.ttf')+',ModLoader.Jost.ttf'
 $extensions += Join-Path $PSScriptRoot 'BrowserDownloadBridge.cs'
 foreach($file in @('manifest.json','downloads.js')){
