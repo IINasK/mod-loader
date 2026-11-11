@@ -195,6 +195,38 @@ internal sealed partial class GeneralModWindow {
         int passed=0;Action<bool,string> check=(ok,message)=>{if(!ok)throw new IOException(message);passed++;};
         TestForm(FixedData.Load(),state,data,root,async form=>{
             form.testPresetEditScope=()=>false;
+            var settingsStore=new GeneralProjectStore(Path.Combine(root,"preferences"));
+            var defaults=settingsStore.Read().SwitchSettings;
+            check(defaults.CpuPercent==50&&defaults.AskBeforeSwitch,"Existing projects default to asking at 50 percent.");
+            check(new[]{25,50,75,100}.Select(percent=>new SwitchPerformance{CpuPercent=percent}.Workers(28))
+                .SequenceEqual(new[]{7,14,21,28}),"The four CPU choices map to the corresponding logical processor count.");
+            settingsStore.SaveSwitchPerformance(new SwitchPerformance{CpuPercent=75,AskBeforeSwitch=false});
+            var savedSettings=new GeneralProjectStore(settingsStore.Root).Read().SwitchSettings;
+            using(var options=new GeneralOptionsDialog("light","pt",root,switchSettings:savedSettings)){
+                check(options.SwitchSettings.CpuPercent==75&&!options.SwitchSettings.AskBeforeSwitch,
+                    "The saved preference loads in Options.");
+                ((GeneralPicker)AllControls(options).Single(control=>control.Name=="SwitchCpuLimit")).SelectedIndex=0;
+                ((CheckBox)AllControls(options).Single(control=>control.Name=="RememberSwitchPerformance")).Checked=false;
+                settingsStore.SavePreferences("light","pt",root,options.SwitchSettings);
+            }
+            check(settingsStore.Read().SwitchSettings.CpuPercent==25&&settingsStore.Read().SwitchSettings.AskBeforeSwitch,
+                "Options can change the limit and restore the prompt.");
+            int chosenWorkers;
+            using(var timer=new Timer{Interval=30}){
+                timer.Tick+=(sender,args)=>{
+                    var dialog=Application.OpenForms.OfType<SwitchPerformanceDialog>().FirstOrDefault();
+                    if(dialog==null)return;
+                    timer.Stop();
+                    ((GeneralPicker)AllControls(dialog).Single(control=>control.Name=="SwitchCpuLimit")).SelectedIndex=2;
+                    ((CheckBox)AllControls(dialog).Single(control=>control.Name=="RememberSwitchPerformance")).Checked=true;
+                    dialog.AcceptButton.PerformClick();
+                };
+                timer.Start();
+                chosenWorkers=form.ChooseSwitchWorkers();
+            }
+            check(chosenWorkers==new SwitchPerformance{CpuPercent=75}.Workers(Environment.ProcessorCount)&&
+                !form.ReadSwitchPerformance().AskBeforeSwitch&&form.ChooseSwitchWorkers()==chosenWorkers,
+                "Apply uses the chosen budget and remembering skips the next prompt.");
             form.Generic(game).Install(archiveA,new Work{Entry=a,Variant=a.Variants[0]}.Receipt(0),null);
             form.Generic(game).Install(archiveB,new Work{Entry=b,Variant=b.Variants[0]}.Receipt(0),null);
             await form.Scan();form.RefreshPrimaryAction();
@@ -218,7 +250,7 @@ internal sealed partial class GeneralModWindow {
             check(!form.next.Visible&&form.NeedsPresetLoad&&form.currentProgress.Caption.Contains("cancelada")&&
                 File.Exists(Path.Combine(game,"mods/a.txt"))&&File.Exists(Path.Combine(game,"mods/b.txt")),
                 "Cancelling from the window leaves both original files intact and allows a new attempt.");
-            var loading=form.LoadPreset();
+            var loading=form.LoadPreset(chosenWorkers);
             check(form.currentProgress.Caption.Contains("preset")&&form.currentProgress.Indeterminate&&((GeneralButton)form.primaryAction).ShowActivity,
                 "The footer takes over immediately while the preset is being checked.");
             await loading;

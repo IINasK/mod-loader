@@ -147,11 +147,28 @@ internal sealed partial class GeneralModWindow {
         }
         return paths;
     }
-    async Task LoadPreset() {
+    SwitchPerformance localSwitchPerformance=new SwitchPerformance();
+    SwitchPerformance ReadSwitchPerformance() {
+        return projectStore==null?localSwitchPerformance:projectStore.Read().SwitchSettings;
+    }
+    int ChooseSwitchWorkers() {
+        var settings=ReadSwitchPerformance();
+        if(settings.AskBeforeSwitch) {
+            using(var dialog=new SwitchPerformanceDialog(settings)) {
+                if(dialog.ShowDialog(this)!=DialogResult.OK)return 0;
+                settings=dialog.Settings;
+            }
+            if(projectStore==null)localSwitchPerformance=settings;
+            else projectStore.SaveSwitchPerformance(settings);
+        }
+        return settings.Workers(Environment.ProcessorCount);
+    }
+    async Task LoadPreset(int workers=0) {
         if(loadingPreset||FinishingOperations||ActivePreset==null)return;
         if(!ConfirmProjectNavigation()||ActivePreset==null||!NeedsPresetLoad)return;
         string root=Root(),selected=state.SelectedPreset,fingerprint=PresetFingerprint;
         EnsurePresetGameClosed(root);GeneralPresetProfiles.Capture(state);
+        if(workers<=0)workers=GeneralPresetDeployment.VerificationWorkers;
         var desiredWorks=PresetWorks().ToArray();
         foreach(var work in desiredWorks.Where(w=>w.Entry.AlternativeGroup!=null))ActivePreset.AlternativeChoices[work.Entry.AlternativeGroup]=work.Entry.Id;
         var universe=PresetUniverse().ToArray();
@@ -183,13 +200,13 @@ internal sealed partial class GeneralModWindow {
                 string checking=T("Conferindo mods","Checking mods");
                 var discovered=GeneralPresetDeployment.CheckPackages(groups,
                     group=>group.FirstOrDefault(p=>{token.ThrowIfCancellationRequested();return PackageMatches(p,root);})??group.First(),
-                    (done,total)=>progress.Report(Tuple.Create(checking,done,total)),token);
+                    (done,total)=>progress.Report(Tuple.Create(checking,done,total)),token,workers);
                 progress.Report(Tuple.Create(T("Preparando a troca","Preparing the switch"),0,0));
                 var shared=PresetSharedPaths(root,receipts);
                 discoveryMs=elapsed.ElapsedMilliseconds;
                 using(var fixedLock=IsCyberpunk(root)?Cyberpunk(root).LockForRouteChange():null)
                 using(Generic(root).ProjectDeletionLock())return engine.Apply(selected,fingerprint,desired,discovered,
-                    (stage,done,total)=>progress.Report(Tuple.Create(stage,done,total)),shared,token);
+                    (stage,done,total)=>progress.Report(Tuple.Create(stage,done,total)),shared,token,workers);
             });
             presetCancellation=null;
             UpdateOperationButton();
@@ -200,11 +217,11 @@ internal sealed partial class GeneralModWindow {
             UpdatePresetIssueLink();
             scanning=false;
             ShowPresetProgress(T("Atualizando a lista do preset","Refreshing the preset list"),0,0);
-            await Scan();
+            await Scan(workerLimit:workers);
             RefreshStorageSize();
             RenderPresetResult();
             OnlineDiagnostics.Record("general.preset.complete",null,"Carregamento de preset concluído.",
-                new{Preset=selected,Workers=GeneralPresetDeployment.VerificationWorkers,DiscoveryMs=discoveryMs,ApplyMs=applyMs,
+                new{Preset=selected,Workers=workers,DiscoveryMs=discoveryMs,ApplyMs=applyMs,
                     RefreshMs=elapsed.ElapsedMilliseconds-discoveryMs-applyMs,TotalMs=elapsed.ElapsedMilliseconds,
                     ActiveMods=result.Active.Count,Issues=result.Issues.Count});
             ShowPresetProgress(result.Issues.Count==0?T("Preset carregado","Preset loaded"):

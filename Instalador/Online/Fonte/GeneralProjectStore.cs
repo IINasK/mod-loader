@@ -16,6 +16,7 @@ internal sealed class GeneralProjectIndex {
     public int Schema = 1;
     public string Theme = "light-red", Language = "pt";
     public string DownloadFolder = OnlineDownloadWatch.DefaultFolder();
+    public SwitchPerformance SwitchSettings = new SwitchPerformance();
     public List<GeneralProject> Projects = new List<GeneralProject>();
 }
 
@@ -278,15 +279,23 @@ internal sealed class GeneralProjectStore {
         }
     }
 
-    internal void SavePreferences(string theme, string language, string downloadFolder = null) {
+    internal void SavePreferences(string theme, string language, string downloadFolder = null,SwitchPerformance switchSettings=null) {
         lock (gate) {
             ValidatePreferences(theme, language);
             var index = Read(); index.Theme = theme; index.Language = language;
             if (downloadFolder != null) index.DownloadFolder = DownloadPath(downloadFolder, true);
+            if(switchSettings!=null)index.SwitchSettings=switchSettings;
             Write(index);
         }
     }
 
+    internal void SaveSwitchPerformance(SwitchPerformance settings) {
+        lock(gate) {
+            var index=Read();
+            index.SwitchSettings=settings;
+            Write(index);
+        }
+    }
     static GeneralProject Registered(GeneralProjectIndex index, GeneralProject project) {
         ValidateProject(project);
         var registered = index.Projects.FirstOrDefault(item => item.Id == project.Id && item.Legacy == project.Legacy);
@@ -304,6 +313,8 @@ internal sealed class GeneralProjectStore {
     static void Validate(GeneralProjectIndex index) {
         if (index == null || index.Schema != 1 || index.Projects == null || index.Projects.Count > 200) throw new IOException("Índice de projetos inválido.");
         ValidatePreferences(index.Theme, index.Language);
+        if(index.SwitchSettings==null)index.SwitchSettings=new SwitchPerformance();
+        index.SwitchSettings.Normalize();
         index.DownloadFolder = DownloadPath(String.IsNullOrWhiteSpace(index.DownloadFolder) ? OnlineDownloadWatch.DefaultFolder() : index.DownloadFolder, false);
         var ids = new HashSet<string>(StringComparer.Ordinal);
         var templates = new HashSet<string>(StringComparer.Ordinal);

@@ -125,7 +125,7 @@ internal sealed class GeneralPresetDeployment {
         Safe.WriteJson(stateFile,journal.Before);File.Delete(journalFile);
     }
     internal static int VerificationWorkers {get{return Math.Max(1,Math.Min(8,Environment.ProcessorCount/2));}}
-    internal static TResult[] CheckPackages<TPackage,TResult>(IList<TPackage> packages,Func<TPackage,TResult> verify,Action<int,int> progress,CancellationToken cancellation=default(CancellationToken)) {
+    internal static TResult[] CheckPackages<TPackage,TResult>(IList<TPackage> packages,Func<TPackage,TResult> verify,Action<int,int> progress,CancellationToken cancellation=default(CancellationToken),int workers=0) {
         cancellation.ThrowIfCancellationRequested();
         var results=new TResult[packages.Count];
         if(packages.Count==0)return results;
@@ -133,7 +133,7 @@ internal sealed class GeneralPresetDeployment {
         var progressLock=new object();
         int completed=0;
         if(progress!=null)progress(0,packages.Count);
-        var options=new ParallelOptions{MaxDegreeOfParallelism=VerificationWorkers,CancellationToken=cancellation};
+        var options=new ParallelOptions{MaxDegreeOfParallelism=workers>0?workers:VerificationWorkers,CancellationToken=cancellation};
         try {
             Parallel.For(0,packages.Count,options,index=>{
                 results[index]=verify(packages[index]);
@@ -146,7 +146,7 @@ internal sealed class GeneralPresetDeployment {
         return results;
     }
     internal PresetDeploymentState Apply(string preset,string fingerprint,IEnumerable<PresetPackage> wanted,IEnumerable<PresetPackage> discovered,Action<string,int,int> progress=null,ISet<string> sharedPaths=null,
-        CancellationToken cancellation=default(CancellationToken)) {
+        CancellationToken cancellation=default(CancellationToken),int workers=0) {
         cancellation.ThrowIfCancellationRequested();
         using(Lock()) {
             RecoverCore();var state=Read();var desired=wanted.ToList();Validate(desired);
@@ -172,7 +172,7 @@ internal sealed class GeneralPresetDeployment {
             var activeByKey=state.Active.ToDictionary(package=>package.Key,StringComparer.Ordinal);
             string validating=GeneralStyle.T("Validando instalações","Validating installations");
             var verified=CheckPackages(candidates,package=>activeByKey.ContainsKey(package.Key)||package.Files.All(Matches),
-                (done,total)=>{if(progress!=null)progress(validating,done,total);},cancellation);
+                (done,total)=>{if(progress!=null)progress(validating,done,total);},cancellation,workers);
             for(int index=0;index<candidates.Count;index++) {
                 if(!verified[index])continue;
                 var package=candidates[index];
@@ -187,7 +187,7 @@ internal sealed class GeneralPresetDeployment {
             state.Issues.Clear();
             string checkingActive=GeneralStyle.T("Verificando arquivos ativos","Checking active files");
             var changedFiles=CheckPackages(state.Active,package=>package.Files.Any(f=>!Matches(f)),
-                (done,total)=>{if(progress!=null)progress(checkingActive,done,total);},cancellation);
+                (done,total)=>{if(progress!=null)progress(checkingActive,done,total);},cancellation,workers);
             for(int index=0;index<state.Active.Count;index++) {
                 var package=state.Active[index];
                 if(changedFiles[index])state.Protected[package.ModId]=GeneralStyle.T("alterado fora do Mod Loader; mantido sem alterações.","changed outside Mod Loader; left unchanged.");

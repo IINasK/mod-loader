@@ -312,7 +312,7 @@ internal sealed partial class GeneralModWindow {
             nexusManual.TryGetValue(work.Entry.Id,out match)&&Object.ReferenceEquals(match.Variant,work.Variant)&&match.StillPresent(root);
     }
 
-    async Task Scan(ProjectVerification audit=null){
+    async Task Scan(ProjectVerification audit=null,int? workerLimit=null){
         if(working||scanning)return;
         if(String.IsNullOrWhiteSpace(state.Destination)){
             RefreshPrimaryAction();
@@ -332,7 +332,7 @@ internal sealed partial class GeneralModWindow {
             var reads=new ScanReads(this,root);
             if(audit!=null)audit.Reads=reads;
             var inventory=reads.Exists?Task.Run(()=>TryReadGameInventory(root,reads)):null;
-            int workers=Math.Max(1,Math.Min(4,Environment.ProcessorCount/2));
+            int workers=workerLimit??Math.Max(1,Math.Min(4,Environment.ProcessorCount/2));
             var visibleRows=ModRows().ToDictionary(row=>(string)row.Tag);
             var pending=new Queue<Task<string>>();
             Func<Work,Task<string>> verify=work=>Task.Run(async()=>{
@@ -445,7 +445,11 @@ internal sealed partial class GeneralModWindow {
                 await Scan();
                 return;
             }
-            if(NeedsPresetLoad){await LoadPreset();return;}
+            if(NeedsPresetLoad){
+                int presetWorkers=ChooseSwitchWorkers();
+                if(presetWorkers>0)await LoadPreset(presetWorkers);
+                return;
+            }
             List<Work> jobs;
             var selection=SelectedJobs();
             var command=ClassifyJobs(selection,out jobs);
@@ -473,12 +477,17 @@ internal sealed partial class GeneralModWindow {
                     T("Desabilitar a versão ativa depois de preparar a substituta?","Disable the active version after the replacement is ready?"),
                     T("Mudar versão","Change version"),MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
             }
+            int workers=1;
+            if(command==ModAction.Change||command==ModAction.Update){
+                workers=ChooseSwitchWorkers();
+                if(workers==0)return;
+            }
             jobs=WithLinkedDependencies(jobs);
             var pending=new List<Work>();
             List<string> downloads;
             scanning=true;Busy(true);next.Visible=false;
             detail.Text=T("Conferindo os mods selecionados…","Checking the selected mods…");
-            try{downloads=await Task.Run(()=>PlanSelected(jobs,root,pending));}
+            try{downloads=await Task.Run(()=>PlanSelected(jobs,root,pending,workers));}
             finally{scanning=false;Busy(false);}
             if(IsDisposed)return;
             if(pending.Count==0){
@@ -533,12 +542,14 @@ internal sealed partial class GeneralModWindow {
         return ordered;
     }
 
-    List<string> PlanSelected(List<Work> selected,string root,List<Work> pending){
+    List<string> PlanSelected(List<Work> selected,string root,List<Work> pending,int workers=1){
         var reads=new ScanReads(this,root);
         var known=new Dictionary<string,FixedMod>();
         var downloads=new List<string>();
-        foreach(var work in selected){
-            string status=Status(work,root,reads);
+        var checkedStatuses=workers>1?GeneralPresetDeployment.CheckPackages(selected,work=>Status(work,root,reads),null,workers:workers):null;
+        for(int position=0;position<selected.Count;position++){
+            var work=selected[position];
+            string status=checkedStatuses==null?Status(work,root,reads):checkedStatuses[position];
             if(IsSharedBodySwitch(work,status)){pending.Add(work);continue;}
             if(status==GeneralStatusPresentation.Disabled){
                 if(work.SwitchAlternatives||work.DependencyQueue)pending.Add(work);
