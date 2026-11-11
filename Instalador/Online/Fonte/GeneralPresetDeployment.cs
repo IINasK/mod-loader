@@ -61,7 +61,19 @@ internal sealed class GeneralPresetDeployment {
     static Dictionary<string,List<DisabledModFile>> Plan(IEnumerable<PresetPackage> packages) {
         return packages.ToDictionary(p=>p.StorageKey,p=>p.Files,StringComparer.Ordinal);
     }
-    bool SameTarget(DisabledModFile a,DisabledModFile b) {return String.Equals(Target(a),Target(b),StringComparison.OrdinalIgnoreCase);}
+
+    static void IndexHashes(Dictionary<string,HashSet<string>> index,PresetPackage package,Func<DisabledModFile,string> destination) {
+        foreach(var file in package.Files) {
+            string target=destination(file);
+            HashSet<string> hashes;
+            if(!index.TryGetValue(target,out hashes))index.Add(target,hashes=new HashSet<string>(StringComparer.Ordinal));
+            hashes.Add(file.Hash);
+        }
+    }
+    static bool DifferentHash(Dictionary<string,HashSet<string>> index,string target,string hash) {
+        HashSet<string> hashes;
+        return index.TryGetValue(target,out hashes)&&(hashes.Count>1||!hashes.Contains(hash));
+    }
     HashSet<string> SamePaths(IEnumerable<PresetPackage> keep,IEnumerable<DisabledModFile> files) {
         var known=keep.SelectMany(p=>p.Files).ToLookup(Target,StringComparer.OrdinalIgnoreCase);
         return new HashSet<string>(files.Where(f=>known[Target(f)].Any(k=>k.Hash==f.Hash&&k.Size==f.Size)).Select(Target),StringComparer.OrdinalIgnoreCase);
@@ -159,15 +171,7 @@ internal sealed class GeneralPresetDeployment {
             }
             // Never replace an existing baseline with current bytes: that would hide external changes.
             var activeHashes=new Dictionary<string,HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-            Action<PresetPackage> indexPackage=package=>{
-                foreach(var file in package.Files) {
-                    string target=Target(file);
-                    HashSet<string> hashes;
-                    if(!activeHashes.TryGetValue(target,out hashes))activeHashes.Add(target,hashes=new HashSet<string>(StringComparer.Ordinal));
-                    hashes.Add(file.Hash);
-                }
-            };
-            foreach(var package in state.Active)indexPackage(package);
+            foreach(var package in state.Active)IndexHashes(activeHashes,package,Target);
             var candidates=inventory.Where(p=>p.Files.Count>0&&!cached.ContainsKey(p.StorageKey)).ToList();
             var activeByKey=state.Active.ToDictionary(package=>package.Key,StringComparer.Ordinal);
             string validating=GeneralStyle.T("Validando instalações","Validating installations");
@@ -182,7 +186,7 @@ internal sealed class GeneralPresetDeployment {
                     HashSet<string> hashes;
                     return activeHashes.TryGetValue(Target(file),out hashes)&&(hashes.Count>1||!hashes.Contains(file.Hash));
                 });
-                if(!conflict){state.Active.Add(package);indexPackage(package);}
+                if(!conflict){state.Active.Add(package);IndexHashes(activeHashes,package,Target);}
             }
             state.Issues.Clear();
             string checkingActive=GeneralStyle.T("Verificando arquivos ativos","Checking active files");
@@ -196,6 +200,7 @@ internal sealed class GeneralPresetDeployment {
                 if(package.Files.Any(f=>File.Exists(Target(f)))&&package.Files.Any(f=>!Matches(f))&&
                     !state.Active.Any(a=>a.ModId==package.ModId))state.Protected[package.ModId]=GeneralStyle.T("arquivos existentes não correspondem ao registro; preservados.","existing files differ from the record; preserved.");
             }
+            var preparation=System.Diagnostics.Stopwatch.StartNew();
             if(progress!=null)progress(GeneralStyle.T("Preparando a troca","Preparing the switch"),0,0);
             var held=new HashSet<string>(state.Protected.Keys,StringComparer.Ordinal);
             foreach(var package in state.Active.Where(p=>p.Immutable||sharedPaths!=null&&p.Files.Any(f=>sharedPaths.Contains(Target(f))))) {
@@ -215,17 +220,39 @@ internal sealed class GeneralPresetDeployment {
             var keep=state.Active.Where(p=>held.Contains(p.ModId)||eligible.Any(x=>x.Key==p.Key)).ToList();
             var outgoing=state.Active.Where(p=>!keep.Any(k=>k.Key==p.Key)).ToList();
             var incoming=eligible.Where(p=>!state.Active.Any(a=>a.Key==p.Key)).ToList();
+            var comparer=StringComparer.OrdinalIgnoreCase;
+            var destinations=state.Active.Concat(incoming).SelectMany(package=>package.Files).Distinct().ToDictionary(file=>file,Target);
+            Func<DisabledModFile,string> destination=file=>destinations[file];
+            var existingFiles=state.Active.SelectMany(package=>package.Files).ToLookup(destination,comparer);
+            var retainedHashes=new Dictionary<string,HashSet<string>>(comparer);
+            foreach(var package in keep)IndexHashes(retainedHashes,package,destination);
+            var incomingFiles=incoming.SelectMany(package=>package.Files.Select(file=>new{Package=package,File=file}))
+                .ToLookup(entry=>destination(entry.File),comparer);
+            var candidatesForRestore=new HashSet<PresetPackage>(incoming);
+
             // A protected or unknown destination blocks the affected incoming mod, not the whole preset.
             foreach(var p in incoming.ToArray()) {
                 cancellation.ThrowIfCancellationRequested();
                 bool validDestination=true;
                 try{foreach(var f in p.Files)GeneralInstallRoutes.Resolve(root,f.Path,true);}catch(DirectoryNotFoundException){validDestination=false;}
-                if(!validDestination){incoming.Remove(p);state.Issues.Add(p.Name+GeneralStyle.T(": destino indisponível.",": destination unavailable."));continue;}
-                bool conflict=p.Group!=null&&keep.Any(k=>k.Group==p.Group&&k.Key!=p.Key)||p.Files.Any(f=>Directory.Exists(Target(f))||keep.SelectMany(k=>k.Files).Any(k=>SameTarget(k,f)&&k.Hash!=f.Hash)||
-                    File.Exists(Target(f))&&!keep.Concat(outgoing).Any(o=>o.Files.Any(k=>SameTarget(k,f)&&Matches(k))))||
-                    incoming.Where(o=>o!=p).Any(o=>o.Files.Any(k=>p.Files.Any(f=>SameTarget(f,k)&&f.Hash!=k.Hash)));
-                if(conflict){incoming.Remove(p);state.Issues.Add(p.Name+GeneralStyle.T(": destino em conflito; preservado.",": conflicting destination; preserved."));}
+                if(!validDestination){
+                    candidatesForRestore.Remove(p);
+                    state.Issues.Add(p.Name+GeneralStyle.T(": destino indisponível.",": destination unavailable."));
+                    continue;
+                }
+                bool conflict=p.Group!=null&&keep.Any(k=>k.Group==p.Group&&k.Key!=p.Key);
+                if(!conflict)conflict=p.Files.Any(file=>{
+                    string target=destination(file);
+                    return Directory.Exists(target)||DifferentHash(retainedHashes,target,file.Hash)||
+                        (File.Exists(target)&&!existingFiles[target].Any(Matches))||
+                        incomingFiles[target].Any(entry=>entry.Package!=p&&entry.File.Hash!=file.Hash&&candidatesForRestore.Contains(entry.Package));
+                });
+                if(conflict){
+                    candidatesForRestore.Remove(p);
+                    state.Issues.Add(p.Name+GeneralStyle.T(": destino em conflito; preservado.",": conflicting destination; preserved."));
+                }
             }
+            incoming.RemoveAll(package=>!candidatesForRestore.Contains(package));
             do {changed=false;foreach(var p in incoming.ToArray())if(p.RequiredMods.Any(dep=>!keep.Concat(incoming).Any(d=>d.ModId==dep))){incoming.Remove(p);changed=true;state.Issues.Add(p.Name+GeneralStyle.T(": dependência indisponível.",": unavailable dependency."));}}while(changed);
 
             // A failed replacement must not remove an active dependency that a retained mod still needs.
@@ -236,10 +263,12 @@ internal sealed class GeneralPresetDeployment {
                     var old=outgoing.FirstOrDefault(p=>p.ModId==dependency);
                     if(old==null)continue;
                     outgoing.Remove(old);keep.Add(old);changed=true;
+                    IndexHashes(retainedHashes,old,destination);
                     state.Issues.Add(old.Name+GeneralStyle.T(": mantido por dependência ativa.",": retained for an active dependency."));
                 }
                 foreach(var p in incoming.ToArray())if(p.RequiredMods.Any(dep=>!keep.Concat(incoming).Any(d=>d.ModId==dep))||
-                    keep.Any(k=>k.Group!=null&&k.Group==p.Group&&k.Key!=p.Key||k.Files.Any(f=>p.Files.Any(n=>SameTarget(n,f)&&n.Hash!=f.Hash)))) {
+                    keep.Any(k=>k.Group!=null&&k.Group==p.Group&&k.Key!=p.Key)||
+                    p.Files.Any(file=>DifferentHash(retainedHashes,destination(file),file.Hash))) {
                     incoming.Remove(p);changed=true;
                     state.Issues.Add(p.Name+GeneralStyle.T(": dependência ou destino em conflito.",": conflicting dependency or destination."));
                 }
@@ -250,6 +279,8 @@ internal sealed class GeneralPresetDeployment {
             foreach(var f in incoming.SelectMany(p=>p.Files).GroupBy(f=>f.Path,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()))reserve(Target(f),checked(f.Size+65536));
             foreach(var needed in space)if(FreeBytes(needed.Key)<needed.Value)throw new IOException(GeneralStyle.T("Espaço insuficiente para carregar o preset: ","Insufficient space to load preset: ")+needed.Key);
             cancellation.ThrowIfCancellationRequested();
+            OnlineDiagnostics.Record("general.preset.plan",null,"Preparação da troca concluída.",
+                new{Preset=preset,ElapsedMs=preparation.ElapsedMilliseconds,Kept=keep.Count,Outgoing=outgoing.Count,Incoming=incoming.Count});
             // Persist discoveries and protections before the first mutation, then journal the whole transition.
             Safe.WriteJson(stateFile,state);
             var journal=new PresetDeploymentJournal{Before=GeneralPresetProfiles.Copy(state),Outgoing=outgoing,Incoming=incoming};

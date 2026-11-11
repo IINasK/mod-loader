@@ -163,6 +163,21 @@ internal static class GeneralPresetTests {
             dependencyEngine.Apply("both","both",new[]{aliasA,aliasB},new[]{aliasA,aliasB});
             dependencyEngine.Apply("only-b","b",new[]{aliasB},new[]{aliasA,aliasB});
             check(routeA!=routeB&&File.ReadAllText(sharedTarget)=="alias","Equivalent portable routes keep their shared physical file and save a recoverable copy.");
+            File.WriteAllText(sharedTarget,"other");
+            var different=GeneralPresetProfiles.Copy(aliasA);
+            different.Key=different.StorageKey="route-c/one";
+            different.ModId="route-c";
+            different.Files[0].Hash=Safe.Hash(sharedTarget);
+            var aliasStorage=new DisabledMods(dependencyGame,dependencyData);
+            aliasStorage.Disable(new Dictionary<string,List<DisabledModFile>>{{different.StorageKey,different.Files}},true);
+            File.WriteAllText(sharedTarget,"alias");
+            var variants=new[]{aliasA,aliasB,different};
+            var retained=dependencyEngine.Apply("retain","retain",new[]{aliasB,different},variants);
+            check(File.ReadAllText(sharedTarget)=="alias"&&retained.Active.All(p=>p.Key!=different.Key)&&
+                aliasStorage.Read().ContainsKey(different.StorageKey),"A cached mod cannot overwrite a retained file via a different portable route.");
+            var overlapping=dependencyEngine.Apply("overlap","overlap",new[]{aliasA,different},variants);
+            check(File.ReadAllText(sharedTarget)=="other"&&overlapping.Active.Any(p=>p.Key==different.Key)&&
+                overlapping.Active.All(p=>p.Key!=aliasA.Key),"Conflicting incoming files are filtered in preset order and only one owner is activated.");
         }finally{GeneralInstallRoutes.FixtureAppData=null;}
         Safe.WriteJson(Path.Combine(root,"result.json"),new{Passed=true,Checks=passed});return passed;
     }
