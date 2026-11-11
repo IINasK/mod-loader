@@ -46,6 +46,9 @@ internal static class GeneralPresetTests {
         var stages=new List<Tuple<string,int,int>>();
         result=engine.Apply("b","two",new[]{second},new[]{first,second},
             (stage,done,total)=>stages.Add(Tuple.Create(stage,done,total)));
+        var validation=stages.Where(step=>step.Item1.Contains("Validando instalações")).ToArray();
+        check(validation.Length>1&&validation.Select(step=>step.Item2).SequenceEqual(Enumerable.Range(0,validation[0].Item3+1)),
+            "Parallel verification reports completed packages in increasing order.");
         int saving=stages.FindIndex(step=>step.Item1.Contains("desativados")&&step.Item3==1);
         int activating=stages.FindIndex(step=>step.Item1.Contains("second")&&step.Item3==1);
         check(saving>=0&&activating>saving,"Progress reports counted file storage before counted mod activation.");

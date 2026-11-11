@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 internal sealed class PresetPackage {
     public string Key, StorageKey, LegacyKey, ModId, Name, Group;
@@ -122,6 +123,25 @@ internal sealed class GeneralPresetDeployment {
         storage.Enable(journal.Outgoing.Select(p=>p.StorageKey));
         Safe.WriteJson(stateFile,journal.Before);File.Delete(journalFile);
     }
+    internal static TResult[] CheckPackages<TPackage,TResult>(IList<TPackage> packages,Func<TPackage,TResult> verify,Action<int,int> progress) {
+        var results=new TResult[packages.Count];
+        if(packages.Count==0)return results;
+
+        var progressLock=new object();
+        int completed=0;
+        if(progress!=null)progress(0,packages.Count);
+        var options=new ParallelOptions{MaxDegreeOfParallelism=Math.Max(1,Math.Min(4,Environment.ProcessorCount/2))};
+        try {
+            Parallel.For(0,packages.Count,options,index=>{
+                results[index]=verify(packages[index]);
+                if(progress!=null)lock(progressLock)progress(++completed,packages.Count);
+            });
+        }catch(AggregateException ex) {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex.Flatten().InnerExceptions[0]).Throw();
+            throw;
+        }
+        return results;
+    }
     internal PresetDeploymentState Apply(string preset,string fingerprint,IEnumerable<PresetPackage> wanted,IEnumerable<PresetPackage> discovered,Action<string,int,int> progress=null,ISet<string> sharedPaths=null) {
         using(Lock()) {
             RecoverCore();var state=Read();var desired=wanted.ToList();Validate(desired);
@@ -144,13 +164,15 @@ internal sealed class GeneralPresetDeployment {
             };
             foreach(var package in state.Active)indexPackage(package);
             var candidates=inventory.Where(p=>p.Files.Count>0&&!cached.ContainsKey(p.StorageKey)).ToList();
+            var activeByKey=state.Active.ToDictionary(package=>package.Key,StringComparer.Ordinal);
             string validating=GeneralStyle.T("Validando instalações","Validating installations");
+            var verified=CheckPackages(candidates,package=>activeByKey.ContainsKey(package.Key)||package.Files.All(Matches),
+                (done,total)=>{if(progress!=null)progress(validating,done,total);});
             for(int index=0;index<candidates.Count;index++) {
-                if(progress!=null)progress(validating,index,candidates.Count);
+                if(!verified[index])continue;
                 var package=candidates[index];
-                var previous=state.Active.FirstOrDefault(p=>p.Key==package.Key);
-                if(previous!=null){previous.Group=package.Group;previous.Name=package.Name;previous.RequiredMods=package.RequiredMods;continue;}
-                if(!package.Files.All(Matches))continue;
+                PresetPackage previous;
+                if(activeByKey.TryGetValue(package.Key,out previous)){previous.Group=package.Group;previous.Name=package.Name;previous.RequiredMods=package.RequiredMods;continue;}
                 bool conflict=package.Files.Any(file=>{
                     HashSet<string> hashes;
                     return activeHashes.TryGetValue(Target(file),out hashes)&&(hashes.Count>1||!hashes.Contains(file.Hash));
@@ -159,10 +181,11 @@ internal sealed class GeneralPresetDeployment {
             }
             state.Issues.Clear();
             string checkingActive=GeneralStyle.T("Verificando arquivos ativos","Checking active files");
+            var changedFiles=CheckPackages(state.Active,package=>package.Files.Any(f=>!Matches(f)),
+                (done,total)=>{if(progress!=null)progress(checkingActive,done,total);});
             for(int index=0;index<state.Active.Count;index++) {
-                if(progress!=null)progress(checkingActive,index,state.Active.Count);
                 var package=state.Active[index];
-                if(package.Files.Any(f=>!Matches(f)))state.Protected[package.ModId]=GeneralStyle.T("alterado fora do Mod Loader; mantido sem alterações.","changed outside Mod Loader; left unchanged.");
+                if(changedFiles[index])state.Protected[package.ModId]=GeneralStyle.T("alterado fora do Mod Loader; mantido sem alterações.","changed outside Mod Loader; left unchanged.");
             }
             foreach(var package in inventory.Where(p=>p.Files.Count>0&&!state.Active.Any(a=>a.Key==p.Key)&&!cached.ContainsKey(p.StorageKey))) {
                 if(package.Files.Any(f=>File.Exists(Target(f)))&&package.Files.Any(f=>!Matches(f))&&

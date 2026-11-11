@@ -10,7 +10,11 @@ public sealed class GeneralInstallRoute {
 internal static class GeneralInstallRoutes {
     const string Prefix = "__modloader_destination__/";
     const string FileMarker = "/__files__/";
-    [ThreadStatic] internal static string FixtureAppData;
+    static readonly System.Threading.AsyncLocal<string> fixtureAppData = new System.Threading.AsyncLocal<string>();
+    internal static string FixtureAppData {
+        get { return fixtureAppData.Value; }
+        set { fixtureAppData.Value = value; }
+    }
     static readonly string[] Locations = { "%GAME%", "%DOCUMENTS%", "%SAVEDGAMES%", "%LOCALAPPDATA%", "%APPDATA%", "%USERPROFILE%" };
 
     internal static List<GeneralInstallRoute> Parse(string text, string game) {

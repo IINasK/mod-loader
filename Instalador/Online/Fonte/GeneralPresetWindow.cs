@@ -163,12 +163,10 @@ internal sealed partial class GeneralModWindow {
                 var desired=desiredWorks.Select(w=>PresetPackageFor(w,root,receipts,disabled)).ToList();
                 var packages=desired.Concat(universe.Select(w=>PresetPackageFor(w,root,receipts,disabled))).GroupBy(p=>p.Key).Select(g=>g.First()).ToList();
                 var groups=packages.GroupBy(p=>p.ModId).ToArray();
-                var discovered=new List<PresetPackage>(groups.Length);
                 string checking=T("Conferindo mods","Checking mods");
-                foreach(var group in groups) {
-                    progress.Report(Tuple.Create(checking,discovered.Count,groups.Length));
-                    discovered.Add(group.FirstOrDefault(p=>PackageMatches(p,root))??group.First());
-                }
+                var discovered=GeneralPresetDeployment.CheckPackages(groups,
+                    group=>group.FirstOrDefault(p=>PackageMatches(p,root))??group.First(),
+                    (done,total)=>progress.Report(Tuple.Create(checking,done,total)));
                 progress.Report(Tuple.Create(T("Preparando a troca","Preparing the switch"),0,0));
                 var shared=PresetSharedPaths(root,receipts);
                 using(var fixedLock=IsCyberpunk(root)?Cyberpunk(root).LockForRouteChange():null)
