@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -70,14 +70,17 @@ internal sealed partial class GeneralModWindow {
         TestForm(FixedData.Load(),state,Path.Combine(root,"state"),root,async form=>{
             check(form.tableName.Text=="Kit original"&&!form.tableName.ReadOnly,"Título integrado usa o nome do preset ativo.");
             form.tableName.Text="Kit renomeado";form.SaveTableTitle();check(list.Presets[0].Name=="Kit renomeado"&&form.preset.SelectedItem.ToString()=="Kit renomeado","Renomear a tabela atualiza e persiste o preset.");
+            first=form.state.List.Mods.Single(mod=>mod.Id==first.Id);
+            second=form.state.List.Mods.Single(mod=>mod.Id==second.Id);
+            third=form.state.List.Mods.Single(mod=>mod.Id==third.Id);
             form.statuses[Key(first,form.Selected(first))]="Instalado";form.statuses[Key(second,form.Selected(second))]="Baixando";form.statuses[Key(third,form.Selected(third))]="Falhou";
             form.categoryFilters=new HashSet<string>{"Principal"};form.DrawRows();check(form.VisibleMods().Count==2,"Cabeçalho Mods filtra múltiplas categorias.");
-            form.statusFilters=new HashSet<string>{"Instalado"};form.DrawRows();check(form.VisibleMods().Single()==first,"Categoria e situação são compostas.");
+            form.statusFilters=new HashSet<string>{"Instalado"};form.DrawRows();check(form.VisibleMods().Single().Id==first.Id,"Categoria e situação são compostas.");
             form.statusFilters=new HashSet<string>{"Download concluído"};form.DrawRows();check(form.VisibleMods().Count==0,"O filtro Download concluído é distinto de Instalado.");
             form.statusFilters=new HashSet<string>{"Instalado"};
             form.variantFilters=new HashSet<string>{"Alternativa"};form.DrawRows();check(form.VisibleMods().Count==0,"Filtro de variante se combina com os anteriores.");
             form.categoryFilters=new HashSet<string>{"Principal","Veículos"};form.variantFilters=null;form.statusFilters=new HashSet<string>{"Baixando","Falha"};form.DrawRows();check(form.VisibleMods().Count==2,"Multisseleção de situações conserva as duas situações escolhidas.");
-            form.nameFilter="bet";form.DrawRows();check(form.VisibleMods().Single()==second,"Busca do cabeçalho Mod é combinada e não distingue maiúsculas.");
+            form.nameFilter="bet";form.DrawRows();check(form.VisibleMods().Single().Id==second.Id,"Busca do cabeçalho Mod é combinada e não distingue maiúsculas.");
             form.ResetColumnFilters();form.DrawRows();check(form.VisibleMods().Count==3,"Limpar filtros restaura todos os itens do preset.");
             form.measuredMods[first.Id]=50;
             form.measuredMods[second.Id]=900;
@@ -107,7 +110,7 @@ internal sealed partial class GeneralModWindow {
             form.state.ChosenVariants[first.Id]=extra.Id;
             form.groupFilters=new HashSet<string>{first.Name};
             form.DrawRows();
-            check(form.VisibleMods().Single()==first&&Equals(form.ModRows().Single().Cells["Group"].Tag,"Wave"),
+            check(form.VisibleMods().Single().Id==first.Id&&Equals(form.ModRows().Single().Cells["Group"].Tag,"Wave"),
                 "O filtro de grupo encontra a gaveta e o marcador reflete a variante ativa.");
             first.Variants.Remove(extra);
             form.state.ChosenVariants.Remove(first.Id);
@@ -205,7 +208,7 @@ internal sealed partial class GeneralModWindow {
             first.Variants[0].CompatibilityGroups.Add("Pés padrão");
             first.Tags.Add("teste exclusivo");
             form.SetAssociationSearch("teste exclusivo");
-            check(form.VisibleMods().Single()==first&&!(form.ModRows().Single().Cells["Name"].ToolTipText??"").Contains("teste exclusivo"),
+            check(form.VisibleMods().Single().Id==first.Id&&!(form.ModRows().Single().Cells["Name"].ToolTipText??"").Contains("teste exclusivo"),
                 "A busca encontra tags manuais sem mostrar as tags na tabela.");
             form.SetAssociationSearch("");
             string groupsExport=Path.Combine(root,"groups.json");

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -281,6 +281,7 @@ internal sealed class GeneralPicker : UserControl {
     internal ToolStripDropDown OpenPopup {get{return dropdown;}}
     internal bool SettingText {get{return writing;}}
     internal bool IconOnly {get;set;}
+    internal Control PopupAnchor {get;set;}
     internal GeneralPicker(){
         SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.Selectable,true);
         Height=44;MinimumSize=new Size(80,44);MaximumSize=new Size(0,44);Font=GeneralStyle.Font(12);BackColor=GeneralStyle.Surface;ForeColor=GeneralStyle.Foreground;Cursor=Cursors.Hand;
@@ -324,7 +325,7 @@ internal sealed class GeneralPicker : UserControl {
             list.Items.Add(Convert.ToString(items[i])+(i==0&&DeleteChoice!=null?GeneralStyle.T(" (padrão)"," (default)"):""));
         if(AddChoice!=null)list.Items.Add(AddChoiceLabel);
         list.SelectedIndex=index;
-        int width=Math.Max(Width,300);
+        int width=Math.Min(Math.Max((PopupAnchor??this).Width,300),Math.Max(200,Screen.FromControl(this).WorkingArea.Width-32));
         int height=Math.Min(340,list.Items.Count*list.ItemHeight);
         var scroll=new GeneralScrollView(list,reserveBarSpace:true){Size=new Size(width-20,height)};
         popup.Items.Add(new ToolStripControlHost(scroll){Margin=Padding.Empty,Padding=Padding.Empty,AutoSize=false,Size=scroll.Size});
@@ -357,7 +358,7 @@ internal sealed class GeneralPicker : UserControl {
         };
         popup.Opened+=(s,e)=>{list.Focus();Invalidate();};
         dropdown=popup;
-        var point=GeneralPopupPlacement.Location(this,ClientRectangle,popup.Size,false);
+        var anchor=PopupAnchor??this;var point=GeneralPopupPlacement.Location(anchor,anchor.ClientRectangle,popup.Size,false);
         popup.Show(this,PointToClient(point));Invalidate();
     }
     internal void EditText(){input.Focus();input.SelectAll();}

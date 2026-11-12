@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -40,7 +40,7 @@ internal sealed partial class GeneralModWindow : Form {
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
 
     [Flags]
-    enum CategoryBranch { Middle=0, First=1, Last=2 }
+    enum CategoryBranch { Middle=0, First=1, Last=2, Continuation=4 }
 
     sealed class SectionRow {
         internal string Kind,Category,Size;
@@ -84,6 +84,7 @@ internal sealed partial class GeneralModWindow : Form {
         if(String.IsNullOrWhiteSpace(state.DownloadFolder))state.DownloadFolder=OnlineDownloadWatch.DefaultFolder();
         if(!testMode)this.cache=new DownloadCache(Path.Combine(data,"Cache"),()=>state.DownloadFolder,cache.Root);
         if(state.SelectedPreset==null&&state.List.Presets.Any(p=>p.Id=="all"))state.SelectedPreset="all";
+        GeneralPresetProfiles.Initialize(state);GeneralPresetProfiles.Project(state);
         Text=GeneralAppPaths.WindowTitle;Icon=ModLoaderBrand.AppIcon;ClientSize=new Size(1240,820);MinimumSize=new Size(1000,680);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
         BuildInterface();
         FormClosing+=CloseModWindow;
@@ -94,13 +95,13 @@ internal sealed partial class GeneralModWindow : Form {
 #if !VELOPACK
             CheckUpdatesOnStartup();
 #endif
-            await Scan();if(!IsDisposed&&!exitApproved)await ResumeP2P();
+            await RecoverPresetOnOpen();ReadPresetPresentation();await Scan();if(!IsDisposed)RenderPresetResult();if(!IsDisposed&&!exitApproved)await ResumeP2P();
         };
     }
     bool exitApproved,waitingToExit;
 
     bool FinishingOperations {get{
-        return working||scanning||associationChoice!=null||
+        return working||scanning||loadingPreset||associationChoice!=null||
             (sharingHome!=null?sharingHome.InstallingTransfer:p2p!=null&&p2p.Installing);
     }}
 
@@ -121,6 +122,7 @@ internal sealed partial class GeneralModWindow : Form {
                 MessageBoxDefaultButton.Button2)!=DialogResult.Yes){e.Cancel=true;return;}
             if(!ConfirmProjectNavigation()){e.Cancel=true;return;}
             exitApproved=true;
+            if(loadingPreset)CancelPresetLoad();
             if(associationChoice!=null)associationChoice.TrySetResult(null);
             if(working){
                 if(current!=null)skipRequests.Add(current);
@@ -199,7 +201,7 @@ internal sealed partial class GeneralModWindow : Form {
         tableHeading.Controls.Add(preset,1,0);tableHeading.Controls.Add(presetSettings,2,0);tableHeading.Controls.Add(deletePreset,3,0);tableHeading.Controls.Add(clearFilters,4,0);
         expandList=IconButton("maximize",T("Expandir lista","Expand list"),()=>SetListExpanded(!listExpanded));((GeneralButton)expandList).Bare=true;expandList.Name="ExpandList";expandList.Margin=Padding.Empty;tableHeading.Controls.Add(expandList,5,0);
         var tableTitle=new Panel{Dock=DockStyle.Fill,Height=64,Margin=Padding.Empty,Padding=new Padding(0,0,0,12),BackColor=GeneralStyle.Surface,Name="PresetHeading"};
-        tableTitle.Controls.Add(tableHeading);
+        tableTitle.Controls.Add(tableHeading);preset.PopupAnchor=tableName;
         tableTitle.Paint+=(s,e)=>{using(var pen=new Pen(GeneralStyle.Line))e.Graphics.DrawLine(pen,16,tableTitle.Height-6,tableTitle.Width-17,tableTitle.Height-6);};
         tableTools=new TableLayoutPanel{Name="TableTools",Dock=DockStyle.Fill,AutoSize=true,ColumnCount=1,RowCount=2,Margin=Padding.Empty,BackColor=GeneralStyle.Surface};
         tableTools.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));tableTools.RowStyles.Add(new RowStyle(SizeType.Absolute,64));tableTools.RowStyles.Add(new RowStyle(SizeType.Absolute,62));
@@ -261,6 +263,7 @@ internal sealed partial class GeneralModWindow : Form {
             if(e.ColumnIndex==grid.Columns["Name"].Index&&row.Cells["Group"].Tag is string&&e.Y>=row.Height/2){
                 ToggleVersions(row);return;
             }
+            if(row.Tag is Work){SelectVersion((Work)row.Tag);return;}
             if(e.ColumnIndex!=0||!(row.Tag is string))return;
             var mark=row.Cells["Mark"];
             bool desiredMark=!markBeforeMouseDown;
@@ -344,6 +347,7 @@ internal sealed partial class GeneralModWindow : Form {
         };
         detail=new Label{Dock=DockStyle.Fill,AutoEllipsis=true,TextAlign=ContentAlignment.MiddleCenter,
             Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(16,0,16,0)};
+        detail.Click+=(s,e)=>ShowPresetIssues();
         detail.Text=startupIssue??T("Marque na primeira coluna ou dê dois cliques na linha para editar. Use Adicionar item ou arraste um ZIP, RAR ou 7z.","Use the first column to check a mod or double-click its row to edit. Use Add item or drop a ZIP, RAR or 7z.");
         var bars=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=false,Height=44,MinimumSize=new Size(0,44),ColumnCount=3,RowCount=1,Margin=new Padding(0,4,0,10)};
         bars.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -373,7 +377,7 @@ internal sealed partial class GeneralModWindow : Form {
             string requested=preset.SelectedIndex>0?state.List.Presets[preset.SelectedIndex-1].Id:null;
             if(ConfirmPresetNavigation()){
                 if(state.SelectedPreset!=requested)coverageFilter=null;
-                state.SelectedPreset=requested;CapturePresetDraft();Guard(Persist);
+                GeneralPresetProfiles.Switch(state,requested);pendingVersion=null;CapturePresetDraft();Guard(Persist);
             }
             RebuildPresets();
         };
@@ -447,8 +451,8 @@ internal sealed partial class GeneralModWindow : Form {
             return detected.Variant;
         return entry.Variants.FirstOrDefault(variant=>variant.Id==id)??entry.Variants.First(variant=>variant.Id==entry.DefaultVariant);
     }
-    static string Key(GeneralModEntry entry,GeneralModVariant variant){return entry.Id+"/"+variant.Id;}
-    void Persist(){library.Save(CommittedProject());startupIssue=null;}
+    static string Key(GeneralModEntry entry,GeneralModVariant variant){return GeneralModLibrary.InstallationKey(entry,variant);}
+    void Persist(){GeneralPresetProfiles.Capture(state);library.Save(CommittedProject());startupIssue=null;}
     string UncatName(){return state.List.UncategorizedName=="Sem categoria"?T("Sem categoria","Uncategorized"):state.List.UncategorizedName;}
     void RebuildPresets(){
         drawing=true;preset.Items.Clear();preset.Items.Add(T("Todos os itens","All items"));preset.Items.AddRange(state.List.Presets.Select(p=>p.Name).Cast<object>().ToArray());
@@ -469,6 +473,7 @@ internal sealed partial class GeneralModWindow : Form {
     }
     void DrawRows(){
         if(grid==null)return;string old=grid.CurrentRow==null?null:grid.CurrentRow.Tag as string;
+        var oldVersion=grid.CurrentRow==null?null:grid.CurrentRow.Tag as Work;
         int scroll=grid.FirstDisplayedScrollingRowIndex;drawing=true;hoveredRow=-1;grid.Rows.Clear();
         var visible=VisibleMods();var groups=new List<string>();
         bool picking=associationChoice!=null;
@@ -532,13 +537,17 @@ internal sealed partial class GeneralModWindow : Form {
         }
         if(!picking&&!flat&&groupFilters==null&&coverageFilter==null&&searchTerms.Length==0&&(visible.Count>0||statusFilters==null))AddSection("new",null,56);
         else if(visible.Count==0&&inventory.Count==0)AddSection("empty",null,56);
-        if(old==null)grid.ClearSelection();
+        if(oldVersion!=null){
+            var row=grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(candidate=>candidate.Visible&&
+                candidate.Tag is Work&&SameVersion((Work)candidate.Tag,oldVersion));
+            if(row!=null)grid.CurrentCell=row.Cells["Name"];
+        }else if(old==null)grid.ClearSelection();
         if(scroll>=0&&scroll<grid.RowCount)try{grid.FirstDisplayedScrollingRowIndex=scroll;}catch(InvalidOperationException){}
         drawing=false;UpdateCounts();
     }
     void AddModRow(GeneralModEntry mod,string previous,bool picking,bool collapsed,CategoryBranch? branch){
         var variant=Selected(mod);
-        string key=Key(mod,variant),status=ListStatus(mod),raw=InstallationStatus(mod,status);
+        string key=MakeWork(mod).Key,status=ListStatus(mod),raw=InstallationStatus(mod,status);
         int percent;
         var row=grid.Rows[grid.Rows.Add(marked.Contains(mod.Id),picking?mod.Name:ModDisplayName(mod),
             NexusVariantName(mod),GeneralStatusPresentation.Label(raw),progress.TryGetValue(key,out percent)?(object)percent:null,ModSpace(mod))];
@@ -557,7 +566,7 @@ internal sealed partial class GeneralModWindow : Form {
         row.Cells["CategoryIndent"].Tag=branch;
         if(collapsed)row.Visible=false;
         else if(mod.Id==previous)grid.CurrentCell=row.Cells["Name"];
-        if(!picking)AddVersionRows(mod,variant,row,collapsed);
+        if(!picking)AddVersionRows(mod,row,collapsed);
     }
 
     DataGridViewRow AddSection(string kind,string category,int height){
@@ -582,7 +591,7 @@ internal sealed partial class GeneralModWindow : Form {
         return true;
     }
 
-    void AddVersionRows(GeneralModEntry entry,GeneralModVariant active,DataGridViewRow parent,bool hidden){
+    void AddVersionRows(GeneralModEntry entry,DataGridViewRow parent,bool hidden){
         var versions=IsBigBody(entry)
             ?BodyVersionsForPreset()
             :entry.Variants.Skip(entry.Variants.Count>1?0:1).Select(variant=>new Work{Entry=entry,Variant=variant}).ToList();
@@ -598,18 +607,25 @@ internal sealed partial class GeneralModWindow : Form {
         if(!expandedVersions.Contains(DrawerKey(entry)))return;
         bool body=IsBigBody(entry);
         parent.Cells["Mark"].Tag="body-branch";
+        var categoryBranch=parent.Cells["CategoryIndent"].Tag as CategoryBranch?;
+        bool continues=categoryBranch.HasValue&&(categoryBranch.Value&CategoryBranch.Last)==0;
         for(int index=0;index<versions.Count;index++){
             var work=versions[index];
             string name=VersionDisplayName(work);
             string label=body?BodyChoiceLabel(work):work.Variant.Name;
-            bool chosen=body?work.BodyChoice==ActiveBodyChoice(entry):work.Variant==active;
-            string status=chosen?T("Selecionado","Selected"):T("Não selecionado","Not selected");
+            bool chosen=ActivePreset==null?VersionIsActive(work):IsPresetVersionSelected(work);
+            string raw;
+            statuses.TryGetValue(work.Key,out raw);
+            bool installed=InstalledVersion(raw)||raw==GeneralStatusPresentation.Disabled;
+            string status=installed?T("Instalado","Installed"):T("Não instalado","Not installed");
             var row=grid.Rows[grid.Rows.Add(null,name,label,status,null,BodyOptionSpace(work))];
             row.Tag=work;
             row.Cells["Name"].Tag=work.Variant.Nsfw??work.Entry.Nsfw;
             row.Height=36;
             row.ReadOnly=true;
+            row.DefaultCellStyle.BackColor=GeneralStyle.DrawerSurface;
             row.Cells["Mark"].Tag=index==versions.Count-1?CategoryBranch.Last:CategoryBranch.Middle;
+            if(continues)row.Cells["CategoryIndent"].Tag=CategoryBranch.Continuation;
             var textColor=chosen?GeneralStyle.Foreground:GeneralStyle.Muted;
             foreach(string column in new[]{"Name","Variant","Size"}){
                 var style=row.Cells[column].Style;
@@ -617,10 +633,12 @@ internal sealed partial class GeneralModWindow : Form {
                 if(chosen)style.Font=optionSelectedFont;
             }
             row.Cells["Name"].ToolTipText=String.Join("\r\n",new[]{work.Variant.Description??work.Entry.Description,
-                T("Dê dois cliques para escolher esta opção. F2 abre os detalhes.","Double-click to select this option. F2 opens details.")}.Where(value=>!String.IsNullOrWhiteSpace(value)));
+                T("Clique para escolher. Confirme no botão do rodapé. F2 abre os detalhes.","Click to select. Apply with the footer button. F2 opens details.")}.Where(value=>!String.IsNullOrWhiteSpace(value)));
             {
                 row.Cells["Status"].Tag=chosen;
-                row.Cells["Status"].ToolTipText=GeneralStatusPresentation.Label(ListStatus(work.Entry));
+                row.Cells["Status"].ToolTipText=raw==GeneralStatusPresentation.Disabled
+                    ?T("Versão guardada no cache deste projeto.","Version stored in this project's cache.")
+                    :installed&&!chosen?T("Compartilha os arquivos da versão ativa.","Shares the files of the active version."):status;
                 row.Cells["Size"].ToolTipText=row.Cells["Size"].Value.ToString().StartsWith("≈",StringComparison.Ordinal)
                     ?T("Tamanho do download. O espaço instalado ainda não foi medido.","Download size. Installed size has not been measured.")
                     :VerifiedBodyBytes(work.Entry,work.Variant).HasValue?T("Tamanho dos arquivos instalados e verificados.","Size of the verified installed files."):SpaceTip(work.Entry);
@@ -756,6 +774,10 @@ internal sealed partial class GeneralModWindow : Form {
             graphics.SmoothingMode=SmoothingMode.AntiAlias;
             using(var pen=new Pen(Color.FromArgb(160,GeneralStyle.Line)))
             using(var elbow=new GraphicsPath()){
+                if(branch==CategoryBranch.Continuation){
+                    graphics.DrawLine(pen,spine,bounds.Top,spine,bounds.Bottom);
+                    return;
+                }
                 if(last)elbow.AddLine(spine,start,spine,center-radius);
                 else graphics.DrawLine(pen,spine,start,spine,bounds.Bottom);
                 elbow.AddArc(spine,center-2*radius,2*radius,2*radius,180,-90);
@@ -865,8 +887,11 @@ internal sealed partial class GeneralModWindow : Form {
         int old=hoveredRow;hoveredRow=row;
         foreach(int at in new[]{old,row}){
             if(at<0||at>=grid.RowCount)continue;
-            var section=grid.Rows[at].Tag as SectionRow;if(section!=null&&section.Kind=="divider")continue;
-            grid.Rows[at].DefaultCellStyle.BackColor=at==hoveredRow?GeneralStyle.Selection:GeneralStyle.Surface;grid.InvalidateRow(at);
+            var item=grid.Rows[at];
+            var section=item.Tag as SectionRow;if(section!=null&&section.Kind=="divider")continue;
+            Color resting=item.Tag is Work?GeneralStyle.DrawerSurface:GeneralStyle.Surface;
+            item.DefaultCellStyle.BackColor=at==hoveredRow?GeneralStyle.Selection:resting;
+            grid.InvalidateRow(at);
         }
         grid.Cursor=row>=0&&row<grid.RowCount?Cursors.Hand:Cursors.Default;
     }
@@ -894,24 +919,14 @@ internal sealed partial class GeneralModWindow : Form {
         var v=new GeneralModVariant{Id="default",Name=T("Principal","Main")};if(source!=null)v.Sources.Add(source);
         return new GeneralModEntry{Id="mod-"+Guid.NewGuid().ToString("N"),Name=name,DefaultVariant=v.Id,Variants=new List<GeneralModVariant>{v}};
     }
-    async void OpenRowEditor(DataGridViewRow row){
+    void OpenRowEditor(DataGridViewRow row){
         if(row==null)return;
         var id=row.Tag as string;
         if(id!=null){
             var mod=state.List.Mods.Single(item=>item.Id==id);
             Edit(mod);
         }
-        else if(row.Tag is Work&&!scanning&&!working){
-            var work=(Work)row.Tag;
-            if(work.BodyChoice!=null)SelectBodyChoice(work);
-            else if(Selected(work.Entry)!=work.Variant){
-                BeginProjectEdit();
-                state.ChosenVariants[work.Entry.Id]=work.Variant.Id;
-                FinishProjectEdit();
-                DrawRows();
-                await Scan();
-            }
-        }
+        else if(row.Tag is Work)SelectVersion((Work)row.Tag);
         else if(row.Tag is P2PSyncDifference)EditDetectedMod((P2PSyncDifference)row.Tag);
     }
 
@@ -993,14 +1008,21 @@ internal sealed partial class GeneralModWindow : Form {
         var routes=changed.Where(pair=>pair.Key.Variants.Zip(pair.Value.Variants,(before,after)=>
             !GeneralInstallRoutes.Same(before.InstallRoutes,after.InstallRoutes)).Any(value=>value)).ToList();
         if(routes.Count>1)throw new IOException(T("Altere o destino de um corpo por vez.","Change the destination of one body at a time."));
-        bool? moved=routes.Count==0||BuiltInProject?false:await ChangeInstalledDestinations(routes[0].Key,routes[0].Value);
+        bool? scope=PresetEditScope(choices[0].Entry);if(!scope.HasValue)return false;bool? moved=false;
         if(!moved.HasValue)return false;
         BeginProjectEdit();
-        state.BodyChoice=dialog.SelectedVariant;
         state.List.AlternativeGroups[GeneralModLibrary.BodyGroup].DisplayName=dialog.Result.Name;
+        if(scope.Value)foreach(var p in state.List.Presets.Where(p=>choices.Any(w=>p.ModIds.Contains(w.Entry.Id))))
+            p.Groups[GeneralModLibrary.BodyGroup]=GeneralPresetProfiles.Copy(state.List.AlternativeGroups[GeneralModLibrary.BodyGroup]);
+        if(selected!=null) {
+            state.BodyChoice=selected.BodyChoice;
+            foreach(var p in state.List.Presets.Where(p=>p.Id==state.SelectedPreset||scope.Value&&p.ModIds.Contains(selected.Entry.Id))){p.BodyChoice=selected.BodyChoice;p.AlternativeChoices[GeneralModLibrary.BodyGroup]=selected.Entry.Id;}
+        }
         foreach(var pair in changed){
             string profile=selected!=null&&pair.Key==selected.Entry?selected.Variant.Id:Selected(pair.Key).Id;
-            ApplyEdited(pair.Key,pair.Value,profile,true,dialog.NewCategories,finish:false);
+            GeneralPresetProfiles.Edit(state,pair.Key,pair.Value,profile,scope.Value,pair.Key.Id==choices[0].Entry.Id?dialog.ChangedPresetIds:null);
+            var live=state.List.Mods.Single(m=>m.Id==pair.Key.Id);
+            ApplyEdited(live,live,profile,true,dialog.NewCategories,finish:false);
         }
         foreach(var entry in added){
             var presetIds=state.List.Presets.Where(preset=>choices.All(work=>preset.ModIds.Contains(work.Entry.Id))).ToList();
@@ -1011,7 +1033,7 @@ internal sealed partial class GeneralModWindow : Form {
         FinishProjectEdit();
         DrawRows();
         if(dialog.InstallRequested||moved.Value)SaveProjectEdits();
-        if(dialog.InstallRequested)ConfirmUrgentInstall(state.List.Mods.Single(entry=>entry.Id==(selected==null?dialog.SelectedVariant:selected.Entry.Id)));
+        if(dialog.InstallRequested&&!NeedsPresetLoad)ConfirmUrgentInstall(state.List.Mods.Single(entry=>entry.Id==(selected==null?dialog.SelectedVariant:selected.Entry.Id)),dialog.SelectedVariant);
         else await Scan();
         return true;
     }
@@ -1049,7 +1071,14 @@ internal sealed partial class GeneralModWindow : Form {
                 },fixedChoices:editingBody,archivePreview:testMode
                     ?(Func<GeneralNexusLink,NexusFilePreview[]>)(link=>testNexusPreviews==null?null:testNexusPreviews(link,()=>!IsDisposed))
                     :nexusScan.PreviewSession(GeneralNexusInfo.ReadFilePreviews),
-                cyberpunkLayout:IsCyberpunk(state.Destination))){
+                cyberpunkLayout:IsCyberpunk(state.Destination),backupFile:variant=>{
+                    if(!Directory.Exists(state.Destination)||variant==null)return null;
+                    var selectedWork=editingBody?bodyVersions.FirstOrDefault(choice=>choice.BodyChoice==variant.Id):null;
+                    var original=item.Variants.FirstOrDefault(option=>option.Id==variant.Id);
+                    string key=selectedWork!=null?selectedWork.Key:original==null?null:Key(item,original);
+                    return key==null?null:DisabledAt(state.Destination).BackupFile(key);
+                })){
+                dialog.ConfigurePresets(state.List.Presets,state.SelectedPreset,item.Id,existing);
                 DialogResult answer;
                 while((answer=dialog.ShowDialog(this))==DialogResult.Retry){
                     var linked=await PickAlternative(item.Id,null,true);
@@ -1058,17 +1087,20 @@ internal sealed partial class GeneralModWindow : Form {
                 }
                 if(answer!=DialogResult.OK)return;
                 if(editingBody){await ApplyBodyEditor(dialog,bodyVersions);return;}
-                bool? moved=existing&&!BuiltInProject?await ChangeInstalledDestinations(item,dialog.Result):false;
+                bool? scope=existing?PresetEditScope(item):false;if(!scope.HasValue)return;
+                bool? moved=false;
                 if(!moved.HasValue)return;
                 BeginProjectEdit();
                 dialog.Result.AlternativeGroup=item.AlternativeGroup;
                 var editedVariant=dialog.Result.Variants.Single(variant=>variant.Id==dialog.SelectedVariant);
                 bool needsScan=!existing||selected.Id!=editedVariant.Id||
                     !selected.Sources.SequenceEqual(editedVariant.Sources,StringComparer.Ordinal)||!GeneralInstallRoutes.Same(selected.InstallRoutes,editedVariant.InstallRoutes);
-                if(existing)ApplyCategoryName(dialog.CategoryRenameFrom,dialog.Result);
-                ApplyEdited(item,dialog.Result,dialog.SelectedVariant,existing,dialog.NewCategories);
+                if(existing&&scope.Value)ApplyCategoryName(dialog.CategoryRenameFrom,dialog.Result);
+                ApplyEdited(item,dialog.Result,dialog.SelectedVariant,existing,dialog.NewCategories,finish:false);
+                GeneralPresetProfiles.Edit(state,item,dialog.Result,dialog.SelectedVariant,scope.Value,existing?dialog.ChangedPresetIds:dialog.PresetIds,selected.Id);
+                FinishProjectEdit();DrawRows();
                 if(fromInventory||moved.Value)SaveProjectEdits();
-                if(dialog.InstallRequested){SaveProjectEdits();ConfirmUrgentInstall(dialog.Result);}
+                if(dialog.InstallRequested){SaveProjectEdits();if(!NeedsPresetLoad)ConfirmUrgentInstall(state.List.Mods.Single(m=>m.Id==dialog.Result.Id));}
                 else if(!working&&needsScan)await Scan();
             }
         }catch(Exception ex){ShowError(ex);}
@@ -1284,12 +1316,18 @@ internal sealed partial class GeneralModWindow : Form {
     }
 
     void RemoveEntry(){
-        var item=FocusedEntry();if(item==null||IsBigBody(item)||working||scanning)return;
+        var item=FocusedEntry();if(item==null||working||scanning)return;
         if(GeneralDialog.Message(this,T("Tirar da lista sem desinstalar?","Remove from the list without uninstalling?")+"\n"+item.Name,T("Tirar da lista","Remove from list"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-        BeginProjectEdit();
-        state.List.Mods.Remove(item);state.ChosenVariants.Remove(item.Id);foreach(var p in state.List.Presets)p.ModIds.Remove(item.Id);marked.Remove(item.Id);FinishProjectEdit();DrawRows();
+        var scope=PresetEditScope(item,true);if(!scope.HasValue)return;
+        BeginProjectEdit();GeneralPresetProfiles.Remove(state,item.Id,scope.Value);marked.Remove(item.Id);FinishProjectEdit();DrawRows();
     }
-    void Busy(bool value){foreach(var control in idle)control.Enabled=!value;if(totalProgress!=null)totalProgress.Enabled=!value;if(next!=null){next.Visible=working||scanning;next.Enabled=working||scanning;}UpdatePresetCommands();RefreshPrimaryAction();}
+    void Busy(bool value){if(primaryAction is GeneralButton)((GeneralButton)primaryAction).ShowActivity=value&&(loadingPreset||working);foreach(var control in idle)control.Enabled=!value;if(totalProgress!=null)totalProgress.Enabled=!value;UpdateOperationButton();UpdatePresetCommands();RefreshPrimaryAction();}
+    void UpdateOperationButton(){
+        if(next==null)return;
+        next.Text=loadingPreset?T("Cancelar troca","Cancel switch"):T("Pular mod","Skip mod");
+        next.Visible=loadingPreset?presetCancellation!=null:working||scanning;
+        next.Enabled=loadingPreset?presetCancellation!=null&&!presetCancellation.IsCancellationRequested:working||scanning;
+    }
     internal void Preview(string path){
         ShowInTaskbar=false;StartPosition=FormStartPosition.Manual;Location=new Point(-30000,-30000);Show();Application.DoEvents();PerformLayout();
         using(var bmp=new Bitmap(Width,Height)){DrawToBitmap(bmp,new Rectangle(0,0,Width,Height));bmp.Save(path,System.Drawing.Imaging.ImageFormat.Png);}Close();

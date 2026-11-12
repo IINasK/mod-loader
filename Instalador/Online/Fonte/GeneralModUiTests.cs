@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -420,11 +420,112 @@ internal sealed partial class GeneralModWindow {
         first.AlternativeGroup=null;
         form.marked.Clear();
         form.DrawRows();
+        await TestVariantDrawerSwitch(form,root,check);
+    }
+
+    static async Task TestVariantDrawerSwitch(GeneralModWindow form,string root,Action<bool,string> check){
+        string game=form.state.Destination;
+        string route="mods/variant-switch.txt";
+        string target=Safe.In(game,route);
+        string original=TestZip(root,"variant-one.zip",route,"one");
+        string alternate=TestZip(root,"variant-two.zip",route,"two");
+        string invalid=Path.Combine(root,"variant-invalid.zip");
+        File.WriteAllText(invalid,"broken zip");
+        var mod=NewEntry("Gaveta de versões",original);
+        mod.Variants.Add(new GeneralModVariant{Id="second",Name="Versão 2",Sources=new List<string>{alternate}});
+        mod.Variants.Add(new GeneralModVariant{Id="broken",Name="Versão inválida",Sources=new List<string>{invalid}});
+        var sibling=NewEntry("Próximo item da categoria",original);
+        form.state.List.Mods.AddRange(new[]{mod,sibling});
+        var first=form.MakeWork(mod);
+        form.Generic(game).Install(original,first.Receipt(0),null);
+        await form.Scan();
+        form.ToggleVersions(form.ModRows().Single(row=>Equals(row.Tag,mod.Id)));
+        Func<List<DataGridViewRow>> children=()=>form.grid.Rows.Cast<DataGridViewRow>()
+            .Where(row=>row.Tag is Work&&((Work)row.Tag).Entry==mod).ToList();
+        var expanded=children();
+        check(expanded.Count==3&&expanded.All(row=>Equals(row.Cells["CategoryIndent"].Tag,CategoryBranch.Continuation)),
+            "O traço da categoria atravessa a gaveta aberta até o próximo item.");
+        string originalTheme=form.state.Theme;
+        foreach(string theme in new[]{"light","light-red","dark","black"}){
+            form.state.Theme=theme;
+            form.BuildInterface();
+            form.RebuildPresets();
+            var parent=form.ModRows().Single(row=>Equals(row.Tag,mod.Id));
+            var following=form.ModRows().Single(row=>Equals(row.Tag,sibling.Id));
+            expanded=children();
+            form.grid.FirstDisplayedScrollingRowIndex=parent.Index;
+            form.grid.ClearSelection();
+            form.PerformLayout();Application.DoEvents();
+            form.SetHover(expanded[0].Index);
+            check(expanded[0].InheritedStyle.BackColor==GeneralStyle.Selection,"Hover visível nas variantes: "+theme);
+            form.SetHover(-1);
+            int indent=form.grid.Columns["CategoryIndent"].Index;
+            var start=form.grid.GetCellDisplayRectangle(indent,parent.Index,false);
+            var child=form.grid.GetCellDisplayRectangle(indent,expanded[0].Index,false);
+            var end=form.grid.GetCellDisplayRectangle(indent,following.Index,false);
+            using(var rendered=new Bitmap(form.grid.Width,form.grid.Height)){
+                form.grid.DrawToBitmap(rendered,new Rectangle(Point.Empty,rendered.Size));
+                check(rendered.GetPixel(child.X+4,child.Y+4).ToArgb()==GeneralStyle.DrawerSurface.ToArgb()&&
+                    rendered.GetPixel(start.X+4,start.Y+4).ToArgb()==GeneralStyle.Surface.ToArgb()&&
+                    rendered.GetPixel(end.X+4,end.Y+4).ToArgb()==GeneralStyle.Surface.ToArgb(),
+                    "Só as linhas filhas ganham fundo de gaveta e recuperam a cor depois do hover: "+theme);
+                check(Enumerable.Range(start.Bottom-1,end.Y-start.Bottom+6).All(y=>
+                    rendered.GetPixel(start.X+10,y)!=rendered.GetPixel(start.X+4,y)),
+                    "O traço pintado atravessa as emendas até o próximo item: "+theme);
+            }
+            CaptureUi(form,Path.Combine(root,"variant-drawer-"+theme+".png"));
+        }
+        form.state.Theme=originalTheme;
+        form.BuildInterface();
+        form.RebuildPresets();
+        form.state.List.Mods.Remove(sibling);
+        form.DrawRows();
+        check(children().All(row=>row.Cells["CategoryIndent"].Tag==null),
+            "A última gaveta da categoria termina no próprio item principal.");
+
+        Func<string,Work> choose=id=>{
+            var row=form.grid.Rows.Cast<DataGridViewRow>().Single(item=>item.Tag is Work&&
+                ((Work)item.Tag).Entry==mod&&((Work)item.Tag).Variant.Id==id);
+            form.grid.CurrentCell=row.Cells["Name"];
+            form.OpenRowEditor(row);
+            var requested=form.SelectedJobs().Single();
+            check(requested.Variant.Id==id&&form.primaryAction.Text=="Atualizar",
+                "A gaveta oferece Atualizar para "+id+" sem trocar a versão em uso.");
+            return requested;
+        };
+        var second=choose("second");
+        check(form.Selected(mod).Id==first.Variant.Id&&File.ReadAllText(target)=="one","Escolher a linha preserva os arquivos ativos.");
+        var pending=new List<Work>();
+        check(form.PlanSelected(new List<Work>{second},game,pending).Count==0&&pending.SequenceEqual(new[]{second}),
+            "A atualização usa o download local e enfileira a versão escolhida.");
+        await form.RunWork(second,game,false);
+        var store=form.DisabledAt(game);
+        check(File.ReadAllText(target)=="two"&&form.Selected(mod).Id=="second"&&
+            Path.GetExtension(store.BackupFile(first.Key))==".zip","A troca compacta a versão anterior e ativa a nova.");
+        var cachedRow=form.grid.Rows.Cast<DataGridViewRow>().Single(row=>row.Tag is Work&&((Work)row.Tag).Key==first.Key);
+        check(Equals(cachedRow.Cells["Status"].Value,"Instalado")&&Equals(cachedRow.Cells["Status"].Tag,false),
+            "A variante guardada aparece instalada em cinza.");
+
+        var bad=choose("broken");
+        await form.RunWork(bad,game,false);
+        check(File.ReadAllText(target)=="two"&&form.Selected(mod).Id=="second"&&store.Read().ContainsKey(first.Key),
+            "Um ZIP inválido preserva a variante anterior e o cache existente.");
+        File.Delete(original);
+        await form.RunWork(choose("default"),game,false);
+        check(File.ReadAllText(target)=="one"&&form.Selected(mod).Id=="default"&&
+            Path.GetExtension(store.BackupFile(second.Key))==".zip","Voltar usa o cache sem o download original.");
+
+        form.RemoveManagedWorks(new List<Work>{first,second},game,new HashSet<string>(store.Read().Keys));
+        store.Discard(new[]{second.Key});
+        form.state.List.Mods.Remove(mod);
+        form.pendingVersion=null;
+        form.DrawRows();
     }
 
     static void TestSyncRemovalReview(GeneralModWindow owner,string root,Action<bool,string> check){
-        var extras=new[]{new P2PSyncExtra{Name="Extra 1",Files=new[]{new OwnedChange{Path="r6/tweaks/one.yaml"}}},
-            new P2PSyncExtra{Name="Extra 2",Files=new[]{new OwnedChange{Path="r6/tweaks/two.yaml"}}}};
+        var extras=new[]{new P2PSyncExtra{Name="Extra 1",Proven=true,Files=new[]{new OwnedChange{Path="r6/tweaks/one.yaml"}}},
+            new P2PSyncExtra{Name="Extra 2",Proven=true,Files=new[]{new OwnedChange{Path="r6/tweaks/two.yaml"}}},
+            new P2PSyncExtra{Name="cache",Files=new[]{new OwnedChange{Path="r6/scripts/cache/runtime.reds"}}}};
         using(var review=new GeneralSyncReviewDialog(new P2PSyncComparison{Extras=extras}))
         using(var timer=new Timer{Interval=40}){
             review.Show(owner);
@@ -434,7 +535,10 @@ internal sealed partial class GeneralModWindow {
             var remove=buttons.Single(button=>button.Name=="RemoveSelectedSyncExtras");
             check(review.SelectedExtras.Length==0&&!remove.Enabled,"A revisão começa sem itens autorizados para remoção.");
             all.PerformClick();
-            check(review.SelectedExtras.SequenceEqual(new[]{0,1})&&remove.Enabled,"Selecionar todos inclui cada mod extra.");
+            check(review.SelectedExtras.SequenceEqual(new[]{0,1})&&remove.Enabled,"Selecionar todos inclui só os extras comprovados, preservando a pasta cache desconhecida.");
+            var choices=AllControls(review).OfType<CheckedListBox>().Single();
+            choices.SetItemChecked(2,true);
+            check(!choices.GetItemChecked(2)&&review.SelectedExtras.SequenceEqual(new[]{0,1}),"Nem o clique individual autoriza remover um item sem vínculo comprovado.");
             all.PerformClick();
             check(review.SelectedExtras.Length==0&&!remove.Enabled,"Desmarcar todos retorna ao estado seguro.");
             all.PerformClick();

@@ -22,7 +22,20 @@ internal static class P2PPack {
     internal const long MaxFile=16L*1024*1024*1024, MaxTotal=128L*1024*1024*1024;
     [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)]static extern bool CreateHardLink(string path,string existing,IntPtr reserved);
     internal static bool HashValid(string hash){return hash!=null&&Regex.IsMatch(hash,"\\A[a-f0-9]{64}\\z");}
-    internal static string Slot(GeneralModEntry mod,GeneralModVariant variant,int index){return mod.Id+"/"+variant.Id+"/"+index+"/"+variant.Sources[index];}
+    internal static string Slot(GeneralModEntry mod,GeneralModVariant variant,int index){return GeneralModLibrary.InstallationKey(mod,variant)+"/"+index+"/"+variant.Sources[index];}
+
+    internal static string LegacySlot(GeneralModEntry mod,GeneralModVariant variant,int index){
+        var regular=mod.Variants.FirstOrDefault(option=>ReferenceEquals(option.NaturalOption,variant));
+        if(regular==null||GeneralModLibrary.SamePayload(regular,variant)||
+            index<regular.Sources.Count&&regular.Sources[index]==variant.Sources[index])return null;
+        return InstalledSnapshot.Owner(mod,variant)+"/"+index+"/"+variant.Sources[index];
+    }
+
+    internal static bool TrySlot(Dictionary<string,string> records,GeneralModEntry mod,GeneralModVariant variant,int index,out string value){
+        if(records.TryGetValue(Slot(mod,variant,index),out value))return true;
+        string legacy=LegacySlot(mod,variant,index);
+        return legacy!=null&&records.TryGetValue(legacy,out value);
+    }
     static string Token(string file){return "shared:"+file;}
     static P2PBlob Blob(string path,string extension){
         Safe.NoLinks(path);var info=new FileInfo(path);
@@ -73,7 +86,7 @@ internal static class P2PPack {
             }else for(int index=0;index<variant.Sources.Count;index++){
                 string source=variant.Sources[index],local;
                 if(GeneralModDownload.IsArchivePath(source))local=source;
-                else if(!state.ResolvedDownloads.TryGetValue(Slot(mod,variant,index),out local))local=null;
+                else if(!TrySlot(state.ResolvedDownloads,mod,variant,index,out local))local=null;
                 if(local==null||!File.Exists(local)){
                     if(GeneralModDownload.IsArchivePath(source))throw new IOException(mod.Name+": o arquivo original não está disponível. Associe o ZIP/RAR/7z novamente.");
                     manifest.Missing++;continue;

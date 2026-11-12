@@ -22,11 +22,12 @@ internal sealed partial class GeneralModWindow {
     GeneralModState CommittedProject(){
         if(projectDraft==null)return state;
         var saved=CopyProjectState();
-        saved.List=projectDraft.List;
+        saved.List=GeneralPresetProfiles.Copy(projectDraft.List);
         saved.ChosenVariants=new Dictionary<string,string>(projectDraft.ChosenVariants);
         saved.BodyChoice=projectDraft.BodyChoice;
         if(!saved.List.Presets.Any(preset=>preset.Id==saved.SelectedPreset))
             saved.SelectedPreset=projectDraft.SelectedPreset;
+        if(saved.SelectedPreset!=projectDraft.SelectedPreset)GeneralPresetProfiles.Project(saved);
         foreach(var receipt in projectDraft.SnapshotReceipts)
             if(!saved.SnapshotReceipts.ContainsKey(receipt.Key))saved.SnapshotReceipts.Add(receipt.Key,receipt.Value);
         return saved;
@@ -65,7 +66,7 @@ internal sealed partial class GeneralModWindow {
         if(projectDraft==null)return;
         var saved=CommittedProject();
         state.List=saved.List;state.ChosenVariants=saved.ChosenVariants;state.SelectedPreset=saved.SelectedPreset;state.BodyChoice=saved.BodyChoice;
-        state.SnapshotReceipts=saved.SnapshotReceipts;
+        state.SnapshotReceipts=saved.SnapshotReceipts;GeneralPresetProfiles.Project(state);
         marked.IntersectWith(state.List.Mods.Select(mod=>mod.Id));
         statuses.Clear();statusDetails.Clear();progress.Clear();ResetColumnFilters();
         EndProjectEdit();
@@ -109,7 +110,7 @@ internal sealed partial class GeneralModWindow {
         if(clearFilters!=null)clearFilters.Enabled=available&&associationChoice==null&&HasListFilters;
     }
     bool ConfirmPresetNavigation(){
-        return !DraftNameChanged||ConfirmProjectNavigation();
+        return ConfirmProjectNavigation();
     }
     void SaveCurrentPreset(){
         if(working||scanning)return;

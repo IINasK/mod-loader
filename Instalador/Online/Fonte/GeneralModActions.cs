@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -8,7 +8,8 @@ using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
     Button primaryAction;
-    enum ModAction { None, Disable, ChooseDependency, Enable, Change, Install, Download }
+    Work pendingVersion;
+    enum ModAction { None, Disable, ChooseDependency, Enable, Change, Update, Install, Download }
 
     static bool IsBigBody(GeneralModEntry mod) {
         return mod.AlternativeGroup==GeneralModLibrary.BodyGroup&&mod.Id!=GeneralModLibrary.VanillaFeetId;
@@ -31,8 +32,18 @@ internal sealed partial class GeneralModWindow {
         var versions=new List<Work>();
         foreach(var entry in entries.Where(IsBigBody)){
             var variant=Selected(entry);
-            if(!IsActiveAlternative(entry)&&!state.ChosenVariants.ContainsKey(entry.Id))
-                variant=entry.Variants.FirstOrDefault(option=>option.Id==(dlc?"with-refit-dlc":"with-refit-base"))??variant;
+            var active=VersionWorks(entry).OrderByDescending(work=>work.Variant.Sources.Count).FirstOrDefault(work=>{
+                string status;
+                return statuses.TryGetValue(work.Key,out status)&&InstalledVersion(status);
+            });
+            if(!state.ChosenVariants.ContainsKey(entry.Id)&&active!=null)variant=entry.Variants.Single(option=>option.Id==active.Variant.Id);
+            else if(!state.ChosenVariants.ContainsKey(entry.Id)){
+                var saved=entry.Variants.FirstOrDefault(option=>{
+                    string status;
+                    return statuses.TryGetValue(Key(entry,option),out status)&&status==GeneralStatusPresentation.Disabled;
+                });
+                variant=saved??entry.Variants.FirstOrDefault(option=>option.Id==(dlc?"with-refit-dlc":"with-refit-base"))??variant;
+            }
             if(!dlc&&variant.Id=="with-refit-dlc")
                 variant=entry.Variants.FirstOrDefault(option=>option.Id=="with-refit-base")??variant;
             versions.Add(new Work{Entry=entry,Variant=variant,BodyChoice=entry.Id,SwitchAlternatives=true,SaveVariant=true});
@@ -56,25 +67,60 @@ internal sealed partial class GeneralModWindow {
             ?GeneralModLibrary.NaturalBody:entry.Id;
     }
 
-    void SelectBodyChoice(Work choice){
-        if(working||scanning||state.BodyChoice==choice.BodyChoice)return;
-        state.BodyChoice=choice.BodyChoice;
-        if(projectDraft==null)Persist();
-        else FinishProjectEdit();
+    bool VersionIsActive(Work work) {
+        string status;
+        if(!statuses.TryGetValue(work.Key,out status)||!InstalledVersion(status))return false;
+        if(work.Entry.Id!=GeneralModLibrary.EbbBody||work.BodyChoice==null)return true;
+        var regular=work.Entry.Variants.Single(variant=>variant.Id==work.Variant.Id);
+        if(regular.NaturalOption!=null&&!GeneralModLibrary.SamePayload(regular,regular.NaturalOption))return true;
+        return work.BodyChoice==ActiveBodyChoice(work.Entry);
+    }
+
+    static bool InstalledVersion(string status) {
+        return status=="Instalado"||status=="Instalado correto"||status==GeneralStatusPresentation.ManualBody||
+            status==GeneralStatusPresentation.NexusManual;
+    }
+
+    void SelectVersion(Work choice){
+        if(working||scanning||associationChoice!=null)return;
+        if(SameVersion(MakeWork(choice.Entry),choice)&&(choice.Entry.AlternativeGroup==null||
+            (ActivePreset!=null?PresetWorks().Any(w=>w.Entry.Id==choice.Entry.Id):IsActiveAlternative(choice.Entry))))return;
+        var scope=PresetEditScope(choice.Entry);if(!scope.HasValue)return;
+        GeneralPresetProfiles.Capture(state);
+        foreach(var p in state.List.Presets.Where(p=>p.ModIds.Contains(choice.Entry.Id)&&(scope.Value||p.Id==state.SelectedPreset))){
+            if(!p.Configurations[choice.Entry.Id].Variants.Any(v=>v.Id==choice.Variant.Id))continue;
+            p.VariantChoices[choice.Entry.Id]=choice.Variant.Id;
+            if(choice.Entry.AlternativeGroup!=null)p.AlternativeChoices[choice.Entry.AlternativeGroup]=choice.Entry.Id;
+            if(choice.BodyChoice!=null)p.BodyChoice=choice.BodyChoice;
+        }
+        if(ActivePreset!=null){
+            state.ChosenVariants[choice.Entry.Id]=choice.Variant.Id;
+            if(choice.BodyChoice!=null)state.BodyChoice=choice.BodyChoice;
+        }
+        Persist();
+        pendingVersion=choice;
+        choice.SwitchAlternatives=true;
+        choice.SaveVariant=true;
         DrawRows();
-        var row=grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(candidate=>candidate.Visible&&
-            candidate.Tag is Work&&((Work)candidate.Tag).BodyChoice==choice.BodyChoice);
-        if(row!=null)grid.CurrentCell=row.Cells["Name"];
+        RefreshPrimaryAction();
+    }
+
+    IEnumerable<Work> VersionWorks(GeneralModEntry entry) {
+        foreach(var variant in entry.Variants){
+            yield return new Work{Entry=entry,Variant=variant,BodyChoice=IsBigBody(entry)?entry.Id:null};
+            if(variant.NaturalOption!=null&&!GeneralModLibrary.SamePayload(variant,variant.NaturalOption))
+                yield return new Work{Entry=entry,Variant=variant.NaturalOption,BodyChoice=GeneralModLibrary.NaturalBody};
+        }
     }
 
     List<Work> SelectedJobs() {
         var jobs = Marked();
         var focused=FocusedEntry();
-        if(jobs.Count==0){
-            var child=grid.CurrentRow==null?null:grid.CurrentRow.Tag as Work;
-            if(focused!=null)jobs.Add(MakeWork(focused));
-            else if(child!=null&&child.BodyChoice!=null&&child.BodyChoice==state.BodyChoice)jobs.Add(child);
-        }
+        var choice=pendingVersion;
+        if(choice!=null&&state.List.Mods.Contains(choice.Entry)&&
+            grid.CurrentRow!=null&&grid.CurrentRow.Tag is Work&&SameVersion((Work)grid.CurrentRow.Tag,choice))
+            return new List<Work>{choice};
+        if(jobs.Count==0&&focused!=null)jobs.Add(MakeWork(focused));
         int index=jobs.FindIndex(work=>IsBigBody(work.Entry));
         if(index>=0){
             var entry=jobs[index].Entry;
@@ -87,10 +133,20 @@ internal sealed partial class GeneralModWindow {
         return jobs;
     }
 
+    static bool SameVersion(Work left,Work right) {
+        return left.Key==right.Key&&left.BodyChoice==right.BodyChoice;
+    }
+
     ModAction ActionFor(Work work, HashSet<string> selectedIds) {
+        if(presetProtected.Contains(work.Entry.Id))return ModAction.None;
 
         string status;
         statuses.TryGetValue(work.Key, out status);
+        if(work==pendingVersion&&!VersionIsActive(work)&&
+            (status==GeneralStatusPresentation.Disabled||VersionWorks(work.Entry).Any(VersionIsActive)||
+             work.Entry.AlternativeGroup!=null&&state.List.Mods.Any(other=>
+                 other.AlternativeGroup==work.Entry.AlternativeGroup&&IsActiveAlternative(other))))
+            return ModAction.Update;
         if(status==GeneralStatusPresentation.NexusManual)return ModAction.None;
         if(GeneralModLibrary.NeedsDependencyVersion(work.Entry,work.Variant))return ModAction.ChooseDependency;
         bool active = GeneralStatusPresentation.Kind(status) == "installed";
@@ -113,9 +169,10 @@ internal sealed partial class GeneralModWindow {
     }
 
     bool IsActiveAlternative(GeneralModEntry entry) {
-        string status;
-        return statuses.TryGetValue(Key(entry, Selected(entry)), out status)
-            && (GeneralStatusPresentation.Kind(status) == "installed" || status == GeneralStatusPresentation.ManualBody);
+        return VersionWorks(entry).Any(work=>{
+            string status;
+            return statuses.TryGetValue(work.Key,out status)&&InstalledVersion(status);
+        });
     }
 
     ModAction ClassifyJobs(List<Work> jobs, out List<Work> actionable) {
@@ -135,11 +192,13 @@ internal sealed partial class GeneralModWindow {
             primaryAction.Enabled=true;
             return;
         }
+        if(NeedsPresetLoad){primaryAction.Text=T("Carregar preset","Load preset");primaryAction.Enabled=ActivePreset!=null;return;}
         List<Work> ignored;
         var action = ClassifyJobs(SelectedJobs(), out ignored);
         primaryAction.Text = action == ModAction.Disable ? T("Desabilitar", "Disable")
             : action == ModAction.ChooseDependency ? GeneralStatusPresentation.Label(GeneralStatusPresentation.ChooseDependency)
             : action == ModAction.Enable ? T("Reativar", "Enable")
+            : action == ModAction.Update ? T("Atualizar", "Update")
             : action == ModAction.Change ? T("Mudar versão", "Change version")
             : action == ModAction.Install ? T("Instalar", "Install")
             : T("Baixar", "Download");
@@ -150,8 +209,8 @@ internal sealed partial class GeneralModWindow {
         return new DisabledMods(root, data, () => EnsureGameClosed(root));
     }
 
-    void KeepLinkedDependencies(List<Work> jobs,string root) {
-        var removing=new HashSet<string>(jobs.Select(work=>work.Entry.Id),StringComparer.Ordinal);
+    void KeepLinkedDependencies(List<Work> jobs,string root,string replacementId=null) {
+        var removing=new HashSet<string>(jobs.Select(work=>work.Entry.Id).Where(id=>id!=replacementId),StringComparer.Ordinal);
         var removingVariants=new HashSet<string>(jobs.Select(work=>work.Key),StringComparer.Ordinal);
         var affected=state.List.Mods.Where(mod=>
             mod.Variants.Any(variant=>variant.RequiredMods.Any(removing.Contains))).ToList();
@@ -165,21 +224,38 @@ internal sealed partial class GeneralModWindow {
         }
     }
 
-    Dictionary<string, List<DisabledModFile>> PlanDisable(List<Work> jobs, string root) {
+    Dictionary<string, List<DisabledModFile>> PlanDisable(List<Work> jobs, string root,string replacementId=null) {
         EnsureGameClosed(root);
-        KeepLinkedDependencies(jobs,root);
+        KeepLinkedDependencies(jobs,root,replacementId);
         var result = jobs.ToDictionary(work => work.Key, work => new List<DisabledModFile>(), StringComparer.Ordinal);
         var selected = new HashSet<string>(result.Keys, StringComparer.Ordinal);
         bool cyberpunk = IsCyberpunk(root);
         var allFiles = Snapshot(root).ProjectDeletionFiles().ToList();
+        foreach(var work in jobs.Where(work=>work.Key!=InstalledSnapshot.Owner(work.Entry,work.Variant))){
+            string receipt;
+            if(!TryWorkSnapshot(work,root,out receipt))continue;
+            string owner=InstalledSnapshot.Owner(work.Entry,work.Variant);
+            foreach(var file in allFiles.Where(file=>file.OwnerKeys.Contains(owner))){
+                file.OwnerKeys.Remove(owner);
+                file.OwnerKeys.Add(work.Key);
+            }
+        }
         var fixedIds = new HashSet<string>(jobs.Select(work => work.Variant.CyberpunkId).Where(id => id != null), StringComparer.Ordinal);
         var routedIds = new HashSet<string>(jobs.Where(work=>work.Variant.InstallRoutes.Count>0).Select(work=>work.Variant.CyberpunkId),StringComparer.Ordinal);
+        var aliases=state.List.Mods.Where(entry=>entry.Id==GeneralModLibrary.EbbBody).SelectMany(VersionWorks)
+            .SelectMany(work=>Enumerable.Range(0,work.Variant.Sources.Count)
+                .Select(index=>new{Work=work,Legacy=P2PPack.LegacySlot(work.Entry,work.Variant,index)}))
+            .Where(item=>item.Legacy!=null).ToDictionary(item=>item.Legacy,item=>item.Work.Key,StringComparer.Ordinal);
+        Func<string,string> receiptOwner=key=>{
+            string alias;
+            return aliases.TryGetValue(key,out alias)?alias:WorkKeyFromReceipt(key);
+        };
         foreach (var file in Generic(root).ProjectDeletionFiles()) {
-            file.OwnerKeys = file.OwnerKeys.Select(WorkKeyFromReceipt).Distinct().ToList();
+            file.OwnerKeys = file.OwnerKeys.Select(receiptOwner).Distinct().ToList();
             allFiles.Add(file);
         }
         if (cyberpunk) {
-            var importOwners = state.CyberpunkImports.ToLookup(item => item.Value, item => WorkKeyFromReceipt(item.Key), StringComparer.Ordinal);
+            var importOwners = state.CyberpunkImports.ToLookup(item => item.Value, item => receiptOwner(item.Key), StringComparer.Ordinal);
             var imports = Cyberpunk(root).ProjectDeletionFiles(null).ToList();
             foreach (var file in imports) {
                 string id = file.OwnerKeys.Single();
@@ -300,7 +376,7 @@ internal sealed partial class GeneralModWindow {
                             if (missing != null) throw new IOException(T("Ative primeiro: ", "Enable first: ") + missing.Name);
                         }
                     }
-                    store.Enable(jobs.Select(work => work.Key));
+                    store.Enable(jobs.Select(work => PresetStoredKey(work,root)));
                 } else store.Disable(PlanDisable(jobs, root));
             });
             detail.Text = enable ? T("Mods reativados.", "Mods enabled.") : T("Mods desabilitados.", "Mods disabled.");
@@ -314,10 +390,15 @@ internal sealed partial class GeneralModWindow {
         var notes = new List<string>();
         var personalPeers=new Lazy<HashSet<string>>(ExternalFilesInOtherProjects);
         Func<string,bool> preserveExternal=path=>personalPeers.Value.Contains(GeneralInstallRoutes.Resolve(root,path));
-        var snapshots = jobs.Where(work => state.SnapshotReceipts.ContainsKey(work.Key) && work.Variant.CyberpunkId != "NightCoop").ToList();
-        foreach (var group in snapshots.GroupBy(work => new { Receipt = state.SnapshotReceipts[work.Key], Disabled = disabled.Contains(work.Key) })) {
-            notes.Add(Snapshot(root).Remove(group.Key.Receipt, group.Select(work => work.Key), Report, group.Key.Disabled,preserveExternal));
-            foreach (var work in group) state.SnapshotReceipts.Remove(work.Key);
+        var snapshots = jobs.Where(work => {
+            string receipt;
+            return work.Variant.CyberpunkId!="NightCoop"&&TryWorkSnapshot(work,root,out receipt);
+        }).ToList();
+        foreach (var group in snapshots.GroupBy(work => new {
+            Receipt=state.SnapshotReceipts[InstalledSnapshot.Owner(work.Entry,work.Variant)], Disabled=disabled.Contains(work.Key)
+        })) {
+            notes.Add(Snapshot(root).Remove(group.Key.Receipt,group.Select(work=>InstalledSnapshot.Owner(work.Entry,work.Variant)),Report,group.Key.Disabled,preserveExternal));
+            foreach (var work in group) state.SnapshotReceipts.Remove(InstalledSnapshot.Owner(work.Entry,work.Variant));
         }
         var standard = jobs.Except(snapshots).ToList();
         var fixedIds = standard.Where(work => work.Variant.CyberpunkId != null && work.Variant.InstallRoutes.Count==0 && !disabled.Contains(work.Key))
@@ -333,13 +414,19 @@ internal sealed partial class GeneralModWindow {
         foreach (var work in standard.Where(item => item.Variant.CyberpunkId == null)) {
             for (int index = work.Variant.Sources.Count - 1; index >= 0; index--) {
                 string key = work.Receipt(index);
-                if (!cyberpunk) notes.Add(Generic(root).Remove(key, disabled.Contains(work.Key), owner => !disabled.Contains(WorkKeyFromReceipt(owner)),preserveExternal));
+                if (!cyberpunk) {
+                    var engine=Generic(root);
+                    notes.Add(engine.Remove(ExistingReceipt(engine,work,index),disabled.Contains(work.Key),
+                        owner=>!disabled.Contains(WorkKeyFromReceipt(owner)),preserveExternal));
+                }
                 else {
                     string id = CyberpunkImportId(work, index);
                     if (id == null) continue;
                     bool anotherOwner = state.CyberpunkImports.Any(pair => pair.Value == id && !jobs.Any(item => item.Key == WorkKeyFromReceipt(pair.Key)));
                     if (!anotherOwner) notes.Add(Cyberpunk(root).RemoveImported(id, Report, disabled.Contains(work.Key)));
                     state.CyberpunkImports.Remove(key);
+                    string legacy=P2PPack.LegacySlot(work.Entry,work.Variant,index);
+                    if(legacy!=null)state.CyberpunkImports.Remove(legacy);
                 }
             }
         }
@@ -362,14 +449,14 @@ internal sealed partial class GeneralModWindow {
     }
 
     List<Work> ConflictingAlternatives(Work incoming, string root) {
-        if (incoming.Entry.AlternativeGroup == null) return new List<Work>();
         var found = new List<Work>();
-        foreach (var entry in state.List.Mods.Where(item => item.Id != incoming.Entry.Id && item.AlternativeGroup == incoming.Entry.AlternativeGroup)) {
-            var conflict = entry.Variants.OrderByDescending(variant => variant.Sources.Count)
-                .Select(variant => new Work { Entry = entry, Variant = variant }).FirstOrDefault(candidate => {
-                    string status = Status(candidate, root);
-                    return GeneralStatusPresentation.Kind(status) == "installed" || status == GeneralStatusPresentation.ManualBody;
-                });
+        var reads=new ScanReads(this,root);
+        foreach (var entry in state.List.Mods.Where(item => item.Id==incoming.Entry.Id||
+            incoming.Entry.AlternativeGroup!=null&&item.AlternativeGroup==incoming.Entry.AlternativeGroup)) {
+            var conflict = VersionWorks(entry).OrderByDescending(candidate=>candidate.Variant.Sources.Count)
+                .Where(candidate=>candidate.Key!=incoming.Key&&(entry.Id!=incoming.Entry.Id||
+                    candidate.Variant.CyberpunkId==null||candidate.Variant.CyberpunkId!=incoming.Variant.CyberpunkId))
+                .FirstOrDefault(candidate=>InstalledVersion(Status(candidate,root,reads)));
             if (conflict != null) found.Add(conflict);
         }
         if(IsBigBody(incoming.Entry)){
@@ -379,7 +466,7 @@ internal sealed partial class GeneralModWindow {
                 if(GeneralStatusPresentation.Kind(Status(existing,root))=="installed")found.Add(existing);
             }
         }
-        if(IsBigBody(incoming.Entry)&&incoming.Entry.Id!="hyst-ebb-rb"&&found.Any(old=>old.Entry.Id=="hyst-ebb-rb")){
+        if(IsBigBody(incoming.Entry)&&found.Any(old=>old.Entry.Id==GeneralModLibrary.EbbBody)){
             var eclipse=state.List.Mods.FirstOrDefault(entry=>entry.Id==GeneralModLibrary.EclipseTattooId);
             if(eclipse!=null){
                 var tattoo=MakeWork(eclipse);

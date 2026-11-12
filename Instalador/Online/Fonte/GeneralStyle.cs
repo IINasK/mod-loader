@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.Drawing;
@@ -33,6 +33,7 @@ internal static class GeneralStyle {
     }
     internal static Color Background {get{return ColorTranslator.FromHtml(BlackTheme?"#090909":Dark?"#15121d":"#ffffff");}}
     internal static Color Surface {get{return ColorTranslator.FromHtml(BlackTheme?"#1b1b1b":Dark?"#242032":"#ffffff");}}
+    internal static Color DrawerSurface {get{return ColorTranslator.FromHtml(BlackTheme?"#242424":Dark?"#2e293e":RedTheme?"#fcf5f6":"#f8f5fc");}}
     internal static Color Foreground {get{return ColorTranslator.FromHtml(BlackTheme?"#f2f2f2":Dark?"#ece8f6":RedTheme?"#2b2326":"#221d33");}}
     internal static Color Muted {get{return ColorTranslator.FromHtml(BlackTheme?"#bcbcbc":Dark?"#b9b1cf":RedTheme?"#756167":"#625b7c");}}
     internal static Color Accent {get{return ColorTranslator.FromHtml(BlackTheme?"#eeeeee":Dark?"#b8a4ff":RedTheme?"#d92e42":"#5b3fd8");}}
@@ -183,6 +184,30 @@ internal sealed class GeneralButton : Button {
     internal bool Primary,Destructive,Bare;
     internal string IconKind;
     internal Color? BareInk;
+    Timer activityTimer;
+    readonly System.Diagnostics.Stopwatch activityClock=new System.Diagnostics.Stopwatch();
+    internal bool ShowActivity {
+        get{return activityClock.IsRunning;}
+        set {
+            if(value==activityClock.IsRunning)return;
+            if(value&&!SystemInformation.HighContrast) {
+                if(activityTimer==null) {
+                    activityTimer=new Timer{Interval=42};
+                    activityTimer.Tick+=(s,e)=>{if(Visible)Invalidate();};
+                }
+                activityClock.Restart();
+                activityTimer.Start();
+            }else {
+                activityClock.Reset();
+                if(activityTimer!=null)activityTimer.Stop();
+            }
+            Invalidate();
+        }
+    }
+    protected override void Dispose(bool disposing) {
+        if(disposing&&activityTimer!=null)activityTimer.Dispose();
+        base.Dispose(disposing);
+    }
     internal GeneralButton(){SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.Opaque,true);BackColor=GeneralStyle.Background;Cursor=Cursors.Hand;FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;UseVisualStyleBackColor=false;}
     public override Size GetPreferredSize(Size proposedSize){
         var size=base.GetPreferredSize(proposedSize);
@@ -208,7 +233,22 @@ internal sealed class GeneralButton : Button {
             LucideIcons.Draw(g,IconKind,new Rectangle(x,y,20,20),ink);
             if(!String.IsNullOrEmpty(Text))textRect=new Rectangle(42,0,Width-52,Height);
         }
-        TextRenderer.DrawText(g,Text,Font,textRect,ink,TextFormatFlags.VerticalCenter|(TextAlign==ContentAlignment.MiddleLeft?TextFormatFlags.Left:TextFormatFlags.HorizontalCenter)|TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine);
+        var flags=TextFormatFlags.VerticalCenter|(TextAlign==ContentAlignment.MiddleLeft?TextFormatFlags.Left:TextFormatFlags.HorizontalCenter)|
+            TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine;
+        TextRenderer.DrawText(g,Text,Font,textRect,ink,flags);
+        if(ShowActivity&&!String.IsNullOrEmpty(Text)&&textRect.Width>0) {
+            int x=textRect.Left-24+(int)((textRect.Width+48)*(activityClock.ElapsedMilliseconds%1900)/1900);
+            var highlight=GeneralStyle.Dark?Color.White:GeneralStyle.Primary;
+            for(int offset=-18;offset<18;offset+=4) {
+                int mix=72-3*Math.Abs(offset+2);
+                var brighter=Color.FromArgb(ink.R+(highlight.R-ink.R)*mix/100,
+                    ink.G+(highlight.G-ink.G)*mix/100,ink.B+(highlight.B-ink.B)*mix/100);
+                var saved=g.Save();
+                g.IntersectClip(Rectangle.Intersect(textRect,new Rectangle(x+offset,0,4,Height)));
+                TextRenderer.DrawText(g,Text,Font,textRect,brighter,flags|TextFormatFlags.PreserveGraphicsClipping);
+                g.Restore(saved);
+            }
+        }
     }
 }
 
@@ -218,7 +258,21 @@ internal sealed class GeneralProgress : Control {
     internal event Action<PackCoverageSegment> SegmentActivated;
     readonly ToolTip segmentTip=new ToolTip{UseAnimation=false,UseFading=false};
     internal int Value {get{return value;}set{this.value=Math.Max(0,Math.Min(100,value));Invalidate();}}
-    internal bool Indeterminate, NotApplicable;
+    internal bool NotApplicable;
+    Timer pulse;
+    internal bool Indeterminate {
+        get{return pulse!=null&&pulse.Enabled;}
+        set {
+            if(value&&pulse==null) {
+                pulse=new Timer{Interval=45};
+                pulse.Tick+=(s,e)=>Invalidate();
+            }
+            if(pulse!=null&&pulse.Enabled!=value) {
+                pulse.Enabled=value;
+                Invalidate();
+            }
+        }
+    }
     internal string Caption;
     internal GeneralProgress(){Height=37;SetStyle(ControlStyles.UserPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);}
     RectangleF Track {get{return new RectangleF(0,27,Math.Max(1,Width-1),6);}}
@@ -264,7 +318,7 @@ internal sealed class GeneralProgress : Control {
         var segment=SegmentAt(e.Location);
         if(segment!=null)SegmentActivated(segment);
     }
-    protected override void Dispose(bool disposing){if(disposing)segmentTip.Dispose();base.Dispose(disposing);}
+    protected override void Dispose(bool disposing){if(disposing){segmentTip.Dispose();if(pulse!=null)pulse.Dispose();}base.Dispose(disposing);}
     protected override void OnPaint(PaintEventArgs e){
         var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;
         using(var font=GeneralStyle.Font(10.5f))TextRenderer.DrawText(g,Caption??"",font,new Rectangle(0,0,Width-52,23),GeneralStyle.Muted,TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
@@ -276,7 +330,8 @@ internal sealed class GeneralProgress : Control {
             float x=0,total=Segments.Sum(s=>(float)s.Count);foreach(var segment in Segments){float part=track.Width*segment.Count/total;using(var brush=new SolidBrush(segment.Color))g.FillRectangle(brush,x,track.Y,part+.5f,track.Height);x+=part;}g.Restore(saved);return;
         }
         float width=track.Width*(Indeterminate ? .16f : Value/100f);
-        if(width>0)using(var path=GeneralStyle.Round(new RectangleF(0,27,width,6),3))using(var brush=new SolidBrush(GeneralStyle.Accent))g.FillPath(brush,path);
+        float indicatorX=Indeterminate?(track.Width-width)*((1f-(float)Math.Cos((Environment.TickCount&Int32.MaxValue)%1800*Math.PI/900))/2f):0;
+        if(width>0)using(var path=GeneralStyle.Round(new RectangleF(indicatorX,27,width,6),3))using(var brush=new SolidBrush(GeneralStyle.Accent))g.FillPath(brush,path);
     }
 }
 

@@ -33,12 +33,19 @@ internal static class HistoricalReceipts {
             Defaults=(catalog.Defaults??new List<FixedDefault>()).Concat(known.Defaults.Where(item=>replacements.ContainsKey(item.ModId))).ToList()
         };
     }
+    internal static IEnumerable<ModFileAnchor> CleanupAnchors(FixedCatalog catalog) {
+        if(catalog.Id!=CatalogId)return Enumerable.Empty<ModFileAnchor>();
+        // Trusted prior package manifests prove exact paths/hashes, including manual installations.
+        return SnapshotRecipes.Value.Packages.Concat(new[]{retiredHotline}).Concat(RetiredClothingAndMap)
+            .Where(mod=>!mod.Immutable).SelectMany(mod=>mod.Files.Select(file=>new ModFileAnchor{Owner=mod.Id,Path=file.Path,Hash=file.Sha256}));
+    }
+
     internal static List<FixedMod> Expand(FixedCatalog catalog,IEnumerable<string> ids){
         var result=new List<FixedMod>();var done=new HashSet<string>();var visiting=new HashSet<string>();
         Action<string> visit=null;visit=id=>{
             if(done.Contains(id))return;if(!visiting.Add(id))throw new IOException("Ciclo no histórico de instalação.");
             var current=catalog.Packages.SingleOrDefault(m=>m.Id==id);
-            var prior=catalog.Id==CatalogId?(id==RetiredPackEntries.HotlineId?retiredHotline:(Recipes.SingleOrDefault(m=>m.Id==id)??RetiredClothingAndMap.SingleOrDefault(m=>m.Id==id))):null;
+            var prior=catalog.Id==CatalogId?(id==RetiredPackEntries.HotlineId?retiredHotline:(Recipes.SingleOrDefault(m=>m.Id==id)??RetiredClothingAndMap.SingleOrDefault(m=>m.Id==id)??SnapshotRecipes.Value.Packages.SingleOrDefault(m=>m.Id==id))):null;
             if(current==null&&prior==null)throw new IOException("Mod do recibo não reconhecido no catálogo ou histórico: "+id);
             foreach(string dependency in (current??prior).Dependencies)visit(dependency);
             var recipe=Safe.Json.Deserialize<FixedMod>(Safe.Json.Serialize(current??prior));

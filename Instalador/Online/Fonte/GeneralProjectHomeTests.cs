@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -234,6 +234,7 @@ internal sealed partial class GeneralModWindow {
             check(storedBody.Variants.Single(variant => variant.Id == "default").Name.Contains("Natural (EBBN)") &&
                 storedBody.Variants.Single(variant => variant.Id == "with-refit-base").Name == "Meu refit",
                 "A opção Natural aparece em um projeto oficial antigo sem alterar nomes personalizados.");
+            form.preset.SelectedIndex=0;
             var bodyRows=form.VisibleMods().Where(IsBigBody).ToList();
             check(bodyRows.Count==1&&form.ModDisplayName(bodyRows[0])=="Big Body",
                 "A tabela mostra o Big Body em uma única linha.");
@@ -246,6 +247,7 @@ internal sealed partial class GeneralModWindow {
                 "A gaveta mostra três escolhas de corpo e mantém Togglable Feet fora dela.");
             var optionRows=form.grid.Rows.Cast<DataGridViewRow>().Where(row=>row.Tag is Work).ToList();
             var bodyOptions=optionRows.Select(row=>(Work)row.Tag).ToList();
+            form.statuses[bodyOptions.First().Key]="Instalado";
             var nsfwBefore=bodyOptions.Select(work=>work.Variant.Nsfw).ToArray();
             var inactive=bodyOptions.First(work=>work.BodyChoice!=form.ActiveBodyChoice(bodyRows[0]));
             foreach(var work in bodyOptions)work.Variant.Nsfw=work==inactive;
@@ -275,16 +277,25 @@ internal sealed partial class GeneralModWindow {
                 "Arquivos verificados manualmente mostram o tamanho medido e a situação de instalação.");
             form.gameInventory=inventory;
             var naturalRow=optionRows.Single(row=>((Work)row.Tag).BodyChoice==GeneralModLibrary.NaturalBody);
+            form.grid.CurrentCell=naturalRow.Cells["Name"];
             form.OpenRowEditor(naturalRow);
-            check(new GeneralModLibrary(Path.Combine(form.data,"lista.json")).Load().BodyChoice==GeneralModLibrary.NaturalBody&&
-                form.SelectedJobs().Single().BodyChoice==GeneralModLibrary.NaturalBody,
-                "Selecionar Natural salva a escolha e a fila usa a seleção da gaveta.");
+            var naturalChoice=form.SelectedJobs().Single();
+            check(new GeneralModLibrary(Path.Combine(form.data,"lista.json")).Load().BodyChoice!=GeneralModLibrary.NaturalBody&&
+                naturalChoice.BodyChoice==GeneralModLibrary.NaturalBody&&form.primaryAction.Text=="Update",
+                "Escolher Natural apenas prepara a troca e oferece Atualizar.");
+            check(form.IsSharedBodySwitch(naturalChoice,"Instalado")&&activeBody.Key==naturalChoice.Key,
+                "EBB e Natural com o mesmo conteúdo não precisam movimentar arquivos.");
+            form.RememberInstalledVariant(naturalChoice);
+            check(new GeneralModLibrary(Path.Combine(form.data,"lista.json")).Load().BodyChoice==GeneralModLibrary.NaturalBody,
+                "A seleção Natural é salva depois de aplicar.");
             var selectedOption=form.grid.Rows.Cast<DataGridViewRow>().Single(row=>row.Tag is Work&&Equals(row.Cells["Status"].Tag,true));
             check(Equals(form.ModRows().Single(row=>Equals(row.Cells["Name"].Value,"Big Body")).Cells["Size"].Value,
                 selectedOption.Cells["Size"].Value),"A linha principal mostra o tamanho da variante escolhida.");
             check(form.ToggleVersions(form.ModRows().Single(row=>(string)row.Cells["Name"].Value=="Big Body"))&&
                 !form.grid.Rows.Cast<DataGridViewRow>().Any(row=>row.Tag is Work),
                 "A gaveta fecha sem duplicar itens selecionáveis.");
+            form.statuses.Remove(activeBody.Key);
+            form.state.ChosenVariants.Remove(activeBody.Entry.Id);
             var baseVersions=form.BigBodyVersions(form.state.List.Mods,false);
             var dlcVersions=form.BigBodyVersions(form.state.List.Mods,true);
             check(baseVersions.Count==3&&baseVersions.All(work=>work.Variant.Id=="with-refit-base"&&work.Variant.Sources.Count==2)&&
@@ -380,8 +391,8 @@ internal sealed partial class GeneralModWindow {
         }
         form.SaveProjectEdits();
         saved=form.library.Load();
-        var extra=saved.List.Mods.Single(mod=>mod.Id==saved.BodyChoice);
-        check(extra.Name=="Mod alternativo"&&extra.Variants.Single().Name=="Quarta variante"&&
+        var extra=saved.List.Mods.Single(mod=>mod.Name=="Mod alternativo");
+        check(saved.BodyChoice==GeneralModLibrary.NaturalBody&&extra.Variants.Single().Name=="Quarta variante"&&
             extra.Variants.Single().RequiredMods.SequenceEqual(new[]{"Codeware"})&&
             form.BodyVersionsForPreset().Any(work=>work.Entry.Id==extra.Id&&BodyChoiceLabel(work)=="Quarta variante"),
             "A quarta opção é persistida e reaparece na mesma gaveta.");

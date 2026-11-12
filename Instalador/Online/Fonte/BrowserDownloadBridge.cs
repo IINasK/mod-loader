@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
+using System.Linq;
 using System.Reflection;
 using System.Security.AccessControl;
 using System.Security.Principal;
@@ -51,10 +52,56 @@ internal static class BrowserDownloadBridge {
         bool delivered = false;
         try {
             string path = ReadPath(input).GetAwaiter().GetResult();
-            if (path != null) delivered = Forward(path, channel ?? Channel);
+            if (path != null) {
+                delivered = Forward(path, channel ?? Channel);
+                if(channel==null)RememberRecent(path);
+            }
         } catch (IOException) { }
         WriteFrame(output, new { delivered = delivered });
         return 0;
+    }
+
+    sealed class RecentDownload {
+        public string Path;
+        public DateTime RecordedUtc;
+    }
+
+    static string RecentPath(){
+        return Safe.In(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"ModLoader/BrowserIntegration/recent.json");
+    }
+
+    static List<RecentDownload> ReadRecent(string path) {
+        Safe.NoLinks(path);
+        if(!File.Exists(path))return new List<RecentDownload>();
+        var items=Safe.Json.Deserialize<List<RecentDownload>>(GeneralProjectStorage.ReadText(path,256000));
+        var cutoff=DateTime.UtcNow.AddDays(-7);
+        return (items??new List<RecentDownload>()).Where(item=>item!=null&&item.RecordedUtc>=cutoff&&GeneralModDownload.IsArchivePath(item.Path)).Take(32).ToList();
+    }
+
+    static void RememberRecent(string archive){
+        try{
+            string path=RecentPath();
+            string folder=Path.GetDirectoryName(path);
+            Safe.NoLinks(folder);
+            Directory.CreateDirectory(folder);
+            string guard=Safe.In(folder,"recent.lock");
+            Safe.NoLinks(guard);
+            using(var handle=new FileStream(guard,FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None)){
+                var items=ReadRecent(path);
+                items.RemoveAll(item=>String.Equals(item.Path,archive,StringComparison.OrdinalIgnoreCase));
+                items.Insert(0,new RecentDownload{Path=archive,RecordedUtc=DateTime.UtcNow});
+                Safe.WriteJson(path,items.GetRange(0,Math.Min(32,items.Count)));
+            }
+        }catch(IOException){}catch(UnauthorizedAccessException){}catch(ArgumentException){}catch(InvalidOperationException){}
+    }
+
+    internal static string FindRecent(string source,GeneralSourceInfo info,FixedAsset asset) {
+        if(asset==null&&GeneralNexusLink.Parse(source)==null)return null;
+        try{
+            foreach(var item in ReadRecent(RecentPath()))
+                if(GeneralModDownload.MatchesCompleted(item.Path,source,info,asset))return item.Path;
+        }catch(IOException){}catch(UnauthorizedAccessException){}catch(ArgumentException){}catch(InvalidOperationException){}
+        return null;
     }
 
     internal static bool Forward(string path, string channel) {

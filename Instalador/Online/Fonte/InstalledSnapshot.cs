@@ -30,6 +30,14 @@ public static partial class InstalledSnapshot {
     public static string Entry(InstalledSnapshotFile file){return "files/"+file.Sha256;}
     public static string Owner(GeneralModEntry mod,GeneralModVariant variant){return mod.Id+"/"+variant.Id;}
     static T Clone<T>(T value){return Safe.Json.Deserialize<T>(Safe.Json.Serialize(value));}
+    internal static bool MatchesBodyReceipt(InstalledSnapshotInstaller engine,GeneralModEntry mod,GeneralModVariant variant,string receipt){
+        var installed=engine.ReadManifest(receipt).List.Mods.FirstOrDefault(entry=>entry.Id==mod.Id);
+        var recipe=installed==null?null:installed.Variants.FirstOrDefault(v=>v.Id==variant.Id);
+        if(recipe==null)return false;
+        var expected=Clone(variant);
+        MakeSourcesPortable(expected,mod.Id);
+        return GeneralModLibrary.SamePayload(recipe,expected);
+    }
     static string Selected(GeneralModState state,GeneralModEntry mod){string id;return state.ChosenVariants.TryGetValue(mod.Id,out id)?id:mod.DefaultVariant;}
     static bool IsCyberpunk(string root){return File.Exists(Safe.In(root,"bin/x64/Cyberpunk2077.exe"));}
     static bool IncludesBodyChoice(GeneralModList list,string choice) {
@@ -68,7 +76,12 @@ public static partial class InstalledSnapshot {
         var list=new GeneralModList{UncategorizedName=state.List.UncategorizedName,UncategorizedDescription=state.List.UncategorizedDescription};
         var manifest=new InstalledSnapshotManifest{Name=state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset)==null?"Pacote instalado":state.List.Presets.First(p=>p.Id==state.SelectedPreset).Name,ProjectName=state.ProjectName,Game=cyberpunk?"cyberpunk2077":"generic",GameFileVersion=cyberpunk?catalog.GameFileVersion:null,List=list};
         var seed=GeneralModLibrary.Seed(catalog,new ModImportItem[0]);
-        var entries=state.List.Mods.Where(m=>selected.Contains(m.Id)).Select(Clone).ToList();
+        var profile=GeneralPresetProfiles.Selected(state);
+        var entries=state.List.Mods.Where(m=>{
+            string chosen;
+            return selected.Contains(m.Id)&&(profile==null||profile.AlternativeChoices==null||m.AlternativeGroup==null||
+                !profile.AlternativeChoices.TryGetValue(m.AlternativeGroup,out chosen)||m.Id==chosen);
+        }).Select(Clone).ToList();
         if(cyberpunk) {
             var fixedIds=entries.Select(m=>m.Variants.Single(v=>v.Id==Selected(state,m)).CyberpunkId).Where(id=>id!=null).ToList();
             foreach(var dependency in FixedData.Expand(catalog,fixedIds,EquipmentExOptions.StockActive(catalog,root))) {
@@ -88,17 +101,19 @@ public static partial class InstalledSnapshot {
             if(inspectProgress!=null)inspectProgress(index,entries.Count,mod.Name);
             try {
             var variant=GeneralModLibrary.BodyOption(state.BodyChoice,mod,mod.Variants.Single(v=>v.Id==Selected(state,mod)));
-            if(disabled.ContainsKey(Owner(mod,variant))){
+            if(disabled.ContainsKey(GeneralModLibrary.InstallationKey(mod,variant))){
                 if(allowMissing)continue;
                 throw new IOException("Este mod está desabilitado.");
             }
             if(allowMissing&&Uninstalled(state,mod,variant,catalog,root,appData))continue;
-            if(cyberpunk && variant.CyberpunkId==NightCityDensity.ModId) {
+            bool fixedChoice=profile!=null&&(state.AppliedPreset!=null||profile.VariantChoices!=null&&profile.VariantChoices.ContainsKey(mod.Id));
+            var expectedRecipe=variant;
+            if(!fixedChoice&&cyberpunk && variant.CyberpunkId==NightCityDensity.ModId) {
                 var density=NightCityDensity.Read(catalog.Packages.Single(m=>m.Id==variant.CyberpunkId),root);
                 if(density.Id=="legacy-low"){variant=LegacyDensityVariant(catalog);mod.Variants.Add(variant);}
                 else {if(!NightCityDensity.Supported(density.Id)||density.Partial)throw new IOException(density.Detail);variant=mod.Variants.Single(v=>v.CyberpunkVariant==density.Id);}
             }
-            if (cyberpunk && variant.CyberpunkId == EquipmentExOptions.ModId) {
+            if (!fixedChoice&&cyberpunk && variant.CyberpunkId == EquipmentExOptions.ModId) {
                 var equipment = catalog.Packages.Single(recipe => recipe.Id == EquipmentExOptions.ModId);
                 if (EquipmentExOptions.Available(equipment)) {
                     var option = EquipmentExOptions.Read(equipment, root);
@@ -112,15 +127,8 @@ public static partial class InstalledSnapshot {
             var originalSources=variant.Sources.ToList();
             List<InstalledSnapshotFile> files=new List<InstalledSnapshotFile>();
             string snapshotId;
-            if(variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(work,out snapshotId)){
-                if(mod.Id==GeneralModLibrary.EbbBody&&mod.Variants.Single(v=>v.Id==variant.Id).NaturalOption!=null){
-                    var installed=receivedEngine.ReadManifest(snapshotId).List.Mods.Single(entry=>entry.Id==mod.Id).Variants.Single();
-                    var expected=Clone(variant);
-                    MakeSourcesPortable(expected,mod.Id);
-                    if(!installed.Sources.SequenceEqual(expected.Sources,StringComparer.Ordinal)||
-                        !GeneralInstallRoutes.Same(installed.InstallRoutes,variant.InstallRoutes))
-                        throw new IOException("O recibo do corpo corresponde a outra configuração de instalação.");
-                }
+            if(variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(work,out snapshotId)&&
+                MatchesBodyReceipt(receivedEngine,mod,variant,snapshotId)){
                 files=receivedEngine.ReadInstalledFiles(snapshotId,work);
             }
             else if(variant.CyberpunkId!=null) {
@@ -146,23 +154,32 @@ public static partial class InstalledSnapshot {
                     if(content!=null)files.Add(Config(config.Path,config.Format,config.Section,content));
                 }
             }else if(cyberpunk&&HasManualHystFiles(mod.Id,root)&&
-                (state.CyberpunkImports==null||!originalSources.Select((source,sourceIndex)=>work+"/"+sourceIndex+"/"+source).Any(state.CyberpunkImports.ContainsKey))) {
+                (state.CyberpunkImports==null||!Enumerable.Range(0,originalSources.Count).Any(sourceIndex=>{
+                    string id;
+                    return P2PPack.TrySlot(state.CyberpunkImports,mod,variant,sourceIndex,out id);
+                }))) {
                 var knownBody=seed.Mods.FirstOrDefault(item=>item.Id==mod.Id);
                 variant=ReadManualHyst(root,mod,knownBody,state.SelectedPreset!="no-pl",files,bodyChoice:state.BodyChoice);
+                if(fixedChoice&&(variant.Id!=expectedRecipe.Id||!GeneralModLibrary.SamePayload(variant,expectedRecipe)))
+                    throw new IOException("A versão instalada difere da escolha do preset.");
                 work=Owner(mod,variant);
                 originalSources=variant.Sources.ToList();
                 if(disabled.ContainsKey(work))throw new IOException("Este mod está desabilitado.");
             }else {
                 for(int i=0;i<originalSources.Count;i++) {
-                    string key=work+"/"+i+"/"+originalSources[i];
+                    string key=P2PPack.Slot(mod,variant,i);
                     if(cyberpunk) {
                         string id;
-                        if(state.CyberpunkImports==null||!state.CyberpunkImports.TryGetValue(key,out id)) {
+                        if(state.CyberpunkImports==null||!P2PPack.TrySlot(state.CyberpunkImports,mod,variant,i,out id)) {
                             id=mod.Id.StartsWith("file-",StringComparison.Ordinal)?mod.Id:null;
                             if(id==null)throw new IOException(mod.Name+": recibo instalado não encontrado.");
                         }
                         files.AddRange(fixedEngine.ExportSnapshotImportedFiles(id));
-                    }else files.AddRange(genericEngine.ExportSnapshotFiles(key,variant.InstallRoutes));
+                    }else{
+                        string legacy=P2PPack.LegacySlot(mod,variant,i);
+                        if(legacy!=null&&!genericEngine.HasSnapshotRecord(key))key=legacy;
+                        files.AddRange(genericEngine.ExportSnapshotFiles(key,variant.InstallRoutes));
+                    }
                 }
             }
             if(cyberpunk && files.Any(RetiredPackEntries.LocalDroneFile)) continue;
@@ -233,18 +250,18 @@ public static partial class InstalledSnapshot {
         }
         var included=new HashSet<string>(list.Mods.Select(m=>m.Id),StringComparer.Ordinal);
         foreach(var original in state.List.Presets.OrderByDescending(p=>p.Id==state.SelectedPreset)){
-            var copy=Clone(original);copy.ModIds=copy.ModIds.Where(included.Contains).ToList();list.Presets.Add(copy);
+            var copy=new GeneralModPreset{Id=original.Id,Name=original.Name,Categories=original.Categories.ToList(),ModIds=original.ModIds.Where(included.Contains).ToList()};list.Presets.Add(copy);
         }
         if(list.Presets.Count==0)list.Presets.Add(new GeneralModPreset{Id="installed",Name=manifest.Name,ModIds=list.Mods.Select(m=>m.Id).ToList()});
         if(IncludesBodyChoice(list,state.BodyChoice))manifest.BodyChoice=state.BodyChoice;
-        if(allowMissing||HasInstallRoutes(manifest)||manifest.BodyChoice!=null){
+        if(allowMissing||HasInstallRoutes(manifest)||manifest.BodyChoice!=null||state.List.Presets.Any(p=>p.Configurations.Count>0||p.VariantChoices.Count>0||p.AlternativeChoices.Count>0)){
             manifest.Project=ProjectDefinition(state,manifest.List);
             if(cyberpunk&&state.TemplateId==GeneralProjectStore.CyberpunkTemplate){
                 manifest.TemplateId=state.TemplateId;
                 manifest.TemplateSubset=state.TemplateSubset;
             }
         }
-        if(HasInstallRoutes(manifest))manifest.Schema=2;
+        GeneralPresetProfiles.Prune(manifest.List);if(HasInstallRoutes(manifest))manifest.Schema=2;
         Validate(manifest,catalog);
         return manifest;
     }

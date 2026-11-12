@@ -16,6 +16,11 @@ public sealed class GeneralModList {
 }
 
 public sealed class GeneralModPreset {
+    public Dictionary<string,GeneralModEntry> Configurations = new Dictionary<string,GeneralModEntry>();
+    public Dictionary<string,string> VariantChoices = new Dictionary<string,string>();
+    public Dictionary<string,string> AlternativeChoices = new Dictionary<string,string>();
+    public string BodyChoice;
+    public Dictionary<string,GeneralAlternativeGroup> Groups = new Dictionary<string,GeneralAlternativeGroup>();
     public string Id, Name;
     public List<string> ModIds = new List<string>();
     public List<string> Categories = new List<string>();
@@ -56,6 +61,8 @@ public sealed class GeneralModVariant {
 }
 
 public sealed class GeneralModState {
+    public int PresetStateVersion;
+    public string AppliedPreset, AppliedPresetFingerprint;
     public string Destination, DownloadFolder;
     internal string TemplateId, ProjectName;
     internal bool TemplateSubset;
@@ -82,6 +89,16 @@ public sealed class GeneralModLibrary {
     internal static GeneralModVariant BodyOption(string bodyChoice, GeneralModEntry mod, GeneralModVariant variant) {
         return bodyChoice == NaturalBody && mod.Id == EbbBody ? variant.NaturalOption ?? variant : variant;
     }
+
+    internal static bool SamePayload(GeneralModVariant left,GeneralModVariant right) {
+        return left.Sources.SequenceEqual(right.Sources,StringComparer.Ordinal)&&
+            GeneralInstallRoutes.Same(left.InstallRoutes,right.InstallRoutes);
+    }
+
+    internal static string InstallationKey(GeneralModEntry mod,GeneralModVariant variant) {
+        var parent=mod.Id==EbbBody?mod.Variants.FirstOrDefault(item=>ReferenceEquals(item.NaturalOption,variant)):null;
+        return mod.Id+"/"+(parent!=null&&!SamePayload(parent,variant)?"natural-":"")+variant.Id;
+    }
     internal static bool IsFacialMod(string id) { return id.StartsWith("face-", StringComparison.Ordinal); }
     readonly string statePath;
 
@@ -98,14 +115,18 @@ public sealed class GeneralModLibrary {
         ValidateChoices(state);
         RetiredPackEntries.Remove(state);
         ApplyAuditedAdultFlags(state.List);
+        GeneralPresetProfiles.Initialize(state);
+        GeneralPresetProfiles.Project(state);
         return state;
     }
 
     public void Save(GeneralModState state) {
         if (state == null) throw new IOException("Estado do Mod Loader inválido.");
+        GeneralPresetProfiles.Capture(state);
         ValidateList(state.List, true);
         ValidateChoices(state);
         ApplyAuditedAdultFlags(state.List);
+        GeneralPresetProfiles.Capture(state);
         Write(statePath, state);
     }
 
@@ -116,7 +137,7 @@ public sealed class GeneralModLibrary {
         if (String.Equals(fullPath, statePath, StringComparison.OrdinalIgnoreCase))
             throw new IOException("Escolha outro nome para a lista exportada.");
         Write(fullPath, new {
-            list.Schema, list.Categories, list.CategoryDescriptions, list.Presets, list.UncategorizedName, list.UncategorizedDescription, list.AlternativeGroups,
+            list.Schema, list.Categories, list.CategoryDescriptions, Presets=list.Presets.Select(ExportPreset).ToList(), list.UncategorizedName, list.UncategorizedDescription, list.AlternativeGroups,
             Mods = list.Mods.Select(mod => new {
                 mod.Id, mod.Name, mod.Category, mod.DefaultVariant, mod.Description, mod.Tags, mod.CompatibilityGroups, mod.Nsfw, mod.NsfwOverride, mod.AlternativeGroup, mod.DependencySource, mod.DependencyFile,
                 Variants = mod.Variants.Select(ExportVariant).ToList()
@@ -124,6 +145,14 @@ public sealed class GeneralModLibrary {
         });
     }
 
+    static object ExportPreset(GeneralModPreset preset) {
+        return new {preset.Id,preset.Name,preset.ModIds,preset.Categories,preset.VariantChoices,preset.AlternativeChoices,preset.BodyChoice,preset.Groups,
+            Configurations=preset.Configurations.ToDictionary(pair=>pair.Key,pair=>ExportPresetMod(pair.Value))};
+    }
+    static object ExportPresetMod(GeneralModEntry mod) {
+        return new {mod.Id,mod.Name,mod.Category,mod.DefaultVariant,mod.Description,mod.Tags,mod.CompatibilityGroups,mod.Nsfw,mod.NsfwOverride,mod.AlternativeGroup,mod.DependencySource,mod.DependencyFile,
+            Variants=mod.Variants.Select(ExportVariant).ToList()};
+    }
     static object ExportVariant(GeneralModVariant variant) {
         return new {
             variant.Id, variant.Name, variant.Sources, variant.SourceInfo, variant.CompatibilityGroups, variant.RequiredMods, variant.InstallRoutes,
@@ -204,9 +233,10 @@ public sealed class GeneralModLibrary {
         ValidateList(list, true);
         string existing = list.Categories.FirstOrDefault(item => String.Equals(item, requested, StringComparison.OrdinalIgnoreCase));
         if (existing == null) throw new IOException("A categoria não pertence à lista. O grupo sem categoria não pode ser excluído.");
-        foreach (var mod in list.Mods.Where(item => String.Equals(item.Category, existing, StringComparison.OrdinalIgnoreCase)))
+        var entries = list.Mods.Concat(list.Presets.SelectMany(p => p.Configurations.Values)).ToArray();
+        foreach (var mod in entries.Where(item => String.Equals(item.Category, existing, StringComparison.OrdinalIgnoreCase)))
             mod.Category = null;
-        foreach (var option in list.Mods.SelectMany(mod => mod.Variants).SelectMany(variant => variant.WithNaturalOption()))
+        foreach (var option in entries.SelectMany(mod => mod.Variants).SelectMany(variant => variant.WithNaturalOption()))
             if (String.Equals(option.Category, existing, StringComparison.OrdinalIgnoreCase)) option.Category = "";
         list.Categories.Remove(existing);
         list.CategoryDescriptions.Remove(existing);
@@ -227,6 +257,8 @@ public sealed class GeneralModLibrary {
     internal static void RestoreKnownMappings(GeneralModList list, GeneralModList trustedSeed, bool keepHistoricalEntries) {
         ValidateList(list, false);
         if(!keepHistoricalEntries)RetiredPackEntries.Remove(list);
+        foreach(var preset in list.Presets.Where(p=>p.Configurations.Count>0))
+            RestoreKnownMappings(new GeneralModList{Categories=list.Categories,AlternativeGroups=list.AlternativeGroups,Mods=preset.Configurations.Values.ToList()},trustedSeed,keepHistoricalEntries);
         var byId = trustedSeed.Mods.ToDictionary(mod => mod.Id, StringComparer.Ordinal);
         foreach (var entry in list.Mods) {
             GeneralModEntry trusted;
@@ -457,6 +489,7 @@ public sealed class GeneralModLibrary {
             foreach (string id in preset.ModIds)
                 if (id == null || !ids.Contains(id) || !members.Add(id)) throw new IOException("O preset contém um mod desconhecido ou repetido.");
         }
+        GeneralPresetProfiles.Validate(list,trustRecipes);
     }
 
     static void ValidateTags(List<string> tags) {

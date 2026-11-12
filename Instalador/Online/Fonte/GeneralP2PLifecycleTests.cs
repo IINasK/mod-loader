@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -182,6 +182,7 @@ internal static class GeneralP2PLifecycleTests {
         Directory.CreateDirectory(root);
         var checks=new List<string>();
         try{
+            OnlineExtraCleanupTests.RunSyncOwnership(parent);
             Sync(root,helper,checks);
             CyberpunkSync(root,helper,checks);
             Safe.WriteJson(Path.Combine(root,"resultado-p2p-sync.json"),new{Passed=true,Tests=checks});
@@ -262,9 +263,24 @@ internal static class GeneralP2PLifecycleTests {
         WriteSyncFile(target,outside,"local version");
         const string empty="red4ext/plugins/stale-folder",sharedEmpty="red4ext/plugins/shared-empty",bundle="red4ext/plugins/stale-plugin";
         foreach(string path in new[]{remove,sidecar,keep,baseFile,bundle+"/mod.dll"})WriteSyncFile(target,path,path);
+        const string cet="bin/x64/plugins/cyber_engine_tweaks/mods/";
+        string hotline=cet+"NPCD_Hotline",stop=cet+"stopNCPD",sharedCet=cet+"shared";
+        const string script="r6/scripts/NCPD_Hotline",oldShell="r6/scripts/OldShell";
+        foreach(string path in new[]{hotline+"/init.lua",hotline+"/NPCD_Hotline.log",hotline+"/db.sqlite3",
+            stop+"/stopNCPD.log",stop+"/db.sqlite3",script+"/nested/mod.reds",sharedCet+"/db.sqlite3"})
+            WriteSyncFile(target,path,path);
+        WriteSyncFile(source,sharedCet+"/init.lua","shared CET");
+        WriteSyncFile(target,sharedCet+"/init.lua","shared CET");
+        Directory.CreateDirectory(Safe.In(target,hotline+"/nested/empty"));
+        Directory.CreateDirectory(Safe.In(target,oldShell+"/nested"));
         Directory.CreateDirectory(Safe.In(target,empty));
         Directory.CreateDirectory(Safe.In(source,sharedEmpty));
         Directory.CreateDirectory(Safe.In(target,sharedEmpty));
+        string oldPackage=Safe.In(root,"old-receiver-mods.zip");
+        using(var zip=System.IO.Compression.ZipFile.Open(oldPackage,System.IO.Compression.ZipArchiveMode.Create))
+            foreach(string path in new[]{remove,sidecar,keep,bundle+"/mod.dll",hotline+"/init.lua",script+"/nested/mod.reds"})
+                using(var writer=new StreamWriter(zip.CreateEntry(path).Open()))writer.Write(path);
+        new GeneralModInstaller(target,Path.Combine(data,"Instalacoes")).Install(oldPackage,"old-receiver-mods",_=>{});
         using(var host=Service(root,"cp-host",Safe.In(root,"cp-source"),helper,catalog:catalog))
         using(var friend=Service(root,"cp-friend",data,helper,catalog:catalog)){
             host.SetPreparationState(state);
@@ -278,29 +294,46 @@ internal static class GeneralP2PLifecycleTests {
                 shown=true;
                 Check(checks,review.Different.Contains("Mod de teste")&&review.HostOutsideDifferences.SequenceEqual(new[]{outside}),
                     "Comparison identifies an older package file and an actual host file outside the preset.");
-                Check(checks,review.Extras.Length==4&&review.Extras.Single(extra=>extra.Name=="remove").Files.Length==2&&
-                    review.Extras.Single(extra=>extra.Name=="stale-folder").Files.Single().Before==null,
-                    "Archive sidecars are grouped. Receiver-only empty folders are listed and host files and protected base stay out.");
+                Check(checks,review.Extras.Single(extra=>extra.Proven&&extra.Name=="remove").Files.Length==2&&
+                    !review.Extras.Single(extra=>extra.Name=="stale-folder").Proven,
+                    "Registered archive sidecars have proof; empty folders alone do not prove ownership.");
+                Check(checks,review.Extras.Any(extra=>extra.Proven&&extra.Name=="NPCD_Hotline")&&
+                    review.Extras.Where(extra=>extra.Name=="NPCD_Hotline"&&!extra.Proven).SelectMany(extra=>extra.Files).Any(file=>file.Path==hotline+"/db.sqlite3")&&
+                    !review.Extras.Single(extra=>extra.Name=="stopNCPD").Proven&&
+                    !review.Extras.Single(extra=>extra.Name=="OldShell").Proven&&!review.Extras.Any(extra=>extra.Name=="shared"),
+                    "Runtime files and empty script shells remain unknown even beside a proven mod, while host state is protected.");
+                bool blocked=false;
+                try { friend.SubmitSyncChoice(review,false,Enumerable.Range(0,review.Extras.Length).ToArray()); }
+                catch(IOException){blocked=true;}
+                Check(checks,blocked&&!friend.HasSyncChoice(received),"An unfiltered select-all cannot authorize unknown files through the service.");
                 return null;
             }).GetAwaiter().GetResult();
             Check(checks,shown&&!friend.HasSyncChoice(received)&&File.Exists(Safe.In(target,remove))&&sent.PayloadHash==null,
                 "Closing the review makes no changes and sends no choice.");
             friend.ChooseIncoming(received,false,review=>Enumerable.Range(0,review.Extras.Length)
-                .Where(index=>review.Extras[index].Name!="keep").ToArray()).GetAwaiter().GetResult();
+                .Where(index=>review.Extras[index].Proven&&review.Extras[index].Name!="keep").ToArray()).GetAwaiter().GetResult();
             Wait(()=> {
                 if(received.Error!=null||sent.Error!=null)throw new IOException("Cyberpunk sync: "+received.Error+" "+sent.Error);
                 return received.Completed&&sent.Completed;
             },"Selected Cyberpunk sync did not finish.");
-            Check(checks,!Directory.Exists(Safe.In(target,empty))&&!Directory.Exists(Safe.In(target,bundle))&&Directory.Exists(Safe.In(target,sharedEmpty)),
-                "Selected empty folders and shells from selected mods disappear while shared folders remain.");
+            Check(checks,Directory.Exists(Safe.In(target,empty))&&!Directory.Exists(Safe.In(target,bundle))&&Directory.Exists(Safe.In(target,sharedEmpty)),
+                "Only the empty ancestor of a removed registered file is pruned; unknown and shared folders remain.");
             Check(checks,!File.Exists(Safe.In(target,remove))&&!File.Exists(Safe.In(target,sidecar))&&File.Exists(Safe.In(target,keep))&&File.Exists(Safe.In(target,baseFile))&&
                 File.ReadAllText(Safe.In(target,outside))=="local version"&&File.ReadAllText(Safe.In(target,stale))=="test "+stale,
                 "Only checked extras are moved. Existing host files and unchecked mods stay while the approved version is updated.");
-            Check(checks,received.SyncLocalExtrasKept==1&&received.SyncHostFilesDifferent==1,"Known differences remain visible after installation.");
+            Check(checks,!FixedInstaller.SyncInventoryEntry(stop+"/stopNCPD.log",Safe.Hash(Safe.In(target,sharedCet+"/db.sqlite3")))&&
+                !FixedInstaller.SyncInventoryEntry(stop+"/db.sqlite3",Safe.Hash(Safe.In(target,sharedCet+"/db.sqlite3")))&&
+                friend.InstalledManifest(received).Files.All(file=>!file.Path.EndsWith(".log")&&!file.Path.EndsWith(".sqlite3")),
+                "CET runtime leftovers stay local and are never added to the transmitted mod inventory or package.");
+            Check(checks,new[]{hotline,stop,oldShell}.All(path=>Directory.Exists(Safe.In(target,path)))&&
+                !Directory.Exists(Safe.In(target,script))&&!File.Exists(Safe.In(target,hotline+"/init.lua"))&&
+                File.Exists(Safe.In(target,hotline+"/db.sqlite3"))&&File.Exists(Safe.In(target,sharedCet+"/db.sqlite3")),
+                "Only proven files move; generated logs/databases, unknown trees and unrelated empty subdirectories remain.");
+            Check(checks,received.SyncLocalExtrasKept>1&&received.SyncHostFilesDifferent==1,"Known differences remain visible after installation.");
             using(var reopened=new P2PService(friend.Root,friend.Store,true)){
                 var session=reopened.SnapshotSessions().Single(item=>item.Id==received.Id);
                 var differences=reopened.ReadSyncDifferences(session);
-                Check(checks,differences.Length==2&&differences.Any(item=>item.Kind=="kept"&&item.Mod=="keep"&&item.Path==keep)&&
+                Check(checks,differences.Length>2&&differences.Any(item=>item.Kind=="kept"&&item.Mod=="keep"&&item.Path==keep)&&
                     differences.Any(item=>item.Kind=="different"&&item.Path==outside),
                     "Completed comparison keeps only unresolved paths and their origin across restarts.");
                 reopened.DismissCompletedTransfer(session);
@@ -309,6 +342,11 @@ internal static class GeneralP2PLifecycleTests {
             new FixedInstaller(catalog,target,true).Undo(_=>{});
             Check(checks,File.Exists(Safe.In(target,remove))&&File.Exists(Safe.In(target,sidecar))&&
                 Directory.Exists(Safe.In(target,empty))&&File.Exists(Safe.In(target,bundle+"/mod.dll")),"The removal journal restores files and empty folders.");
+            Check(checks,Directory.Exists(Safe.In(target,hotline+"/nested/empty"))&&
+                File.ReadAllText(Safe.In(target,hotline+"/db.sqlite3"))==hotline+"/db.sqlite3"&&
+                File.ReadAllText(Safe.In(target,stop+"/stopNCPD.log"))==stop+"/stopNCPD.log"&&
+                File.Exists(Safe.In(target,script+"/nested/mod.reds"))&&Directory.Exists(Safe.In(target,oldShell+"/nested")),
+                "Undo restores CET logs and database, scripts and nested empty directories.");
         }
     }
 

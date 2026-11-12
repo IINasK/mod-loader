@@ -20,7 +20,8 @@ public static class ModDefaults {
     };
     static readonly Dictionary<string,string> JsonPaths=new Dictionary<string,string>(StringComparer.Ordinal){
         {"mod-22340","bin/x64/plugins/cyber_engine_tweaks/mods/Shift/userConfig.json"},
-        {"15-NCPDHotline","bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/mod_user_settings.json"}
+        {"15-NCPDHotline","bin/x64/plugins/cyber_engine_tweaks/mods/NPCD_Hotline/mod_user_settings.json"},
+        {"mod-35626","bin/x64/plugins/cyber_engine_tweaks/mods/ExpandedDualWielding/settings-v2.json"}
     };
     sealed class Change {
         public string Relative,Path,BeforeHash,AfterHash;

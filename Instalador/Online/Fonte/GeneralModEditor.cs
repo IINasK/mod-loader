@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -84,7 +84,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
     internal string CategoryRenameFrom { get { return categoryFrom; } }
     internal readonly Dictionary<string,string> NewCategories = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
 
-    internal GeneralModEditor(GeneralModEntry entry, IEnumerable<string> categories, string selected, bool allowInstall, string installInfo,Func<string,Task<GeneralSourceInfo>> lookup=null, IEnumerable<GeneralModEntry> alternatives=null, GeneralModList groupList=null, bool projectDraft=false, string installationFolder=null, bool inventoryDraft=false, Func<string,Task<GeneralSourceInfo>> refreshLookup=null, Func<GeneralModVariant,IEnumerable<string>> catalogPaths=null, Func<GeneralModVariant,int,string> downloadedSource=null, bool fixedChoices=false, Func<GeneralNexusLink,NexusFilePreview[]> archivePreview=null, bool cyberpunkLayout=false) {
+    internal GeneralModEditor(GeneralModEntry entry, IEnumerable<string> categories, string selected, bool allowInstall, string installInfo,Func<string,Task<GeneralSourceInfo>> lookup=null, IEnumerable<GeneralModEntry> alternatives=null, GeneralModList groupList=null, bool projectDraft=false, string installationFolder=null, bool inventoryDraft=false, Func<string,Task<GeneralSourceInfo>> refreshLookup=null, Func<GeneralModVariant,IEnumerable<string>> catalogPaths=null, Func<GeneralModVariant,int,string> downloadedSource=null, bool fixedChoices=false, Func<GeneralNexusLink,NexusFilePreview[]> archivePreview=null, bool cyberpunkLayout=false, Func<GeneralModVariant,string> backupFile=null) {
         this.lookup=lookup;
         this.fixedChoices=fixedChoices;
         this.archivePreview=archivePreview;
@@ -211,6 +211,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         sourceLayout.Controls.Add(copySource,1,0);
         editorTips.SetToolTip(copySource,copySource.AccessibleName);
         AddEditorRow(layout,sourceField);
+        AddEditorRow(layout,presetMembershipRow);
         sourceInfo.Font = GeneralStyle.Font(10);
         sourceInfo.Dock = DockStyle.Top;
         sourceInfo.Margin = new Padding(3, 4, 3, 8);
@@ -280,7 +281,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
 
         archiveHeading=EditorSection(T("Destinos dos arquivos","File destinations"),true);
         AddEditorRow(layout,archiveHeading);
-        archiveDestinations=new GeneralArchiveDestinations(installationFolder);
+        archiveDestinations=new GeneralArchiveDestinations(installationFolder,backupFile==null?null:(Func<string>)(()=>backupFile(current)));
         archiveDestinations.Applied+=routes=>{current.InstallRoutes=routes;ValidateInputs();};
         archiveDestinations.DraftChanged+=ValidateInputs;
         AddEditorRow(layout,archiveDestinations);
@@ -765,6 +766,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         if(!routeDrafts.TryGetValue(current.Id,out pending))
             routeDrafts[current.Id]=pending=GeneralArchiveDestinations.RouteDraft(current.InstallRoutes);
         archiveDestinations.SetRoutes(current.InstallRoutes,pending);
+        archiveDestinations.RefreshFolderButton();
         LoadSource();
         changing = false;
         ValidateInputs();ScheduleSourceInfo();ScheduleArchive();
@@ -921,8 +923,12 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
     internal event Action<List<GeneralInstallRoute>> Applied;
     internal event Action DraftChanged;
 
-    internal GeneralArchiveDestinations(string game){
+    readonly Func<string> backupFile;
+    readonly Button openFolder;
+
+    internal GeneralArchiveDestinations(string game,Func<string> backupFile=null){
         this.game=game;
+        this.backupFile=backupFile;
         Name="ArchiveDestinations";
         Dock=DockStyle.Fill;AutoSize=true;AutoSizeMode=AutoSizeMode.GrowAndShrink;
         ColumnCount=1;RowCount=4;Margin=new Padding(3,0,3,6);
@@ -998,6 +1004,30 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
         reset.Name="ResetArchiveDestination";
         buttons.Controls.AddRange(new Control[]{apply,cancel,reset});
         Controls.Add(buttons,0,3);
+        if(backupFile!=null){
+            openFolder=GeneralStyle.Button(T("Abrir pasta da instalação","Open installation folder"),()=>{
+                try{
+                    string backup=backupFile();
+                    if(backup!=null){
+                        Safe.NoLinks(backup);
+                        System.Diagnostics.Process.Start("explorer.exe","/select,\""+backup+"\"");
+                        return;
+                    }
+                    var node=Selected;
+                    if(node==null)return;
+                    var route=accepted.FirstOrDefault(item=>String.Equals(item.Folder,SelectedPath,StringComparison.OrdinalIgnoreCase));
+                    string folder=GeneralInstallRoutes.DirectoryFor(game,route==null?SuggestedFolder(node):route.Destination,true);
+                    Safe.NoLinks(folder);
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(folder){UseShellExecute=true});
+                }catch(Exception ex){
+                    feedback.Text=ex.Message;
+                }
+            });
+            openFolder.Name="OpenVariantFiles";
+            openFolder.Margin=new Padding(0,2,0,0);
+            Controls.Add(openFolder,0,4);
+            RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        }
         var tips=new ToolTip { UseAnimation=false,UseFading=false };
         Disposed+=(s,e)=>tips.Dispose();
         tips.SetToolTip(reset,T("Restaurar a localização herdada apenas neste item.","Restore the inherited location for this item."));
@@ -1008,6 +1038,13 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
     }
 
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
+    internal void RefreshFolderButton(){
+        if(openFolder==null)return;
+        string backup=null;
+        try{backup=backupFile();}catch(IOException){}catch(UnauthorizedAccessException){}
+        openFolder.Text=backup==null?T("Abrir pasta da instalação","Open installation folder"):T("Abrir pasta de backup","Open backup folder");
+        openFolder.Enabled=backup!=null||Directory.Exists(game);
+    }
     TreeNode Selected {get{return tree.SelectedItem as TreeNode;}}
     string SelectedPath {get{return Selected==null?"":(string)Selected.Tag;}}
 

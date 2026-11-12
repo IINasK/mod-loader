@@ -651,7 +651,7 @@ public sealed partial class InstalledSnapshotInstaller {
         File.Copy(source, target, false);
         if (Safe.Hash(target) != expected) throw new IOException("O arquivo mudou antes do backup.");
     }
-    static void CopyBounded(Stream source, Stream target, long size) {
+    internal static void CopyBounded(Stream source, Stream target, long size) {
         byte[] buffer = new byte[524288]; long total = 0; int count;
         while ((count = source.Read(buffer, 0, buffer.Length)) > 0) { total += count; if (total > size) throw new IOException("Arquivo maior que o declarado."); target.Write(buffer, 0, count); }
         if (total != size) throw new IOException("Arquivo incompleto no pacote.");

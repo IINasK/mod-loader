@@ -13912,63 +13912,6 @@
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/35772?tab=description\nhttps://www.nexusmods.com/cyberpunk2077/mods/35772?tab=files"
     },
     {
-      "Id": "mod-35353",
-      "Name": "NETGVNNER - FL00R SHXT POSE PACK",
-      "Version": "1",
-      "Profile": "Complementos",
-      "GameVersion": "2.5",
-      "RequiresPL": false,
-      "RequiresRedmod": false,
-      "Immutable": false,
-      "Dependencies": [
-        "ArchiveXL",
-        "TweakXL"
-      ],
-      "Warning": "Modo foto: poses femininas. Variantes ANGEL/EBB podem não ajustar no corpo padrão; preferir as demais. Poses com arma precisam de pistola no inventário.",
-      "Assets": [
-        {
-          "Id": "a0",
-          "Name": "NETGVNNER - FL00R SHXT 35353 1 2026-10-26T13-04Z k8Iw8mmuE.zip",
-          "Sha256": "d49b5902c8ab73ab11a67953b6518ffe21c0793e4d70f947ba3ea3babfca7bd3",
-          "Size": 151429,
-          "Format": "zip",
-          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/35353?tab=files&file_id=168808",
-          "ModId": 35353,
-          "FileId": 168808
-        }
-      ],
-      "Files": [
-        {
-          "Asset": "a0",
-          "Entry": "r6/tweaks/NETGVNNER/NETGVNNER_FL00R_SHXT.yaml",
-          "Path": "r6/tweaks/NETGVNNER/NETGVNNER_FL00R_SHXT.yaml",
-          "Size": 19480,
-          "Sha256": "b2dde4e87317e91b131f889b35e1bfcdd9a53571157777c93e8f27ffe9e08a69"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "archive/pc/mod/NETGVNNER_FL00R_SHXT.archive",
-          "Path": "archive/pc/mod/NETGVNNER_FL00R_SHXT.archive",
-          "Size": 155648,
-          "Sha256": "222d2b33dd6c223efe63bea26ab1ef53d1fb4be00488543f45920231d44c1bda"
-        },
-        {
-          "Asset": "a0",
-          "Entry": "archive/pc/mod/NETGVNNER_FL00R_SHXT.xl",
-          "Path": "archive/pc/mod/NETGVNNER_FL00R_SHXT.xl",
-          "Size": 180,
-          "Sha256": "ec6268bfc88bd6ceb9beb3944ba35d116a0a63ec4897756c42dd856ba38c4f05"
-        }
-      ],
-      "BlockedReason": "",
-      "ThirdPerson": "Conjunto feminino de animações; não altera corpo padrão",
-      "ThirdPersonNotes": "Pacote de 36 poses femininas de chão para o modo foto. O YAML contém 56 registros únicos:36 poses-base e20 variações, incluindo opções para corpos específicos.\r\n\r\nAbrir o modo foto > poses > categoria NETGVNNER - FL00R SHXT.\r\n\r\nAs poses foram pensadas para sapatos de plataforma; salto fino ou solado baixo pode alterar o contato com o chão.\r\n\r\nPara as poses armadas aparecerem, o autor pede uma pistola no inventário.\r\n\r\nMantendo o corpo padrão, começar pelas variações sem marcação ANGEL/EBB; os nomes das variações não obrigam a instalar esses corpos.\r\n\r\nCandidato compatível pelas dependências declaradas e pelo escopo dos arquivos. Sem referência EP1 nos textos conferidos; ausência de DLC é inferência estática, não teste runtime.\r\n\r\n- ArchiveXL e TweakXL são explicitamente declarados pelo autor; versões mínimas não informadas.\r\n- O arquivo informa que foi gerado com Easy Photomode Poses; esse programa de criação não é uma dependência runtime demonstrada.\r\n- O autor alerta deformações/clipping com rigs corporais.\r\n- Nenhum conflito de destino encontrado com o catálogo ou com EXtra; ambos acrescentam animações à entidade feminina de modo foto. Compatibilidade interna de archives e sincronização coop não foram executadas.\r\n- O YAML usa CategoryName com inicial maiúscula. Não foi verificada a aceitação dessa propriedade pelo TweakXL1.12.0 em runtime; observar seu log num futuro teste, sem alterar o arquivo do autor.\r\n- O autor proíbe modificar, converter e redistribuir o pacote; esta ficha contém somente metadados e resumo.\r\n\r\nSincronização em coop não demonstrada. Nenhum arquivo do jogo, corpo, loader ou save foi alterado.",
-      "ThirdPersonSource": "https://www.nexusmods.com/cyberpunk2077/mods/35353?tab=description\nhttps://www.nexusmods.com/cyberpunk2077/mods/35353?tab=files",
-      "PhantomLibertyStatus": "not-required",
-      "PhantomLibertyNotes": "Sem exigência de expansão nas fontes e textos auditados; classificação documental/estática, sem teste de jogo sem DLC.",
-      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/35353?tab=description\nhttps://www.nexusmods.com/cyberpunk2077/mods/35353?tab=files"
-    },
-    {
       "Id": "mod-36378",
       "Name": "Unlimited Attribute Reset",
       "Version": "1.0.1",
@@ -17119,7 +17062,7 @@
     },
     {
       "Id": "mod-12637",
-      "Name": "VOIDWEAR Accessories Virtual Atelier",
+      "Name": "VOIDWEAR Virtual Atelier",
       "Version": "0.85",
       "Profile": "Complementos",
       "GameVersion": "2.5",
@@ -17130,7 +17073,7 @@
         "mod-2987",
         "redscript"
       ],
-      "Warning": "No computador: Net > Atelier > VOIDWEAR Accessories. As lojas Casual e Tacticool foram retiradas por escolha do usuário; suas roupas não são removidas por isso. A loja de acessórios permanece para os óculos.",
+      "Warning": "No computador do apartamento, abra Net > Atelier. Inclui Accessories, Casual e Tacticool.",
       "PhantomLibertyStatus": "not-required",
       "PhantomLibertyNotes": "Sem requisito de expansão declarado. Inferência documental e estática.",
       "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/12637",
@@ -17154,14 +17097,32 @@
           "Entry": "archive/pc/mod/void_Atelier_Store.archive",
           "Path": "archive/pc/mod/void_Atelier_Store.archive",
           "Size": 16384,
-          "Sha256": "8dc444b66da06d80850179ddcd1c4bd27e46b7dac09f8544db0752e06290aa32"
+          "Sha256": "8dc444b66da06d80850179ddcd1c4bd27e46b7dac09f8544db0752e06290aa32",
+          "UserData": false
         },
         {
           "Asset": "a0",
           "Entry": "r6/scripts/yellingintothevoid/voidwear-accessories.reds",
           "Path": "r6/scripts/yellingintothevoid/voidwear-accessories.reds",
           "Size": 17609,
-          "Sha256": "347462f8013f78f63e5c478aaef82af9aecbc4ceb8034924d820d7a25fc9d69e"
+          "Sha256": "347462f8013f78f63e5c478aaef82af9aecbc4ceb8034924d820d7a25fc9d69e",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/yellingintothevoid/voidwear-casual.reds",
+          "Path": "r6/scripts/yellingintothevoid/voidwear-casual.reds",
+          "Size": 24566,
+          "Sha256": "e2286db2f30732e66d0da0b644d3763f7b501aada75a4dadf9a80e0cf54cd226",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/yellingintothevoid/voidwear-tacticool.reds",
+          "Path": "r6/scripts/yellingintothevoid/voidwear-tacticool.reds",
+          "Size": 22885,
+          "Sha256": "6a2b5b8d74478efcd7c71667aefacbf07b64adb1ae085fe4714637c3a773881c",
+          "UserData": false
         }
       ]
     },
@@ -19802,46 +19763,6 @@
       ]
     },
     {
-      "Id": "mod-35667",
-      "Name": "Dual Wield Anything and Everything",
-      "Version": "0.2.0",
-      "Profile": "Complementos",
-      "GameVersion": "2.5",
-      "Warning": "Requer o perk Double Trouble. Armas pesadas de pegar no cenário e algumas combinações de duas armas brancas têm limitações. Evite usar junto com Expanded Dual Wielding. Sincronização no coop ainda sem teste.",
-      "Dependencies": [
-        "CET"
-      ],
-      "RequiresPL": false,
-      "RequiresRedmod": false,
-      "Immutable": false,
-      "PhantomLibertyStatus": "not-required",
-      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/35667?tab=files&file_id=167854",
-      "NexusModId": 35667,
-      "NexusFileId": 167854,
-      "Assets": [
-        {
-          "Id": "a0",
-          "Name": "DualWieldEverything 0.2.0 35667 2 2026-10-23T15-51Z YfTif773L.zip",
-          "Size": 3217,
-          "Sha256": "eeb162e71daa14d884573756a53b439de56ef4d7a1643b12e690d833306e34bd",
-          "Format": "zip",
-          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/35667?tab=files&file_id=167854",
-          "ModId": 35667,
-          "FileId": 167854
-        }
-      ],
-      "Files": [
-        {
-          "Asset": "a0",
-          "Entry": "DualWieldEverything-0.1.0/bin/x64/plugins/cyber_engine_tweaks/mods/DualWieldEverything/init.lua",
-          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/DualWieldEverything/init.lua",
-          "Size": 4615,
-          "Sha256": "f749b515956927971d9b21207b8fa673c5ff07c2daafe730d57b23b53fd6bbe1",
-          "UserData": false
-        }
-      ]
-    },
-    {
       "Id": "mod-12681",
       "Name": "H10 Megabuilding Unlocked",
       "Version": "3.0.5",
@@ -20003,6 +19924,1287 @@
           "UserData": false
         }
       ]
+    },
+    {
+      "Id": "mod-35626",
+      "Name": "Expanded Dual Wielding + patch para Immersive Third Person",
+      "Version": "3.7",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "All Guns é experimental. Submetralhadoras e pares com katana podem ter sobreposição visual.",
+      "Dependencies": [
+        "CET",
+        "NativeSettings",
+        "redscript",
+        "Codeware",
+        "19-ThirdPerson"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "not-required",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/35626?tab=files&file_id=171093",
+      "NexusModId": 35626,
+      "NexusFileId": 171093,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Expanded Dual Wielding 35626 3.7 2026-10-30T17-00Z Q6xF6liOW.zip",
+          "Size": 1144954,
+          "Sha256": "2c8ae6f6d88b85190622d53f1d96472d155cc9e90b9e9f215ebb949723f8132c",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/35626?tab=files&file_id=171093",
+          "ModId": 35626,
+          "FileId": 171093
+        },
+        {
+          "Id": "a1",
+          "Name": "Compatibility patch for Immersive Third Person 35626 1 2026-10-27T22-52Z Z0ER0BBZ3.zip",
+          "Size": 127050,
+          "Sha256": "4a2615c5624c365a68fe3d381709a975a1d207e31b0e4d8ba1a7e86abe3dee15",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/35626?tab=files&file_id=169677",
+          "ModId": 35626,
+          "FileId": 169677
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/edw_hud_layout.archive",
+          "Path": "archive/pc/mod/edw_hud_layout.archive",
+          "Size": 20480,
+          "Sha256": "1c81857c0061e0e9ac9f01acd1c0498802171d4c613654d0cddf75ce487a2a06",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/edw_mixed_pose_004.archive",
+          "Path": "archive/pc/mod/edw_mixed_pose_004.archive",
+          "Size": 131072,
+          "Sha256": "df8fe300e0532ae825fe4f107fe5d5d31b251d6b351c464a20f51de64a7f3a09",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/edw_right_pistol_reload_002.archive",
+          "Path": "archive/pc/mod/edw_right_pistol_reload_002.archive",
+          "Size": 958464,
+          "Sha256": "4bbf9ec669a1a67e4cbf4b7f114698c54873cef178765bf854bf9da8ac4e7d91",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/ExpandedDualWielding/bindings.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/ExpandedDualWielding/bindings.lua",
+          "Size": 11545,
+          "Sha256": "d0764b33be97478fc611c39b8286fef4e75c1dff6bea27484b902db2d9fb53af",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/ExpandedDualWielding/damage.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/ExpandedDualWielding/damage.lua",
+          "Size": 1691,
+          "Sha256": "b61f5cc40ca398828a4a11d1eabc017fb17bad613a1e0da40d8686c1e0e2757d",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/ExpandedDualWielding/eligibility.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/ExpandedDualWielding/eligibility.lua",
+          "Size": 2911,
+          "Sha256": "31cb0728ffa1ec31dccc0f76ca55adb2c94b6c5d28a2eb713e70903a3deb1824",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/ExpandedDualWielding/init.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/ExpandedDualWielding/init.lua",
+          "Size": 9973,
+          "Sha256": "1d12a1db4c9184d82f670f6eec31807cc28b40df5564943c48d85f1164020117",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/ExpandedDualWielding/native-menu.lua",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/ExpandedDualWielding/native-menu.lua",
+          "Size": 21064,
+          "Sha256": "41541eb5f0f37fe599e68447aad31c935fbe3a561c73bf8c02936974a0158796",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/alternate.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/alternate.reds",
+          "Size": 1367,
+          "Sha256": "a2c0c88bf93c7f6454d392b4f1e2f9f4674b21f90edbc3849880782ef98bc3d5",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/ammo-layout-ui.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/ammo-layout-ui.reds",
+          "Size": 3340,
+          "Sha256": "19e0f237f4f240de3f3f3a2c5bd692216690410dfc566dcb8b18568face45791",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/bindings-holstered.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/bindings-holstered.reds",
+          "Size": 2149,
+          "Sha256": "bebfbb4fb82998db5e7e494acffb12f13337f83332f0eeb3c67eeadc4cc3099a",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/bindings-hooks.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/bindings-hooks.reds",
+          "Size": 9860,
+          "Sha256": "9979ab4d6ffb76583d1927d232186064a07cf647f702688cd74e41bab99ac2b7",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/bindings-runtime.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/bindings-runtime.reds",
+          "Size": 19793,
+          "Sha256": "8cf730854fe271a5379fae3355c592b449823e08c1c68f1a92d8b37c49c2a1bc",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/body-requirement.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/body-requirement.reds",
+          "Size": 8756,
+          "Sha256": "58bf02f44177d990590adc1eefdbd61693669a96a007ed4744d3a8cdbcd574e9",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/hud-hints.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/hud-hints.reds",
+          "Size": 2344,
+          "Sha256": "eac4526c2c1124a85cf3b8c60f937f9fbe0d3e7cf061823ffc9e396a1640ba96",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/left-slot.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/left-slot.reds",
+          "Size": 1224,
+          "Sha256": "e6bf892db5996a3fc4b19810671a694724cf38c4d534b43165d6ab73e71bb8e4",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/machete.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/machete.reds",
+          "Size": 9826,
+          "Sha256": "bcc6dcc9d88b5d02b5b8c8a995252efba844500f09c1209539c9eeb786919117",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/mixed-inputs.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/mixed-inputs.reds",
+          "Size": 6805,
+          "Sha256": "664af0cc8cb81f52232b265fa077bf87d43644b0f5745ffde35120e9737093ad",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/mixed-pose.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/mixed-pose.reds",
+          "Size": 1427,
+          "Sha256": "22a8e8a145c064b351f21a04611b2b5e6d1d616f8c6961384c6f77327a03d087",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/perk-requirement.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/perk-requirement.reds",
+          "Size": 1856,
+          "Sha256": "b7b5900e4499b5b4b0d8a66d4731407cae0b5c22b3df0fca2c7b65106b206d8f",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/perk-tooltip.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/perk-tooltip.reds",
+          "Size": 10400,
+          "Sha256": "7a5ba145ce2d67546ba172b892c6534eec938486685b0fb9cc417fff50608323",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/runtime.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/runtime.reds",
+          "Size": 14561,
+          "Sha256": "22fa152a85e2705d7aa2defc7e670d238b9dcc4ec5223a50815e5b9ca8858a4b",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/scanner-controls.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/scanner-controls.reds",
+          "Size": 9282,
+          "Sha256": "b1f63726518b7213afd6763ee9d37bf96b2c15c0ed662d5d76293819410620c4",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/secondary-weapon.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/secondary-weapon.reds",
+          "Size": 10318,
+          "Sha256": "894b371f459d93d87e93c50ea8a58a968a6dfdf4fdc283ebf51f3dc381432350",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/smart-targeting.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/smart-targeting.reds",
+          "Size": 2407,
+          "Sha256": "a3c82189ba67cc861d6495d9a35c49ccbb000a168dc66718b882e407f07e884d",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/transitions.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/transitions.reds",
+          "Size": 74500,
+          "Sha256": "4e5d0024eff1b63fa8c1e0dc0d863286d984f97e4d3a66355cdb8e8ab0c46b9a",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/universal-controls.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/universal-controls.reds",
+          "Size": 2916,
+          "Sha256": "1df4ef2ed40becdb8edbe5c393ed87064275d7f167b340bc29b34b8c573e06eb",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/scripts/ExpandedDualWielding/weapon-roster-ui.reds",
+          "Path": "r6/scripts/ExpandedDualWielding/weapon-roster-ui.reds",
+          "Size": 1837,
+          "Sha256": "62ed79d0743a5dd7115450effe1e25c257a7ea9a19a4a3e5f08373888cb870d4",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "archive/pc/mod/000_edw_itp_compat.archive",
+          "Path": "archive/pc/mod/000_edw_itp_compat.archive",
+          "Size": 135168,
+          "Sha256": "0061b6da74bce340d1c3c30925d1930b2b7a1175a3b9fd31fe0bf58f788ef065",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-14512",
+      "Name": "Goth Outfit Pt4",
+      "Version": "1.0",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "",
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "Codeware"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/14512?tab=files&file_id=76569",
+      "NexusModId": 14512,
+      "NexusFileId": 76569,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Goth Outfit Pt4_VanillaArms-14512-1-0-1714906495.zip",
+          "Size": 140484611,
+          "Sha256": "feccad880b4a55c6f637f254c284d71f262c53ddb569adfb85d8ee8fdb143973",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/14512?tab=files&file_id=76569",
+          "ModId": 14512,
+          "FileId": 76569
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/Goth Outfit Pt4.archive",
+          "Path": "archive/pc/mod/Goth Outfit Pt4.archive",
+          "Size": 142245888,
+          "Sha256": "9aaa50635463b843ff98a50dd4f970faf132889a061a46a70e947eba924a5034",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/veegee_goth_pt4.xl",
+          "Path": "archive/pc/mod/veegee_goth_pt4.xl",
+          "Size": 147,
+          "Sha256": "23d987b6a67379524bb1379ac528625b08bea1de208967b2709bbc41300d3795",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/Veegee/veegee_goth_pt4.yaml",
+          "Path": "r6/tweaks/Veegee/veegee_goth_pt4.yaml",
+          "Size": 1402,
+          "Sha256": "2b11d5ad2f08adb2b80bd0f67337202954931ce8318a30bd1f0a5a3e51e7baba",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-12230",
+      "Name": "Spring Full Outfit (EBB + RB)",
+      "Version": "1.0",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "",
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "Codeware"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/12230?tab=files&file_id=64159",
+      "NexusModId": 12230,
+      "NexusFileId": 64159,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Spring Full Outfit_ebbrb-12230-1-0-1704868527.zip",
+          "Size": 438015503,
+          "Sha256": "40928b6f15cfce1d8afcb4ccc152ba1b121c5921903358ea66c38bec5d124178",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/12230?tab=files&file_id=64159",
+          "ModId": 12230,
+          "FileId": 64159
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/Spring Full Outfit.archive",
+          "Path": "archive/pc/mod/Spring Full Outfit.archive",
+          "Size": 441122816,
+          "Sha256": "32c6c548c574c24febfcdb11771a3340edb448ed2bbc37a25150c9c8d3c65f28",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/spring_full_outfit.xl",
+          "Path": "archive/pc/mod/spring_full_outfit.xl",
+          "Size": 159,
+          "Sha256": "450ecf72c94863e9482ffae360aa3fa96fdf066ca95cb27f7a65653a2fc82b05",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/Spring Full Outfit/spring_full_outfit.yaml",
+          "Path": "r6/tweaks/Spring Full Outfit/spring_full_outfit.yaml",
+          "Size": 36760,
+          "Sha256": "0234a0448487a87b4fc94e9c942189e440fbe3301bff1a96f6e0936bdb482bb3",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-13731",
+      "Name": "Ayumi x Veegee · Landmine Set (EBB + RB)",
+      "Version": "1.1",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "",
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "Codeware"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/13731?tab=files&file_id=72312",
+      "NexusModId": 13731,
+      "NexusFileId": 72312,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Ayumi X Veegee Landmine Set_EBBRB_EBBPRB-13731-1-1-1710907012.zip",
+          "Size": 63204475,
+          "Sha256": "51c00df21d9a9a00150763b3428e6583e9652acdea6cd532e10ebd25c2768c2b",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/13731?tab=files&file_id=72312",
+          "ModId": 13731,
+          "FileId": 72312
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/Ayumi X Veegee Landmine Set.archive",
+          "Path": "archive/pc/mod/Ayumi X Veegee Landmine Set.archive",
+          "Size": 63991808,
+          "Sha256": "83abdd8a87aacd027d2d0c8f991d6798194f85968207d1dbdad0e3ab2585a751",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/ayumixveegee_landmine_set.xl",
+          "Path": "archive/pc/mod/ayumixveegee_landmine_set.xl",
+          "Size": 187,
+          "Sha256": "ce0d2b1e00f6802d8baf035043d1124d14e3e9a08efeb17f85594b88b19c4f68",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/Ayumi X Veegee Landmine Set/ayumixveegee_landmine_set.yaml",
+          "Path": "r6/tweaks/Ayumi X Veegee Landmine Set/ayumixveegee_landmine_set.yaml",
+          "Size": 2149,
+          "Sha256": "151c2e1c9f3308573cc2464982a79673b7098e35fe3633c477aebabd4158d047",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-17523",
+      "Name": "Casual Style Outfit",
+      "Version": "1.0",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "",
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "Codeware"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/17523?tab=files&file_id=91310",
+      "NexusModId": 17523,
+      "NexusFileId": 91310,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Casual Style Outfit-17523-1-0-1730840370.zip",
+          "Size": 612585411,
+          "Sha256": "c13a775a83cce343418dc1939c0ad83e789e85555f87cd91181038eeb2e7222d",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/17523?tab=files&file_id=91310",
+          "ModId": 17523,
+          "FileId": 91310
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/Casual Style Outfit Pt15.archive",
+          "Path": "archive/pc/mod/Casual Style Outfit Pt15.archive",
+          "Size": 619298816,
+          "Sha256": "29b408d3539383cb40dae06b9f4535aa7d0d7bceb387b50cdaa167ecb06a8dd2",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/veegee_casual_pt15.xl",
+          "Path": "archive/pc/mod/veegee_casual_pt15.xl",
+          "Size": 159,
+          "Sha256": "5ea3fa6a6eb0c88fbede1827fba6e88379ff98fb22528301217ce522015726c5",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/Veegee/veegee_casual_pt15.yaml",
+          "Path": "r6/tweaks/Veegee/veegee_casual_pt15.yaml",
+          "Size": 5539,
+          "Sha256": "ed40cc56e9096864e6954ef6cf0a15ad090867f49ba8475440a607a1ba913272",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-28260",
+      "Name": "Groovy Y2K Outfit Pt2",
+      "Version": "1.0",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "",
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "Codeware"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/28260?tab=files&file_id=141410",
+      "NexusModId": 28260,
+      "NexusFileId": 141410,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "Groovy Y2K Outfit Pt2-28260-1-0-1775560925.zip",
+          "Size": 91291313,
+          "Sha256": "80c956326e969a7ddaaba96bef0da22d732d3a995fd4782f36cb3c99dae19f6c",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/28260?tab=files&file_id=141410",
+          "ModId": 28260,
+          "FileId": 141410
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/Groovy Y2K Outfit Pt2.archive",
+          "Path": "archive/pc/mod/Groovy Y2K Outfit Pt2.archive",
+          "Size": 92430336,
+          "Sha256": "d35036b0651d89631b97cc5c8086272e2e94a69ae30b6552237fec6bf53cfa01",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/veegee_groovy_pt2.xl",
+          "Path": "archive/pc/mod/veegee_groovy_pt2.xl",
+          "Size": 155,
+          "Sha256": "6df8f81a25ec5dd200bc994ae67a763d1aac395ff86762221ba801e773dab059",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/Veegee/veegee_groovy_pt2.yaml",
+          "Path": "r6/tweaks/Veegee/veegee_groovy_pt2.yaml",
+          "Size": 2993,
+          "Sha256": "b98393ce77f8c5fc254df2daadf816c3cf7309230d9aa792bd4c5a6230c35b83",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-17519",
+      "Name": "VOIDWEAR · Techwear Pants",
+      "Version": "1.2",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "",
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "Codeware",
+        "mod-12637"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/17519?tab=files&file_id=91279",
+      "NexusModId": 17519,
+      "NexusFileId": 91279,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "void_Techwear_Pants-17519-1-2-1730813279.zip",
+          "Size": 7329776,
+          "Sha256": "a38bfba67bb49fa010d022cd030aa3e6b228b6a51f3a49e5bbff62256e9e0b28",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/17519?tab=files&file_id=91279",
+          "ModId": 17519,
+          "FileId": 91279
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Techwear_Pants.archive",
+          "Path": "archive/pc/mod/void_Techwear_Pants.archive",
+          "Size": 7344128,
+          "Sha256": "f0b9f1ced441802f86b50a27b51c6150abfb651718abe77c4b1af62d0c2ccc6d",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Techwear_Pants.xl",
+          "Path": "archive/pc/mod/void_Techwear_Pants.xl",
+          "Size": 154,
+          "Sha256": "6bca06dd7dc2f2381aa73d872767cabe75226a4867c152481e6ed95f1ae1fbca",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/yellingintothevoid/void_Techwear_Pants.yaml",
+          "Path": "r6/tweaks/yellingintothevoid/void_Techwear_Pants.yaml",
+          "Size": 1528,
+          "Sha256": "6153117a27331afc79e5be96215f816f634aa4892aa9ffdefa7c359014c2bd3e",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-15041",
+      "Name": "VOIDWEAR · Reed's Coat",
+      "Version": "0.9",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "",
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "Codeware",
+        "mod-12637"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/15041?tab=files&file_id=136660",
+      "NexusModId": 15041,
+      "NexusFileId": 136660,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "void_Reeds_Coat-15041-0-9-1771524794.zip",
+          "Size": 23402818,
+          "Sha256": "b9424351de920cce97b07d24aac8bcfbc8c52029e3d063a3d15ac7e7487ed874",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/15041?tab=files&file_id=136660",
+          "ModId": 15041,
+          "FileId": 136660
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Reeds_Coat.archive",
+          "Path": "archive/pc/mod/void_Reeds_Coat.archive",
+          "Size": 23433216,
+          "Sha256": "448999be5b8fe662f8081de5b16a7a277daaa97d5cac924eee8c80ef075b0f8b",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Reeds_Coat.xl",
+          "Path": "archive/pc/mod/void_Reeds_Coat.xl",
+          "Size": 146,
+          "Sha256": "beee0accec3a481eab62a499b13da2b9613393dd530d7dc58f434d0f7963b4ca",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/yellingintothevoid/void_Reeds_Coat.yaml",
+          "Path": "r6/tweaks/yellingintothevoid/void_Reeds_Coat.yaml",
+          "Size": 1462,
+          "Sha256": "018c1253c599ee301793b3362e9c4f43e0eda729b0ab4488909945aed3617de3",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-16178",
+      "Name": "VOIDWEAR · Alex's Pants",
+      "Version": "0.1",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "",
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "Codeware",
+        "mod-12637"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/16178?tab=files&file_id=85089",
+      "NexusModId": 16178,
+      "NexusFileId": 85089,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "void_Alexs_Pants-16178-0-1-1724067478.zip",
+          "Size": 9717996,
+          "Sha256": "1c693f6d772141c617de4dbc00ef650732a5571e19d1ed5b47f74d4d7494d6e9",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/16178?tab=files&file_id=85089",
+          "ModId": 16178,
+          "FileId": 85089
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Alex_Pants.archive",
+          "Path": "archive/pc/mod/void_Alex_Pants.archive",
+          "Size": 9752576,
+          "Sha256": "b1f0c882ab6529625543e36de111bd9d1b402bfc6a7c79e1b83fdd469970b87a",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Alex_Pants.xl",
+          "Path": "archive/pc/mod/void_Alex_Pants.xl",
+          "Size": 146,
+          "Sha256": "299a29d77b620da2790369dbee95b090881479cb555fdffbec2589823427f0ae",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/yellingintothevoid/void_Alex_Pants.yaml",
+          "Path": "r6/tweaks/yellingintothevoid/void_Alex_Pants.yaml",
+          "Size": 1010,
+          "Sha256": "4d9580262f6614ba4eb9ea35d7cb255a524103485ddab3be2eeb30b799fb15dc",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-14704",
+      "Name": "VOIDWEAR · Oda's Pants",
+      "Version": "2.0",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "",
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "Codeware",
+        "mod-12637"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/14704?tab=files&file_id=92077",
+      "NexusModId": 14704,
+      "NexusFileId": 92077,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "void_Odas_Pants-14704-2-0-1731604822.zip",
+          "Size": 14338706,
+          "Sha256": "f5542cd9122ca0d2822a51e14d2902bfefd8f953adc52b9ba6d80f0f22568f1f",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/14704?tab=files&file_id=92077",
+          "ModId": 14704,
+          "FileId": 92077
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Odas_Pants.archive",
+          "Path": "archive/pc/mod/void_Odas_Pants.archive",
+          "Size": 14581760,
+          "Sha256": "cb94001060d8420fcd0e3615473d88d40cc0ebaf995aac64ee72ccf36a03e8e4",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Odas_Pants.xl",
+          "Path": "archive/pc/mod/void_Odas_Pants.xl",
+          "Size": 146,
+          "Sha256": "c1bf175e9f2d91bea196912a37895626e95455becb372e5be56847c78410476d",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/yellingintothevoid/void_Odas_Pants.yaml",
+          "Path": "r6/tweaks/yellingintothevoid/void_Odas_Pants.yaml",
+          "Size": 2972,
+          "Sha256": "ada4124a1f685fd33a0e253bf30ffeb37d277022019ed97b96a3eef224386d7f",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-16448",
+      "Name": "VOIDWEAR · Scav Jacket",
+      "Version": "1.2",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "",
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "Codeware",
+        "mod-12637"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/16448?tab=files&file_id=99259",
+      "NexusModId": 16448,
+      "NexusFileId": 99259,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "void_Scav_Jacket-16448-1-2-1737750215.zip",
+          "Size": 8730222,
+          "Sha256": "8bb0155a32d173848d603facbe83c28ce968aac82152c64630789f139caa93a7",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/16448?tab=files&file_id=99259",
+          "ModId": 16448,
+          "FileId": 99259
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Scavenger_Jacket.archive",
+          "Path": "archive/pc/mod/void_Scavenger_Jacket.archive",
+          "Size": 8753152,
+          "Sha256": "8830fd635e74606dd632fad7f1e00278be553d270f81a95604fdb9ad6917482f",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Scavenger_Jacket.xl",
+          "Path": "archive/pc/mod/void_Scavenger_Jacket.xl",
+          "Size": 158,
+          "Sha256": "5c149ac92cd2e47e116f1e9de14ae6a5a83ee1420035e60a201482884d6ae847",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/yellingintothevoid/void_Scavenger_Jacket.yaml",
+          "Path": "r6/tweaks/yellingintothevoid/void_Scavenger_Jacket.yaml",
+          "Size": 1641,
+          "Sha256": "078e7b02ec0d76d8194140b4019e322338d06a0bdf11a70eedac2a2ca2d3a045",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-29358",
+      "Name": "VOIDWEAR · Punk Outfit",
+      "Version": "1.0.2",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "",
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "Codeware",
+        "mod-12637"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/29358?tab=files&file_id=147249",
+      "NexusModId": 29358,
+      "NexusFileId": 147249,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "void_Punk_Outfit-29358-1-0-2-1780264865.zip",
+          "Size": 32178638,
+          "Sha256": "d9b65d096e01dea44138dd402569dd9ba2064103798f3a588e413a25dce4ef86",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/29358?tab=files&file_id=147249",
+          "ModId": 29358,
+          "FileId": 147249
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Punk_Outfit.archive",
+          "Path": "archive/pc/mod/void_Punk_Outfit.archive",
+          "Size": 32391168,
+          "Sha256": "b495f891ef94f5478dd45a5b4ae238a7e011fbae8e69eddf6c2f56b703f6c398",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Punk_Outfit.xl",
+          "Path": "archive/pc/mod/void_Punk_Outfit.xl",
+          "Size": 973,
+          "Sha256": "b96caaa708686b1b2b0506f72646f3ea7c866d5a1ca0b63701acee00a76e0ef0",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/yellingintothevoid/void_Punk_Outfit.yaml",
+          "Path": "r6/tweaks/yellingintothevoid/void_Punk_Outfit.yaml",
+          "Size": 2197,
+          "Sha256": "c80ec8af613793e882b528e4fb783eb49595c60f57db787f88e4a85f52122ba7",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-29739",
+      "Name": "VOIDWEAR · Punk Skirt",
+      "Version": "1.0.1",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "",
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL",
+        "Codeware",
+        "mod-12637"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/29739?tab=files&file_id=153026",
+      "NexusModId": 29739,
+      "NexusFileId": 153026,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "void_Punk_Skirt 29739 1.0.1 2026-07-22T12-34Z vD6JDHRRD.zip",
+          "Size": 22580887,
+          "Sha256": "3c028128be63188b313dabe7fa036737c5cd68c043f0f4b613ad8593991c8c5c",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/29739?tab=files&file_id=153026",
+          "ModId": 29739,
+          "FileId": 153026
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Punk_Skirt.archive",
+          "Path": "archive/pc/mod/void_Punk_Skirt.archive",
+          "Size": 22765568,
+          "Sha256": "8ea61d22b1098908528b7a2607ff04d95d54d7fce571b1e4d7f64928a379d6ca",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Punk_Skirt.xl",
+          "Path": "archive/pc/mod/void_Punk_Skirt.xl",
+          "Size": 450,
+          "Sha256": "057f96631b24dd35e230885fe196573b810660ec3ddf56e6baf8e401baa80a49",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/yellingintothevoid/void_Punk_Skirt.yaml",
+          "Path": "r6/tweaks/yellingintothevoid/void_Punk_Skirt.yaml",
+          "Size": 1105,
+          "Sha256": "0f3a95458b3821fc28653d5b1364e46d8e14ad3e32a062879083d0f9b1e5bc69",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-22469",
+      "Name": "Toyota Supra FD",
+      "Version": "1.4",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "",
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/22469?tab=files&file_id=131357",
+      "NexusModId": 22469,
+      "NexusFileId": 131357,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "void_Toyota_Supra_FD-22469-1-4-1767179276.zip",
+          "Size": 63364584,
+          "Sha256": "2e8677562afd2829ba25cf707b05c140cba4201e26aa540a0b328ce9d9d910a2",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/22469?tab=files&file_id=131357",
+          "ModId": 22469,
+          "FileId": 131357
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Toyota_Supra_FD_xx_base.archive",
+          "Path": "archive/pc/mod/void_Toyota_Supra_FD_xx_base.archive",
+          "Size": 64229376,
+          "Sha256": "e923885d5f39f15d402d3853989b8f0f252dc66e7efe2c0da96fd5f51cc84fa1",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Toyota_Supra_FD_xx_base.xl",
+          "Path": "archive/pc/mod/void_Toyota_Supra_FD_xx_base.xl",
+          "Size": 76,
+          "Sha256": "125015a83d7bd5d246a02775f2d15a13be67e6ee8ef5dfbd1bbdc592ec345ca7",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/yellingintothevoid/void_Toyota_Supra_FD_00_base.yaml",
+          "Path": "r6/tweaks/yellingintothevoid/void_Toyota_Supra_FD_00_base.yaml",
+          "Size": 19989,
+          "Sha256": "181baa24ec4e52dc435a96544fa4ae7a9d28aa0d59dc2561a43be8b90c48578e",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/whip_wizard/vehicles/lights/Vehicle.yv_toyota_supra_fd.json",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/whip_wizard/vehicles/lights/Vehicle.yv_toyota_supra_fd.json",
+          "Size": 339,
+          "Sha256": "12e1b0ec6b810a578baed9fda1130d518d6b353454d618be82caaed8ceb95905",
+          "UserData": false
+        }
+      ]
+    },
+    {
+      "Id": "mod-31812",
+      "Name": "Nissan 350Z · Tokyo Drift",
+      "Version": "1.2.1",
+      "Profile": "Complementos",
+      "GameVersion": "2.5",
+      "Warning": "Conjunto Tokyo Drift na cor padrão.",
+      "Dependencies": [
+        "ArchiveXL",
+        "TweakXL"
+      ],
+      "RequiresPL": false,
+      "RequiresRedmod": false,
+      "Immutable": false,
+      "PhantomLibertyStatus": "unverified",
+      "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/31812?tab=files&file_id=163184",
+      "NexusModId": 31812,
+      "NexusFileId": 163184,
+      "Assets": [
+        {
+          "Id": "a0",
+          "Name": "void_Nissan_350Z 31812 1.2.1 2026-09-29T13-36Z gMz5Muc42.zip",
+          "Size": 49911288,
+          "Sha256": "f4e8a2bc893d2f1d55b50734ed005668849cda1cc7e092cd33cf1f6522c8b07c",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/31812?tab=files&file_id=163184",
+          "ModId": 31812,
+          "FileId": 163184
+        },
+        {
+          "Id": "a1",
+          "Name": "void_Nissan_350Z_tuning_parts 31812 1.2 2026-08-08T11-28Z UQrhQSy8O.zip",
+          "Size": 67042174,
+          "Sha256": "dfde74fea45486d0c4db816ff70cb18cc2ec832076c0d405b734fa94ed1dc248",
+          "Format": "zip",
+          "Url": "https://www.nexusmods.com/cyberpunk2077/mods/31812?tab=files&file_id=155307",
+          "ModId": 31812,
+          "FileId": 155307
+        }
+      ],
+      "Files": [
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Nissan_350Z_p00_default.xl",
+          "Path": "archive/pc/mod/void_Nissan_350Z_p00_default.xl",
+          "Size": 869,
+          "Sha256": "6788fb7220437bedfefab3b81b1242ef5890d8a672312e2cd7810574d6225bf2",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Nissan_350Z_xx_base.archive",
+          "Path": "archive/pc/mod/void_Nissan_350Z_xx_base.archive",
+          "Size": 51974144,
+          "Sha256": "3e71f1f245ac0c9cc68f5e71b0ddbe94cd993dd0d284eefa820966bd00826a5a",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "archive/pc/mod/void_Nissan_350Z_xx_base.xl",
+          "Path": "archive/pc/mod/void_Nissan_350Z_xx_base.xl",
+          "Size": 190,
+          "Sha256": "616a7da38cad20d879df25e13d4c6b942e93161551d654c45dcc619bacfdcf1e",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "r6/tweaks/yellingintothevoid/void_Nissan_350Z_00_base.yaml",
+          "Path": "r6/tweaks/yellingintothevoid/void_Nissan_350Z_00_base.yaml",
+          "Size": 17131,
+          "Sha256": "65f366628de4e3090159f2c0cbd76a7656266f459e9e0645ac9574c180a06772",
+          "UserData": false
+        },
+        {
+          "Asset": "a0",
+          "Entry": "bin/x64/plugins/cyber_engine_tweaks/mods/whip_wizard/vehicles/lights/Vehicle.yv_350z.json",
+          "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/whip_wizard/vehicles/lights/Vehicle.yv_350z.json",
+          "Size": 478,
+          "Sha256": "5688d703261586ecf2a2c91307ef9d0c59df0bbf4c946e9c570b51b4301123d0",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/exhausts/void_Nissan_350Z_ex03.archive",
+          "Path": "archive/pc/mod/void_Nissan_350Z_ex03.archive",
+          "Size": 28672,
+          "Sha256": "26d005629c0be8a987642f0f88938b58d70e07788fe0029d758375e29ec490bb",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/exhausts/void_Nissan_350Z_ex03.xl",
+          "Path": "archive/pc/mod/void_Nissan_350Z_ex03.xl",
+          "Size": 92,
+          "Sha256": "8cc0574ee18dd535868876e636ed8b71723afae749e83629caf13d83cd988fda",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/hoods/void_Nissan_350Z_h06.archive",
+          "Path": "archive/pc/mod/void_Nissan_350Z_h06.archive",
+          "Size": 159744,
+          "Sha256": "db5415006d9ebafbcff8b7ef11cad0bef903af0f023ec25aef305bd284117869",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/interior_accessory/void_Nissan_350Z_int_acc.archive",
+          "Path": "archive/pc/mod/void_Nissan_350Z_int_acc.archive",
+          "Size": 40960,
+          "Sha256": "841b5e23d9f83a6159e980eeff2147572676e89ce9c14447a6710da63b285339",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/interior_accessory/void_Nissan_350Z_int_acc.xl",
+          "Path": "archive/pc/mod/void_Nissan_350Z_int_acc.xl",
+          "Size": 92,
+          "Sha256": "3e5027ca1be6b01b9867a3b1d7f6fe1365749e753cd072fd5501d24989135a3d",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/interior_seats/void_Nissan_350Z_sea02.archive",
+          "Path": "archive/pc/mod/void_Nissan_350Z_sea02.archive",
+          "Size": 462848,
+          "Sha256": "a391dbe7361c50891c902e9e26af121c20ba0a1d99518dfcc0d3a487bc89b06d",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/interior_steering_wheels/void_Nissan_350Z_stw04.archive",
+          "Path": "archive/pc/mod/void_Nissan_350Z_stw04.archive",
+          "Size": 53248,
+          "Sha256": "7ba173a5bb554af9a9a33617e0f3203d0610a9650d1ba6fc5a78d3fdf4ebd31c",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/interior_stereos/void_Nissan_350Z_ste03.archive",
+          "Path": "archive/pc/mod/void_Nissan_350Z_ste03.archive",
+          "Size": 745472,
+          "Sha256": "00e1824d59bad2527c512d2d85d6b9e49c9f42ec634921c30acb7e049d763c85",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/interior_stereos/void_Nissan_350Z_ste03.xl",
+          "Path": "archive/pc/mod/void_Nissan_350Z_ste03.xl",
+          "Size": 91,
+          "Sha256": "2162d1a8d5ab34a113a2d1af3595f3dfac217ffcb1d3531e883e3e8339e01b9e",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/interior_trunk_accessories/void_Nissan_350Z_nos.yaml",
+          "Path": "r6/tweaks/yellingintothevoid/void_Nissan_350Z_nos.yaml",
+          "Size": 400,
+          "Sha256": "1ce4f63a454fb4d6b7e88c4605321903342302cbc051ab4674fbd6137a581ec4",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/interior_trunk_accessories/void_Nissan_350Z_tr01.archive",
+          "Path": "archive/pc/mod/void_Nissan_350Z_tr01.archive",
+          "Size": 335872,
+          "Sha256": "01e68e888b51556d134f6d499edad8ebe02505b1141d6a8c8b64e893e1e490aa",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/interior_trunk_accessories/void_Nissan_350Z_tr01.xl",
+          "Path": "archive/pc/mod/void_Nissan_350Z_tr01.xl",
+          "Size": 90,
+          "Sha256": "e4ee949052762caab9ea567cebe18266d3c5f5c9e3c326692d28f7b07148d1a6",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/mirrors/void_Nissan_350Z_mi01.archive",
+          "Path": "archive/pc/mod/void_Nissan_350Z_mi01.archive",
+          "Size": 131072,
+          "Sha256": "0b488e6ffb78afa709891d7c7fc929d49b948454308101bb8545818608ee6a4b",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/no_antenna/void_Nissan_350Z_00_no_antenna.archive",
+          "Path": "archive/pc/mod/void_Nissan_350Z_00_no_antenna.archive",
+          "Size": 8192,
+          "Sha256": "143d30fc0d9b32be55c3afdab967b4ace2f15d8456064a3c351458c3cb813493",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/racing_brakes/void_Nissan_350Z_rb01.archive",
+          "Path": "archive/pc/mod/void_Nissan_350Z_rb01.archive",
+          "Size": 1671168,
+          "Sha256": "63827dbc1f2b86953b8eb769a9c662ebb2a2e460e71ce46f59f98fae59ffe011",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/spoilers/void_Nissan_350Z_sp06.archive",
+          "Path": "archive/pc/mod/void_Nissan_350Z_sp06.archive",
+          "Size": 49152,
+          "Sha256": "8374564a30f88118abb69f87030d91577e2602037452eef96ad359c944515bd3",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/taillights/void_Nissan_350Z_tl01.archive",
+          "Path": "archive/pc/mod/void_Nissan_350Z_tl01.archive",
+          "Size": 73728,
+          "Sha256": "f2f3c45e1c43f4dd1377a644dac39ade29a7b0e61093c77a0c5702f9fcba812d",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/wheels/void_Nissan_350Z_wh07.archive",
+          "Path": "archive/pc/mod/void_Nissan_350Z_wh07.archive",
+          "Size": 94208,
+          "Sha256": "658c875b0882c3207c5db87c9ee09518b0cc3c33fe18dae5bce73370df64390d",
+          "UserData": false
+        },
+        {
+          "Asset": "a1",
+          "Entry": "fomod/widebody_kits/void_Nissan_350Z_01_wb04.archive",
+          "Path": "archive/pc/mod/void_Nissan_350Z_01_wb04.archive",
+          "Size": 471040,
+          "Sha256": "57c89e3b332401a732e5ffc726e97fd6a959612984148c37a70b16f4b331a4a8",
+          "UserData": false
+        }
+      ]
     }
   ],
   "Excluded": [
@@ -20079,6 +21281,15 @@
       "Section": null,
       "Content": "{\"settings\":{\"weaponRiflesShakeInterpTypeZ\":2,\"weaponRiflesShakeIntensityRX\":0.015,\"weaponRiflesShakeFrequencyRX\":4,\"weaponRiflesShakeInterpTypeRX\":3,\"weaponRiflesShakeIntensityRY\":0.004,\"weaponRiflesShakeFrequencyRY\":4,\"weaponRiflesShakeInterpTypeRY\":2,\"weaponRiflesShakeIntensityRZ\":0.006,\"weaponRiflesShakeFrequencyRZ\":4,\"weaponRiflesShakeInterpTypeRZ\":3,\"weaponShotgunsShakeMasterIntensity\":1,\"weaponShotgunsShakeMasterFrequency\":1,\"weaponShotgunsShakeIntensityX\":0.004,\"weaponShotgunsShakeFrequencyX\":3.5,\"weaponShotgunsShakeInterpTypeX\":2,\"weaponShotgunsShakeIntensityY\":0.008,\"weaponShotgunsShakeFrequencyY\":3.5,\"weaponShotgunsShakeInterpTypeY\":3,\"weaponShotgunsShakeIntensityZ\":0.003,\"weaponShotgunsShakeFrequencyZ\":3.5,\"onFootShakeEnabled\":false,\"onFootShakeMinSpeed\":1,\"onFootShakeMaxSpeed\":8,\"onFootShakeCrouchReduction\":0.5,\"onFootShakeADSReduction\":0.3,\"onFootShakeSlidingIntensity\":0.4,\"onFootShakeSlidingFreqMult\":2,\"onFootShakeMasterIntensity\":1,\"windowAnimationDuration\":0.2,\"windowInterpolation\":\"easeOut\",\"adsResetCameraZRotation\":true,\"useGlobalPreset\":true,\"enableWeaponPresets\":true,\"disableInCutscenes\":false,\"enableUnarmedPresets\":true,\"debugMode\":false,\"enableADSPresets\":true,\"debugConsoleOutput\":false,\"useADSPresetsInVehicle\":true,\"debugStopSpawns\":false,\"onlyUnarmedFOV\":true,\"debugDisableCollisions\":false,\"passengerFOVMode\":\"none\",\"debugOverrideRestrictedSpawning\":false,\"passengerCustomFOV\":80,\"vehicleDataWindowOpen\":false,\"cameraDataWindowOpen\":false,\"freeLookEnabled\":true,\"fovStreamingFix\":true,\"toggleFreeLook\":false,\"onFootShakeFrequencyZ\":1.8,\"freeLookRestoreDuration\":1,\"weaponShotgunsShakeInterpTypeZ\":2,\"onFootShakeFrequencyRX\":1.8,\"freeLookMaxYaw\":90,\"weaponShotgunsShakeIntensityRX\":0.018,\"onFootShakeFrequencyRY\":1.8,\"freeLookMaxPitch\":45,\"onFootShakeFrequencyRZ\":1.8,\"freeLookSensitivity\":0.5,\"onFootShakeInterpTypeX\":2,\"freeLookNaturalHead\":true,\"onFootShakeInterpTypeZ\":2,\"weaponShotgunsShakeInterpTypeRX\":3,\"interpolationDuration\":0.5,\"freeLookNaturalHeadHorizontal\":0.15,\"weaponShotgunsShakeIntensityRY\":0.005,\"freeLookNaturalHeadRoll\":15,\"damageShakeEnabled\":false,\"freeLookMomentum\":true,\"damageShakeIntensity\":0.8,\"freeLookMomentumSmoothing\":0.15,\"damageShakeDuration\":0.4,\"freeLookMomentumDecay\":0.98,\"weaponShotgunsShakeInterpTypeRY\":2,\"freeLookMomentumDampening\":0.22,\"weaponShotgunsShakeIntensityRZ\":0.008,\"freeLookHorizonLimit\":true,\"damageShakeMasterFrequency\":1,\"freeLookNeutralPosition\":false,\"damageShakeIntensityX\":0.005,\"freeLookResetPitch\":false,\"freeLookCinematicCamera\":false,\"immersiveCameraEnabled\":false,\"damageShakeIntensityZ\":0.003,\"immersiveCameraShiftY\":-0.03,\"weaponFistsShakeMasterIntensity\":1,\"immersiveCameraShiftZ\":-0.25,\"damageShakeIntensityRY\":0.005,\"settingsPanelOpen\":false,\"developerWindowOpen\":false,\"damageShakeIntensityRZ\":0.012,\"presetManagerOpen\":false,\"immersiveCameraFOVChange\":0,\"damageShakeFrequencyX\":6,\"shakePreviewEnabled\":false,\"shakeFineSplitterPercent\":0.55,\"damageShakeFrequencyY\":6,\"weaponFistsShakeIntensityY\":0.004,\"damageShakeFrequencyZ\":6,\"weaponFistsShakeFrequencyY\":4,\"aggressiveRidingPresetModified\":false,\"responsiveDrivingPresetModified\":false,\"weaponFistsShakeInterpTypeY\":3,\"damageShakeFrequencyRY\":6,\"shakeSeedY\":0.73573903003308,\"shakeSeedZ\":0.42668680786097,\"shakeSeedRX\":0.56859228170254,\"shakeSeedRY\":0.11446190140255,\"shakeSeedRZ\":0.054892783198761,\"onFootShakePreset\":\"default\",\"onFootShakePresetModified\":false,\"damageShakeInterpTypeY\":3,\"damageShakePreset\":\"default\",\"immersiveCameraVerticalCurve\":\"SineIn\",\"originalDamageShakePreset\":\"default\",\"immersiveCameraLeanCurve\":\"Linear\",\"crashShakePresetModified\":false,\"damageShakeInterpTypeRY\":2,\"weaponFistsShakeInterpTypeRX\":3,\"damageShakeInterpTypeRZ\":3,\"weaponFistsShakeIntensityRY\":0.003,\"crashShakeEnabled\":false,\"immersiveCameraCrouchMultZ\":1.35,\"crashShakeIntensity\":1.2,\"weaponPistolsShakePreset\":\"default\",\"crashShakeDuration\":0.6,\"originalWeaponPistolsShakePreset\":\"default\",\"immersiveCameraCrouchBlendDuration\":0.3,\"crashShakeSpeedThreshold\":15,\"originalWeaponAutomaticShakePreset\":\"default\",\"immersiveCameraSmoothRestore\":true,\"crashShakeMaxIntensity\":2,\"originalWeaponRiflesShakePreset\":\"default\",\"weaponFistsShakeInterpTypeRZ\":3,\"crashShakeMasterIntensity\":1,\"originalWeaponShotgunsShakePreset\":\"default\",\"weaponFistsShakePreset\":\"default\",\"crashShakeMinRelativeDrop\":0.35,\"locomotionShakeJumpMasterFrequency\":1,\"firstEquipCameraEnabled\":false,\"weaponPistolsShakeMasterIntensity\":1,\"locomotionShakeJumpIntensityX\":0.003,\"crashShakeIntensityX\":0.008,\"locomotionShakeJumpFrequencyX\":4,\"reloadCameraPreview\":false,\"crashShakeIntensityY\":0.006,\"weaponPistolsShakeIntensityX\":0.002,\"locomotionShakeJumpIntensityY\":0.005,\"weaponPistolsShakeFrequencyX\":5,\"crashShakeIntensityRX\":0.015,\"weaponPistolsShakeInterpTypeX\":2,\"weaponPistolsShakeIntensityY\":0.004,\"reloadCameraPitch\":-21,\"locomotionShakeJumpIntensityZ\":0.008,\"weaponPistolsShakeFrequencyY\":5,\"reloadCameraYaw\":12.4,\"locomotionShakeJumpFrequencyZ\":4,\"weaponPistolsShakeInterpTypeY\":3,\"reloadCameraRoll\":4.1,\"locomotionShakeJumpInterpTypeZ\":2,\"crashShakeFrequencyY\":3,\"locomotionShakeJumpIntensityRX\":0.01,\"weaponPistolsShakeFrequencyZ\":5,\"crashShakeFrequencyZ\":3,\"locomotionShakeJumpFrequencyRX\":4,\"weaponPistolsShakeInterpTypeZ\":2,\"crashShakeFrequencyRX\":3,\"locomotionShakeJumpInterpTypeRX\":3,\"crashShakeFrequencyRY\":3,\"reloadCameraInterpolationEnter\":\"Cosine\",\"weaponPistolsShakeFrequencyRX\":5,\"reloadCameraInterpolationExit\":\"Cosine\",\"weaponPistolsShakeInterpTypeRX\":3,\"crashShakeInterpTypeX\":2,\"weaponPistolsShakeIntensityRY\":0.003,\"crashShakeInterpTypeY\":3,\"reloadCameraChance\":100,\"crashShakeInterpTypeZ\":2,\"weaponPistolsShakeFrequencyRY\":5,\"speedAffectsFOV\":false,\"weaponPistolsShakeInterpTypeRY\":2,\"fovCurveType\":\"Sine\",\"fovBikeMinSpeed\":30,\"weaponPistolsShakeFrequencyRZ\":5,\"fovBikeMaxSpeed\":350,\"weaponPistolsShakeInterpTypeRZ\":3,\"weaponAutomaticShakeMasterIntensity\":1,\"weaponPistolsShakeIntensity\":0.3,\"fovCarMinSpeed\":40,\"weaponAutomaticShakeMasterFrequency\":1,\"fovCarMaxSpeed\":250,\"weaponAutomaticShakeIntensityX\":0.002,\"fovCarMaxIncreasePercent\":0.25,\"weaponAutomaticShakeFrequencyX\":6,\"weaponPistolsShakeRecoilKick\":1.5,\"speedAffectsCameraShake\":false,\"weaponAutomaticShakeInterpTypeX\":2,\"vehicleWeaponCameraShake\":false,\"weaponAutomaticShakeIntensityY\":0.004,\"passengerCameraShake\":true,\"weaponAutomaticShakeFrequencyY\":6,\"weaponAutomaticShakeInterpTypeY\":3,\"weaponAutomaticShakeIntensityZ\":0.001,\"weaponAutomaticShakeFrequencyZ\":6,\"weaponAutomaticShakeInterpTypeZ\":2,\"weaponAutomaticShakeIntensityRX\":0.012,\"weaponAutomaticShakeFrequencyRX\":6,\"locomotionShakeDodgeFrequencyZ\":4,\"locomotionShakeDodgeInterpTypeZ\":2,\"locomotionShakeDodgeIntensityRX\":0.01,\"locomotionShakeDodgeFrequencyRX\":4,\"locomotionShakeDodgeInterpTypeRX\":3,\"locomotionShakeDodgeIntensityRY\":0.003,\"locomotionShakeLandingIntensity\":0.6,\"locomotionShakeDodgeFrequencyRY\":4,\"locomotionShakeLandingDuration\":0.35,\"locomotionShakeDodgeInterpTypeRY\":2,\"locomotionShakeDodgeIntensityRZ\":0.005,\"locomotionShakeDodgeFrequencyRZ\":4,\"locomotionShakeDodgeInterpTypeRZ\":3,\"locomotionShakeVaultMasterIntensity\":1,\"locomotionShakeJumpDuration\":0.2,\"locomotionShakeVaultMasterFrequency\":1,\"locomotionShakeDodgeIntensity\":0.3,\"locomotionShakeVaultIntensityX\":0.003,\"locomotionShakeDodgeDuration\":0.2,\"locomotionShakeVaultFrequencyX\":4,\"locomotionShakeVaultIntensity\":0.2,\"locomotionShakeVaultInterpTypeX\":2,\"locomotionShakeVaultDuration\":0.2,\"locomotionShakeVaultIntensityY\":0.005,\"locomotionShakeAirThrusterIntensity\":0.15,\"locomotionShakeVaultFrequencyY\":4,\"locomotionShakeVaultInterpTypeY\":3,\"locomotionShakeVaultIntensityZ\":0.008,\"locomotionShakeVaultFrequencyZ\":4,\"locomotionShakeVaultInterpTypeZ\":2,\"locomotionShakeVaultIntensityRX\":0.01,\"locomotionShakeVaultFrequencyRX\":4,\"locomotionShakeVaultInterpTypeRX\":3,\"locomotionShakeVaultIntensityRY\":0.003,\"locomotionShakeVaultFrequencyRY\":4,\"locomotionShakeVaultInterpTypeRY\":2,\"locomotionShakeVaultIntensityRZ\":0.005,\"locomotionShakeVaultFrequencyRZ\":4,\"locomotionShakeVaultInterpTypeRZ\":3,\"locomotionShakeAirThrusterMasterIntensity\":1,\"locomotionShakeAirThrusterMasterFrequency\":1,\"locomotionShakeAirThrusterIntensityX\":0.003,\"locomotionShakeAirThrusterFrequencyX\":4,\"locomotionShakeAirThrusterInterpTypeX\":2,\"locomotionShakeAirThrusterIntensityY\":0.005,\"locomotionShakeAirThrusterFrequencyY\":4,\"locomotionShakeAirThrusterInterpTypeY\":3,\"locomotionShakeAirThrusterIntensityZ\":0.008,\"locomotionShakeAirThrusterFrequencyZ\":4,\"locomotionShakeAirThrusterInterpTypeZ\":2,\"locomotionShakeAirThrusterIntensityRX\":0.01,\"locomotionShakeAirThrusterFrequencyRX\":4,\"locomotionShakeAirThrusterInterpTypeRX\":3,\"locomotionShakeAirThrusterIntensityRY\":0.003,\"locomotionShakeAirThrusterFrequencyRY\":4,\"locomotionShakeAirThrusterInterpTypeRY\":2,\"locomotionShakeAirThrusterIntensityRZ\":0.005,\"locomotionShakeAirThrusterFrequencyRZ\":4,\"locomotionShakeAirThrusterInterpTypeRZ\":3,\"weaponRiflesShakeRecoilDepth\":2,\"weaponRiflesShakeRecoilKick\":2.5,\"weaponShotgunsShakeIntensity\":0.3,\"weaponShotgunsShakeDuration\":0.25,\"weaponShotgunsShakeRecoilDepth\":3,\"weaponShotgunsShakeRecoilKick\":2,\"weaponFistsShakeIntensity\":0.3,\"locomotionShakeJumpIntensityRY\":0.003,\"locomotionShakeJumpFrequencyRY\":4,\"locomotionShakeJumpInterpTypeRY\":2,\"locomotionShakeJumpIntensityRZ\":0.005,\"locomotionShakeEnabled\":false,\"locomotionShakeJumpFrequencyRZ\":4,\"locomotionShakeLandingEnabled\":true,\"locomotionShakeLandingMasterIntensity\":1,\"locomotionShakeHardLandingEnabled\":true,\"locomotionShakeDodgeEnabled\":true,\"locomotionShakeLandingIntensityX\":0.003,\"locomotionShakeAirThrusterDuration\":0.15,\"locomotionShakeLandingFrequencyX\":4,\"locomotionShakeJumpFreqMult\":1.5,\"locomotionShakeLandingInterpTypeX\":2,\"locomotionShakeLandingFreqMult\":0.7,\"locomotionShakeLandingFrequencyY\":4,\"locomotionShakeHardLandingFreqMult\":0.5,\"locomotionShakeLandingInterpTypeY\":3,\"locomotionShakeDodgeFreqMult\":1.2,\"locomotionShakeLandingIntensityZ\":0.008,\"locomotionShakeVaultFreqMult\":1,\"locomotionShakeLandingFrequencyZ\":4,\"locomotionShakeAirThrusterFreqMult\":1.3,\"locomotionShakeLandingInterpTypeZ\":2,\"locomotionShakeLandingIntensityRX\":0.01,\"locomotionShakeLandingFrequencyRX\":4,\"locomotionShakeLandingInterpTypeRX\":3,\"locomotionShakeLandingIntensityRY\":0.003,\"aggressiveRidingMode\":false,\"locomotionShakeLandingFrequencyRY\":4,\"locomotionShakeLandingInterpTypeRY\":2,\"locomotionShakeLandingIntensityRZ\":0.005,\"locomotionShakeLandingFrequencyRZ\":4,\"locomotionShakeLandingInterpTypeRZ\":3,\"locomotionShakeHardLandingMasterIntensity\":1,\"locomotionShakeHardLandingMasterFrequency\":1,\"locomotionShakeHardLandingIntensityX\":0.005,\"locomotionShakeHardLandingFrequencyX\":3,\"baseFOV\":67.672747970764,\"locomotionShakeHardLandingInterpTypeX\":2,\"dynamicSteeringSensitivityMode\":false,\"locomotionShakeHardLandingIntensityY\":0.008,\"responsiveDrivingMode\":false,\"originalOnFootShakePreset\":\"default\",\"locomotionShakeHardLandingFrequencyY\":3,\"weaponFistsShakeInterpTypeRY\":2,\"reloadCameraWhileADS\":false,\"locomotionShakeHardLandingInterpTypeY\":3,\"immersiveADSPistols\":true,\"locomotionShakeHardLandingIntensityZ\":0.012,\"damageShakeIntensityRX\":0.015,\"originalCrashShakePreset\":\"default\",\"locomotionShakeHardLandingFrequencyZ\":3,\"reloadCameraFOV\":0,\"damageShakeInterpTypeRX\":3,\"locomotionShakeHardLandingInterpTypeZ\":2,\"onFootShakeMasterFrequency\":1,\"locomotionShakeHardLandingIntensityRX\":0.015,\"crashShakeIntensityRY\":0.008,\"crashShakeIntensityZ\":0.01,\"locomotionShakeHardLandingFrequencyRX\":3,\"locomotionShakeMasterFrequency\":1,\"responsiveDrivingSpeedDampening\":false,\"locomotionShakeHardLandingInterpTypeRX\":3,\"cornerLookAheadMode\":false,\"locomotionShakeHardLandingIntensityRY\":0.005,\"cornerLookAheadYaw\":0.69813170079773,\"shakeFocalDistance\":50,\"cornerLookAheadRoll\":15,\"shakeBikeMaxSpeed\":200,\"cornerLookAheadInterpolationDuration\":4,\"locomotionShakeHardLandingInterpTypeRY\":2,\"shakeSpeedCurve\":\"exponential\",\"locomotionShakeHardLandingIntensityRZ\":0.008,\"shakeIntensityX\":0.0020000000949949,\"shakeIntensityY\":0.0010000000474975,\"shakeIntensityZ\":0.0020000000949949,\"shakeIntensityRX\":0.0099999997764826,\"shakeIntensityRY\":0.0010000000474975,\"shakeIntensityRZ\":0.0099999997764826,\"shakeFrequencyX\":0.61000001430511,\"shakeFrequencyY\":3.7599999904633,\"shakeFrequencyZ\":1.0299999713898,\"shakeFrequencyRX\":2.2,\"shakeFrequencyRY\":4.4800000190735,\"shakeFrequencyRZ\":1.3300000429153,\"shakeInterpTypeX\":13,\"shakeInterpTypeY\":13,\"shakeInterpTypeZ\":13,\"shakeInterpTypeRX\":2,\"shakeInterpTypeRY\":13,\"locomotionShakeDodgeFrequencyX\":4,\"shakeLookAtConstraint\":true,\"shakeConstraintStrength\":0.95,\"locomotionShakeDodgeInterpTypeX\":2,\"immersiveADSOnHotkey\":false,\"locomotionShakeDodgeIntensityY\":0.005,\"immersiveADSHotkeyToggle\":false,\"vehicleWeaponFOV\":false,\"aggressiveMinSpeed\":20,\"aggressiveMaxSpeed\":75,\"aggressiveYPosLow\":0.05,\"aggressiveYPosHigh\":0.1,\"aggressiveZPosLow\":-0.03,\"aggressiveZPosHigh\":-0.06,\"aggressiveSpeedTransitionDuration\":0.8,\"aggressiveTurnResetDuration\":0.8,\"aggressiveTurnTransitionDuration\":2,\"aggressiveTurnEaseInDuration\":2.5,\"turnModifierPitch\":-5.7,\"turnModifierRoll\":-17.189,\"turnModifierHorizontalOffset\":0.15,\"turnModifierVertOffset\":-0.075,\"turnModifierDepthOffset\":-0.3,\"onFootShakeIntensityRY\":0.002,\"immersiveADSAutomatic\":false,\"responsiveDrivingHorizontalOffset\":-0.10000000149012,\"responsiveDrivingInterpolationDuration\":1,\"responsiveDrivingMaxSpeed\":75,\"responsiveDrivingMinSpeed\":10,\"responsiveDrivingResetDuration\":0.6,\"responsiveDrivingRoll\":5.73,\"responsiveDrivingVerticalOffset\":-0.015,\"responsiveDrivingPitch\":-4.384,\"responsiveDrivingYaw\":-2.257,\"responsiveDrivingMaxSpeedScale\":0.25,\"responsiveDrivingScaleWithSensitivity\":false,\"damageShakePresetModified\":false,\"adsDuration\":0.2,\"freeLookRestoreCurve\":\"OutQuad\",\"locomotionShakeHardLandingFrequencyRY\":3,\"weaponInVehicleFOVMode\":\"none\",\"weaponFistsShakeDuration\":0.25,\"useWeaponPresetInVehicle\":false,\"weaponFistsShakeRecoilDepth\":1,\"adsResetCameraFOV\":false,\"onFootShakeInterpTypeY\":3,\"adsResetCameraXPosition\":true,\"weaponFistsShakeRecoilKick\":1,\"adsResetCameraYPosition\":true,\"weaponAutomaticShakeIntensity\":0.3,\"adsResetCameraZPosition\":true,\"locomotionShakeJumpEnabled\":true,\"weaponAutomaticShakeDuration\":0.25,\"resetCameraOnVault\":true,\"shakeMasterIntensity\":1,\"weaponAutomaticShakeRecoilDepth\":1,\"immersiveCameraRestoreDuration\":0.5,\"shakePreset\":\"vibrations\",\"weaponAutomaticShakeRecoilKick\":1.2,\"bikePresetModified\":false,\"bikeShakePreset\":\"vibrations\",\"weaponRiflesShakeIntensity\":0.3,\"originalCarShakePreset\":\"vibrations\",\"carPresetModified\":false,\"weaponRiflesShakeDuration\":0.25,\"weaponPistolsShakeIntensityZ\":0.001,\"originalCarPassengerShakePreset\":\"Passenger\",\"passengerPresetModified\":false,\"carPassengerShakePreset\":\"Passenger\",\"weaponShotgunsShakeFrequencyRZ\":3.5,\"aggressiveRidingPreset\":\"racing\",\"shakeBikeMinSpeed\":15,\"responsiveDrivingPreset\":\"reactive\",\"damageShakeIntensityY\":0.004,\"weaponShotgunsShakeInterpTypeRZ\":3,\"cornerLookAheadMinSpeed\":10,\"locomotionShakeVaultEnabled\":true,\"weaponFistsShakeMasterFrequency\":1,\"locomotionShakeAirThrusterEnabled\":true,\"weaponFistsShakeFrequencyX\":4,\"weaponFistsShakeInterpTypeX\":2,\"onFootShakeIntensityZ\":0.002,\"weaponAutomaticShakeInterpTypeRY\":2,\"expandSliderRanges\":false,\"weaponFistsShakeIntensityZ\":0.001,\"damageShakeFrequencyRZ\":6,\"weaponFistsShakeFrequencyZ\":4,\"onFootShakeInterpTypeRY\":2,\"weaponAutomaticShakeIntensityRY\":0.003,\"alwaysFirstEquip\":false,\"weaponAutomaticShakeInterpTypeRX\":3,\"onFootShakeInterpTypeRZ\":3,\"damageShakeInterpTypeZ\":2,\"damageShakeMaxIntensity\":1.5,\"immersiveCameraFOVCurve\":\"Linear\",\"damageShakeMasterIntensity\":1,\"weaponFistsShakeFrequencyRY\":4,\"shakeCarMinSpeed\":25,\"modEnabled\":true,\"devSettingsSelectedCategory\":\"dynamic_fov\",\"devSettingsSplitterPercent\":0.18,\"resetCameraOnSlide\":true,\"cameraResetDuration\":0.35,\"weaponShotgunsShakePreset\":\"default\",\"reloadCameraEnabled\":false,\"originalWeaponFistsShakePreset\":\"default\",\"crashShakeMasterFrequency\":1,\"weaponPistolsShakeMasterFrequency\":1,\"reloadCameraHorizontal\":0,\"adsResetCameraXRotation\":true,\"reloadCameraVertical\":0.021,\"shakeMasterFrequency\":1,\"reloadCameraDepth\":-0.011,\"originalBikeShakePreset\":\"vibrations\",\"crashShakeIntensityRZ\":0.01,\"carShakePreset\":\"vibrations\",\"reloadCameraDuration\":0.45,\"reloadCameraRestoreDuration\":0.4,\"immersiveCameraCrouchMultLean\":1.5,\"crashShakeFrequencyRZ\":3,\"firstEquipCameraChance\":100,\"immersiveCameraLeanSpeed\":1,\"crashShakeInterpTypeRY\":2,\"immersiveCameraVerticalSpeed\":1,\"crashShakeInterpTypeRZ\":3,\"immersiveCameraDepthSpeed\":1,\"immersiveCameraProgressCurve\":\"Linear\",\"weaponFireShakeMasterIntensity\":1,\"immersiveCameraPitchOffset\":30,\"weaponFireShakeMasterFrequency\":1,\"immersiveCameraMaxPitch\":-90,\"fovBikeMaxIncreasePercent\":0.35,\"immersiveCameraLean\":-5,\"weaponPistolsShakeDuration\":0.25,\"weaponPistolsShakeRecoilDepth\":1.2,\"locomotionShakeLandingIntensityY\":0.005,\"locomotionShakeMasterIntensity\":1,\"shakeGlobalIntensityCap\":3,\"damageShakeFrequencyRX\":6,\"locomotionShakeJumpIntensity\":0.25,\"damageShakeInterpTypeX\":2,\"locomotionShakeHardLandingDuration\":0.5,\"immersiveCameraDepthCurve\":\"SineOut\",\"locomotionShakeHardLandingIntensity\":1.2,\"locomotionShakeDodgeIntensityZ\":0.008,\"locomotionShakeDodgeInterpTypeY\":3,\"locomotionShakeDodgeFrequencyY\":4,\"locomotionShakeHardLandingInterpTypeRZ\":3,\"locomotionShakeDodgeMasterFrequency\":1,\"locomotionShakeDodgeMasterIntensity\":1,\"shakeCarMaxSpeed\":300,\"cornerLookAheadResetDuration\":1,\"shakeSpeedSensitivity\":1,\"cornerLookAheadMaxSpeed\":120,\"cornerLookIntensityLow\":0.75,\"cornerLookIntensityHigh\":1,\"turnModifierTilt\":-5.73,\"dynamicSteeringMinSpeed\":10,\"dynamicSteeringMaxSpeed\":200,\"dynamicSteeringMaxSensitivity\":50,\"shakeInterpTypeRZ\":12,\"immersiveADSEnabled\":false,\"immersiveADSHotkeyDuration\":0.15,\"useImmersiveADSInVehicle\":true,\"immersiveADSRoll\":11.5,\"immersiveADSDepth\":0.15,\"weaponFireShakeEnabled\":false,\"weaponPistolsShakeIntensityRZ\":0.005,\"immersiveADSFOV\":0,\"crashShakeInterpTypeRX\":3,\"weaponPistolsShakeIntensityRX\":0.012,\"crashShakeFrequencyX\":3,\"locomotionShakeJumpInterpTypeY\":3,\"locomotionShakeJumpFrequencyY\":4,\"adsResetCameraYRotation\":true,\"locomotionShakeJumpInterpTypeX\":2,\"animationCameraModifierRequired\":false,\"weaponFistsShakePresetModified\":false,\"locomotionShakeJumpMasterIntensity\":1,\"weaponShotgunsShakePresetModified\":false,\"weaponRiflesShakePresetModified\":false,\"weaponFistsShakeFrequencyRZ\":4,\"weaponAutomaticShakePresetModified\":false,\"weaponFistsShakeIntensityRZ\":0.005,\"weaponPistolsShakePresetModified\":false,\"immersiveADSRifles\":false,\"vehicleCameraEnabled\":true,\"immersiveCameraCrouchMultY\":1.17,\"weaponCameraEnabled\":true,\"weaponFistsShakeFrequencyRX\":4,\"onFootCameraEnabled\":true,\"weaponFistsShakeIntensityRX\":0.012,\"tooltipsEnabled\":true,\"weaponFistsShakeInterpTypeZ\":2,\"scrollbarEnabled\":true,\"immersiveCameraFOVSpeed\":1,\"displayHorizontalFOV\":true,\"weaponAutomaticShakeFrequencyRY\":6,\"hideGuiInMenu\":false,\"shakeSeedX\":0.33933341140343,\"speedObserverThrottleEnabled\":false,\"locomotionShakeDodgeIntensityX\":0.003,\"weaponAutomaticShakeIntensityRZ\":0.005,\"speedObserverThrottleFrames\":6,\"weaponFistsShakeIntensityX\":0.002,\"weaponAutomaticShakeFrequencyRZ\":6,\"locomotionShakeHardLandingFrequencyRZ\":3,\"windowGridEnabled\":true,\"weaponAutomaticShakeInterpTypeRZ\":3,\"windowAnimationEnabled\":true,\"weaponRiflesShakeMasterIntensity\":1,\"windowGridUnits\":2,\"immersiveADSShotguns\":false,\"weaponShotgunsShakeFrequencyRY\":3.5,\"weaponRiflesShakeMasterFrequency\":1,\"onFootShakeInterpTypeRX\":3,\"freeLookNaturalHeadDepth\":-0.08,\"weaponRiflesShakeIntensityX\":0.003,\"weaponShotgunsShakeFrequencyRX\":3.5,\"onFootShakeFrequencyY\":1.8,\"weaponRiflesShakeFrequencyX\":4,\"onFootShakeFrequencyX\":1.8,\"onFootShakeIntensityRZ\":0.003,\"weaponRiflesShakeInterpTypeX\":2,\"onFootShakeIntensityRX\":0.008,\"weaponRiflesShakeIntensityY\":0.006,\"onFootShakeIntensityY\":0.006,\"onFootShakeIntensityX\":0.003,\"weaponRiflesShakeFrequencyY\":4,\"locomotionShakeLandingMasterFrequency\":1,\"locomotionShakeJumpInterpTypeRZ\":3,\"weaponRiflesShakeInterpTypeY\":3,\"crashShakePreset\":\"default\",\"weaponRiflesShakeIntensityZ\":0.002,\"weaponRiflesShakePreset\":\"default\",\"weaponAutomaticShakePreset\":\"default\",\"weaponRiflesShakeFrequencyZ\":4},\"version\":\"1.14.0\",\"cameraSettings\":{\"cameraXPosition\":0,\"steeringSensitivity\":100,\"cameraYRotation\":0,\"cameraZRotation\":0,\"cameraZPosition\":0,\"cameraFOV\":67.672747970764,\"cameraYPosition\":0,\"cameraXRotation\":0},\"format_version\":2,\"cameraSettingsTPP\":{\"cameraZoom\":30,\"cameraFOV\":70}}",
       "Sha256": "8938db677022a92ec5ec4047c40aa0df1899068007797a0097f07448a70375ba"
+    },
+    {
+      "Id": "expanded-dual-wielding",
+      "ModId": "mod-35626",
+      "Version": "3.7",
+      "Path": "bin/x64/plugins/cyber_engine_tweaks/mods/ExpandedDualWielding/settings-v2.json",
+      "Format": "json",
+      "Content": "{\"weapons\":\"all\",\"attributeRequirements\":false,\"bypassPerk\":true}",
+      "Sha256": "07aad4df4162ed550226237efa04bd65a1c077cf3f14c18ed29d8c7e63d0f2a0"
     }
   ]
 }

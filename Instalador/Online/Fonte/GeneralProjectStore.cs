@@ -16,6 +16,7 @@ internal sealed class GeneralProjectIndex {
     public int Schema = 1;
     public string Theme = "light-red", Language = "pt";
     public string DownloadFolder = OnlineDownloadWatch.DefaultFolder();
+    public SwitchPerformance SwitchSettings = new SwitchPerformance();
     public List<GeneralProject> Projects = new List<GeneralProject>();
 }
 
@@ -105,6 +106,7 @@ internal sealed class GeneralProjectStore {
                 DownloadFolder = index.DownloadFolder,
                 SelectedPreset = list.Presets.Count == 0 ? null : list.Presets[0].Id
             };
+            GeneralPresetProfiles.Project(state);
             new GeneralModLibrary(Path.Combine(data, "lista.json")).Save(state);
             index.Projects.Add(project);
             Write(index);
@@ -135,7 +137,7 @@ internal sealed class GeneralProjectStore {
             if(skipped.Count>0){
                 string group=index.Language=="en"?"Not installed":"Não instalados";
                 if(!list.Categories.Contains(group,StringComparer.OrdinalIgnoreCase))list.Categories.Add(group);
-                foreach(var mod in list.Mods.Where(mod=>skipped.Contains(mod.Id)))mod.Category=group;
+                foreach(var mod in list.Mods.Concat(list.Presets.Where(p=>p.Configurations!=null).SelectMany(p=>p.Configurations.Values)).Where(mod=>skipped.Contains(mod.Id)))mod.Category=group;
                 foreach(var preset in list.Presets.Where(preset=>preset.ModIds.Any(skipped.Contains)))
                     if(!preset.Categories.Contains(group,StringComparer.OrdinalIgnoreCase))preset.Categories.Add(group);
             }
@@ -153,7 +155,9 @@ internal sealed class GeneralProjectStore {
                         state.ChosenVariants[choice.Key]=choice.Value;
                 }
             }
-            BindReceivedVariants(state,manifest,session.ReceiptId);
+            var receivedDefinitions=state.List.Mods.ToDictionary(m=>m.Id,StringComparer.Ordinal);
+            GeneralPresetProfiles.Project(state);
+            BindReceivedVariants(state,manifest,session.ReceiptId,receivedDefinitions);
             if(!String.Equals(Path.GetFullPath(sourceData),data,StringComparison.OrdinalIgnoreCase))
                 source.CopyReceivedRecognition(session.ReceiptId,data);
             new GeneralModLibrary(Path.Combine(data,"lista.json")).Save(state);
@@ -162,11 +166,19 @@ internal sealed class GeneralProjectStore {
         }
     }
 
-    internal static void BindReceivedVariants(GeneralModState state,InstalledSnapshotManifest manifest,string receipt){
+    internal static void BindReceivedVariants(GeneralModState state,InstalledSnapshotManifest manifest,string receipt,Dictionary<string,GeneralModEntry> receivedDefinitions=null){
         var entries=state.List.Mods.ToDictionary(mod=>mod.Id,StringComparer.Ordinal);
         foreach(var mod in manifest.List.Mods){
             GeneralModEntry entry;
-            if(!entries.TryGetValue(mod.Id,out entry)||!entry.Variants.Any(variant=>variant.Id==mod.DefaultVariant))continue;
+            if(!entries.TryGetValue(mod.Id,out entry))continue;
+            if(!entry.Variants.Any(variant=>variant.Id==mod.DefaultVariant)){
+                GeneralModEntry source;
+                if(receivedDefinitions==null||!receivedDefinitions.TryGetValue(mod.Id,out source))continue;
+                var sent=mod.Variants.Single();
+                var alternate=source.Variants.FirstOrDefault(v=>v.Id==sent.Id&&GeneralModLibrary.SamePayload(v,sent));
+                if(alternate==null)continue;
+                entry.Variants.Add(GeneralPresetProfiles.Copy(alternate));
+            }
             state.SnapshotReceipts[mod.Id+"/"+mod.DefaultVariant]=receipt;
             if(entry.DefaultVariant==mod.DefaultVariant)state.ChosenVariants.Remove(mod.Id);
             else state.ChosenVariants[mod.Id]=mod.DefaultVariant;
@@ -267,15 +279,23 @@ internal sealed class GeneralProjectStore {
         }
     }
 
-    internal void SavePreferences(string theme, string language, string downloadFolder = null) {
+    internal void SavePreferences(string theme, string language, string downloadFolder = null,SwitchPerformance switchSettings=null) {
         lock (gate) {
             ValidatePreferences(theme, language);
             var index = Read(); index.Theme = theme; index.Language = language;
             if (downloadFolder != null) index.DownloadFolder = DownloadPath(downloadFolder, true);
+            if(switchSettings!=null)index.SwitchSettings=switchSettings;
             Write(index);
         }
     }
 
+    internal void SaveSwitchPerformance(SwitchPerformance settings) {
+        lock(gate) {
+            var index=Read();
+            index.SwitchSettings=settings;
+            Write(index);
+        }
+    }
     static GeneralProject Registered(GeneralProjectIndex index, GeneralProject project) {
         ValidateProject(project);
         var registered = index.Projects.FirstOrDefault(item => item.Id == project.Id && item.Legacy == project.Legacy);
@@ -293,6 +313,8 @@ internal sealed class GeneralProjectStore {
     static void Validate(GeneralProjectIndex index) {
         if (index == null || index.Schema != 1 || index.Projects == null || index.Projects.Count > 200) throw new IOException("Índice de projetos inválido.");
         ValidatePreferences(index.Theme, index.Language);
+        if(index.SwitchSettings==null)index.SwitchSettings=new SwitchPerformance();
+        index.SwitchSettings.Normalize();
         index.DownloadFolder = DownloadPath(String.IsNullOrWhiteSpace(index.DownloadFolder) ? OnlineDownloadWatch.DefaultFolder() : index.DownloadFolder, false);
         var ids = new HashSet<string>(StringComparer.Ordinal);
         var templates = new HashSet<string>(StringComparer.Ordinal);

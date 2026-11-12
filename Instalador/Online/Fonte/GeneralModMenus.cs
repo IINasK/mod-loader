@@ -22,7 +22,7 @@ internal sealed partial class GeneralModWindow {
         if(working||scanning||list==null||!ConfirmProjectNavigation())return false;
         if(state.List.Mods.Count!=0&&GeneralDialog.Message(this,T("Trocar a lista atual? Exporte primeiro se quiser guardar uma cópia. Os arquivos instalados permanecem no lugar.","Replace the current list? Export it first to keep a copy. Installed files will stay in place."),T("Trocar lista","Replace list"),MessageBoxButtons.OKCancel,MessageBoxIcon.Question)!=DialogResult.OK)return false;
         try{
-            GeneralModLibrary.RestoreKnownMappings(list,seed);state.List=list;state.SelectedPreset=list.Presets.FirstOrDefault()==null?null:list.Presets[0].Id;state.ChosenVariants.Clear();state.BodyChoice=null;marked.Clear();statuses.Clear();statusDetails.Clear();progress.Clear();ResetColumnFilters();hasPresetDraft=false;
+            GeneralModLibrary.RestoreKnownMappings(list,seed);state.List=list;state.SelectedPreset=list.Presets.FirstOrDefault()==null?null:list.Presets[0].Id;state.ChosenVariants.Clear();state.BodyChoice=null;state.AppliedPreset=null;state.AppliedPresetFingerprint=null;GeneralPresetProfiles.Initialize(state);GeneralPresetProfiles.Project(state);marked.Clear();statuses.Clear();statusDetails.Clear();progress.Clear();ResetColumnFilters();hasPresetDraft=false;
             if(clearBindings){
                 foreach(string key in state.ResolvedDownloads.Keys.Where(key=>list.Mods.Any(mod=>key.StartsWith(mod.Id+"/",StringComparison.Ordinal))).ToArray())state.ResolvedDownloads.Remove(key);
                 foreach(string key in state.CyberpunkImports.Keys.Where(key=>list.Mods.Any(mod=>key.StartsWith(mod.Id+"/",StringComparison.Ordinal))).ToArray())state.CyberpunkImports.Remove(key);
@@ -88,9 +88,10 @@ internal sealed partial class GeneralModWindow {
         foreach(var preset in state.List.Presets)
             for(int i=0;i<preset.Categories.Count;i++)
                 if(String.Equals(preset.Categories[i],category,StringComparison.OrdinalIgnoreCase))preset.Categories[i]=renamed;
-        foreach(var mod in state.List.Mods.Where(item=>String.Equals(item.Category,category,StringComparison.OrdinalIgnoreCase)))
+        var entries=state.List.Mods.Concat(state.List.Presets.SelectMany(p=>p.Configurations.Values)).ToArray();
+        foreach(var mod in entries.Where(item=>String.Equals(item.Category,category,StringComparison.OrdinalIgnoreCase)))
             mod.Category=renamed;
-        foreach(var option in state.List.Mods.SelectMany(mod=>mod.Variants).SelectMany(variant=>variant.WithNaturalOption()))
+        foreach(var option in entries.SelectMany(mod=>mod.Variants).SelectMany(variant=>variant.WithNaturalOption()))
             if(String.Equals(option.Category,category,StringComparison.OrdinalIgnoreCase))option.Category=renamed;
         state.List.CategoryDescriptions.Remove(category);
         if(description!=null)state.List.CategoryDescriptions[renamed]=description;
@@ -102,7 +103,8 @@ internal sealed partial class GeneralModWindow {
     }
     bool SetDestination(string destination){
         if(String.Equals(state.Destination??"",destination,StringComparison.OrdinalIgnoreCase))return false;
-        state.Destination=destination;
+        state.Destination=destination;state.AppliedPreset=null;state.AppliedPresetFingerprint=null;ReadPresetPresentation();
+        pendingVersion=null;
         gameInventory=new P2PSyncDifference[0];
         nexusManual.Clear();
         statuses.Clear();statusDetails.Clear();progress.Clear();
@@ -110,12 +112,14 @@ internal sealed partial class GeneralModWindow {
     }
     async void ShowOptions(){
         if(working||scanning)return;
-        using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder,            cache.PreviewRetainedDownloads,state.Destination??"",root=>Cyberpunk(root).PreviewOldSaveBackups())){
+        using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder,            cache.PreviewRetainedDownloads,state.Destination??"",root=>Cyberpunk(root).PreviewOldSaveBackups(),ReadSwitchPerformance())){
             dialog.AnchorTo(optionsButton);
             if(dialog.ShowDialog(this)!=DialogResult.OK){RefreshStorageSize();return;}
             bool moved=SetDestination(dialog.Destination);
             state.Theme=dialog.ThemeValue;state.Language=dialog.LanguageValue;state.DownloadFolder=dialog.DownloadFolder;
-            Persist();if(projectStore!=null)projectStore.SavePreferences(state.Theme,state.Language,state.DownloadFolder);BuildInterface();if(moved)await Scan();else RefreshStorageSize();
+            Persist();if(projectStore!=null)projectStore.SavePreferences(state.Theme,state.Language,state.DownloadFolder,dialog.SwitchSettings);
+            else localSwitchPerformance=dialog.SwitchSettings;
+            BuildInterface();if(moved)await Scan();else RefreshStorageSize();
         }
     }
 }

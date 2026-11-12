@@ -287,9 +287,9 @@ internal sealed class GeneralProjectHome : Form {
     }
 
     void Options(Control anchor){
-        var preferences=store.Read();using(var dialog=new GeneralOptionsDialog(preferences.Theme,preferences.Language,preferences.DownloadFolder,cache.PreviewRetainedDownloads)){
+        var preferences=store.Read();using(var dialog=new GeneralOptionsDialog(preferences.Theme,preferences.Language,preferences.DownloadFolder,cache.PreviewRetainedDownloads,switchSettings:preferences.SwitchSettings)){
             dialog.AnchorTo(anchor);if(dialog.ShowDialog(this)!=DialogResult.OK){RefreshStorageSize();return;}
-            store.SavePreferences(dialog.ThemeValue,dialog.LanguageValue,dialog.DownloadFolder);Build();
+            store.SavePreferences(dialog.ThemeValue,dialog.LanguageValue,dialog.DownloadFolder,dialog.SwitchSettings);Build();
         }
     }
     void Guard(Action action){int before=buildVersion;try{action();if(Visible&&before==buildVersion)Build();}catch(Exception ex){GeneralDialog.Message(this,ex.Message,T("Não foi possível continuar","Unable to continue"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}}

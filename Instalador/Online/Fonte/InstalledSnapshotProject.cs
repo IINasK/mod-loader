@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -42,7 +42,7 @@ public static partial class InstalledSnapshot {
             .Select(mod=>Owner(mod,mod.Variants.Single())),StringComparer.Ordinal);
         manifest.List.Mods.RemoveAll(mod=>unavailable.Contains(mod.Id));
         if(!IncludesBodyChoice(manifest.List,manifest.BodyChoice))manifest.BodyChoice=null;
-        foreach(var preset in manifest.List.Presets)preset.ModIds.RemoveAll(unavailable.Contains);
+        foreach(var preset in manifest.List.Presets)preset.ModIds.RemoveAll(unavailable.Contains);GeneralPresetProfiles.Prune(manifest.List);
         foreach(var file in manifest.Files)file.Owners.RemoveAll(owner=>!remaining.Contains(owner));
         manifest.Files.RemoveAll(file=>file.Owners.Count==0);
         return skipped;
@@ -66,11 +66,15 @@ public static partial class InstalledSnapshot {
         }
         if(IsCyberpunk(root)&&HasManualHystFiles(mod.Id,root))return false;
         for(int i=0;i<variant.Sources.Count;i++){
-            string key=work+"/"+i+"/"+variant.Sources[i];
+            string key=P2PPack.Slot(mod,variant,i);
             if(IsCyberpunk(root)){
-                string id;if(state.CyberpunkImports.TryGetValue(key,out id))return false;
+                string id;if(P2PPack.TrySlot(state.CyberpunkImports,mod,variant,i,out id))return false;
                 if(new FixedInstaller(catalog,root).HasSnapshotImportedRecord(mod.Id))return false;
-            }else if(new GeneralModInstaller(root,Path.Combine(appData,"Instalacoes")).HasSnapshotRecord(key))return false;
+            }else{
+                var engine=new GeneralModInstaller(root,Path.Combine(appData,"Instalacoes"));
+                string legacy=P2PPack.LegacySlot(mod,variant,i);
+                if(engine.HasSnapshotRecord(key)||legacy!=null&&engine.HasSnapshotRecord(legacy))return false;
+            }
         }
         return true;
     }
@@ -95,6 +99,12 @@ public static partial class InstalledSnapshot {
         }
         foreach(var item in installed.Mods){var mod=project.Mods.SingleOrDefault(m=>m.Id==item.Id);if(mod==null)project.Mods.Add(Clone(item));else {mod.DefaultVariant=item.DefaultVariant;foreach(var variant in item.Variants)if(!mod.Variants.Any(v=>v.Id==variant.Id))mod.Variants.Add(Clone(variant));}}
         project.Categories=project.Categories.Concat(installed.Categories).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        foreach(var preset in project.Presets)foreach(var mod in preset.Configurations.Values) {
+            mod.DetectedPaths.Clear();
+            foreach(var variant in mod.Variants.SelectMany(v=>v.WithNaturalOption())) {
+                variant.CyberpunkId=null;variant.CyberpunkVariant=null;MakeSourcesPortable(variant,mod.Id);
+            }
+        }
         project.Presets=project.Presets.OrderByDescending(p=>p.Id==state.SelectedPreset).ToList();
         return project;
     }
@@ -102,7 +112,7 @@ public static partial class InstalledSnapshot {
         var project=localReceipt?Clone(manifest.Project):manifest.Project;GeneralModLibrary.ValidateList(project,false);
         if(manifest.TemplateId!=null&&(manifest.TemplateId!=GeneralProjectStore.CyberpunkTemplate||manifest.Game!="cyberpunk2077"))
             throw new IOException("Identidade do projeto padrão inválida.");
-        foreach(var mod in project.Mods)foreach(var variant in mod.Variants.SelectMany(option=>option.WithNaturalOption()))
+        foreach(var mod in project.Mods.Concat(project.Presets.SelectMany(p=>p.Configurations.Values)))foreach(var variant in mod.Variants.SelectMany(option=>option.WithNaturalOption()))
             if(!variant.Sources.All(s=>GeneralModDownload.IsWebSource(s)||s=="installed://"+mod.Id+"/"+variant.Id))throw new IOException("Projeto contém caminhos privados de origem.");
         GeneralModLibrary.RestoreKnownMappings(project,GeneralModLibrary.Seed(catalog,new ModImportItem[0]),localReceipt);
         foreach(var installed in manifest.List.Mods){
