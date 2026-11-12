@@ -131,6 +131,7 @@ internal sealed class GeneralProjectHome : Form {
             string action=null;
             try{
                 var restored=store.Load(project);
+                OnlineDiagnostics.Record("project.open",null,"Projeto aberto.",new{Template=project.TemplateId??"custom",Mods=restored.List.Mods.Count});
                 using(var window=new GeneralModWindow(catalog,cache,store.DataPath(project),fixture?restored:null)){
                     window.AttachProject(store,project);
                     sharingWindow=window;
@@ -292,7 +293,7 @@ internal sealed class GeneralProjectHome : Form {
             store.SavePreferences(dialog.ThemeValue,dialog.LanguageValue,dialog.DownloadFolder,dialog.SwitchSettings);Build();
         }
     }
-    void Guard(Action action){int before=buildVersion;try{action();if(Visible&&before==buildVersion)Build();}catch(Exception ex){GeneralDialog.Message(this,ex.Message,T("Não foi possível continuar","Unable to continue"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}}
+    void Guard(Action action){int before=buildVersion;try{action();if(Visible&&before==buildVersion)Build();}catch(Exception ex){OnlineDiagnostics.Failure("home.action.failed",ex,"Concluir a ação na tela inicial.",stage:action.Method.Name);GeneralDialog.Message(this,ex.Message,T("Não foi possível continuar","Unable to continue"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}}
     sealed class Choice {internal readonly GeneralProject Project;internal Choice(GeneralProject project){Project=project;}public override string ToString(){return Project.Name;}}
 }
 

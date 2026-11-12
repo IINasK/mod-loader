@@ -312,6 +312,8 @@ internal sealed partial class P2PService {
 
     void SetPhase(P2PSession session,string phase) {
         lock(session){
+            if(session.Phase!=phase)OnlineDiagnostics.Record("p2p.phase",null,"A transferência mudou de etapa.",
+                new{Id=DiagnosticId(session.Id),Phase=phase,Mode=session.Mode});
             session.Phase=phase;Save();
             try{PublishNotice(session);}
             catch(System.Net.WebException){/* The next pass advertises the durable state. */}
@@ -365,6 +367,7 @@ internal sealed partial class P2PService {
             }catch(OperationCanceledException){/* The transport and any committed installation journal are kept. */}
             catch(Exception ex){
                 if(!disposed){
+                    OnlineDiagnostics.Failure("p2p.install.failed",ex,"Instalar e verificar o pacote recebido.",stage:session.Phase);
                     session.Error=ex.Message;
                     SetPhase(session,"retry");
                     Notify();

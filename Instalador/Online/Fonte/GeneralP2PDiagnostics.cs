@@ -75,7 +75,6 @@ internal sealed partial class P2PService {
     string DiagnosticPreferencesPath {get{
         return Safe.In(diagnosticFixture?Root:GeneralAppPaths.Current().Data,"p2p-diagnostic-preferences.json");
     }}
-    string LastDiagnosticPath {get{return Safe.In(Root,"p2p-diagnostic.json");}}
     internal P2PDiagnosticPreferences DiagnosticPreferences(){return P2PDiagnosticPreferences.Load(DiagnosticPreferencesPath);}
     internal void SaveDiagnosticPreferences(P2PDiagnosticPreferences preferences){
         string path=DiagnosticPreferencesPath;
@@ -111,8 +110,6 @@ internal sealed partial class P2PService {
             LocalApiResponded=api,PeerConnected=connected,FailureType=failure};
         attempt.Report=report;
         OnlineDiagnostics.Record("p2p.diagnostic",null,phase,report);
-        try{Directory.CreateDirectory(Root);Safe.NoLinks(LastDiagnosticPath);Safe.WriteJson(LastDiagnosticPath,report);}
-        catch(Exception ex){OnlineDiagnostics.Record("p2p.diagnostic.save",null,ex.GetType().Name);}
         if(send&&!attempt.Sender&&!diagnosticFixture){
             string path=DiagnosticPreferencesPath;
             Task.Run(()=>P2PDiagnosticPreferences.SendIfEnabled(path,report));
@@ -122,14 +119,8 @@ internal sealed partial class P2PService {
         lock(diagnosticGate){
             ConnectionAttempt attempt;
             if(folder!=null&&connectionAttempts.TryGetValue(folder,out attempt))return attempt.Report;
-            try{
-                string path=LastDiagnosticPath;Safe.NoLinks(path);
-                if(File.Exists(path)&&new FileInfo(path).Length<8192){
-                    var report=Safe.Json.Deserialize<P2PDiagnosticReport>(File.ReadAllText(path));
-                    if(report!=null&&(folder==null||report.Id==DiagnosticId(folder)))return report;
-                }
-            }catch(Exception ex){OnlineDiagnostics.Record("p2p.diagnostic.read",null,ex.GetType().Name);}
-            return null;
+            return folder==null?connectionAttempts.Values.Select(value=>value.Report)
+                .Where(report=>report!=null).OrderByDescending(report=>report.UpdatedUtc,StringComparer.Ordinal).FirstOrDefault():null;
         }
     }
     internal void ObserveConnectionDiagnostics(DateTime now){

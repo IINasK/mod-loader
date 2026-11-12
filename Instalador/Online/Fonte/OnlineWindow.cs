@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -82,7 +82,6 @@ public sealed partial class OnlineWindow:Form {
         AddEditionControls(tools);
         tools.Controls.Add(Button("Densidade de NPCs…",ChooseDensityProfile));
         var facialButton=Button("Conjunto facial…",ChooseFacialDownloads);facialButton.Name="FacialDownloads";tools.Controls.Add(facialButton);
-        tools.Controls.Add(Button("Abrir registros",OpenDiagnosticFolder));
         tools.Controls.Add(summary);
         tools.SetFlowBreak(summary,true);tools.Controls.Add(editionNotice);
         layout.Controls.Add(tools,0,3);
@@ -169,7 +168,6 @@ public sealed partial class OnlineWindow:Form {
     }
 
     Button Button(string title,Action action){var b=new Button{Text=title,AutoSize=true,MinimumSize=new Size(138,35),Margin=new Padding(0,3,8,3)};b.Click+=(s,e)=>{if(!automaticFlow)action();};actions.Add(b);return b;}
-    void OpenDiagnosticFolder(){try{string file=OnlineDiagnostics.FilePath;if(file==null)throw new IOException(OnlineDiagnostics.Issue??"Os registros são criados ao abrir o programa normalmente.");Process.Start(new ProcessStartInfo(Path.GetDirectoryName(file)){UseShellExecute=true});}catch(Exception ex){status.Text=Friendly(ex);}}
     string DownloadFolderSettings(){return Path.Combine(Path.GetDirectoryName(cache.Root),"pasta-downloads.json");}
     string LoadDownloadFolder(){
         try{string file=DownloadFolderSettings();Safe.NoLinks(file);if(File.Exists(file)&&new FileInfo(file).Length<=8192){string folder=Safe.Json.Deserialize<string>(File.ReadAllText(file));return new OnlineDownloadWatch(folder).Folder;}}
@@ -687,6 +685,7 @@ static class OnlineProgram {
             catch(IOException){return 1;}
         }
         try{
+        if(args.Length==0)OnlineDiagnostics.Start();
 #if VELOPACK
         Velopack.VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
 #endif
@@ -702,6 +701,7 @@ static class OnlineProgram {
         if(args.Length==3&&args[0]=="--inspect"){string game=Path.GetFullPath(args[1]).TrimEnd('\\'),output=Path.GetFullPath(args[2]);if(output.StartsWith(game+"\\",StringComparison.OrdinalIgnoreCase))throw new IOException("O relatório deve ficar fora do jogo.");var report=c.Packages.Select(m=>FixedData.Scan(m,game)).ToList();string issue=null;try{FixedData.ValidateGame(game,c.Packages,c.GameFileVersion);}catch(IOException ex){issue=ex.Message;}Safe.WriteJson(output,new{GameVersion=FixedData.GameVersion(game),Build=FixedData.GameBuild(game),VersionAndRequirementsMatch=issue==null,Issue=issue,Mods=report});return 0;}
         if(args.Length==3&&args[0]=="--verify-local-sources"){OnlineTests.VerifySources(c,args[1],args[2]);return 0;}
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--self-test-diagnostics"){OnlineDiagnosticsTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-inventory-links"){GeneralModWindow.RunInventoryLinkTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-nexus-preview"){GeneralModWindow.RunNexusPreviewTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-general"){GeneralModWindow.RunGeneralTests(args[1]);return 0;}
@@ -733,13 +733,16 @@ static class OnlineProgram {
             using(var f=new GeneralModWindow(c,cache,Path.GetTempPath(),fixture))f.Preview(args[1]);return 0;
         }
         if(args.Length!=0)throw new IOException("Argumento não reconhecido. A instalação exige confirmação na interface.");
-        OnlineDiagnostics.Start(paths.Logs);string exeHash=null;try{if(OnlineDiagnostics.Enabled)exeHash=Safe.Hash(Application.ExecutablePath);}catch(Exception){}OnlineDiagnostics.Record("app.start",null,"Aplicativo iniciado com diagnóstico ativo.",new{AppVersion=GeneralAppPaths.Version,Executable=Path.GetFileName(Application.ExecutablePath),ExecutableSha256=exeHash,Catalog=c.Id,CatalogSha256=OnlineIdentity.CatalogHash});
+        OnlineDiagnostics.Record("app.start",null,"Aplicativo iniciado.",new{AppVersion=GeneralAppPaths.Version,Catalog=c.Id});
 #if VELOPACK
         GeneralVelopackUpdate.CheckAtStartup();
 #else
         if(!GeneralAppPaths.IsDevelopment&&GeneralAutomaticUpdate.TryStart(Application.ExecutablePath,paths)){OnlineDiagnostics.Stop();return 0;}
 #endif
         GeneralAttention.Enabled=true;
-        Application.Run(new GeneralProjectHome(c,cache,paths.Data));OnlineDiagnostics.Stop();return 0;
-    }catch(Exception ex){if(args.Length>0){File.WriteAllText(Path.Combine(Path.GetTempPath(),"CyberpunkCoopOnline-erro.txt"),ex.ToString());return 1;}MessageBox.Show(ex.Message,"Não foi possível abrir o programa",MessageBoxButtons.OK,MessageBoxIcon.Error);return 1;}}
+        Application.Run(new GeneralProjectHome(c,cache,paths.Data));return 0;
+    }catch(Exception ex){if(args.Length>0){File.WriteAllText(Path.Combine(Path.GetTempPath(),"CyberpunkCoopOnline-erro.txt"),ex.ToString());return 1;}
+        OnlineDiagnostics.Failure("app.failed",ex,"Executar o Mod Loader.");
+        MessageBox.Show(ex.Message,"Não foi possível abrir o programa",MessageBoxButtons.OK,MessageBoxIcon.Error);return 1;
+    }finally{OnlineDiagnostics.Stop();}}
 }

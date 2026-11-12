@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -14,7 +14,7 @@ internal sealed partial class GeneralModWindow {
         internal GeneralModVariant Variant;
         internal bool Ended,Applied,SwitchAlternatives,DependencyQueue,SaveVariant;
         internal HashSet<string> DropConflicts;
-        internal string DropDensity, BodyChoice, ScanError;
+        internal string DropDensity, BodyChoice, ScanError, DiagnosticStage, DiagnosticVersion;
         internal double Fraction;
         internal string Key { get{return GeneralModWindow.Key(Entry,Variant);} }
         internal bool Local { get{return Variant.CyberpunkId==null&&Variant.Sources.All(GeneralModDownload.IsArchivePath);} }
@@ -113,6 +113,10 @@ internal sealed partial class GeneralModWindow {
     void RowStatus(Work work,string status,int? pct=null,string message=null){
         string previous;statuses.TryGetValue(work.Key,out previous);
         statuses[work.Key]=status;
+        if(work.DiagnosticStage!=null&&status!="Falhou"&&work.DiagnosticStage!=status){
+            work.DiagnosticStage=status;
+            OnlineDiagnostics.Record("general.install.stage",work.Entry.Id,"Etapa da fila de instalação.",new{Stage=status,Variant=work.Variant.Id});
+        }
         if(message!=null)statusDetails[work.Key]=message;else statusDetails.Remove(work.Key);
         if((coverageFilter!=null||statusFilters!=null||orderColumn=="Status"||work.Entry.AlternativeGroup!=null||work.Entry.Variants.Count>1)&&previous!=status)DrawRows();
         if(pct.HasValue)progress[work.Key]=pct.Value;else progress.Remove(work.Key);
@@ -312,6 +316,14 @@ internal sealed partial class GeneralModWindow {
             nexusManual.TryGetValue(work.Entry.Id,out match)&&Object.ReferenceEquals(match.Variant,work.Variant)&&match.StillPresent(root);
     }
 
+    void ReportScanError(Work work){
+        if(String.IsNullOrWhiteSpace(work.ScanError))return;
+        statusDetails[work.Key]=work.ScanError;
+        OnlineDiagnostics.Record("general.scan.mod.failed",work.Entry.Id,"Não foi possível conferir o mod.",new{
+            Name=work.Entry.Name,Variant=work.Variant.Name,Expected="Conferir os arquivos instalados.",Actual=work.ScanError
+        });
+    }
+
     async Task Scan(ProjectVerification audit=null,int? workerLimit=null){
         if(working||scanning)return;
         if(String.IsNullOrWhiteSpace(state.Destination)){
@@ -326,6 +338,7 @@ internal sealed partial class GeneralModWindow {
             item.Value==GeneralStatusPresentation.NexusAmbiguous).Select(item=>item.Key).ToArray())statuses.Remove(key);
         var works=state.List.Mods.Select(MakeWork).ToList();
         operationTotal=works.Count;operationFinished=0;skipRequests.Clear();
+        OnlineDiagnostics.Record("general.scan.begin",null,"Conferindo os mods instalados.",new{Mods=works.Count});
         string previous=detail.Text;detail.Text=T("Conferindo a pasta de instalação…","Checking the installation folder…");
         try{
             var elapsed=Stopwatch.StartNew();
@@ -357,7 +370,7 @@ internal sealed partial class GeneralModWindow {
                 string result=skipped?"Verificação pulada":found;
                 if(!skipped&&audit!=null)audit.Record(work);
                 statusDetails.Remove(work.Key);
-                if(!skipped&&!String.IsNullOrWhiteSpace(work.ScanError))statusDetails[work.Key]=work.ScanError;
+                if(!skipped)ReportScanError(work);
                 statuses[work.Key]=result;progress.Remove(work.Key);
                 DataGridViewRow row;
                 if(visibleRows.TryGetValue(work.Entry.Id,out row)&&row.DataGridView==grid){
@@ -400,7 +413,7 @@ internal sealed partial class GeneralModWindow {
                 var work=otherVersions[i];
                 statuses[work.Key]=versionStatuses[i];
                 statusDetails.Remove(work.Key);
-                if(!String.IsNullOrWhiteSpace(work.ScanError))statusDetails[work.Key]=work.ScanError;
+                ReportScanError(work);
             }
             await ScanNexusPreviews(works,root,reads);
 
@@ -409,6 +422,9 @@ internal sealed partial class GeneralModWindow {
                 if(audit.MetadataChanged>0)Persist();
             }
             DrawRows();RefreshStorageSize();
+        }catch(Exception ex){
+            OnlineDiagnostics.Failure("general.scan.failed",ex,"Conferir os arquivos instalados e atualizar a situação dos mods.");
+            throw;
         }finally{scanCurrent=null;detail.Text=previous;scanning=false;Busy(false);}
     }
     async Task ScanNexusPreviews(List<Work> works,string root,ScanReads reads) {
@@ -482,6 +498,8 @@ internal sealed partial class GeneralModWindow {
                 workers=ChooseSwitchWorkers();
                 if(workers==0)return;
             }
+            OnlineDiagnostics.Record("general.install.plan.begin",null,"Conferindo a seleção e suas dependências.",
+                new{Action=command.ToString(),Count=jobs.Count,Mods=jobs.Select(work=>work.Entry.Id).ToArray()});
             jobs=WithLinkedDependencies(jobs);
             var pending=new List<Work>();
             List<string> downloads;
@@ -490,6 +508,8 @@ internal sealed partial class GeneralModWindow {
             try{downloads=await Task.Run(()=>PlanSelected(jobs,root,pending,workers));}
             finally{scanning=false;Busy(false);}
             if(IsDisposed)return;
+            OnlineDiagnostics.Record("general.install.plan.complete",null,"Conferência da seleção concluída.",
+                new{Total=jobs.Count,Pending=pending.Count});
             if(pending.Count==0){
                 detail.Text=T("Os mods selecionados já estão instalados.","The selected mods are already installed.");
                 return;
@@ -637,6 +657,7 @@ internal sealed partial class GeneralModWindow {
             using(var dialog=new GeneralInstallConfirmation(root,jobs.Count,downloads)){
                 if(dialog.ShowDialog(this)!=DialogResult.OK){
                     detail.Text=T("Instalação cancelada.","Installation canceled.");
+                    OnlineDiagnostics.Record("general.install.cancelled",null,detail.Text,new{Count=jobs.Count});
                     return;
                 }
             }
@@ -699,13 +720,19 @@ internal sealed partial class GeneralModWindow {
         bool incomingStarted=false, completed=false;
         try{
             skipRequests.Remove(work);
+            work.DiagnosticStage="preflight";
+            work.DiagnosticVersion=catalog.Packages.Where(mod=>mod.Id==work.Variant.CyberpunkId).Select(mod=>mod.Version).FirstOrDefault()??
+                work.Variant.SourceInfo.Values.Select(info=>info.Version??info.ModVersion).FirstOrDefault(version=>!String.IsNullOrWhiteSpace(version));
+            OnlineDiagnostics.Record("general.install.begin",work.Entry.Id,"Iniciando item da fila.",new{
+                Name=work.Entry.Name,Variant=work.Variant.Id,VariantName=work.Variant.Name,ModVersion=work.DiagnosticVersion,
+                Expected="Instalar e verificar a variante selecionada."
+            });
             if(presetProtected.Contains(work.Entry.Id))throw new IOException(T("Mod alterado fora do Mod Loader; mantido sem alterações.","Mod changed outside Mod Loader; left unchanged."));
             if(GeneralModLibrary.NeedsDependencyVersion(work.Entry,work.Variant)){
                 RowStatus(work,GeneralStatusPresentation.ChooseDependency);
                 return;
             }
             RowStatus(work,"Verificando",null,work.Entry.Name+T(": verificando arquivos…",": checking files…"));
-            OnlineDiagnostics.Record("general.install.begin",work.Entry.Id,"Iniciando item da fila.",new{Variant=work.Variant.Id});
             if(work.Variant.InstallRoutes.Count>0){
 
                 try{GeneralInstallRoutes.CheckFolders(root,work.Variant.InstallRoutes);}
@@ -794,11 +821,15 @@ internal sealed partial class GeneralModWindow {
             RowStatus(work,"Instalado",100,work.Entry.Name+T(": instalado e conferido.",": installed and verified."));
             OnlineDiagnostics.Record("general.install.complete",work.Entry.Id,"Instalação conferida.",new{Variant=work.Variant.Id});
         }catch(ModVersionKeptException ex){RowStatus(work,"Versão mantida",null,ex.Message);OnlineDiagnostics.Record("general.version.kept",work.Entry.Id,ex.Message);}
-        catch(OperationCanceledException){RowStatus(work,work.Applied?"Parcial/pulado":"Pulado",null,work.Entry.Name+T(": pulado. A fila continua.",": skipped. The queue continues."));}
+        catch(OperationCanceledException){
+            OnlineDiagnostics.Record("general.install.skipped",work.Entry.Id,"Item pulado. A fila continua.",new{Variant=work.Variant.Id,Stage=work.DiagnosticStage});
+            RowStatus(work,work.Applied?"Parcial/pulado":"Pulado",null,work.Entry.Name+T(": pulado. A fila continua.",": skipped. The queue continues."));
+        }
         catch(Exception ex){
             string message=work.Entry.Name+": "+ex.Message;
             RowStatus(work,"Falhou",null,message);
-            OnlineDiagnostics.Record("general.install.failed",work.Entry.Id,"Falha no item; a fila continua.",new{Variant=work.Variant.Id,ErrorType=ex.GetType().Name,Message=ex.Message,Exception=ex.ToString(),AppVersion=GeneralUpdateChecker.CurrentVersion,Catalog=OnlineIdentity.CatalogHash});
+            OnlineDiagnostics.Failure("general.install.failed",ex,"Instalar e verificar a variante selecionada.",
+                work.Entry.Id,work.Entry.Name,work.Variant.Id,work.DiagnosticVersion,work.DiagnosticStage);
             if(!interrupt&&!suppressQueueErrors){
                 if(testMode){if(testFailurePrompt!=null)suppressQueueErrors=testFailurePrompt(message);}
                 else GeneralDialog.Message(this,message,T("Falha na instalação","Installation failed"),MessageBoxButtons.OK,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button1,value=>suppressQueueErrors=value,T("Ocultar os próximos avisos desta instalação","Hide further warnings for this installation"));
@@ -1158,6 +1189,7 @@ internal sealed partial class GeneralModWindow {
             string root=Root();
             if(GeneralDialog.Message(this,T("Desinstalar os mods selecionados e apagar suas cópias desabilitadas?","Uninstall the selected mods and delete their disabled copies?"),
                 T("Confirmar desinstalação","Confirm uninstall"),MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+            OnlineDiagnostics.Record("general.uninstall.begin",null,"Desinstalação confirmada.",new{Mods=checkedIds.ToArray(),Count=jobs.Count});
             working=true;Busy(true);
             try{
                 string result=await Task.Run(()=>{
@@ -1168,7 +1200,8 @@ internal sealed partial class GeneralModWindow {
                     if(state.AppliedPreset!=null)new GeneralPresetDeployment(root,data,()=>EnsureGameClosed(root)).RecordRemoval(jobs.Select(PresetRecipeKey));
                     return notes;
                 });
-                Persist();                detail.Text=result;
+                Persist();detail.Text=result;
+                OnlineDiagnostics.Record("general.uninstall.complete",null,"Desinstalação processada.",new{Count=jobs.Count,Result=result});
             }finally{working=false;Busy(false);}
             await Scan();
         }catch(Exception ex){Guard(()=>{throw new IOException(ex.Message,ex);});}

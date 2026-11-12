@@ -437,7 +437,9 @@ internal sealed partial class GeneralModWindow : Form {
         foreach(Control child in target.Controls)EnableDrops(child);
     }
     void Guard(Action action){try{action();}catch(Exception ex){ShowError(ex);}}
-    void ShowError(Exception ex){detail.Text=ex.Message;GeneralDialog.Message(this,ex.Message,T("Não foi possível concluir","Unable to complete"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+    void ShowError(Exception ex,[System.Runtime.CompilerServices.CallerMemberName]string action=null){
+        OnlineDiagnostics.Failure("project.action.failed",ex,"Concluir a ação no projeto.",stage:action);
+        detail.Text=ex.Message;GeneralDialog.Message(this,ex.Message,T("Não foi possível concluir","Unable to complete"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}
     GeneralModEntry FocusedEntry(){string id=grid.CurrentRow==null?null:grid.CurrentRow.Tag as string;return id==null?null:state.List.Mods.FirstOrDefault(x=>x.Id==id);}
     IEnumerable<DataGridViewRow> ModRows(){return grid.Rows.Cast<DataGridViewRow>().Where(r=>r.Tag is string);}
     GeneralModVariant Selected(GeneralModEntry entry){

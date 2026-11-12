@@ -33,7 +33,9 @@ internal sealed partial class GeneralModWindow {
                 GeneralProjectStore.BindReceivedVariants(state,manifest,snapshotReceipt);
             }
             if(newDestination!=null)state.Destination=newDestination;
-            Persist();RebuildPresets();await Scan();return true;
+            Persist();RebuildPresets();await Scan();
+            OnlineDiagnostics.Record("project.list.replaced",null,"Lista importada.",new{Count=list.Mods.Count});
+            return true;
         }catch(Exception ex){ShowError(ex);return false;}
     }
     void EditPreset(bool create){

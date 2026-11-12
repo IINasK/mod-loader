@@ -198,7 +198,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     void Copy(string text){if(!text.StartsWith("ML-P2P1:",StringComparison.Ordinal))return;try{Clipboard.SetText(text);}catch(Exception ex){Failed(ex);}}
     void Report(string text){if(!IsDisposed&&IsHandleCreated)BeginInvoke((Action)(()=>{if(!IsDisposed)status.Text=text;}));}
     void Failed(Exception ex){
-        OnlineDiagnostics.Record("p2p.link.failed",null,ex.Message,new{ErrorType=ex.GetType().Name});
+        OnlineDiagnostics.Failure("p2p.action.failed",ex,"Concluir a operação de compartilhamento.");
         status.ForeColor=GeneralStyle.Danger;status.Text=T("Falha: ","Failed: ")+ex.Message;
         tips.SetToolTip(status,status.Text);
     }

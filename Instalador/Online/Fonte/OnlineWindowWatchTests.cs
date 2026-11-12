@@ -188,15 +188,15 @@ public static class OnlineWindowWatchTests {
             check(!File.Exists(Path.Combine(f.Root,"importados-pendentes.json"))&&!Directory.Exists(f.Game),"Monitor ignora desconhecido sem criar fila de auditoria ou alterar jogo");
         }
         using(var f=new Fixture(Path.Combine(root,"log-download-only"),true)) {
-            OnlineDiagnostics.Start(Path.Combine(f.Root,"logs"));string log=OnlineDiagnostics.FilePath;
+            OnlineDiagnostics.Start();
             try{
                 string partial=Path.Combine(f.Downloads,f.Asset.Name+".crdownload");File.WriteAllText(partial,"partial");File.WriteAllText(Path.Combine(f.Downloads,"other-private-download.part"),"private");File.SetLastWriteTimeUtc(f.Downloaded,DateTime.UtcNow.AddMinutes(-5));
                 ((DataGridView)Get(f.Window,"grid")).Rows[0].Cells["Select"].Value=true;Set(f.Window,"launchBrowser",new Action<string>(url=>{}));f.OpenNormal();f.Start();f.Check();Call(f.Window,"RefreshMods",new[]{f.Mod},f.Game);Application.DoEvents();
-                var events=OnlineDiagnosticsTests.Read(log);var grid=(DataGridView)Get(f.Window,"grid");
+                var events=OnlineDiagnostics.Snapshot();var grid=(DataGridView)Get(f.Window,"grid");
                 check(events.Any(e=>Convert.ToString(e["Event"])=="watch.file.observed"&&Convert.ToBoolean(((Dictionary<string,object>)e["Data"])["Partial"]))&&File.Exists(partial),"Log observa arquivo parcial do mod enquanto navegador ainda baixa sem ler conteudo ou apagar parcial");
                 check(events.Any(e=>Convert.ToString(e["Event"])=="watch.verified"&&Convert.ToBoolean(((Dictionary<string,object>)e["Data"])["ExistedBeforeWatch"])),"Registro identifica pacote completo antigo enquanto outra copia esta sendo baixada");
                 check(f.Cache.Contains(f.Asset)&&Convert.ToString(grid.Rows[0].Cells["Installed"].Value)=="Não instalado"&&!Directory.Exists(f.Game),"Concluir apenas Baixar importa cache e nunca marca como instalado sem arquivos no jogo");
-                check(events.Any(e=>Convert.ToString(e["Event"])=="ui.selection.changed")&&events.Any(e=>Convert.ToString(e["Event"])=="browser.open.dispatched")&&events.Any(e=>Convert.ToString(e["Event"])=="ui.row.changed")&&!events.Any(e=>Convert.ToString(e["Event"])=="install.request")&&!File.ReadAllText(log).Contains("other-private-download"),"Linha do tempo registra selecao, navegador e tela sem acionar instalacao nem listar downloads pessoais alheios");
+                check(events.Any(e=>Convert.ToString(e["Event"])=="ui.selection.changed")&&events.Any(e=>Convert.ToString(e["Event"])=="browser.open.dispatched")&&events.Any(e=>Convert.ToString(e["Event"])=="ui.row.changed")&&!events.Any(e=>Convert.ToString(e["Event"])=="install.request")&&!OnlineDiagnostics.Report(false).Contains("other-private-download"),"Linha do tempo registra selecao, navegador e tela sem acionar instalacao nem listar downloads pessoais alheios");
             }finally{OnlineDiagnostics.Stop();}
         }
         using(var f=new Fixture(Path.Combine(root,"online-testes-"+Guid.NewGuid().ToString("N")),false)) {

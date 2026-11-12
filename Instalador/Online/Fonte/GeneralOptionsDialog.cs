@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -72,8 +72,13 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
         layout.Controls.Add(FolderRow(T("Procurar downloads em","Look for downloads in"),this.folder,()=>Browse(this.folder,false)),0,1);
         var browser = GeneralStyle.Button(T("Conectar navegador…", "Connect browser…"), ConnectBrowser);
         browser.Margin = new Padding(0, 10, 0, 0);
-        browser.Anchor = AnchorStyles.Left;
-        layout.Controls.Add(browser, 0, 2);
+        var support = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true, Margin = Padding.Empty };
+        var report = GeneralStyle.Button(T("Reportar erro", "Report a problem"), ShowSessionReport);
+        report.Name = "ReportSessionError";
+        report.Margin = new Padding(10, 10, 0, 0);
+        support.Controls.Add(browser);
+        support.Controls.Add(report);
+        layout.Controls.Add(support, 0, 2);
         if(projectOptions){
             destination.Text=installationFolder;
             destination.Name="OptionsInstallationFolder";
@@ -126,6 +131,45 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
     }
 
     static string T(string pt, string en) { return GeneralStyle.T(pt, en); }
+
+    void ShowSessionReport() {
+        using(var dialog=CreateSessionReport())dialog.ShowDialog(this);
+    }
+
+    internal static GeneralDialog CreateSessionReport() {
+        bool english = GeneralStyle.Language == "en";
+        var dialog = new GeneralDialog(T("Reportar erro", "Report a problem")) { ClientSize = new Size(720, 520) };
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(24, 10, 24, 20) };
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var feedback = new Label { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 8),
+            Text = T("Copie o relatório e cole na conversa com quem vai te ajudar.", "Copy the report and paste it into your conversation with support.") };
+        var preview = new TextBox { Name = "SessionReportPreview", Dock = DockStyle.Fill, Multiline = true, ReadOnly = true,
+            ScrollBars = ScrollBars.Vertical, BorderStyle = BorderStyle.None,
+            AccessibleName = T("Relatório da sessão", "Session report"), Text = OnlineDiagnostics.Report(english) };
+        var surface = new GeneralSurface { Dock = DockStyle.Fill, Padding = new Padding(12) };
+        surface.Controls.Add(preview);
+        var actions = GeneralTableDialogLayout.Commands();
+        var copy = GeneralStyle.Button(T("Copiar relatório", "Copy report"), () => {
+            try {
+                Clipboard.SetText(preview.Text);
+                feedback.Text = T("Relatório copiado.", "Report copied.");
+            } catch (ExternalException) {
+                feedback.Text = T("Não foi possível copiar. Tente novamente ou selecione o texto.", "Couldn't copy. Try again or select the text.");
+            }
+        }, true);
+        copy.Name = "CopySessionReport";
+        var close = GeneralStyle.Button(T("Fechar", "Close"), () => dialog.Close());
+        actions.Controls.Add(copy);
+        actions.Controls.Add(close);
+        layout.Controls.Add(feedback, 0, 0);
+        layout.Controls.Add(surface, 0, 1);
+        layout.Controls.Add(actions, 0, 2);
+        dialog.Content.Controls.Add(layout);
+        GeneralStyle.Apply(dialog, GeneralStyle.Dark);
+        return dialog;
+    }
 
     void ConnectBrowser() {
         try {
@@ -183,6 +227,7 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
     }
 
     void ShowNotice(string text,bool failed=false){
+        if(failed)OnlineDiagnostics.Record("options.failed",null,"Falha ao aplicar uma opção.",new{Actual=text});
         error.ForeColor=failed?GeneralStyle.Danger:GeneralStyle.Foreground;
         error.Text=text;
     }

@@ -174,6 +174,7 @@ internal sealed partial class GeneralModWindow {
         EnsurePresetGameClosed(root);GeneralPresetProfiles.Capture(state);
         if(workers<=0)workers=GeneralPresetDeployment.VerificationWorkers;
         var desiredWorks=PresetWorks().ToArray();
+        OnlineDiagnostics.Record("general.preset.begin",null,"Carregando a combinação do preset.",new{Preset=selected,Workers=workers,Mods=desiredWorks.Length});
         foreach(var work in desiredWorks.Where(w=>w.Entry.AlternativeGroup!=null))ActivePreset.AlternativeChoices[work.Entry.AlternativeGroup]=work.Entry.Id;
         var universe=PresetUniverse().ToArray();
         var cancellation=new System.Threading.CancellationTokenSource();
@@ -232,13 +233,15 @@ internal sealed partial class GeneralModWindow {
                 T("Preset carregado com exceções","Preset loaded with exceptions"),1,1);
         }catch(OperationCanceledException) {
             if(!cancellation.IsCancellationRequested)throw;
+            OnlineDiagnostics.Record("general.preset.cancelled",null,"Troca cancelada.",new{Preset=selected,TotalMs=elapsed.ElapsedMilliseconds});
             presetCancellation=null;
             detail.Text=T("Troca cancelada. A combinação anterior foi mantida.","Switch cancelled. The previous selection was kept.");
             ShowPresetProgress(T("Troca cancelada","Switch cancelled"),0,0);
             currentProgress.Indeterminate=false;
             currentProgress.NotApplicable=true;
             currentProgress.Invalidate();
-        }catch {
+        }catch(Exception ex) {
+            OnlineDiagnostics.Failure("general.preset.failed",ex,"Aplicar a combinação selecionada e verificar a instalação.",stage:selected);
             ShowPresetProgress(T("Carregamento interrompido","Preset load interrupted"),0,0);
             currentProgress.Indeterminate=false;
             currentProgress.NotApplicable=true;

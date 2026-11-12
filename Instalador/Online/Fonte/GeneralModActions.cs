@@ -351,6 +351,8 @@ internal sealed partial class GeneralModWindow {
     }
 
     async Task ToggleMods(List<Work> jobs, string root, bool enable) {
+        var context=new{Action=enable?"enable":"disable",Count=jobs.Count,Mods=jobs.Select(work=>work.Entry.Id).ToArray()};
+        OnlineDiagnostics.Record("general.toggle.begin",null,"Alterando os mods ativos.",context);
         working = true;
         Busy(true);
         try {
@@ -380,6 +382,7 @@ internal sealed partial class GeneralModWindow {
                 } else store.Disable(PlanDisable(jobs, root));
             });
             detail.Text = enable ? T("Mods reativados.", "Mods enabled.") : T("Mods desabilitados.", "Mods disabled.");
+            OnlineDiagnostics.Record("general.toggle.complete",null,detail.Text,context);
         } finally { working = false; Busy(false); }
         await Scan();
     }

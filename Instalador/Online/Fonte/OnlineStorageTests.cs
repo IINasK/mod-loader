@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -80,18 +80,14 @@ public static class OnlineStorageTests {
         string protectedLog=Path.Combine(logs,"diagnostico-20260101-000000-00000000.jsonl");
         string unknownLog=Path.Combine(logs,"personal.txt");File.WriteAllText(unknownLog,"keep");
         using(var guard=new FileStream(protectedLog,FileMode.Open,FileAccess.Read,FileShare.ReadWrite)){
-            OnlineDiagnostics.Start(logs);OnlineDiagnostics.Record("storage-fixture",null,"fixture");
-            check(OnlineDiagnostics.Enabled&&File.Exists(protectedLog),"Rotação preserva um registro em uso e o logger continua funcionando.");
+            OnlineDiagnostics.Start();OnlineDiagnostics.Record("storage-fixture",null,"fixture");
+            check(OnlineDiagnostics.Enabled&&Directory.GetFiles(logs,"*.jsonl").Length==12&&File.Exists(protectedLog),"A sessão funciona sem criar arquivos nem mexer em logs antigos.");
             OnlineDiagnostics.Stop();
         }
         StorageMaintenance.RotateLogs(logs);
         var remaining=new DirectoryInfo(logs).GetFiles("diagnostico-*.jsonl");
         check(remaining.Length<=8&&remaining.Sum(file=>file.Length)<=64L*1024*1024,"Rotação limita históricos a oito arquivos e 64 MiB.");
         check(File.ReadAllText(unknownLog)=="keep","Rotação não apaga arquivos que não pertencem ao logger.");
-        OnlineDiagnostics.Start(logs);
-        remaining=new DirectoryInfo(logs).GetFiles("diagnostico-*.jsonl");
-        check(remaining.Length<=8&&remaining.Sum(file=>file.Length)<=64L*1024*1024,"Abrir uma sessão reserva espaço para o registro atual dentro do limite.");
-        OnlineDiagnostics.Stop();
         Safe.WriteJson(Path.Combine(root,"resultado-armazenamento.json"),new{Passed=true,Tests=tests,RealGameTouched=false,NetworkUsed=false});return tests.Count;
     }
     static void TestSaveBackupRotation(string root,FixedCatalog catalog,DownloadCache cache,string saves,Action<bool,string> check){
