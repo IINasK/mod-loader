@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -98,6 +98,29 @@ public static class InstalledSnapshotInstallerTests {
         var legacy=HistoricalReceipts.Expand(catalog,new[]{removed.Id}).Single().Files.Single();
         manifest.List.Mods.Add(removed);
         AddHistoricalFile(receipt,removed.Id,legacy.Path,legacy.Size,legacy.Sha256);
+        var oldManifest=new InstalledSnapshotManifest{Game="cyberpunk2077"};
+        var oldAtelier=new GeneralModEntry{Id="mod-12637",Name="VOIDWEAR Accessories Virtual Atelier",DefaultVariant="default"};
+        var oldVariant=new GeneralModVariant{Id="default",Name="Principal",CyberpunkId=oldAtelier.Id,
+            Sources=new List<string>{"https://www.nexusmods.com/cyberpunk2077/mods/12637?tab=files&file_id=170850"}};
+        oldAtelier.Variants.Add(oldVariant);
+        oldManifest.List.Mods.Add(oldAtelier);
+        var currentAtelier=catalog.Packages.Single(recipe=>recipe.Id==oldAtelier.Id);
+        foreach(var file in currentAtelier.Files.Where(file=>!file.Path.EndsWith("voidwear-casual.reds")&&!file.Path.EndsWith("voidwear-tacticool.reds")))
+            oldManifest.Files.Add(new InstalledSnapshotFile{Path=file.Path,Size=file.Size,Sha256=file.Sha256,Kind="file",
+                Owners=new List<string>{"mod-12637/default"}});
+        var historical=HistoricalReceipts.CatalogForSnapshot(catalog,oldManifest);
+        Check(historical.Packages.Single(recipe=>recipe.Id==oldAtelier.Id).Files.Count==
+            currentAtelier.Files.Count-2,
+            "O recibo com a versão enxuta do VOIDWEAR não exige os dois scripts adicionados de volta ao catálogo.");
+        var expanded=FixedData.Expand(historical,new[]{oldAtelier.Id});
+        var oldSeed=GeneralModLibrary.Seed(historical,new ModImportItem[0]);
+        manifest.List.Categories=oldSeed.Categories.ToList();
+        foreach(var recipe in expanded){
+            var entry=oldSeed.Mods.Single(mod=>mod.Id==recipe.Id);
+            manifest.List.Mods.Add(entry);
+            foreach(var file in recipe.Files.Where(file=>!file.UserData))
+                AddHistoricalFile(receipt,entry.Id,file.Path,file.Size,file.Sha256);
+        }
         foreach(string id in new[]{"first","second"}){
             var mod=new GeneralModEntry{Id=id,Name=id,DefaultVariant="default"};
             mod.Variants.Add(new GeneralModVariant{Id="default",Name="Principal",Sources=new List<string>{"installed://"+id+"/default"}});
@@ -111,7 +134,22 @@ public static class InstalledSnapshotInstallerTests {
         manifest.Project=Safe.Json.Deserialize<GeneralModList>(Safe.Json.Serialize(manifest.List));
         var flags=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
         typeof(InstalledSnapshotInstaller).GetMethod("Save",flags).Invoke(engine,new object[]{receipt});
+        var legacyAtelierOnly=Safe.Json.Deserialize<InstalledSnapshotManifest>(Safe.Json.Serialize(manifest));
+        legacyAtelierOnly.List.Mods.RemoveAll(mod=>mod.Id==removed.Id);
+        legacyAtelierOnly.Project.Mods.RemoveAll(mod=>mod.Id==removed.Id);
+        legacyAtelierOnly.Files.RemoveAll(file=>file.Owners.Contains(removed.Id+"/default"));
+        Throws(()=>InstalledSnapshot.Validate(legacyAtelierOnly,catalog),
+            "O catálogo atual rejeita um pacote antigo incompleto sem a validação exclusiva de recibos locais.");
         var scan=new InstalledSnapshotInstaller.StatusScan(engine,Safe.Hash);
+        var receiptFile=typeof(InstalledSnapshotInstaller).GetMethod("ReceiptPath",flags);
+        string invalidReceipt=(string)receiptFile.Invoke(engine,new object[]{Guid.NewGuid().ToString("N")});
+        File.WriteAllText(invalidReceipt,"invalid receipt");
+        Check(engine.ProjectDeletionFiles(true,skipUnreadable:true).Any(file=>file.OwnerKeys.Contains("first/default")),
+            "Inventário ignora um recibo ilegível e mantém a prova dos outros.");
+        Throws(()=>engine.ProjectDeletionFiles(true).ToArray(),
+            "A leitura de propriedade usada para alterações continua bloqueada quando há recibo ilegível.");
+        Check(scan.Matches(receipt.Id,manifest.List.Mods.Single(mod=>mod.Id=="first"),manifest.List.Mods.Single(mod=>mod.Id=="first").Variants.Single()),
+            "A receita VOIDWEAR anterior valida sem invalidar os demais mods do mesmo recebimento.");
         Check(scan.Status(receipt.Id,"first/default")==GeneralModInstaller.Installed&&
             scan.Status(receipt.Id,"second/default")==GeneralModInstaller.Installed&&
             scan.Status(receipt.Id,removed.Id+"/default")==GeneralModInstaller.Missing,
@@ -124,7 +162,12 @@ public static class InstalledSnapshotInstallerTests {
     }
     static void AddHistoricalFile(InstalledSnapshotInstaller.Receipt receipt,string id,string path,long size,string hash) {
         string owner=id+"/default";
-        receipt.ActiveOwners.Add(owner);
+        if(!receipt.ActiveOwners.Contains(owner))receipt.ActiveOwners.Add(owner);
+        var existing=receipt.Manifest.Files.FirstOrDefault(file=>file.Path==path);
+        if(existing!=null){
+            if(existing.Sha256!=hash||existing.Size!=size)throw new IOException("Receitas de teste com conflito.");
+            existing.Owners.Add(owner);return;
+        }
         receipt.Manifest.Files.Add(new InstalledSnapshotFile{Path=path,Size=size,Sha256=hash,Kind="file",Owners=new List<string>{owner}});
         receipt.Files.Add(new InstalledSnapshotInstaller.Change{Path=path,Size=size,After=hash,Applied=true,Owned=true});
     }

@@ -81,7 +81,8 @@ static class OnlineExtraCleanupTests {
             "Desfazer restaura exatamente os arquivos movidos, sem tocar nos desconhecidos.");
         const string oldSetting="bin/x64/plugins/cyber_engine_tweaks/mods/stopNCPD/mod_user_settings.json";
         const string oldLog="bin/x64/plugins/cyber_engine_tweaks/mods/stopNCPD/stopNCPD.log";
-        string historicalGame=OnlineTests.Fixture(root,"historical"),historicalData=Safe.In(root,"historical-data");
+        string historicalGame=Safe.In(root,"h"),historicalData=Safe.In(root,"historical-data");
+        Directory.Move(OnlineTests.Fixture(root,"historical"),historicalGame);
         Put(historicalGame,oldSetting,"{}");Put(historicalGame,oldLog,"generated locally");
         var officialCatalog=Safe.Json.Deserialize<FixedCatalog>(Safe.Json.Serialize(FixedData.Load()));
         officialCatalog.GameFileVersion=catalog.GameFileVersion;
@@ -90,9 +91,15 @@ static class OnlineExtraCleanupTests {
         var oldFile=historical.Where(extra=>extra.Proven).SelectMany(extra=>extra.Files).Single(file=>file.Path==oldSetting);
         check(historical.Where(extra=>!extra.Proven).SelectMany(extra=>extra.Files).Any(file=>file.Path==oldLog),
             "O NCPD manual é reconhecido pela assinatura do pacote anterior, mas seu log gerado continua desconhecido.");
-        official.ApplySyncCleanup(new List<OwnedChange>{oldFile},host,new string[0],_=>{},historicalData);
+        check(official.ReadUnlistedModFiles(new string[0]).Any(file=>file.Path==oldSetting&&file.Mod=="Immersive NCPD Hotline"),
+            "O inventário identifica o NPCD pelo nome do pacote histórico.");
+        check(historical.Any(extra=>extra.Proven&&extra.Name=="Immersive NCPD Hotline"),"A sincronização agrupa o NPCD comprovado.");
+        var selection=new[]{oldSetting,oldLog};
+        var selectedPlan=official.PlanExtraReset(historicalData,selection);
+        check(selectedPlan.Count==1&&selectedPlan[0].Path==oldFile.Path,"Retirar só o mod escolhido preserva arquivos desconhecidos na mesma pasta.");
+        official.ApplyExtraReset(selectedPlan,_=>{},historicalData,selection);
         check(!File.Exists(Safe.In(historicalGame,oldSetting))&&File.ReadAllText(Safe.In(historicalGame,oldLog))=="generated locally",
-            "Sincronizar retira o NCPD comprovado sem ampliar a autorização aos resíduos da mesma pasta.");
+            "A remoção seletiva retira o NCPD comprovado sem ampliar a autorização aos resíduos da mesma pasta.");
         Safe.WriteJson(Safe.In(root,"resultado-protecao-sincronizacao.json"),new{Passed=true,Tests=checks,RealGameTouched=false});
     }
 

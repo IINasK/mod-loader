@@ -369,7 +369,55 @@
           "UserData": false
         }
       ]
+    },
+{
+  "Id": "mod-12637",
+  "Name": "VOIDWEAR Accessories Virtual Atelier",
+  "Version": "0.85",
+  "Profile": "Complementos",
+  "GameVersion": "2.5",
+  "RequiresPL": false,
+  "RequiresRedmod": false,
+  "Immutable": false,
+  "Dependencies": [
+    "mod-2987",
+    "redscript"
+  ],
+  "Warning": "No computador: Net > Atelier > VOIDWEAR Accessories. As lojas Casual e Tacticool foram retiradas por escolha do usuário; suas roupas não são removidas por isso. A loja de acessórios permanece para os óculos.",
+  "PhantomLibertyStatus": "not-required",
+  "PhantomLibertyNotes": "Sem requisito de expansão declarado. Inferência documental e estática.",
+  "PhantomLibertySource": "https://www.nexusmods.com/cyberpunk2077/mods/12637",
+  "NexusModId": 12637,
+  "NexusFileId": 147075,
+  "Assets": [
+    {
+      "Id": "a0",
+      "Name": "void_Atelier_Store-12637-0-85-1780140462.zip",
+      "Size": 19030,
+      "Sha256": "b9e751813d7d08349ff70ab845403ae3db8d15ca2d03a359fd5638c62d990fc6",
+      "Format": "zip",
+      "Url": "https://www.nexusmods.com/cyberpunk2077/mods/12637?tab=files&file_id=147075",
+      "ModId": 12637,
+      "FileId": 147075
     }
+  ],
+  "Files": [
+    {
+      "Asset": "a0",
+      "Entry": "archive/pc/mod/void_Atelier_Store.archive",
+      "Path": "archive/pc/mod/void_Atelier_Store.archive",
+      "Size": 16384,
+      "Sha256": "8dc444b66da06d80850179ddcd1c4bd27e46b7dac09f8544db0752e06290aa32"
+    },
+    {
+      "Asset": "a0",
+      "Entry": "r6/scripts/yellingintothevoid/voidwear-accessories.reds",
+      "Path": "r6/scripts/yellingintothevoid/voidwear-accessories.reds",
+      "Size": 17609,
+      "Sha256": "347462f8013f78f63e5c478aaef82af9aecbc4ceb8034924d820d7a25fc9d69e"
+    }
+  ]
+}
   ],
   "Defaults": [
     {

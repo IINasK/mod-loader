@@ -317,6 +317,12 @@ internal sealed partial class GeneralModWindow : Form {
         var copyFailures=GeneralMenuRenderer.Add(menu,T("Copiar erros da instalação","Copy installation errors"),CopyFailures);copyFailures.Name="CopyInstallFailures";
         var undo=GeneralMenuRenderer.Add(menu,T("Cyberpunk: desfazer operação","Cyberpunk: undo operation"),async()=>await CyberpunkMaintenance(false));
         var clean=GeneralMenuRenderer.Add(menu,T("Cyberpunk: limpar extras","Cyberpunk: remove extra mods"),async()=>await CyberpunkMaintenance(true));
+        var removeExtra=GeneralMenuRenderer.Add(menu,T("Retirar este mod do jogo…","Remove this mod from the game…"),async()=>{
+            var selected=grid.CurrentRow==null?null:grid.CurrentRow.Tag as P2PSyncDifference;
+            if(selected!=null)await CyberpunkMaintenance(true,InventoryRow(InventoryLinkStore.Key(selected)).Select(item=>item.Path).ToArray());
+        });
+        menu.Opening+=(s,e)=>removeExtra.Visible=CanEditInventory&&IsCyberpunk(state.Destination)&&
+            grid.CurrentRow!=null&&grid.CurrentRow.Tag is P2PSyncDifference;
         menu.Opening+=(s,e)=>{if(associationChoice!=null){e.Cancel=true;return;}bool available=!working&&!scanning&&IsCyberpunk(state.Destination);undo.Visible=available;clean.Visible=available;var focused=FocusedEntry();string status;failureDetails.Visible=focused!=null&&statuses.TryGetValue(Key(focused,Selected(focused)),out status)&&GeneralStatusPresentation.Kind(status)=="error";copyFailures.Visible=statuses.Values.Any(value=>GeneralStatusPresentation.Kind(value)=="error");e.Cancel=focused==null&&(grid.CurrentRow==null||!(grid.CurrentRow.Tag is P2PSyncDifference));};
         grid.CellMouseDown+=(s,e)=>{
             if(e.RowIndex<0)return;

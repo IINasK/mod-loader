@@ -185,6 +185,14 @@ internal static class GeneralP2PUiTests {
                             service.Sessions.Add(activeSend);
                             update();
                             var activeCard=Children(viewport.Content).Single(c=>c.Name=="p2p-card"&&c.AccessibleName==activeSend.ToString());
+                            activeSend.CompareBeforePack=true;activeSend.Deferred=true;activeSend.Automatic=true;activeSend.Size=0;
+                            activeSend.Recipients[0].SyncChoicePhase="comparing";update();
+                            check(Find<Label>(activeCard,"p2p-transfer-status").Text.Contains(locale=="pt"?"já escolheu":"friend chose"),
+                                "The sender card acknowledges a quick choice while the receiver compares files.");
+                            activeSend.Recipients[0].SyncChoicePhase="choice_sent";update();
+                            check(Find<Label>(activeCard,"p2p-transfer-status").Text.Contains(locale=="pt"?"confirmou":"confirmed"),
+                                "The sender card distinguishes submitted choice from waiting for input.");
+                            activeSend.CompareBeforePack=false;activeSend.Deferred=false;activeSend.Automatic=false;activeSend.Size=1024;
                             Find<Button>(activeCard,"p2p-dismiss").PerformClick();
                             deadline=DateTime.UtcNow.AddSeconds(4);
                             while(!activeCard.IsDisposed&&DateTime.UtcNow<deadline){

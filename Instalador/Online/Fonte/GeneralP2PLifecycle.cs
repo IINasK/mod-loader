@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 internal sealed class P2PRecipient {
     public string Device, Phase;
     public bool ReceiptClosed;
+    [System.Web.Script.Serialization.ScriptIgnore] public volatile string SyncChoicePhase;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PInstallProgress InstallProgress;
 }
 
@@ -36,6 +37,7 @@ internal sealed partial class P2PService {
     }
 
     static readonly string[] NoticePhases = { "review", "installing", "retry", "installed", "discarded" };
+    static bool ChoiceNotice(string phase){return phase=="choosing"||phase=="comparing"||phase=="choice_sent"||phase=="choice_failed";}
     static readonly string EmptyHash = new string('0', 64);
     volatile GeneralModState preparationState;
     int installing;
@@ -130,7 +132,12 @@ internal sealed partial class P2PService {
         string directory=NoticeDirectory(session,Engine.Device);
         string path=Safe.In(directory,"status.json");
         string hash=session.PayloadHash??EmptyHash;
-        var notice=new InstallNotice{Phase=session.Phase,Hash=hash,Tag=NoticeTag(session,Engine.Device,session.Phase,hash)};
+        string phase=session.Phase;
+        if(phase==null&&session.CompareBeforePack){
+            phase=HasSyncChoice(session)?"choice_sent":session.Error!=null?"choice_failed":session.SyncMode!=0?"comparing":"choosing";
+        }
+        if(phase==null)return;
+        var notice=new InstallNotice{Phase=phase,Hash=hash,Tag=NoticeTag(session,Engine.Device,phase,hash)};
         var progress=session.InstallProgress;
         if(session.Phase=="installing"&&progress!=null&&progress.Total>0){
             notice.Writing=progress.Writing;
@@ -150,8 +157,10 @@ internal sealed partial class P2PService {
         InstallNotice notice;
         try{notice=Safe.Json.Deserialize<InstallNotice>(File.ReadAllText(path));}
         catch(ArgumentException){return null;}
-        if(notice==null||!NoticePhases.Contains(notice.Phase)||!P2PPack.HashValid(notice.Hash)||!P2PPack.HashValid(notice.Tag))return null;
-        if(notice.Hash!=session.PayloadHash&&(notice.Phase!="discarded"||notice.Hash!=EmptyHash))return null;
+        if(notice==null||!P2PPack.HashValid(notice.Hash)||!P2PPack.HashValid(notice.Tag))return null;
+        if(ChoiceNotice(notice.Phase)){
+            if(!session.CompareBeforePack||session.PayloadHash!=null||notice.Hash!=EmptyHash)return null;
+        }else if(!NoticePhases.Contains(notice.Phase)||notice.Hash!=session.PayloadHash&&(notice.Phase!="discarded"||notice.Hash!=EmptyHash))return null;
         return SameNoticeTag(NoticeTag(session,recipient.Device,notice.Phase,notice.Hash),notice.Tag)?notice:null;
     }
 
@@ -170,6 +179,13 @@ internal sealed partial class P2PService {
             if(Terminal(recipient.Phase))continue;
             var notice=ReadNotice(session,recipient);
             if(notice==null)continue;
+            if(ChoiceNotice(notice.Phase)){
+                if(recipient.SyncChoicePhase!=notice.Phase)
+                    OnlineDiagnostics.Record("p2p.choice.observed",null,"Estado da escolha recebido.",
+                        new{Id=DiagnosticId(session.Id),Phase=notice.Phase});
+                recipient.SyncChoicePhase=notice.Phase;
+                continue;
+            }
             recipient.InstallProgress=notice.Phase=="installing"&&notice.Total>0&&notice.Total<=InstalledSnapshot.MaxFiles&&
                 notice.Done>=0&&notice.Done<=notice.Total&&SameNoticeTag(InstallProgressTag(session,recipient.Device,notice),notice.ProgressTag)
                 ?new P2PInstallProgress(notice.Writing,notice.Done,notice.Total,null):null;

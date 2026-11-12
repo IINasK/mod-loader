@@ -240,10 +240,22 @@ internal sealed partial class GeneralModWindow {
         }
         Func<string,string> hash=reads==null?null:(Func<string,string>)reads.Hash;
         string snapshot;
-        if(exists&&work.Variant.CyberpunkId!="NightCoop"&&work.Variant.CyberpunkId!=EquipmentExOptions.ModId&&TryWorkSnapshot(work,root,out snapshot)){
-            string owner=InstalledSnapshot.Owner(work.Entry,work.Variant);
-            string found=reads==null?Snapshot(root).Status(snapshot,owner):reads.Snapshots.Value.Status(snapshot,owner);
-            if(found!=GeneralModInstaller.Missing||work.Variant.CyberpunkId==null)return found;
+        if(exists&&work.Variant.CyberpunkId!="NightCoop"&&work.Variant.CyberpunkId!=EquipmentExOptions.ModId){
+            try{
+                if(TryWorkSnapshot(work,root,out snapshot,reads)){
+                    string owner=InstalledSnapshot.Owner(work.Entry,work.Variant);
+                    string found=reads==null?Snapshot(root).Status(snapshot,owner):reads.Snapshots.Value.Status(snapshot,owner);
+                    if(found!=GeneralModInstaller.Missing||work.Variant.CyberpunkId==null)return found;
+                }
+            }catch(IOException ex){
+                if(reads==null||work.Variant.CyberpunkId==null)throw;
+                OnlineDiagnostics.Failure("scan.receipt.failed",ex,"Conferir pelo recibo. Verificando os arquivos pelo catálogo.",
+                    work.Entry.Id,work.Entry.Name,work.Variant.Id);
+            }catch(UnauthorizedAccessException ex){
+                if(reads==null||work.Variant.CyberpunkId==null)throw;
+                OnlineDiagnostics.Failure("scan.receipt.failed",ex,"Ler o recibo. Verificando os arquivos pelo catálogo.",
+                    work.Entry.Id,work.Entry.Name,work.Variant.Id);
+            }
         }
         if(work.Variant.CyberpunkId!=null){
             if(!cyberpunk)return "Requer Cyberpunk 2077";
@@ -644,13 +656,10 @@ internal sealed partial class GeneralModWindow {
             Snapshot(root).Status(receipt,InstalledSnapshot.Owner(work.Entry,work.Variant))==GeneralModInstaller.Installed;
     }
 
-    bool TryWorkSnapshot(Work work,string root,out string receipt){
-        return state.SnapshotReceipts.TryGetValue(InstalledSnapshot.Owner(work.Entry,work.Variant),out receipt)&&
-            SnapshotMatchesBody(work,root,receipt);
-    }
-
-    bool SnapshotMatchesBody(Work work,string root,string receipt){
-        return InstalledSnapshot.MatchesBodyReceipt(Snapshot(root),work.Entry,work.Variant,receipt);
+    bool TryWorkSnapshot(Work work,string root,out string receipt,ScanReads reads=null){
+        if(!state.SnapshotReceipts.TryGetValue(InstalledSnapshot.Owner(work.Entry,work.Variant),out receipt))return false;
+        return reads==null?InstalledSnapshot.MatchesBodyReceipt(Snapshot(root),work.Entry,work.Variant,receipt):
+            reads.Snapshots.Value.Matches(receipt,work.Entry,work.Variant);
     }
     void ConfirmAndEnqueue(List<Work> jobs,string root,IReadOnlyList<string> downloads,bool urgent){
         if(!urgent){
@@ -1206,7 +1215,7 @@ internal sealed partial class GeneralModWindow {
             await Scan();
         }catch(Exception ex){Guard(()=>{throw new IOException(ex.Message,ex);});}
     }
-    async Task CyberpunkMaintenance(bool clean){
+    async Task CyberpunkMaintenance(bool clean,string[] selectedExtras=null){
         if(working||scanning)return;
         string root=state.Destination;
         if(!IsCyberpunk(root))return;
@@ -1215,7 +1224,7 @@ internal sealed partial class GeneralModWindow {
         try{
             var engine=Cyberpunk(root);
             if(clean){
-                var plan=await Task.Run(()=>engine.PlanExtraReset(data));
+                var plan=await Task.Run(()=>engine.PlanExtraReset(data,selectedExtras));
                 if(plan.Count==0){detail.Text="Nenhum arquivo extra com vínculo comprovado foi encontrado. Os desconhecidos foram preservados.";return;}
                 using(var review=new GeneralDialog(T("Revisar arquivos fora do pacote Cyberpunk","Review files outside the Cyberpunk pack")){ClientSize=new Size(820,475),RequiresDecision=true}){
                     var layout=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(20,8,20,20),ColumnCount=1,RowCount=2};
@@ -1231,7 +1240,7 @@ internal sealed partial class GeneralModWindow {
                     if(review.ShowDialog(this)!=DialogResult.OK)return;
                 }
                 if(GeneralDialog.Message(this,"Retirar os "+plan.Count+" arquivos listados? Eles serão guardados para desfazer a operação.","Confirmar limpeza",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
-                detail.Text=await Task.Run(()=>engine.ApplyExtraReset(plan,Report,data));
+                detail.Text=await Task.Run(()=>engine.ApplyExtraReset(plan,Report,data,selectedExtras));
             }else{
                 if(GeneralDialog.Message(this,"Desfazer a última operação do Cyberpunk?","Confirmar reversão",MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
                 detail.Text=await Task.Run(()=>engine.Undo(Report));

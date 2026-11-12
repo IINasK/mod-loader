@@ -31,7 +31,10 @@ public static partial class InstalledSnapshot {
     public static string Owner(GeneralModEntry mod,GeneralModVariant variant){return mod.Id+"/"+variant.Id;}
     static T Clone<T>(T value){return Safe.Json.Deserialize<T>(Safe.Json.Serialize(value));}
     internal static bool MatchesBodyReceipt(InstalledSnapshotInstaller engine,GeneralModEntry mod,GeneralModVariant variant,string receipt){
-        var installed=engine.ReadManifest(receipt).List.Mods.FirstOrDefault(entry=>entry.Id==mod.Id);
+        return MatchesReceiptVariant(engine.ReadManifest(receipt),mod,variant);
+    }
+    internal static bool MatchesReceiptVariant(InstalledSnapshotManifest manifest,GeneralModEntry mod,GeneralModVariant variant){
+        var installed=manifest.List.Mods.FirstOrDefault(entry=>entry.Id==mod.Id);
         var recipe=installed==null?null:installed.Variants.FirstOrDefault(v=>v.Id==variant.Id);
         if(recipe==null)return false;
         var expected=Clone(variant);
@@ -319,6 +322,7 @@ public static partial class InstalledSnapshot {
         var recipes=new Dictionary<string,FixedMod>(StringComparer.Ordinal);
         var recipePaths=new Dictionary<string,Dictionary<string,FixedFile>>(StringComparer.Ordinal);
         var ids=new HashSet<string>(StringComparer.Ordinal);
+        var seedList=new Lazy<GeneralModList>(()=>GeneralModLibrary.Seed(catalog,new ModImportItem[0]));
         if(manifest.List.Mods.Count==0&&manifest.Project==null||manifest.List.Mods.Count>1000)throw new IOException("Lista de instalação inválida.");
         foreach(var mod in manifest.List.Mods) {
             if(mod==null||!Regex.IsMatch(mod.Id??"",@"\A[A-Za-z0-9_-]{1,120}\z")||!ids.Add(mod.Id)||String.IsNullOrWhiteSpace(mod.Name)||mod.Name.Length>300||mod.Variants==null||mod.Variants.Count!=1)throw new IOException("Mod instalado inválido.");
@@ -331,7 +335,7 @@ public static partial class InstalledSnapshot {
                 var recipe=FixedRecipe(catalog,variant);recipes.Add(owner,recipe);
                 var paths=GeneralInstallRoutes.FixedPaths(catalog,recipe,variant.InstallRoutes);
                 recipePaths.Add(owner,recipe.Files.Where(file=>!file.UserData).ToDictionary(file=>paths[file.Path],StringComparer.Ordinal));
-                var seed=recipe.Id==NightCityDensity.ModId&&variant.CyberpunkVariant=="legacy-low"?LegacyDensityVariant(catalog):GeneralModLibrary.Seed(catalog,new ModImportItem[0]).Mods.Single(m=>m.Id==recipe.Id).Variants.Single(v=>v.CyberpunkVariant==variant.CyberpunkVariant);
+                var seed=recipe.Id==NightCityDensity.ModId&&variant.CyberpunkVariant=="legacy-low"?LegacyDensityVariant(catalog):seedList.Value.Mods.Single(m=>m.Id==recipe.Id).Variants.Single(v=>v.CyberpunkVariant==variant.CyberpunkVariant);
                 if(!seed.Sources.SequenceEqual(variant.Sources,StringComparer.Ordinal))throw new IOException("Fontes fixas alteradas no pacote.");
             }else if(variant.CyberpunkVariant!=null||!(variant.Sources.Count==1&&variant.Sources[0]=="installed://"+mod.Id+"/"+variant.Id)&&!variant.Sources.All(GeneralModDownload.IsWebSource))throw new IOException("O pacote contém caminhos privados de origem.");
         }

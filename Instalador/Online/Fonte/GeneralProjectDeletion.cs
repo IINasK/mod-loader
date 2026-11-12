@@ -171,8 +171,8 @@ public sealed partial class FixedInstaller {
     }
 }
 public sealed partial class InstalledSnapshotInstaller {
-    internal IEnumerable<ProjectDeleteFile> ProjectDeletionFiles(bool inspection=false){
-        foreach(var receipt in AllReceipts(inspection)){
+    internal IEnumerable<ProjectDeleteFile> ProjectDeletionFiles(bool inspection=false,bool skipUnreadable=false){
+        foreach(var receipt in AllReceipts(inspection,skipUnreadable)){
             if(receipt.Status!="installed")continue;
             var owners=receipt.Manifest.Files.GroupBy(payload=>payload.Path,StringComparer.OrdinalIgnoreCase).ToDictionary(group=>group.Key,group=>group.SelectMany(payload=>payload.Owners).Where(receipt.ActiveOwners.Contains).Distinct().ToList(),StringComparer.OrdinalIgnoreCase);
             var recipes=receipt.Manifest.List.Mods.ToDictionary(m=>InstalledSnapshot.Owner(m,m.Variants.Single()),m=>m.Variants.Single());

@@ -250,7 +250,7 @@ internal sealed partial class P2PService : IDisposable {
         if(s.Lifecycle&&s.Sender){ProcessOutgoing(s);return;}
         if(!s.Sender&&s.Completed&&s.Stage==null)PublishProject(s);
         if(s.Lifecycle&&(s.Completed||s.Discarded)){if(s.Stage==null)FinishIncoming(s);return;}
-        if(s.Lifecycle&&!s.Sender&&s.Phase!=null)PublishNotice(s);
+        if(s.Lifecycle&&!s.Sender&&(s.Phase!=null||s.CompareBeforePack&&(s.SyncMode!=0||HasSyncPreview(s))))PublishNotice(s);
         if(!s.Sender&&s.Stage!=null)return;
         if(s.Paused||s.Held||s.RecoveryPending||s.Discarded||!s.Completed&&s.Error!=null)return;
         if(s.Completed){

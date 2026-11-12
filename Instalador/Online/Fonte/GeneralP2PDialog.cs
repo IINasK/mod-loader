@@ -576,7 +576,8 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             bool prepared=session.PayloadHash!=null||session.Completed||!session.Deferred;
             bool awaiting=session.CompareBeforePack&&!session.Completed&&session.PayloadHash==null&&!owner.service.HasSyncChoice(session);
             bool preview=awaiting&&owner.service.HasSyncPreview(session);
-            bool waitingConnection=!session.Completed&&!session.Paused&&!view.RemotePaused&&session.Phase==null&&!preview&&
+            string remoteChoice=session.Sender?session.Recipients.Select(peer=>peer.SyncChoicePhase).FirstOrDefault():null;
+            bool waitingConnection=!session.Completed&&!session.Paused&&!view.RemotePaused&&session.Phase==null&&!preview&&remoteChoice==null&&
                 (!view.Connected||!view.Accepted);
             if(waitingConnection&&!waitingSince.HasValue)waitingSince=DateTime.UtcNow;
             if(!waitingConnection)waitingSince=null;
@@ -628,12 +629,19 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
                     :T("Conectando ao anfitrião…","Connecting to the host…");
             }
             else if(message.Length==0&&awaiting){
-                if(session.Sender)message=preview?T("Aguardando a escolha do amigo","Waiting for your friend's choice"):T("Conferindo mods do anfitrião","Checking the host's mods");
+                if(session.Sender){
+                    if(remoteChoice=="choice_sent")message=T("Seu amigo confirmou. Recebendo a seleção…","Your friend confirmed. Receiving the selection…");
+                    else if(remoteChoice=="choice_failed")message=T("A escolha falhou no PC do seu amigo. Aguardando nova tentativa.","Your friend's choice failed. Waiting for them to retry.");
+                    else if(remoteChoice=="comparing")message=T("Seu amigo já escolheu. Aguardando a conferência dos arquivos…","Your friend chose. Waiting for their file check…");
+                    else message=preview?T("Aguardando a escolha do amigo","Waiting for your friend's choice"):T("Conferindo mods do anfitrião","Checking the host's mods");
+                }
                 else if(session.SyncMode!=0)message=T("Aguardando a verificação do anfitrião","Waiting for the host to finish checking");
                 else if(view.Accepted||preview)message=T("Conectado. Escolha as diferenças ou o pacote completo.","Connected. Choose differences or the full pack.");
                 else message=T("Aguardando conexão com o anfitrião","Waiting to connect to the host");
             }
-            else if(message.Length==0&&!session.Sender&&session.CompareBeforePack&&!prepared)message=T("Escolha enviada. Aguardando preparo do anfitrião.","Choice sent. Waiting for the host to prepare the pack.");
+            else if(message.Length==0&&session.CompareBeforePack&&!prepared)message=session.Sender
+                ?T("Escolha recebida. Preparando o pacote…","Choice received. Preparing the pack…")
+                :T("Escolha enviada. Aguardando preparo do anfitrião.","Choice sent. Waiting for the host to prepare the pack.");
             else if(message.Length==0&&!session.CompareBeforePack&&!prepared)message=T("Convite antigo. Gere um novo convite para escolher como receber.","Older invitation. Create a new invitation to choose how to receive.");
             else if(message.Length==0&&view.RemotePaused)message=T("Pausado pelo amigo","Paused by friend");
             else if(message.Length==0&&!view.Connected&&view.Recipients.Length==0)message=T("Aguardando conexão","Waiting for connection");

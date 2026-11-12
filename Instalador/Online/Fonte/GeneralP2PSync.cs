@@ -269,6 +269,8 @@ internal sealed partial class P2PService {
         }catch(Exception ex){
             if(!disposed&&!session.Discarded){
                 session.Error=ex.Message;
+                OnlineDiagnostics.Failure("p2p.choice.failed",ex,"Comparar os mods e enviar a escolha ao anfitrião.",
+                    stage:full?"full":"update");
                 Save();
             }
         }finally{session.SyncProgress=null;session.SyncMode=0;}
@@ -327,6 +329,8 @@ internal sealed partial class P2PService {
             Save();
             var choice=new SyncChoice{PreviewHash=hash,Full=full,Required=full?new string[0]:comparison.Required};
             WriteSyncMessage(session,Engine.Device,ChoicePath(session,Engine.Device),ChoiceName,choice);
+            OnlineDiagnostics.Record("p2p.choice.submitted",null,"Seleção de recebimento confirmada.",
+                new{Id=DiagnosticId(session.Id),Mode=full?"full":"update",Count=choice.Required.Length});
             ScanSyncFolder(ReceiptFolderId(session,Engine.Device));
         }
     }

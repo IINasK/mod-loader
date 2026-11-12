@@ -284,13 +284,15 @@ public sealed partial class InstalledSnapshotInstaller {
     }
 
     public string Status(string receiptId, string workKey) {
-        return CheckStatus(IndexStatus(receiptId),workKey,Safe.Hash);
+        return CheckStatus(IndexStatus(Read(receiptId)),workKey,Safe.Hash);
     }
 
     internal sealed class StatusScan {
         readonly InstalledSnapshotInstaller installer;
         readonly Func<string,string> readHash;
-        readonly ConcurrentDictionary<string,Lazy<ILookup<string,StatusFile>>> receipts =
+        readonly ConcurrentDictionary<string,Lazy<Receipt>> receipts =
+            new ConcurrentDictionary<string,Lazy<Receipt>>(StringComparer.Ordinal);
+        readonly ConcurrentDictionary<string,Lazy<ILookup<string,StatusFile>>> indexes =
             new ConcurrentDictionary<string,Lazy<ILookup<string,StatusFile>>>(StringComparer.Ordinal);
 
         internal StatusScan(InstalledSnapshotInstaller installer,Func<string,string> readHash) {
@@ -298,8 +300,17 @@ public sealed partial class InstalledSnapshotInstaller {
             this.readHash=readHash;
         }
 
+        Receipt Read(string id){
+            return receipts.GetOrAdd(id,key=>new Lazy<Receipt>(()=>installer.ReadCore(key,true))).Value;
+        }
+
+        internal bool Matches(string receiptId,GeneralModEntry mod,GeneralModVariant variant){
+            var receipt=Read(receiptId);
+            return receipt!=null&&receipt.Status=="installed"&&InstalledSnapshot.MatchesReceiptVariant(receipt.Manifest,mod,variant);
+        }
+
         internal string Status(string receiptId,string workKey) {
-            var index=receipts.GetOrAdd(receiptId,id=>new Lazy<ILookup<string,StatusFile>>(()=>installer.IndexStatus(id))).Value;
+            var index=indexes.GetOrAdd(receiptId,id=>new Lazy<ILookup<string,StatusFile>>(()=>IndexStatus(Read(id)))).Value;
             return installer.CheckStatus(index,workKey,readHash);
         }
     }
@@ -309,8 +320,7 @@ public sealed partial class InstalledSnapshotInstaller {
         internal bool Code;
     }
 
-    ILookup<string,StatusFile> IndexStatus(string receiptId) {
-        var receipt=Read(receiptId);
+    static ILookup<string,StatusFile> IndexStatus(Receipt receipt) {
         var owners=new List<KeyValuePair<string,StatusFile>>();
         if(receipt!=null&&receipt.Status=="installed"){
             var active=new HashSet<string>(receipt.ActiveOwners,StringComparer.Ordinal);
@@ -601,10 +611,19 @@ public sealed partial class InstalledSnapshotInstaller {
         if (receipt.Status == "installed" && paths.Count != manifestPaths.Count) throw new IOException("Recibo de snapshot incompleto.");
         return receipt;
     }
-    IEnumerable<Receipt> AllReceipts(bool inspection=false) {
+    IEnumerable<Receipt> AllReceipts(bool inspection=false,bool skipUnreadable=false) {
         Safe.NoLinks(records);
         if (!Directory.Exists(records)) yield break;
-        foreach (string path in Directory.GetFiles(records, "*.json")) { var receipt = ReadCore(Path.GetFileNameWithoutExtension(path),inspection); if (receipt != null) yield return receipt; }
+        foreach (string path in Directory.GetFiles(records, "*.json")) {
+            Receipt receipt;
+            try{receipt=ReadCore(Path.GetFileNameWithoutExtension(path),inspection);}
+            catch(IOException ex) {if(!skipUnreadable)throw;LogUnreadableReceipt(ex);continue;}
+            catch(UnauthorizedAccessException ex) {if(!skipUnreadable)throw;LogUnreadableReceipt(ex);continue;}
+            if(receipt!=null)yield return receipt;
+        }
+    }
+    static void LogUnreadableReceipt(Exception error){
+        OnlineDiagnostics.Failure("scan.receipt.failed",error,"Ler o recibo local. A conferência dos outros recibos continua.");
     }
     bool Matches(Change file) { string path = Target(file.Path); return File.Exists(path) && new FileInfo(path).Length == file.Size && Safe.Hash(path) == file.After; }
     void Rollback(Receipt receipt, Dictionary<string,string> beforeHashes, HashSet<string> written, string stage) {

@@ -133,8 +133,8 @@ internal sealed partial class GeneralModWindow {
 
     List<P2PSyncDifference> TryReadGameInventory(string destination,ScanReads reads) {
         try{return ReadGameInventory(destination,reads);}
-        catch(IOException){return null;}
-        catch(UnauthorizedAccessException){return null;}
+        catch(IOException ex){OnlineDiagnostics.Failure("scan.inventory.failed",ex,"Identificar os mods na pasta do jogo.");return null;}
+        catch(UnauthorizedAccessException ex){OnlineDiagnostics.Failure("scan.inventory.failed",ex,"Ler a pasta do jogo.");return null;}
     }
 
     List<P2PSyncDifference> ReadGameInventory(string destination,ScanReads reads=null) {
@@ -149,7 +149,7 @@ internal sealed partial class GeneralModWindow {
                 registered.Add(new ModFileAnchor{Owner=owner,Path=file.Path,Hash=file.Hash});
         };
         Func<string,IEnumerable<string>> lookup=key=>byWork.ContainsKey(key)?new[]{byWork[key]}:new string[0];
-        foreach(var file in Snapshot(destination).ProjectDeletionFiles(true))add(file,lookup);
+        foreach(var file in Snapshot(destination).ProjectDeletionFiles(true,skipUnreadable:true))add(file,lookup);
         var exact=new HashSet<string>(state.List.Mods.SelectMany(mod=>mod.DetectedPaths),StringComparer.OrdinalIgnoreCase);
         var extras=new List<P2PSyncDifference>();
         if(cyberpunk){

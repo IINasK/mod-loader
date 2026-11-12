@@ -145,10 +145,18 @@ public sealed partial class FixedInstaller {
         Safe.NoLinks(folder);
         if(!Directory.Exists(folder))return result;
         foreach(string path in Directory.GetFiles(folder,"*.json")) {
-            var receipt=ReadReceipt(path);
-            if(receipt.Operation!=LocalModPackage.ReceiptOperation || receipt.Status!="instalado" || receipt.Files.Count==0)continue;
-            if(receipt.Files.All(f=>f.Applied && File.Exists(Safe.In(game,f.Path)) && (readHash==null?Safe.Hash(Safe.In(game,f.Path)):readHash(Safe.In(game,f.Path)))==f.After))
-                result.Add(receipt.Mods[0]);
+            try{
+                var receipt=ReadReceiptCore(path,readHash!=null);
+                if(receipt.Operation!=LocalModPackage.ReceiptOperation || receipt.Status!="instalado" || receipt.Files.Count==0)continue;
+                if(receipt.Files.All(f=>f.Applied && File.Exists(Safe.In(game,f.Path)) && (readHash==null?Safe.Hash(Safe.In(game,f.Path)):readHash(Safe.In(game,f.Path)))==f.After))
+                    result.Add(receipt.Mods[0]);
+            }catch(IOException ex) {
+                if(readHash==null)throw;
+                OnlineDiagnostics.Failure("scan.import.failed",ex,"Verificar o recibo de importação.");
+            }catch(UnauthorizedAccessException ex) {
+                if(readHash==null)throw;
+                OnlineDiagnostics.Failure("scan.import.failed",ex,"Ler o recibo de importação.");
+            }
         }
         return result;
     }

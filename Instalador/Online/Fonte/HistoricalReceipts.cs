@@ -23,6 +23,7 @@ internal static class HistoricalReceipts {
             .SelectMany(mod=>mod.Variants).Where(variant=>variant!=null).ToLookup(variant=>variant.CyberpunkId,StringComparer.Ordinal);
         var known=SnapshotRecipes.Value;
         var replacements=known.Packages.Where(recipe=>variants[recipe.Id].Any(variant=>
+            recipe.Id=="mod-12637"?MatchesLegacyAtelier(manifest,recipe,variant):
             recipe.Id!=EquipmentExOptions.ModId?!catalog.Packages.Any(current=>current.Id==recipe.Id):
             variant.Id==EquipmentExOptions.WeaveId&&variant.CyberpunkVariant==null&&variant.Sources!=null&&
             variant.Sources.SequenceEqual(recipe.Assets.Select(asset=>asset.Url),StringComparer.Ordinal))).ToDictionary(recipe=>recipe.Id);
@@ -33,6 +34,14 @@ internal static class HistoricalReceipts {
             Defaults=(catalog.Defaults??new List<FixedDefault>()).Concat(known.Defaults.Where(item=>replacements.ContainsKey(item.ModId))).ToList()
         };
     }
+    static bool MatchesLegacyAtelier(InstalledSnapshotManifest manifest,FixedMod recipe,GeneralModVariant variant){
+        if(manifest.Files==null||variant.InstallRoutes==null||variant.InstallRoutes.Count!=0)return false;
+        string owner=recipe.Id+"/"+variant.Id;
+        var files=manifest.Files.Where(file=>file!=null&&file.Kind=="file"&&file.Owners!=null&&file.Owners.Contains(owner)).ToArray();
+        return files.Length==recipe.Files.Count&&recipe.Files.All(known=>files.Any(file=>
+            file.Path==known.Path&&file.Size==known.Size&&file.Sha256==known.Sha256));
+    }
+
     internal static IEnumerable<ModFileAnchor> CleanupAnchors(FixedCatalog catalog) {
         if(catalog.Id!=CatalogId)return Enumerable.Empty<ModFileAnchor>();
         // Trusted prior package manifests prove exact paths/hashes, including manual installations.
