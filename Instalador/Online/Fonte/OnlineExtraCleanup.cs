@@ -121,13 +121,34 @@ public sealed partial class FixedInstaller {
             new ModFileAnchor{Owner=owner.Split('/')[0],Path=file.Path,Hash=file.Sha256}));
         return InstalledFileOwnership.FindAssociated(game,CatalogAnchors().Concat(anchors),ModFolder,paths);
     }
-    internal List<P2PSyncDifference> ReadUnlistedModFiles(IEnumerable<string> listedPaths,string appData=null,Func<string,string> readHash=null) {
+    internal IEnumerable<ModFileAnchor> ReceiptInventory(){
+        var packages=catalog.Packages.ToDictionary(mod=>mod.Id,StringComparer.Ordinal);
+        foreach(var receipt in ReadInstalledOwnershipReceipts()){
+            var known=receipt.Mods.Where(packages.ContainsKey).Select(id=>packages[id]).ToArray();
+            var byPath=known.SelectMany(mod=>NightCityDensity.KnownFiles(mod)
+                .Select(file=>new{file.Path,file.Sha256,Name=mod.Name+" · "+mod.Version}))
+                .ToLookup(file=>file.Path,StringComparer.OrdinalIgnoreCase);
+            foreach(var file in receipt.Files.Where(file=>file.Applied&&!file.Reverted&&!file.UndoStarted&&FixedData.HashValid(file.After))){
+                var owners=byPath[file.Path].Where(item=>item.Sha256==file.After).Select(item=>item.Name);
+                if(receipt.Mods.Count==1)owners=owners.DefaultIfEmpty(known.Select(mod=>mod.Name).FirstOrDefault()??receipt.Mods[0]);
+                else owners=owners.DefaultIfEmpty("Mod Loader");
+                foreach(string owner in owners)
+                    yield return new ModFileAnchor{Path=file.Path,Hash=file.After,Owner=owner,LocalReceipt=true};
+            }
+        }
+    }
+
+    internal List<P2PSyncDifference> ReadUnlistedModFiles(IEnumerable<string> listedPaths,string appData=null,
+        Func<string,string> readHash=null,bool includeLocalFiles=false) {
         var listed=new HashSet<string>(listedPaths,StringComparer.OrdinalIgnoreCase);
         var ownership=SyncOwnership(appData);
         var names=OwnershipNames();
         var result=new List<P2PSyncDifference>();
-        foreach(string path in FindExtraPaths(true,false).Where(path=>InstalledSnapshot.SafeGenericPath(path)&&!listed.Contains(path))
-            .Distinct(StringComparer.OrdinalIgnoreCase)){
+        foreach(string path in FindExtraPaths(true,false).Where(path=>!listed.Contains(path)).Distinct(StringComparer.OrdinalIgnoreCase)){
+            if(!InstalledSnapshot.SafeGenericPath(path)){
+                if(includeLocalFiles)result.Add(new P2PSyncDifference{Kind="inventory-local",Path=path});
+                continue;
+            }
             string owner=null;
             if(ownership.Contains(path)){
                 try{
@@ -267,20 +288,24 @@ public sealed partial class FixedInstaller {
             add(()=>new GeneralModInstaller(game,Path.Combine(appData,"Instalacoes")).ProjectDeletionFiles(true));
             add(()=>new InstalledSnapshotInstaller(game,appData,catalog,fixture).ProjectDeletionFiles(true,skipUnreadable:true));
         }
-        if(Directory.Exists(Data)){
-            foreach(string path in AllReceiptPaths().Where(path=>!String.Equals(Path.GetDirectoryName(path),Safe.In(Data,"limpezas"),StringComparison.OrdinalIgnoreCase))){
-                try {
-                    var receipt=ReadReceipt(path);
-                    if(receipt.Status!="instalado"||receipt.Mods.Count==0||
-                        receipt.Operation!=null&&receipt.Operation!="install"&&receipt.Operation!=LocalModPackage.ReceiptOperation)continue;
-                    anchors.AddRange(receipt.Files.Where(file=>file.Applied&&!file.Reverted&&!file.UndoStarted&&FixedData.HashValid(file.After))
-                        .Select(file=>new ModFileAnchor{Path=file.Path,Hash=file.After,Owner=receipt.Mods.Count==1?receipt.Mods[0]:null,LocalReceipt=true}));
-                } catch(IOException) { OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo inválido; arquivos sem outra prova serão preservados."); }
-                  catch(UnauthorizedAccessException) { OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo inacessível; arquivos sem outra prova serão preservados."); }
-            }
-        }
+        foreach(var receipt in ReadInstalledOwnershipReceipts())
+            anchors.AddRange(receipt.Files.Where(file=>file.Applied&&!file.Reverted&&!file.UndoStarted&&FixedData.HashValid(file.After))
+                .Select(file=>new ModFileAnchor{Path=file.Path,Hash=file.After,Owner=receipt.Mods.Count==1?receipt.Mods[0]:null,LocalReceipt=true}));
         return anchors.Where(file=>!String.IsNullOrEmpty(file.Path)&&!GeneralInstallRoutes.External(file.Path)&&FixedData.HashValid(file.Hash))
             .ToLookup(file=>file.Path,StringComparer.OrdinalIgnoreCase);
+    }
+
+    IEnumerable<OnlineReceipt> ReadInstalledOwnershipReceipts(){
+        if(!Directory.Exists(Data))yield break;
+        foreach(string path in AllReceiptPaths().Where(path=>!String.Equals(Path.GetDirectoryName(path),Safe.In(Data,"limpezas"),StringComparison.OrdinalIgnoreCase))){
+            OnlineReceipt receipt;
+            try{receipt=ReadReceipt(path);}
+            catch(IOException){OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo inválido; arquivos sem outra prova serão preservados.");continue;}
+            catch(UnauthorizedAccessException){OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo inacessível; arquivos sem outra prova serão preservados.");continue;}
+            if(receipt.Status=="instalado"&&receipt.Mods.Count>0&&
+                (receipt.Operation==null||receipt.Operation=="install"||receipt.Operation==LocalModPackage.ReceiptOperation))
+                yield return receipt;
+        }
     }
 
     internal P2PSyncExtra[] PlanSyncExtras(InstalledSnapshotManifest host,Action checkpoint=null,string appData=null) {

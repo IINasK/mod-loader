@@ -27,6 +27,20 @@ internal static class ModVersionChoiceTests {
         reject(()=>engine.Install(expanded,"key",null,d=>{check(!d.CanReplace,"Changed file tree requires removing the previous version first.");return false;}),"Changed package structure is preserved instead of mixing versions.");
         check(File.ReadAllText(file)=="new"&&!Directory.Exists(Path.Combine(target,"new")),"Declining an unsupported structural replacement preserves the installed tree.");
         engine.Remove("key");check(File.ReadAllText(file)=="old"&&!File.Exists(Path.Combine(target,"second.txt")),"Uninstall restores the prior file and removes only newly installed files.");
+        engine.Install(zip,"first",null,d=>true);
+        engine.Install(zip,"same",null);
+        engine.Remove("first");
+        check(File.ReadAllText(file)=="new","The other active package keeps the shared file.");
+        engine.Remove("same");
+        check(File.ReadAllText(file)=="old","The last package restores the shared file's verified predecessor.");
+        engine.Install(zip,"lower",null,d=>true);
+        string replacement=Zip(root,"replacement.zip",new Dictionary<string,string>{{"mod.txt","newer"}});
+        engine.Install(replacement,"upper",null,d=>true);
+        reject(()=>engine.Remove("lower"),"A replaced receipt stays registered while the active mod references its contents.");
+        engine.Remove("upper");
+        check(File.ReadAllText(file)=="new"&&engine.Status("lower")==GeneralModInstaller.Installed,
+            "Removing the replacement restores the earlier active package.");
+        engine.Remove("lower");
         reject(()=>engine.Install(zip,"race",null,d=>{File.WriteAllText(file,"user-edit");return true;}),"File changed while choosing is rejected.");
         check(File.ReadAllText(file)=="user-edit"&&!File.Exists(Path.Combine(target,"second.txt")),"User change during prompt is preserved.");
         File.WriteAllText(file,"old");string rollbackData=Path.Combine(root,"rollback-data");var rollback=new GeneralModInstaller(target,rollbackData);
@@ -44,6 +58,15 @@ internal static class ModVersionChoiceTests {
         string id=snapshots.Install(pack,Safe.Hash(pack),null,-1,d=>{packPrompts++;return true;});
         check(packPrompts==2&&File.ReadAllText(file)=="pack","Received pack uses the chosen version.");
         snapshots.Remove(id,new[]{"custom/default"},null);check(File.ReadAllText(file)=="old"&&!File.Exists(Path.Combine(target,"second.txt")),"Removing received replacement restores the previous installation.");
+        string firstPack=Pack(root,catalog,new Dictionary<string,string>{{"mod.txt","lower"}},"lower-pack.zip","lower");
+        string secondPack=Pack(root,catalog,new Dictionary<string,string>{{"mod.txt","upper"}},"upper-pack.zip","upper");
+        string firstId=snapshots.Install(firstPack,Safe.Hash(firstPack),null,-1,d=>true);
+        string secondId=snapshots.Install(secondPack,Safe.Hash(secondPack),null,-1,d=>true);
+        reject(()=>snapshots.Remove(firstId,new[]{"lower/default"},null),"The earlier received receipt stays while the active mod references its backup.");
+        snapshots.Remove(secondId,new[]{"upper/default"},null);
+        check(File.ReadAllText(file)=="lower"&&snapshots.Status(firstId,"lower/default")==GeneralModInstaller.Installed,
+            "Removing the received replacement restores the earlier active mod.");
+        snapshots.Remove(firstId,new[]{"lower/default"},null);
         File.WriteAllText(Path.Combine(target,"second.txt"),"second-old");
         int grouped=0;reject(()=>snapshots.Install(pack,Safe.Hash(pack),null,-1,d=>{grouped++;return false;}),"Multiple conflicting files in a mod can be kept together.");
         check(grouped==1&&File.ReadAllText(file)=="old"&&File.ReadAllText(Path.Combine(target,"second.txt"))=="second-old","Pack requests one choice per mod group before copying any files.");
@@ -103,9 +126,9 @@ internal static class ModVersionChoiceTests {
         }finally{GeneralStyle.UseTheme(priorTheme);GeneralStyle.Language=priorLanguage;GeneralStyle.AnimationsEnabled=priorAnimations;}
     }
     static string Zip(string root,string name,Dictionary<string,string> files){string path=Path.Combine(root,name);using(var zip=ZipFile.Open(path,ZipArchiveMode.Create))foreach(var file in files)using(var writer=new StreamWriter(zip.CreateEntry(file.Key).Open(),new UTF8Encoding(false)))writer.Write(file.Value);return path;}
-    static string Pack(string root,FixedCatalog catalog,Dictionary<string,string> files=null,string name="pack.zip"){
-        var m=new InstalledSnapshotManifest{Name="test",Game="generic"};m.List.Mods.Add(new GeneralModEntry{Id="custom",Name="Custom",DefaultVariant="default",Variants=new List<GeneralModVariant>{new GeneralModVariant{Id="default",Name="Main",Sources=new List<string>{"installed://custom/default"}}}});
-        var bytes=new Dictionary<string,byte[]>();foreach(var p in files??new Dictionary<string,string>{{"mod.txt","pack"},{"second.txt","second"}}){byte[] b=Encoding.UTF8.GetBytes(p.Value);string h=InstalledSnapshot.Hash(b);bytes[h]=b;m.Files.Add(new InstalledSnapshotFile{Path=p.Key,Kind="file",Sha256=h,Size=b.Length,Owners=new List<string>{"custom/default"}});}
+    static string Pack(string root,FixedCatalog catalog,Dictionary<string,string> files=null,string name="pack.zip",string owner="custom"){
+        var m=new InstalledSnapshotManifest{Name="test",Game="generic"};m.List.Mods.Add(new GeneralModEntry{Id=owner,Name=owner,DefaultVariant="default",Variants=new List<GeneralModVariant>{new GeneralModVariant{Id="default",Name="Main",Sources=new List<string>{"installed://"+owner+"/default"}}}});
+        var bytes=new Dictionary<string,byte[]>();foreach(var p in files??new Dictionary<string,string>{{"mod.txt","pack"},{"second.txt","second"}}){byte[] b=Encoding.UTF8.GetBytes(p.Value);string h=InstalledSnapshot.Hash(b);bytes[h]=b;m.Files.Add(new InstalledSnapshotFile{Path=p.Key,Kind="file",Sha256=h,Size=b.Length,Owners=new List<string>{owner+"/default"}});}
         InstalledSnapshot.Validate(m,catalog);string path=Path.Combine(root,name);using(var zip=ZipFile.Open(path,ZipArchiveMode.Create)){using(var writer=new StreamWriter(zip.CreateEntry("manifest.json").Open(),new UTF8Encoding(false)))writer.Write(Safe.Json.Serialize(m));foreach(var b in bytes)using(var stream=zip.CreateEntry("files/"+b.Key).Open())stream.Write(b.Value,0,b.Value.Length);}return path;
     }
 }

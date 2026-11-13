@@ -448,12 +448,24 @@ public sealed partial class InstalledSnapshotInstaller {
             var others = AllReceipts().Where(r => r.Id != receipt.Id && r.Status == "installed" && r.ActiveOwners.Count > 0).ToList();
             if(!forgetOnly)EnsureDependencies(receipt, removing, others);
             var remaining = new HashSet<string>(receipt.ActiveOwners.Where(k => !removing.Contains(k)), StringComparer.Ordinal);
+            var pathOwners=receipt.Manifest.Files.ToLookup(file=>file.Path,file=>file.Owners,StringComparer.OrdinalIgnoreCase);
+            var otherFiles=others.SelectMany(other=>{
+                var activePaths=new HashSet<string>(other.Manifest.Files.Where(file=>file.Owners.Any(other.ActiveOwners.Contains))
+                    .Select(file=>file.Path),StringComparer.OrdinalIgnoreCase);
+                return other.Files.Where(file=>file.Applied&&!file.Reverted&&activePaths.Contains(file.Path));
+            }).ToLookup(file=>file.Path,StringComparer.OrdinalIgnoreCase);
+            if(!forgetOnly&&receipt.Files.Any(change=>change.Applied&&!change.Reverted&&
+                pathOwners[change.Path].SelectMany(keys=>keys).Any(removing.Contains)&&
+                !pathOwners[change.Path].SelectMany(keys=>keys).Any(remaining.Contains)&&
+                otherFiles[change.Path].Any(other=>other.After!=change.After&&other.Before==change.After)&&
+                !otherFiles[change.Path].Any(other=>other.After==change.After)))
+                throw new IOException("Outro mod substituiu arquivos deste pacote. Remova a versão ativa antes de remover o pacote anterior.");
             int removed = 0, preserved = 0;
             foreach (var change in forgetOnly ? Enumerable.Empty<Change>() : receipt.Files.AsEnumerable().Reverse()) {
-                var owners = receipt.Manifest.Files.Where(f => f.Path.Equals(change.Path, StringComparison.OrdinalIgnoreCase)).SelectMany(f => f.Owners).Distinct().ToList();
+                var owners = pathOwners[change.Path].SelectMany(keys=>keys).Distinct().ToList();
                 if (!owners.Any(removing.Contains)) continue;
                 if (owners.Any(remaining.Contains) || receipt.Manifest.Game == "cyberpunk2077" && IsImmutable(change.Path)
-                    || others.Any(r => r.Manifest.Files.Any(f => f.Path.Equals(change.Path, StringComparison.OrdinalIgnoreCase) && f.Owners.Any(r.ActiveOwners.Contains)))) {
+                    || otherFiles[change.Path].Any(other=>other.After==change.After)) {
                     preserved++; continue;
                 }
                 if (!change.Owned || change.Reverted || !change.Applied || !Matches(change) || GeneralInstallRoutes.External(change.Path)&&preserveExternal!=null&&preserveExternal(change.Path)) { preserved++; continue; }

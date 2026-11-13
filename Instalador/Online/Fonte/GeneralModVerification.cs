@@ -142,14 +142,27 @@ internal sealed partial class GeneralModWindow {
         bool cyberpunk=IsCyberpunk(destination);
         var byWork=state.List.Mods.SelectMany(mod=>mod.Variants.Select(variant=>new{Mod=mod,Key=Key(mod,variant)}))
             .ToDictionary(item=>item.Key,item=>item.Mod.Id,StringComparer.Ordinal);
+        var receiptNames=state.List.Mods.SelectMany(mod=>mod.Variants.Select(variant=>new{
+            Key=Key(mod,variant), Legacy=InstalledSnapshot.Owner(mod,variant), Name=mod.Name+" · "+variant.Name
+        })).SelectMany(item=>new[]{new{Key=item.Key,item.Name},new{Key=item.Legacy,item.Name}})
+            .ToLookup(item=>item.Key,item=>item.Name,StringComparer.Ordinal);
+        var recorded=new List<ModFileAnchor>();
         var names=state.List.Mods.ToDictionary(mod=>mod.Id,mod=>mod.Name,StringComparer.Ordinal);
         var registered=new List<ModFileAnchor>();
         Action<ProjectDeleteFile,Func<string,IEnumerable<string>>> add=(file,owners)=>{
             foreach(string owner in file.OwnerKeys.SelectMany(owners).Distinct(StringComparer.Ordinal))
-                registered.Add(new ModFileAnchor{Owner=owner,Path=file.Path,Hash=file.Hash});
+                registered.Add(new ModFileAnchor{Owner=owner,Path=file.Path,Hash=file.Hash,LocalReceipt=true});
         };
+        Action<ProjectDeleteFile,IEnumerable<string>> record=(file,owners)=>{
+            foreach(string owner in owners.Distinct(StringComparer.Ordinal))
+                recorded.Add(new ModFileAnchor{Owner=owner,Path=file.Path,Hash=file.Hash,LocalReceipt=true});
+        };
+        Func<string,IEnumerable<string>> receiptName=key=>receiptNames[WorkKeyFromReceipt(key)].DefaultIfEmpty(WorkKeyFromReceipt(key));
         Func<string,IEnumerable<string>> lookup=key=>byWork.ContainsKey(key)?new[]{byWork[key]}:new string[0];
-        foreach(var file in Snapshot(destination).ProjectDeletionFiles(true,skipUnreadable:true))add(file,lookup);
+        foreach(var file in Snapshot(destination).ProjectDeletionFiles(true,skipUnreadable:true)){
+            add(file,lookup);
+            record(file,file.OwnerKeys.SelectMany(receiptName));
+        }
         var exact=new HashSet<string>(state.List.Mods.SelectMany(mod=>mod.DetectedPaths),StringComparer.OrdinalIgnoreCase);
         var extras=new List<P2PSyncDifference>();
         var registeredNames=new Dictionary<string,string>(names,StringComparer.Ordinal);
@@ -166,8 +179,12 @@ internal sealed partial class GeneralModWindow {
                 }
             }
             var imports=state.CyberpunkImports.ToLookup(item=>item.Value,item=>WorkKeyFromReceipt(item.Key),StringComparer.Ordinal);
-            foreach(var file in engine.ProjectDeletionFiles(new HashSet<string>(imports.Select(item=>item.Key),StringComparer.Ordinal),true))
+            foreach(var file in engine.ProjectDeletionFiles(new HashSet<string>(imports.Select(item=>item.Key),StringComparer.Ordinal),true)){
                 add(file,key=>imports[key].SelectMany(lookup));
+                record(file,file.OwnerKeys.SelectMany(key=>imports[key]).SelectMany(receiptName));
+            }
+            var namedPaths=new HashSet<string>(recorded.Select(file=>file.Path),InventoryPaths);
+            recorded.AddRange(engine.ReceiptInventory().Where(file=>!namedPaths.Contains(file.Path)));
             foreach(var mod in state.List.Mods.Where(mod=>GeneralModLibrary.IsHystBody(mod.Id))){
                 var files=new List<InstalledSnapshotFile>();
                 var installed=InstalledSnapshot.DetectManualHyst(destination,mod,seed.Mods.FirstOrDefault(item=>item.Id==mod.Id),files,reads==null?null:(Func<string,string>)reads.Hash);
@@ -177,11 +194,14 @@ internal sealed partial class GeneralModWindow {
                     VariantId=installed.Id,VerifiedBytes=files.Sum(file=>file.Size)});
             }
             exact.UnionWith(registered.Where(file=>names.ContainsKey(file.Owner)).Select(file=>file.Path));
-            extras.AddRange(engine.ReadUnlistedModFiles(exact,data,reads==null?null:(Func<string,string>)reads.Hash));
+            extras.AddRange(engine.ReadUnlistedModFiles(exact,data,reads==null?null:(Func<string,string>)reads.Hash,true));
             foreach(var owner in engine.OwnershipNames())
                 if(!registeredNames.ContainsKey(owner.Key))registeredNames.Add(owner.Key,owner.Value);
         }
-        foreach(var file in Generic(destination).ProjectDeletionFiles(true))add(file,key=>lookup(WorkKeyFromReceipt(key)));
+        foreach(var file in Generic(destination).ProjectDeletionFiles(true)){
+            add(file,key=>lookup(WorkKeyFromReceipt(key)));
+            record(file,file.OwnerKeys.SelectMany(receiptName));
+        }
         Func<string,string> scope=cyberpunk?(Func<string,string>)FixedInstaller.ModFolder:InstalledFileOwnership.GenericScope;
         var associated=InstalledFileOwnership.FindAssociated(destination,registered,scope,
             cyberpunk?extras.Where(file=>file.Kind=="found").Select(file=>file.Path):null);
@@ -212,7 +232,35 @@ internal sealed partial class GeneralModWindow {
         foreach(var pair in associated.Where(item=>names.ContainsKey(item.Value)&&!labels.ContainsKey(item.Key)&&!ambiguous.Contains(item.Key)&&
             !observedScopes.Contains(scope(item.Key))))
             extras.Add(new P2PSyncDifference{Kind="associated",Mod=names[pair.Value],ModId=pair.Value,Path=pair.Key});
+        var recordedFiles=RecordedInventory(destination,recorded,readHash).ToArray();
+        extras.AddRange(recordedFiles);
+        if(!cyberpunk){
+            var folders=recordedFiles.Select(file=>file.Path.LastIndexOf('/')>0
+                ?file.Path.Substring(0,file.Path.LastIndexOf('/')):null).Where(path=>path!=null).Distinct(InventoryPaths);
+            var known=new HashSet<string>(extras.Select(file=>file.Path).Concat(exact),InventoryPaths);
+            foreach(string path in InstalledFileOwnership.Walk(destination,folders).Where(known.Add))
+                extras.Add(new P2PSyncDifference{Kind="inventory-local",Path=path});
+        }
         return extras;
+    }
+
+    static IEnumerable<P2PSyncDifference> RecordedInventory(string root,IEnumerable<ModFileAnchor> records,
+        Func<string,string> readHash){
+        foreach(var group in records.Where(file=>!GeneralInstallRoutes.External(file.Path)&&FixedData.HashValid(file.Hash))
+            .GroupBy(file=>file.Path,InventoryPaths)){
+            string hash;
+            try{
+                string path=Safe.In(root,group.Key);
+                Safe.NoLinks(path);
+                if(!File.Exists(path))continue;
+                hash=readHash(path);
+            }catch(IOException){continue;}catch(UnauthorizedAccessException){continue;}
+            var matching=group.Where(file=>file.Hash==hash).ToArray();
+            var names=(matching.Length==0?group:matching.AsEnumerable()).Select(file=>file.Owner)
+                .Distinct(InventoryPaths).OrderBy(name=>name,InventoryPaths);
+            yield return new P2PSyncDifference{Path=group.Key,Kind="inventory-record",Mod=String.Join(", ",names),
+                RecordedFile=true,RecordedChange=matching.Length==0};
+        }
     }
 
     static HashSet<string> GroupModFolders(string root,List<P2PSyncDifference> inventory,IEnumerable<ModFileAnchor> registered,

@@ -168,6 +168,49 @@ internal sealed partial class GeneralModWindow {
                 form.grid.Rows.Cast<DataGridViewRow>().Any(row=>row.Tag is P2PSyncDifference&&
                     InventoryLinkStore.Key((P2PSyncDifference)row.Tag)==InventoryLinkStore.Key(found[unknown])&&Equals(row.Cells["Origin"].Value,"?")),
                 "The inventory shows ZIP for verified files and a question mark for the remaining files.");
+            var installedEntry=NewEntry("Recorded mod",null);
+            string receiptZip=Safe.In(root,"recorded.zip");
+            installedEntry.Variants[0].Sources.Add(receiptZip);
+            state.List.Mods.Add(installedEntry);
+            string recordedFile=framework+"registered.lua", changedFile=framework+"edited.lua";
+            using(var archive=ZipFile.Open(receiptZip,ZipArchiveMode.Create)){
+                WriteZipEntry(archive,recordedFile,"registered");
+                WriteZipEntry(archive,changedFile,"original");
+            }
+            var work=form.MakeWork(installedEntry);
+            form.Generic(game).Install(receiptZip,work.Receipt(0),null);
+            File.WriteAllText(Safe.In(game,changedFile),"modified by user");
+            await form.Scan();
+            var tree=GeneralInventoryTree.BuildTree(form.DisplayedInventory(),"Game");
+            Func<string,GeneralInventoryTree.Entry> node=relative=>relative.TrimEnd('/').Split('/')
+                .Aggregate(tree,(branch,name)=>branch.Children[name]);
+            check(node(framework).Folder&&node(framework).ContainsRecord&&
+                node(recordedFile).File.RecordedFile&&!node(recordedFile).File.RecordedChange,
+                "A mixed folder and its matching receipt file show the Mod Loader origin.");
+            check(node(changedFile).File.RecordedChange&&node(changedFile).File.Mod.Contains("Recorded mod")&&
+                !node(unknown).ContainsRecord&&!node(unknown).ContainsProof&&node(frameworkLog).File!=null&&
+                !node(frameworkLog).ContainsRecord&&!node(frameworkLog).ContainsProof,
+                "Modified and unknown files are distinguished inside the same folder.");
+            check(tree.Children.ContainsKey("archive")&&!node("archive/pc/mod").ContainsRecord,
+                "A folder without a receipt does not inherit the Mod Loader mark from another branch.");
+            var inventoryHeading=form.grid.Rows.Cast<DataGridViewRow>().Single(row=>row.Cells["Name"].ToolTipText=="Explorar arquivos");
+            Exception dialogError=null;
+            using(var timer=new Timer{Interval=30}){
+                timer.Tick+=(s,e)=>{
+                    timer.Stop();
+                    var dialog=Application.OpenForms.OfType<GeneralInventoryTree>().SingleOrDefault();
+                    if(dialog==null){dialogError=new IOException("Explorer dialog did not open.");return;}
+                    try{
+                        var list=(ListBox)dialog.Controls.Find("InventoryFileTree",true).Single();
+                        check(list.Items.Count>1&&list.Items.Cast<GeneralInventoryTree.Entry>().Any(entry=>entry.Name=="bin"),
+                            "The inventory section opens the real expandable file tree.");
+                    }catch(Exception ex){dialogError=ex;}
+                    finally{dialog.Close();}
+                };
+                timer.Start();
+                form.HandleSection((SectionRow)inventoryHeading.Tag);
+            }
+            if(dialogError!=null)throw dialogError;
             File.WriteAllText(Safe.In(game,exact),"modified!");
             await form.Scan();
             check(form.VisibleGameInventory().Single(file=>file.Path==exact).VerifiedZip==null,

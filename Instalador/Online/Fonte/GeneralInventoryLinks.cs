@@ -46,6 +46,12 @@ internal sealed partial class GeneralModWindow {
         DrawRows();
     }
 
+    void OpenInventoryTree(){
+        if(!CanEditInventory)return;
+        var files=DisplayedInventory().Where(file=>file.Kind!="verified-variant").ToArray();
+        using(var dialog=new GeneralInventoryTree(state.Destination,files))dialog.ShowDialog(this);
+    }
+
     P2PSyncDifference[] InventoryRow(string key){
         return DisplayedInventory().Where(file=>file.Kind=="found"&&!file.LocalInModFolder&&InventoryPaths.Equals(InventoryLinkStore.Key(file),key)).ToArray();
     }

@@ -304,6 +304,8 @@ internal sealed partial class GeneralModWindow : Form {
         var linkInventory=GeneralMenuRenderer.Add(menu,T("Vincular link do Nexus…","Link Nexus URL…"),()=>
             SetInventorySource(grid.CurrentRow==null?null:grid.CurrentRow.Tag as P2PSyncDifference));
         var zipOrigin=GeneralMenuRenderer.Add(menu,T("Conferir origem pelo ZIP…","Verify origin from ZIP…"),VerifyInventoryZip);
+        var inventoryTree=GeneralMenuRenderer.Add(menu,T("Explorar arquivos de mods…","Browse mod files…"),OpenInventoryTree);
+        menu.Opening+=(s,e)=>inventoryTree.Visible=CanEditInventory&&gameInventory.Any(file=>file.Path!=null);
         var showFiles=GeneralMenuRenderer.Add(menu,T("Ver arquivos associados…","View associated files…"),()=>{
             var row=grid.CurrentRow;
             var item=row==null?null:row.Tag as P2PSyncDifference;
@@ -533,11 +535,14 @@ internal sealed partial class GeneralModWindow : Form {
             }
         }
         var inventory=VisibleGameInventory().GroupBy(InventoryLinkStore.Key,StringComparer.OrdinalIgnoreCase).ToList();
+        bool showInventorySection=!picking&&!flat&&(inventory.Count>0||
+            searchTerms.Length==0&&categoryFilters==null&&variantFilters==null&&groupFilters==null&&statusFilters==null&&coverageFilter==null&&
+            gameInventory.Any(file=>file.Kind=="inventory-local"));
+        if(showInventorySection){
+            if(grid.Rows.Count>0)AddSection("divider",null,23);
+            AddSection("inventory",T("Fora do catálogo do projeto","Outside the project catalog"),54);
+        }
         if(inventory.Count>0){
-            if(!flat){
-                if(grid.Rows.Count>0)AddSection("divider",null,23);
-                AddSection("inventory",T("Fora do catálogo do projeto","Outside the project catalog"),54);
-            }
             var inventoryMembers=DisplayedInventory().Where(file=>file.Kind=="found").ToLookup(InventoryLinkStore.Key,InventoryPaths);
             var savedGroups=InventoryLinks.Groups.ToDictionary(group=>group.Id,StringComparer.Ordinal);
             foreach(var entry in inventory){
@@ -564,7 +569,7 @@ internal sealed partial class GeneralModWindow : Form {
             }
         }
         if(!picking&&!flat&&groupFilters==null&&coverageFilter==null&&searchTerms.Length==0&&(visible.Count>0||statusFilters==null))AddSection("new",null,56);
-        else if(visible.Count==0&&inventory.Count==0)AddSection("empty",null,56);
+        else if(visible.Count==0&&inventory.Count==0&&!showInventorySection)AddSection("empty",null,56);
         if(oldVersion!=null){
             var row=grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(candidate=>candidate.Visible&&
                 candidate.Tag is Work&&SameVersion((Work)candidate.Tag,oldVersion));
@@ -600,6 +605,7 @@ internal sealed partial class GeneralModWindow : Form {
     DataGridViewRow AddSection(string kind,string category,int height){
         int i=grid.Rows.Add();var row=grid.Rows[i];row.Tag=new SectionRow(kind,category);row.Height=height;row.ReadOnly=true;
         row.Cells["Name"].Value=kind=="heading"?category??UncatName():kind=="inventory"?category:kind=="add"?T("Adicionar item","Add item"):kind=="new"?T("Criar nova categoria","Create new category"):"";
+        if(kind=="inventory")foreach(DataGridViewCell cell in row.Cells)cell.ToolTipText=T("Explorar arquivos","Browse files");
         return row;
     }
 
@@ -777,7 +783,17 @@ internal sealed partial class GeneralModWindow : Form {
             const TextFormatFlags flags=TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis|TextFormatFlags.PreserveGraphicsClipping|TextFormatFlags.VerticalCenter;
             bool toggle=section.Kind=="heading"&&CanToggleCategory;
             int x=bounds.X+18+(section.Kind=="add"?CategoryIndent:0);
+            string inventoryAction=section.Kind=="inventory"?T("Explorar arquivos","Browse files"):null;
             int right=bounds.Right-(toggle?CategoryToggleWidth:20);
+            if(inventoryAction!=null){
+                using(var actionFont=GeneralStyle.Font(11,true)){
+                    int actionWidth=TextRenderer.MeasureText(inventoryAction,actionFont).Width+25;
+                    int start=Math.Max(x,right-actionWidth);
+                    LucideIcons.Draw(g,"folder",new Rectangle(start,y+6,16,16),GeneralStyle.Accent);
+                    TextRenderer.DrawText(g,inventoryAction,actionFont,new Rectangle(start+22,y,Math.Max(0,right-start-22),30),GeneralStyle.Accent,flags);
+                    right=start-12;
+                }
+            }
             using(var font=GeneralStyle.Font(heading?15:12,heading))
             using(var small=GeneralStyle.Font(10.5f)){
                 string size=section.Size??"";
@@ -942,6 +958,7 @@ internal sealed partial class GeneralModWindow : Form {
         if(section.Kind=="add"){var item=NewEntry("",null);item.Category=section.Category;Edit(item);}
         if(section.Kind=="heading")EditCategory(section.Category,false);
         if(section.Kind=="new")EditCategory(null,true);
+        if(section.Kind=="inventory")OpenInventoryTree();
     }
     static GeneralModEntry NewEntry(string name,string source){
         var v=new GeneralModVariant{Id="default",Name=T("Principal","Main")};if(source!=null)v.Sources.Add(source);

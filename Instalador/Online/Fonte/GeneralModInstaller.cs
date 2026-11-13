@@ -107,19 +107,20 @@ public sealed partial class GeneralModInstaller {
                     }
                 }
 
-                var existingOwners = new HashSet<string>(OtherFiles(receipt).Where(file => file.Owned)
-                    .Select(file => file.Path + "\n" + file.Sha256), StringComparer.OrdinalIgnoreCase);
+                var existingOwners = OtherFiles(receipt).Where(file=>file.Owned)
+                    .ToLookup(file=>file.Path,StringComparer.OrdinalIgnoreCase);
                 var conflicts=record.Files.Where(file=>File.Exists(Target(file.Path))&&!Matches(Target(file.Path),file)).ToList();
                 var expected=conflicts.ToDictionary(file=>file.Path,file=>Safe.Hash(Target(file.Path)),StringComparer.OrdinalIgnoreCase);
                 if(conflicts.Count>0)new ModVersionDifference{Name=Path.GetFileName(source),Current=String.Join("; ",conflicts.Select(file=>ModVersionDifference.FileVersion(Target(file.Path))).Distinct()),Incoming=Path.GetFileName(source),Detail=String.Join("\r\n",conflicts.Take(6).Select(file=>file.Path))+"\r\n"+GeneralStyle.T("A troca guarda os arquivos anteriores para restaurar ao remover. Nenhuma troca ocorre sem sua escolha.","Replacement backs up the previous files for restoration on removal. Nothing is replaced without your choice.")}.Require(chooseVersion);
                 foreach (RecordFile file in record.Files) {
                     string target = Target(file.Path);RecordFile old;
-                    file.Owned = previousFiles.TryGetValue(file.Path, out old) && old.Owned
-                        || existingOwners.Contains(file.Path + "\n" + file.Sha256);
+                    var shared=existingOwners[file.Path].FirstOrDefault(owner=>owner.Sha256==file.Sha256);
+                    file.Owned = previousFiles.TryGetValue(file.Path, out old) && old.Owned || shared!=null;
                     if(expected.ContainsKey(file.Path)){
                         if(Safe.Hash(target)!=expected[file.Path])throw Conflict(file.Path);
                         SaveBackup(target,expected[file.Path]);file.Before=expected[file.Path];file.Owned=true;
                     }else if(previousFiles.TryGetValue(file.Path,out old))file.Before=old.Before;
+                    else if(shared!=null)file.Before=shared.Before;
                 }
 
                 for (int i = 0; i < record.Files.Count; i++) {
@@ -166,13 +167,19 @@ public sealed partial class GeneralModInstaller {
         using (AcquireLock()) {
             Record record = ReadRecord(receipt);
             if (record == null) return "Nenhuma instalação registrada para remover.";
-            var shared = new HashSet<string>(OtherFiles(receipt, activeOwner).Select(file => file.Path), StringComparer.OrdinalIgnoreCase);
+            var others=OtherFiles(receipt,activeOwner).ToLookup(file=>file.Path,StringComparer.OrdinalIgnoreCase);
+            // Keep the lower receipt until its replacement has released the backup reference.
+            if(!forgetOnly&&record.Files.Any(file=>others[file.Path].Any(other=>
+                other.Sha256!=file.Sha256&&other.Before==file.Sha256)&&
+                !others[file.Path].Any(other=>other.Sha256==file.Sha256)))
+                throw new IOException(GeneralStyle.T("Outro mod substituiu arquivos deste pacote. Remova a versão ativa antes de remover o pacote anterior.",
+                    "Another mod replaced files from this package. Remove the active version before removing the earlier package."));
             int removed = 0;
             int preserved = 0;
             foreach (RecordFile file in forgetOnly ? Enumerable.Empty<RecordFile>() : record.Files) {
                 string target = Target(file.Path);
                 if (!File.Exists(target)) continue;
-                if (!file.Owned || shared.Contains(file.Path) || !Matches(target, file) || GeneralInstallRoutes.External(file.Path)&&preserveExternal!=null&&preserveExternal(file.Path)) {
+                if (!file.Owned || others[file.Path].Any(other=>other.Sha256==file.Sha256) || !Matches(target, file) || GeneralInstallRoutes.External(file.Path)&&preserveExternal!=null&&preserveExternal(file.Path)) {
                     preserved++;
                     continue;
                 }
