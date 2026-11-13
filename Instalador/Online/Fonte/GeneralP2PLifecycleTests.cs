@@ -283,10 +283,16 @@ internal static class GeneralP2PLifecycleTests {
         Directory.CreateDirectory(Safe.In(source,sharedEmpty));
         Directory.CreateDirectory(Safe.In(target,sharedEmpty));
         string oldPackage=Safe.In(root,"old-receiver-mods.zip");
-        using(var zip=System.IO.Compression.ZipFile.Open(oldPackage,System.IO.Compression.ZipArchiveMode.Create))
-            foreach(string path in new[]{remove,sidecar,keep,bundle+"/mod.dll",hotline+"/init.lua",script+"/nested/mod.reds"})
-                using(var writer=new StreamWriter(zip.CreateEntry(path).Open()))writer.Write(path);
-        new GeneralModInstaller(target,Path.Combine(data,"Instalacoes")).Install(oldPackage,"old-receiver-mods",_=>{});
+        var installer=new GeneralModInstaller(target,Path.Combine(data,"Instalacoes"));
+        foreach(var mod in new[]{
+            new[]{remove,sidecar},new[]{keep},new[]{bundle+"/mod.dll",hotline+"/init.lua",script+"/nested/mod.reds"}
+        }){
+            using(var zip=System.IO.Compression.ZipFile.Open(oldPackage,System.IO.Compression.ZipArchiveMode.Create))
+                foreach(string path in mod)
+                    using(var writer=new StreamWriter(zip.CreateEntry(path).Open()))writer.Write(path);
+            installer.Install(oldPackage,Path.GetFileNameWithoutExtension(mod[0]),_=>{});
+            File.Delete(oldPackage);
+        }
         using(var host=Service(root,"cp-host",Safe.In(root,"cp-source"),helper,catalog:catalog))
         using(var friend=Service(root,"cp-friend",data,helper,catalog:catalog)){
             host.SetPreparationState(state);
@@ -303,7 +309,7 @@ internal static class GeneralP2PLifecycleTests {
                 Check(checks,review.Extras.Single(extra=>extra.Proven&&extra.Name=="remove").Files.Length==2&&
                     !review.Extras.Single(extra=>extra.Name=="stale-folder").Proven,
                     "Registered archive sidecars have proof; empty folders alone do not prove ownership.");
-                Check(checks,review.Extras.Any(extra=>extra.Proven&&extra.Name=="NPCD_Hotline")&&
+                Check(checks,review.Extras.Any(extra=>extra.Proven&&extra.Files.Length==3&&extra.Files.Any(file=>file.Path==hotline+"/init.lua"))&&
                     review.Extras.Where(extra=>extra.Name=="NPCD_Hotline"&&!extra.Proven).SelectMany(extra=>extra.Files).Any(file=>file.Path==hotline+"/db.sqlite3")&&
                     !review.Extras.Single(extra=>extra.Name=="stopNCPD").Proven&&
                     !review.Extras.Single(extra=>extra.Name=="OldShell").Proven&&!review.Extras.Any(extra=>extra.Name=="shared"),
@@ -317,7 +323,7 @@ internal static class GeneralP2PLifecycleTests {
             Check(checks,shown&&!friend.HasSyncChoice(received)&&File.Exists(Safe.In(target,remove))&&sent.PayloadHash==null,
                 "Closing the review makes no changes and sends no choice.");
             friend.ChooseIncoming(received,false,review=>Enumerable.Range(0,review.Extras.Length)
-                .Where(index=>review.Extras[index].Proven&&review.Extras[index].Name!="keep").ToArray()).GetAwaiter().GetResult();
+                .Where(index=>review.Extras[index].Proven&&!review.Extras[index].Files.Any(file=>file.Path==keep)).ToArray()).GetAwaiter().GetResult();
             Wait(()=> {
                 if(received.Error!=null||sent.Error!=null)throw new IOException("Cyberpunk sync: "+received.Error+" "+sent.Error);
                 return received.Completed&&sent.Completed;

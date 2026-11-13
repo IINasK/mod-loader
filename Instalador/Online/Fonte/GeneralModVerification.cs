@@ -176,7 +176,7 @@ internal sealed partial class GeneralModWindow {
                     VariantId=installed.Id,VerifiedBytes=files.Sum(file=>file.Size)});
             }
             var listed=exact.Concat(registered.Where(file=>names.ContainsKey(file.Owner)).Select(file=>file.Path));
-            extras.AddRange(engine.ReadUnlistedModFiles(listed));
+            extras.AddRange(engine.ReadUnlistedModFiles(listed,data,reads==null?null:(Func<string,string>)reads.Hash));
         }
         foreach(var file in Generic(destination).ProjectDeletionFiles(true))add(file,key=>lookup(WorkKeyFromReceipt(key)));
         Func<string,string> scope=cyberpunk?(Func<string,string>)FixedInstaller.ModFolder:InstalledFileOwnership.GenericScope;

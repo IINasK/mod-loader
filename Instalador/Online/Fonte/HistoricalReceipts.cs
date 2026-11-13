@@ -42,11 +42,13 @@ internal static class HistoricalReceipts {
             file.Path==known.Path&&file.Size==known.Size&&file.Sha256==known.Sha256));
     }
 
+    internal static IEnumerable<FixedMod> CleanupRecipes(FixedCatalog catalog) {
+        if(catalog.Id!=CatalogId)return Enumerable.Empty<FixedMod>();
+        return SnapshotRecipes.Value.Packages.Concat(new[]{retiredHotline}).Concat(RetiredClothingAndMap).Where(mod=>!mod.Immutable);
+    }
+
     internal static IEnumerable<ModFileAnchor> CleanupAnchors(FixedCatalog catalog) {
-        if(catalog.Id!=CatalogId)return Enumerable.Empty<ModFileAnchor>();
-        // Trusted prior package manifests prove exact paths/hashes, including manual installations.
-        return SnapshotRecipes.Value.Packages.Concat(new[]{retiredHotline}).Concat(RetiredClothingAndMap)
-            .Where(mod=>!mod.Immutable).SelectMany(mod=>mod.Files.Select(file=>new ModFileAnchor{Owner=mod.Id,Path=file.Path,Hash=file.Sha256}));
+        return CleanupRecipes(catalog).SelectMany(mod=>mod.Files.Select(file=>new ModFileAnchor{Owner=mod.Id,Path=file.Path,Hash=file.Sha256}));
     }
 
     internal static List<FixedMod> Expand(FixedCatalog catalog,IEnumerable<string> ids){

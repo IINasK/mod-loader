@@ -20,31 +20,43 @@ static class OnlineExtraCleanupTests {
         var host=new InstalledSnapshotManifest{List=new GeneralModList(),Files=new List<InstalledSnapshotFile>(),SyncGameInventory=new Dictionary<string,string>()};
         string known=catalog.Packages[1].Files[0].Path,baseFile=catalog.Packages[0].Files.Last().Path;
         Put(game,known,"test "+known);Put(game,baseFile,"test "+baseFile);
-        const string dll="red4ext/plugins/Cyberteste/mod.dll",script="r6/scripts/Cyberteste/main.reds";
+        const string dll="red4ext/plugins/TelemetryBridge/mod.dll",script="r6/scripts/AppearanceTools/main.reds";
         const string changed="red4ext/plugins/Changed/mod.dll";
         string package=Safe.In(root,"Cyberteste.zip");
         using(var zip=System.IO.Compression.ZipFile.Open(package,System.IO.Compression.ZipArchiveMode.Create))
             foreach(string path in new[]{dll,script,changed})using(var writer=new StreamWriter(zip.CreateEntry(path).Open()))writer.Write(path);
         new GeneralModInstaller(game,Path.Combine(data,"Instalacoes")).Install(package,"Cyberteste",_=>{});
         var unknown=new[]{"cache/runtime.bin","red4ext/plugins/cache/runtime.txt","red4ext/plugins/Temp/generated.json",
-            "red4ext/plugins/Cyberteste/generated.json","red4ext/plugins/Cyberteste/nested/extra.dll",
+            "red4ext/plugins/TelemetryBridge/generated.json","red4ext/plugins/TelemetryBridge/nested/extra.dll",
             "bin/x64/plugins/cyber_engine_tweaks/mods/Temp/init.lua",
             "bin/x64/plugins/cyber_engine_tweaks/mods/Temp/runtime.log",
             "bin/x64/plugins/cyber_engine_tweaks/mods/Temp/db.sqlite3",
             "r6/scripts/Temp/generated.reds","r6/tweaks/Temp/generated.yaml"};
         foreach(string path in unknown)Put(game,path,path);
-        Directory.CreateDirectory(Safe.In(game,"red4ext/plugins/Cyberteste/empty-runtime"));
+        const string sameBytesElsewhere="red4ext/plugins/Unrelated/mod.dll";
+        Put(game,sameBytesElsewhere,dll);
+        Directory.CreateDirectory(Safe.In(game,"red4ext/plugins/TelemetryBridge/empty-runtime"));
         Directory.CreateDirectory(Safe.In(game,"r6/scripts/empty-generic/nested"));
         Put(game,changed,"changed at runtime");
         Func<P2PSyncExtra[]> scan=()=>engine.PlanSyncExtras(host,appData:data);
         var review=scan();
         var proven=review.Where(extra=>extra.Proven).SelectMany(extra=>extra.Files).ToArray();
+        check(review.Any(extra=>extra.Proven&&new HashSet<string>(extra.Files.Select(file=>file.Path)).SetEquals(new[]{dll,script})),
+            "O mesmo recibo agrupa arquivos de diretórios com nomes diferentes na sincronização.");
+        var inventory=engine.ReadUnlistedModFiles(new string[0],data);
+        var plugin=inventory.Single(file=>file.Path==dll);
+        check(plugin.ProvenOwner=="Cyberteste"&&InventoryLinkStore.Key(plugin)==InventoryLinkStore.Key(inventory.Single(file=>file.Path==script))&&
+            inventory.Single(file=>file.Path==changed).ProvenOwner==null,
+            "O inventário usa o mesmo ID entre diretórios e mantém o arquivo modificado sem identificação comprovada.");
+        check(inventory.Single(file=>file.Path=="red4ext/plugins/TelemetryBridge/generated.json").ProvenOwner==null&&
+            inventory.Single(file=>file.Path==sameBytesElsewhere).ProvenOwner==null,
+            "Arquivos vizinhos e cópias com o mesmo hash em um caminho sem registro permanecem sem identificação comprovada.");
         check(new HashSet<string>(proven.Select(file=>file.Path)).SetEquals(new[]{known,dll,script}),
             "Só caminho e conteúdo exatos do catálogo ou recibo comprovam o vínculo, inclusive em múltiplas pastas.");
         check(review.Any(extra=>!extra.Proven&&extra.Files.Any(file=>file.Path==changed)),
             "Arquivo registrado com conteúdo modificado fica desconhecido, não autorizado pelo nome da pasta.");
-        check(review.Any(extra=>!extra.Proven&&extra.Files.Any(file=>file.Path=="red4ext/plugins/Cyberteste/generated.json"))&&
-            review.Any(extra=>!extra.Proven&&extra.Files.Any(file=>file.Path=="red4ext/plugins/Cyberteste/nested/extra.dll")),
+        check(review.Any(extra=>!extra.Proven&&extra.Files.Any(file=>file.Path=="red4ext/plugins/TelemetryBridge/generated.json"))&&
+            review.Any(extra=>!extra.Proven&&extra.Files.Any(file=>file.Path=="red4ext/plugins/TelemetryBridge/nested/extra.dll")),
             "Arquivo gerado e DLL desconhecida no diretório de um mod comprovado não herdam sua autorização.");
         check(review.Where(extra=>extra.Proven).All(extra=>extra.Files.All(file=>!unknown.Contains(file.Path)))&&
             review.Any(extra=>!extra.Proven&&extra.Files.Any(file=>file.Path=="r6/scripts/Temp/generated.reds")),
@@ -60,6 +72,10 @@ static class OnlineExtraCleanupTests {
         var manual=engine.PlanExtraReset(data);
         check(manual.Any(file=>file.Path==dll)&&manual.All(file=>!unknown.Contains(file.Path)&&file.Path!=changed),
             "A limpeza manual usa a mesma proteção, sem autorizar desconhecidos por outra tela.");
+        var selectedMod=engine.PlanExtraReset(data,InventoryLinkStore.View(inventory,new InventoryLinkData(),new GeneralModEntry[0])
+            .Where(file=>InventoryLinkStore.Key(file)==InventoryLinkStore.Key(plugin)).Select(file=>file.Path));
+        check(new HashSet<string>(selectedMod.Select(file=>file.Path)).SetEquals(new[]{dll,script}),
+            "Selecionar a linha revisa apenas os arquivos comprovados daquele mod em seus vários diretórios.");
         var approved=proven.ToList();
         Put(game,dll,"changed after approval");refused=false;
         try{engine.ApplySyncCleanup(approved,host,new string[0],_=>{},data);}catch(IOException){refused=true;}
@@ -73,8 +89,8 @@ static class OnlineExtraCleanupTests {
         check(proven.All(file=>!File.Exists(Safe.In(game,file.Path))),"Só os três arquivos comprovados e aprovados são guardados no backup.");
         check(unknown.All(path=>File.ReadAllText(Safe.In(game,path))==path)&&File.ReadAllText(Safe.In(game,changed))=="changed at runtime",
             "Caches, arquivos gerados, nomes genéricos, logs e bancos permanecem intactos.");
-        check(Directory.Exists(Safe.In(game,"red4ext/plugins/Cyberteste/empty-runtime"))&&
-            Directory.Exists(Safe.In(game,"r6/scripts/empty-generic/nested"))&&!Directory.Exists(Safe.In(game,"r6/scripts/Cyberteste")),
+        check(Directory.Exists(Safe.In(game,"red4ext/plugins/TelemetryBridge/empty-runtime"))&&
+            Directory.Exists(Safe.In(game,"r6/scripts/empty-generic/nested"))&&!Directory.Exists(Safe.In(game,"r6/scripts/AppearanceTools")),
             "Apenas ancestrais comprovados e literalmente vazios saem; subpastas desconhecidas permanecem.");
         engine.Undo(_=>{});
         check(proven.All(file=>Safe.Hash(Safe.In(game,file.Path))==file.Before)&&unknown.All(path=>File.ReadAllText(Safe.In(game,path))==path),

@@ -54,7 +54,7 @@ internal sealed class InventoryLinkStore {
 
     static IOException Invalid(){return new IOException("Agrupamentos locais inválidos.");}
 
-    internal static string Key(P2PSyncDifference file){return file.InventoryGroupId??"raw:"+(file.Mod??file.Path);}
+    internal static string Key(P2PSyncDifference file){return file.InventoryGroupId??(file.ProvenOwner==null?"raw:"+(file.Mod??file.Path):"owner:"+file.ProvenOwner);}
 
     internal static IEnumerable<P2PSyncDifference> View(IEnumerable<P2PSyncDifference> inventory,InventoryLinkData links,
         IEnumerable<GeneralModEntry> entries) {

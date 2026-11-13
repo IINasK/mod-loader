@@ -22,7 +22,7 @@ internal sealed class P2PSyncComparison {
 }
 
 internal sealed class P2PSyncDifference {
-    internal string InventoryGroupId;
+    internal string InventoryGroupId, ProvenOwner;
     internal long? VerifiedBytes;
     public string Kind, Mod, Path, ModId, VariantId;
 }

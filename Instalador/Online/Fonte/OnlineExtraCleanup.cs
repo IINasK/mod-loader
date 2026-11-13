@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 
 internal sealed class P2PSyncExtra {
-    internal string Name;
+    internal string Name, GroupKey;
     internal bool Proven;
     internal OwnedChange[] Files;
     public override string ToString(){
@@ -59,10 +59,18 @@ public sealed partial class FixedInstaller {
         }
     }
 
-    List<string> FindExtraPaths(bool includeKnown=false,bool verifyBuild=true) {
-        if (verifyBuild&&(!Installer.VersionSupported(FixedData.GameVersion(game)) || FixedData.GameBuild(game) != catalog.GameFileVersion))
+    void VerifyExtraCleanupBuild() {
+        if(!Installer.VersionSupported(FixedData.GameVersion(game))||FixedData.GameBuild(game)!=catalog.GameFileVersion)
             throw new IOException("A limpeza precisa da mesma versão do jogo indicada no catálogo.");
-        var known = new HashSet<string>(catalog.Packages.SelectMany(NightCityDensity.KnownFiles).Select(f => f.Path), StringComparer.OrdinalIgnoreCase);
+    }
+
+    HashSet<string> KnownModPaths() {
+        return new HashSet<string>(catalog.Packages.SelectMany(NightCityDensity.KnownFiles).Select(file=>file.Path),StringComparer.OrdinalIgnoreCase);
+    }
+
+    List<string> FindExtraPaths(bool includeKnown=false,bool verifyBuild=true) {
+        if(verifyBuild)VerifyExtraCleanupBuild();
+        var known = KnownModPaths();
         var paths = new List<string>();
         foreach (string root in ExtraFileRoots) {
             string directory = Safe.In(game, root);
@@ -105,23 +113,42 @@ public sealed partial class FixedInstaller {
             new ModFileAnchor{Owner=owner.Split('/')[0],Path=file.Path,Hash=file.Sha256}));
         return InstalledFileOwnership.FindAssociated(game,CatalogAnchors().Concat(anchors),ModFolder,paths);
     }
-    internal List<P2PSyncDifference> ReadUnlistedModFiles(IEnumerable<string> listedPaths) {
+    internal List<P2PSyncDifference> ReadUnlistedModFiles(IEnumerable<string> listedPaths,string appData=null,Func<string,string> readHash=null) {
         var listed=new HashSet<string>(listedPaths,StringComparer.OrdinalIgnoreCase);
-        var hotline=HotlineSignatures();
-        var names=catalog.Packages.SelectMany(mod=>NightCityDensity.KnownFiles(mod).Select(file=>new{file.Path,mod.Name}))
-            .GroupBy(item=>item.Path,StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group=>group.Key,group=>group.First().Name,StringComparer.OrdinalIgnoreCase);
-        return FindExtraPaths(true,false).Where(path=>InstalledSnapshot.SafeGenericPath(path)&&!listed.Contains(path)).Distinct(StringComparer.OrdinalIgnoreCase)
-            .Select(path=>new P2PSyncDifference{Kind="found",Path=path,Mod=names.ContainsKey(path)?names[path]:
-                hotline.Contains(path)&&MatchesHotline(path,hotline)?"Immersive NCPD Hotline":SyncExtraName(path)})
-            .ToList();
+        var ownership=SyncOwnership(appData);
+        var names=OwnershipNames();
+        var result=new List<P2PSyncDifference>();
+        foreach(string path in FindExtraPaths(true,false).Where(path=>InstalledSnapshot.SafeGenericPath(path)&&!listed.Contains(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)){
+            string owner=null;
+            if(ownership.Contains(path)){
+                try{
+                    string hash=(readHash??Safe.Hash)(Safe.In(game,path));
+                    owner=UniqueOwner(ownership[path].Where(file=>file.Hash==hash));
+                }catch(IOException){}catch(UnauthorizedAccessException){}
+            }
+            result.Add(new P2PSyncDifference{Kind="found",Path=path,Mod=ExtraName(path,owner,names),ProvenOwner=owner});
+        }
+        return result;
     }
 
     internal List<OwnedChange> PlanExtraReset(string appData=null,IEnumerable<string> selected=null) {
         var ownership=SyncOwnership(appData);
-        var selection=selected==null?null:new HashSet<string>(selected,StringComparer.OrdinalIgnoreCase);
-        return FindExtraPaths().Where(path=>SyncModPath(path)&&(selection==null||selection.Contains(path))).Select(path=>new OwnedChange{Path=path,Before=Safe.Hash(Safe.In(game,path))})
-            .Where(file=>ownership.ContainsKey(file.Path+"\n"+file.Before)).ToList();
+        var paths=selected==null?FindExtraPaths():SelectedExtraPaths(selected);
+        return paths.Where(path=>ownership.Contains(path)&&SyncModPath(path))
+            .Select(path=>new OwnedChange{Path=path,Before=Safe.Hash(Safe.In(game,path))})
+            .Where(file=>ownership[file.Path].Any(anchor=>anchor.Hash==file.Before)).ToList();
+    }
+
+    List<string> SelectedExtraPaths(IEnumerable<string> selected) {
+        VerifyExtraCleanupBuild();
+        var paths=selected.Where(SyncModPath).Distinct(StringComparer.OrdinalIgnoreCase).Take(ExtraResetLimit+1).ToArray();
+        if(paths.Length>ExtraResetLimit)throw new IOException("Há arquivos extras demais para revisar nesta limpeza.");
+        var known=KnownModPaths();
+        var protectedBundles=new HashSet<string>(known.Where(path=>ExtraBundleRoots.Any(root=>InFolder(path,root)))
+            .Select(ModFolder).Where(folder=>folder!=null),StringComparer.OrdinalIgnoreCase);
+        return paths.Where(path=>!known.Contains(path)&&!protectedBundles.Contains(ModFolder(path))&&File.Exists(Safe.In(game,path)))
+            .OrderBy(path=>path,StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     internal static bool SyncModPath(string path) {
@@ -215,12 +242,12 @@ public sealed partial class FixedInstaller {
     }
 
     // Only exact recorded paths and hashes prove ownership; folder names and companions do not.
-    Dictionary<string,string> SyncOwnership(string appData) {
+    ILookup<string,ModFileAnchor> SyncOwnership(string appData) {
         var anchors=CatalogAnchors().Concat(HistoricalReceipts.CleanupAnchors(catalog)).ToList();
         Action<Func<IEnumerable<ProjectDeleteFile>>> add=read=>{
             try {
                 var recorded=read().Where(file=>file.OwnerKeys!=null&&file.OwnerKeys.Count>0&&FixedData.HashValid(file.Hash))
-                    .Select(file=>new ModFileAnchor{Path=file.Path,Hash=file.Hash,Owner=String.Join(" + ",file.OwnerKeys.OrderBy(key=>key))}).ToArray();
+                    .SelectMany(file=>file.OwnerKeys.Select(key=>new ModFileAnchor{Path=file.Path,Hash=file.Hash,Owner=key.Split('/')[0]})).ToArray();
                 anchors.AddRange(recorded);
             } catch(IOException) { OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo indisponível; arquivos sem outra prova serão preservados."); }
               catch(UnauthorizedAccessException) { OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo inacessível; arquivos sem outra prova serão preservados."); }
@@ -236,14 +263,13 @@ public sealed partial class FixedInstaller {
                     if(receipt.Status!="instalado"||receipt.Mods.Count==0||
                         receipt.Operation!=null&&receipt.Operation!="install"&&receipt.Operation!=LocalModPackage.ReceiptOperation)continue;
                     anchors.AddRange(receipt.Files.Where(file=>file.Applied&&!file.Reverted&&!file.UndoStarted&&FixedData.HashValid(file.After))
-                        .Select(file=>new ModFileAnchor{Path=file.Path,Hash=file.After,Owner=String.Join(" + ",receipt.Mods.OrderBy(id=>id))}));
+                        .Select(file=>new ModFileAnchor{Path=file.Path,Hash=file.After,Owner=receipt.Mods.Count==1?receipt.Mods[0]:null}));
                 } catch(IOException) { OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo inválido; arquivos sem outra prova serão preservados."); }
                   catch(UnauthorizedAccessException) { OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo inacessível; arquivos sem outra prova serão preservados."); }
             }
         }
         return anchors.Where(file=>!String.IsNullOrEmpty(file.Path)&&!GeneralInstallRoutes.External(file.Path)&&FixedData.HashValid(file.Hash))
-            .GroupBy(file=>file.Path+"\n"+file.Hash,StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group=>group.Key,group=>String.Join(" + ",group.Select(file=>file.Owner).Distinct().OrderBy(id=>id)),StringComparer.OrdinalIgnoreCase);
+            .ToLookup(file=>file.Path,StringComparer.OrdinalIgnoreCase);
     }
 
     internal P2PSyncExtra[] PlanSyncExtras(InstalledSnapshotManifest host,Action checkpoint=null,string appData=null) {
@@ -253,33 +279,38 @@ public sealed partial class FixedInstaller {
         var empty=EmptySyncBundles(true).Where(path=>SyncCleanupBundle(path,keep)).ToArray();
         if(paths.Length+empty.Length>ExtraResetLimit)throw new IOException("Há arquivos extras demais para revisar nesta sincronização.");
         var ownership=SyncOwnership(appData);
-        var names=catalog.Packages.ToDictionary(mod=>mod.Id,mod=>mod.Name,StringComparer.Ordinal);
-        var hotline=HotlineSignatures();
+        var names=OwnershipNames();
         var files=new List<P2PSyncExtra>();
         foreach(string path in paths){
             if(checkpoint!=null)checkpoint();
-            string hash=Safe.Hash(Safe.In(game,path)),owner;
-            bool proven=ownership.TryGetValue(path+"\n"+hash,out owner);
-            string name=proven&&hotline[path].Contains(hash,StringComparer.Ordinal)?"Immersive NCPD Hotline":
-                proven&&names.ContainsKey(owner)?names[owner]:SyncExtraName(path);
-            files.Add(new P2PSyncExtra{Name=name,Proven=proven,Files=new[]{new OwnedChange{Path=path,Before=hash}}});
+            string hash=Safe.Hash(Safe.In(game,path));
+            var matches=ownership[path].Where(file=>file.Hash==hash).ToArray();
+            string owner=UniqueOwner(matches);
+            string name=ExtraName(path,owner,names);
+            string group=owner!=null?"owner:"+owner:matches.Length>0?"file:"+path:"unknown:"+name;
+            files.Add(new P2PSyncExtra{Name=name,GroupKey=group,Proven=matches.Length>0,Files=new[]{new OwnedChange{Path=path,Before=hash}}});
         }
         // Unknown files stay separate even when their folder has the name of a registered mod.
-        return files.GroupBy(extra=>extra.Name+"\n"+extra.Proven,StringComparer.OrdinalIgnoreCase)
+        return files.GroupBy(extra=>extra.GroupKey,StringComparer.Ordinal)
             .Select(group=>new P2PSyncExtra{Name=group.First().Name,Proven=group.First().Proven,Files=group.SelectMany(extra=>extra.Files).ToArray()})
             .Concat(empty.Select(path=>new P2PSyncExtra{Name=Path.GetFileName(path),Files=new[]{new OwnedChange{Path=path}}}))
             .OrderByDescending(extra=>extra.Proven).ThenBy(extra=>extra.Name).ToArray();
     }
 
-    ILookup<string,string> HotlineSignatures(){
-        return HistoricalReceipts.CleanupAnchors(catalog).Where(anchor=>anchor.Owner==RetiredPackEntries.HotlineId)
-            .ToLookup(anchor=>anchor.Path,anchor=>anchor.Hash,StringComparer.OrdinalIgnoreCase);
+    Dictionary<string,string> OwnershipNames() {
+        return catalog.Packages.Concat(HistoricalReceipts.CleanupRecipes(catalog))
+            .Where(mod=>!String.IsNullOrWhiteSpace(mod.Name)).GroupBy(mod=>mod.Id,StringComparer.Ordinal)
+            .ToDictionary(group=>group.Key,group=>group.First().Name,StringComparer.Ordinal);
     }
 
-    bool MatchesHotline(string path,ILookup<string,string> signatures){
-        try{return signatures[path].Contains(Safe.Hash(Safe.In(game,path)),StringComparer.Ordinal);}
-        catch(IOException){return false;}
-        catch(UnauthorizedAccessException){return false;}
+    static string UniqueOwner(IEnumerable<ModFileAnchor> matches) {
+        var ids=matches.Select(file=>file.Owner).Where(id=>!String.IsNullOrEmpty(id)).Distinct(StringComparer.Ordinal).Take(2).ToArray();
+        return ids.Length==1?ids[0]:null;
+    }
+
+    static string ExtraName(string path,string owner,Dictionary<string,string> names) {
+        string name;
+        return owner!=null&&names.TryGetValue(owner,out name)?name:SyncExtraName(path);
     }
 
     static string SyncExtraName(string path) {
@@ -311,7 +342,7 @@ public sealed partial class FixedInstaller {
         keep.UnionWith(installedPaths);
         var ownership=SyncOwnership(appData);
         if(approved.Any(file=>file==null||file.Before==null||!SyncCleanupEntry(file.Path,file.Before)||
-            !ownership.ContainsKey(file.Path+"\n"+file.Before)||
+            !ownership[file.Path].Any(anchor=>anchor.Hash==file.Before)||
             !SyncCleanupPath(file.Path,keep))||
             approved.Select(file=>file.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=approved.Count)
             throw new IOException("A seleção contém arquivos protegidos ou sem vínculo comprovado. Compare os mods novamente.");
