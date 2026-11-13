@@ -223,6 +223,22 @@ internal static class GeneralP2PUiTests {
                         check(receiveStatus.Text.Contains(locale=="pt"?"Finalizando":"Finishing")&&!Find<Button>(cards[1],"p2p-full").Enabled,
                             "Aceite confirmado fica visível enquanto a conexão termina: "+theme+locale);
                         views[incoming].Connected=true;views[incoming].Accepted=true;
+                        incoming.CreatedUtc=DateTime.UtcNow.AddSeconds(-5).ToString("o");
+                        incoming.ConnectedUtc=DateTime.UtcNow.ToString("o");
+                        update();
+                        var connection=Find<Control>(cards[1],"p2p-connection");
+                        var dates=Find<Label>(cards[1],"p2p-dates");
+                        check(connection.AccessibleName.StartsWith(locale=="pt"?"Conectado":"Connected")&&
+                            dates.Visible&&dates.Text.StartsWith(locale=="pt"?"Primeira conexão":"First connected"),
+                            "Live connection and time are identified: "+theme+locale);
+                        var tips=(ToolTip)typeof(GeneralP2PDialog).GetField("tips",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(dialog);
+                        check(tips.GetToolTip(connection).Contains(dates.Text),"Connection hover includes the observed date: "+theme+locale);
+                        views[incoming].Connected=false;incoming.DisconnectedUtc=DateTime.UtcNow.ToString("o");
+                        update();
+                        check(connection.AccessibleName.StartsWith(locale=="pt"?"Desconectado":"Disconnected")&&
+                            tips.GetToolTip(connection).Contains(locale=="pt"?"Última desconexão":"Last disconnected"),
+                            "Disconnected peer and disconnection time are identified: "+theme+locale);
+                        views[incoming].Connected=true;
                         update();
                         var updateMods=Find<Button>(cards[1],"p2p-update");
                         var fullPack=Find<Button>(cards[1],"p2p-full");

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -482,8 +483,11 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             var views=await Task.Run(()=>{
                 var result=new Dictionary<P2PSession,P2PTransferStatus>();
                 if(!service.Engine.Running){foreach(var session in sessions)result.Add(session,new P2PTransferStatus{Unavailable=true});return result;}
+                HashSet<string> peers;
+                try{peers=sessions.Length==0?new HashSet<string>():service.ConnectedPeers();}
+                catch(System.Net.WebException){foreach(var session in sessions)result.Add(session,new P2PTransferStatus{Unavailable=true});return result;}
                 foreach(var session in sessions){
-                    try{result.Add(session,service.TransferStatus(session));}
+                    try{result.Add(session,service.TransferStatus(session,peers));}
                     catch(System.Net.WebException){result.Add(session,new P2PTransferStatus{Unavailable=true});}
                 }
                 return result;
@@ -524,7 +528,18 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         };
         readonly FlowLayoutPanel actions=new FlowLayoutPanel{Dock=DockStyle.Fill,Margin=Padding.Empty,WrapContents=false};
         readonly Button pause,retry,import,reply,dismiss,update,full,diagnostic;
+        readonly Control connection=new Control{Dock=DockStyle.Fill,Margin=Padding.Empty,Name="p2p-connection"};
+        readonly Label dates=new Label{Dock=DockStyle.Fill,Margin=Padding.Empty,AutoEllipsis=true,Name="p2p-dates"};
         P2PTransferStatus last;
+        bool connected;
+
+        static string LocalTime(string stamp){
+            DateTimeOffset value;
+            return DateTimeOffset.TryParse(stamp,CultureInfo.InvariantCulture,
+                DateTimeStyles.None,out value)
+                ?value.ToLocalTime().ToString(T("dd/MM/yyyy HH:mm:ss","MMM d, yyyy HH:mm:ss"),
+                    CultureInfo.GetCultureInfo(T("pt-BR","en-US"))):null;
+        }
         DateTime? waitingSince;
         internal int Order,Height;
 
@@ -535,11 +550,18 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             detail.LinkClicked+=(s,e)=>owner.ShowSyncDifferences(session);
             Frame.Padding=new Padding(16,12,16,12);Frame.AccessibleName=session.ToString();
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-            foreach(int height in new[]{28,42,42,0,0})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
-            layout.RowCount=5;Frame.Controls.Add(layout);
+            foreach(int height in new[]{28,0,42,42,0,0})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
+            layout.RowCount=6;Frame.Controls.Add(layout);
             var title=Heading(session.ToString());title.Font=GeneralStyle.Font(13,true);title.AutoEllipsis=true;title.UseMnemonic=false;
             title.TextAlign=ContentAlignment.MiddleLeft;
-            var header=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=Padding.Empty};
+            var header=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,RowCount=1,Margin=Padding.Empty};
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,20));
+            connection.Paint+=(s,e)=>{
+                e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using(var brush=new SolidBrush(connected?Color.SeaGreen:GeneralStyle.DangerFill))
+                    e.Graphics.FillEllipse(brush,2,(connection.Height-10)/2,10,10);
+            };
+            dates.TextAlign=ContentAlignment.MiddleLeft;
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
             header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -549,9 +571,11 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             diagnostic.Name="p2p-copy-diagnostic";diagnostic.Visible=false;
             dismiss=GeneralStyle.Button("",()=>owner.CloseTransfer(session));
             owner.IconButton(dismiss,"close",T("Cancelar transferência","Cancel transfer"));dismiss.Name="p2p-dismiss";
-            header.Controls.Add(title,0,0);header.Controls.Add(diagnostic,1,0);header.Controls.Add(dismiss,2,0);
-            layout.Controls.Add(header,0,0);layout.Controls.Add(preparation,0,1);layout.Controls.Add(bars,0,2);
-            layout.Controls.Add(detail,0,3);layout.Controls.Add(actions,0,4);
+            header.Controls.Add(connection,0,0);header.Controls.Add(title,1,0);
+            header.Controls.Add(diagnostic,2,0);header.Controls.Add(dismiss,3,0);
+            layout.Controls.Add(header,0,0);layout.Controls.Add(dates,0,1);
+            layout.Controls.Add(preparation,0,2);layout.Controls.Add(bars,0,3);
+            layout.Controls.Add(detail,0,4);layout.Controls.Add(actions,0,5);
             bars.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
             bars.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,0));
             pause=GeneralStyle.Button("",()=>owner.Run(()=>Task.Run(()=>owner.service.Pause(session))));
@@ -570,8 +594,41 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             full.Name="p2p-full";
             actions.Controls.AddRange(new Control[]{update,full,retry,import,reply});
         }
+        void SetHint(Control control,string message){
+            if(owner.tips.GetToolTip(control)!=message)owner.tips.SetToolTip(control,message);
+        }
+        static string IncomingPreparation(P2PSession session,P2PTransferStatus view){
+            if(!session.CompareBeforePack||session.Sender)return "";
+            if(view.Unavailable)return T("Serviço P2P indisponível. A escolha foi preservada.","P2P service unavailable. Your choice was saved.");
+            if(!view.Connected)return T("Conexão perdida. A escolha foi preservada.","Connection lost. Your choice was saved.");
+            switch(view.HostDecision){
+                case P2PService.HostPreparing:return T("O anfitrião está preparando o pacote…","The host is preparing the pack…");
+                case P2PService.HostPreparationFailed:return T("Falha no preparo. O anfitrião pode tentar novamente.","Preparation failed. The host can retry.");
+                case P2PService.HostSourceUnavailable:return T("O anfitrião precisa abrir o projeto de origem.","The host needs to open the source project.");
+                case P2PService.HostWaitingForTransfer:return T("Escolha recebida. Aguardando o canal de transferência…","Choice received. Waiting for the transfer channel…");
+                case P2PService.HostPreparationPaused:return T("Preparo pausado pelo anfitrião.","Preparation paused by the host.");
+                default:return T("Escolha enviada. Aguardando confirmação do anfitrião…","Choice sent. Waiting for the host to confirm…");
+            }
+        }
         internal void Refresh(P2PTransferStatus view){
             if(view!=null&&(last==null||!session.Paused))last=view;
+            var connectionView=view??last??new P2PTransferStatus();
+            if(connected!=connectionView.Connected){connected=connectionView.Connected;connection.Invalidate();}
+            string connectionHint=connected?T("Conectado · conexão P2P ativa","Connected · P2P connection is active"):
+                connectionView.Unavailable?T("Desconectado · serviço P2P indisponível","Disconnected · P2P service unavailable"):
+                T("Desconectado · sem conexão P2P ativa","Disconnected · no active P2P connection");
+            string started=LocalTime(session.CreatedUtc),first=LocalTime(session.ConnectedUtc),ended=LocalTime(session.DisconnectedUtc);
+            dates.Text=first!=null?T("Primeira conexão: ","First connected: ")+first:
+                started!=null?T("Sessão criada: ","Session created: ")+started:"";
+            dates.ForeColor=GeneralStyle.Muted;
+            var history=new[]{started==null?null:T("Sessão criada: ","Session created: ")+started,
+                first==null?null:T("Primeira conexão: ","First connected: ")+first,
+                ended==null?null:T("Última desconexão: ","Last disconnected: ")+ended}.Where(value=>value!=null);
+            string historyHint=String.Join("\n",history);
+            connection.AccessibleName=connectionHint;
+            SetHint(connection,historyHint.Length==0?connectionHint:connectionHint+"\n"+historyHint);
+            SetHint(dates,historyHint);
+            layout.RowStyles[1].Height=dates.Text.Length==0?0:22;
             view=last??new P2PTransferStatus();
             bool prepared=session.PayloadHash!=null||session.Completed||!session.Deferred;
             bool awaiting=session.CompareBeforePack&&!session.Completed&&session.PayloadHash==null&&!owner.service.HasSyncChoice(session);
@@ -586,6 +643,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             var scan=session.SyncProgress;
             var issue=session.VerificationIssue;
             bool scanning=scan!=null||session.Sender&&awaiting&&!preview&&session.Stage!=null;
+            string hostPreparation=IncomingPreparation(session,connectionView);
             bool waitingForHost=!session.Sender&&session.CompareBeforePack&&!prepared&&session.Error==null&&
                 !session.Held&&!session.RecoveryPending&&!session.Paused&&!view.RemotePaused&&(!awaiting||session.SyncMode!=0);
             if(scanning){
@@ -594,9 +652,12 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
                 preparation.Indeterminate=scan==null||scan.Total==0;
                 preparation.Value=scan!=null&&scan.Total>0?scan.Done*100/scan.Total:0;
             }else{
-                preparation.Indeterminate=waitingForHost||session.Sender&&session.Stage!=null&&session.PreparationTotal==0;
+                preparation.Indeterminate=waitingForHost&&connectionView.Connected&&
+                    connectionView.HostDecision!=P2PService.HostPreparationFailed&&connectionView.HostDecision!=P2PService.HostSourceUnavailable&&
+                    connectionView.HostDecision!=P2PService.HostPreparationPaused||
+                    session.Sender&&session.Stage!=null&&session.PreparationTotal==0;
                 preparation.Caption=prepared?T("Pacote preparado","Pack prepared"):session.Sender?T("Preparando pacote","Preparing pack"):
-                    awaiting?T("Aguardando conferência do anfitrião","Waiting for host verification"):T("Aguardando preparo do anfitrião","Waiting for the host to prepare the pack");
+                    awaiting?T("Aguardando conferência do anfitrião","Waiting for host verification"):T("Preparo do pacote","Pack preparation");
                 preparation.Value=prepared?100:session.PreparationTotal>0?(int)(session.PreparationBytes*100/session.PreparationTotal):0;
             }
             bool syncDifferences=session.SyncLocalExtrasKept>0||session.SyncHostFilesDifferent>0;
@@ -615,7 +676,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             else if(message.Length==0&&issue!=null)
                 message=T("Erro ao verificar: ","Verification failed: ")+issue.ModName;
             else if(message.Length==0&&scanning&&scan!=null&&scan.Item!=null)message=scan.Item;
-            else if(message.Length==0&&waitingConnection){
+            else if(message.Length==0&&waitingConnection&&(awaiting||prepared||session.Sender||!session.CompareBeforePack)){
                 if(view.Unavailable)message=T("Sem resposta do serviço P2P local. Reabra o Mod Loader se persistir.","Local P2P service unavailable. Reopen Mod Loader if this persists.");
                 else if(view.HostDecision==P2PService.HostWaiting)message=T("Pedido recebido. Aguardando a decisão do anfitrião…",
                     "Request received. Waiting for the host to decide…");
@@ -641,7 +702,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             }
             else if(message.Length==0&&session.CompareBeforePack&&!prepared)message=session.Sender
                 ?T("Escolha recebida. Preparando o pacote…","Choice received. Preparing the pack…")
-                :T("Escolha enviada. Aguardando preparo do anfitrião.","Choice sent. Waiting for the host to prepare the pack.");
+                :hostPreparation;
             else if(message.Length==0&&!session.CompareBeforePack&&!prepared)message=T("Convite antigo. Gere um novo convite para escolher como receber.","Older invitation. Create a new invitation to choose how to receive.");
             else if(message.Length==0&&view.RemotePaused)message=T("Pausado pelo amigo","Paused by friend");
             else if(message.Length==0&&!view.Connected&&view.Recipients.Length==0)message=T("Aguardando conexão","Waiting for connection");
@@ -669,7 +730,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             bool showPreparation=!installing&&(!awaiting||scanning||waitingForHost);
             preparation.Visible=showPreparation;
             bars.Visible=!awaiting;
-            layout.RowStyles[1].Height=showPreparation?42:0;
+            layout.RowStyles[2].Height=showPreparation?42:0;
             if(entries.Length==0)entries=new[]{new P2PRecipientProgress{
                 Caption=session.Sender?T("Envio do pacote","Pack upload"):session.Phase=="retry"?P2PService.PhaseLabel("retry"):T("Recebimento do pacote","Pack download"),
                 Percent=session.Completed||session.Phase!=null?100:view.Percent,
@@ -721,10 +782,10 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             int titleHeight=dismiss.MinimumSize.Height;
             layout.RowStyles[0].Height=titleHeight;
             int actionsHeight=showChoices||showRetry||showImport||showReply?50:0;
-            layout.RowStyles[2].Height=awaiting?0:44*entries.Length;
-            layout.RowStyles[3].Height=message.Length==0?0:28;
-            layout.RowStyles[4].Height=actionsHeight;
-            Height=Frame.Padding.Vertical+titleHeight+(int)layout.RowStyles[1].Height+(int)layout.RowStyles[2].Height+(message.Length==0?0:28)+actionsHeight;
+            layout.RowStyles[3].Height=awaiting?0:44*entries.Length;
+            layout.RowStyles[4].Height=message.Length==0?0:28;
+            layout.RowStyles[5].Height=actionsHeight;
+            Height=Frame.Padding.Vertical+layout.RowStyles.Cast<RowStyle>().Sum(row=>(int)row.Height);
         }
     }
 }

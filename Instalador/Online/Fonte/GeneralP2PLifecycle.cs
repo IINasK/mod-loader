@@ -75,6 +75,8 @@ internal sealed partial class P2PService {
             foreach(var recipient in session.Recipients.Where(peer=>!peer.ReceiptClosed)) {
                 Engine.ConfigurePeer(recipient.Device);
                 ConfigureReceipt(session,recipient.Device,true);
+                if(session.CompareBeforePack&&!session.Completed)
+                    TryHostDecisionIo(()=>ConfigureHostDecision(session,recipient.Device,true));
             }
             if(!session.Completed&&!skipPayload)ConfigureOutgoing(session);
             return;
@@ -207,9 +209,22 @@ internal sealed partial class P2PService {
     }
 
     void StartDeferredPreparation(P2PSession session,Func<bool> ready){
-        if(session.Discarded||session.Paused||session.Stage!=null||session.Error!=null||DeferredPrepared(session))return;
-        var state=preparationState;
-        if(state==null||installedCatalog==null||installedData==null||!ready())return;
+        if(session.Discarded||DeferredPrepared(session))return;
+        var state=session.OfferSource??preparationState;
+        bool choiceReceived=session.CompareBeforePack&&HasSyncChoice(session);
+        if(choiceReceived){
+            var recipient=session.Recipients[0];
+            string phase=session.Error!=null?HostPreparationFailed:session.Paused?HostPreparationPaused:
+                state==null||installedCatalog==null||installedData==null?HostSourceUnavailable:
+                session.Stage!=null?HostPreparing:null;
+            if(phase!=null)PublishHostDecision(session,recipient.Device,phase);
+        }
+        if(session.Paused||session.Stage!=null||session.Error!=null)return;
+        if(state==null||installedCatalog==null||installedData==null)return;
+        if(!ready()){
+            if(choiceReceived)PublishHostDecision(session,session.Recipients[0].Device,HostWaitingForTransfer);
+            return;
+        }
         if(!String.Equals(session.Destination,state.Destination,StringComparison.OrdinalIgnoreCase)){
             session.Error="A pasta de origem do pacote mudou. Abra o projeto com a pasta original e tente novamente.";
             Save();
@@ -218,6 +233,7 @@ internal sealed partial class P2PService {
         InstalledSnapshotManifest delta=null;
         if(session.CompareBeforePack&&session.PayloadHash==null&&!TryPrepareSync(session,state,out delta))return;
         session.Stage="Preparando pacote…";
+        if(session.CompareBeforePack)PublishHostDecision(session,session.Recipients[0].Device,HostPreparing);
         Task.Run(()=>{
             try{PrepareDeferred(session,state,installedCatalog,installedData,true,null,delta);}
             catch(Exception ex){session.Stage=null;if(!disposed&&!session.Discarded){session.Error=ex.Message;Save();}}
@@ -229,8 +245,8 @@ internal sealed partial class P2PService {
         return completion!=null&&completion.ContainsKey("remoteState")&&Convert.ToString(completion["remoteState"])=="valid";
     }
 
-    P2PTransferStatus OutgoingStatus(P2PSession session) {
-        var result=new P2PTransferStatus();
+    P2PTransferStatus OutgoingStatus(P2PSession session,bool connected) {
+        var result=new P2PTransferStatus{Connected=connected};
         var lines=new List<P2PRecipientProgress>();
         int index=0,total=0,measured=0;
         foreach(var recipient in session.Recipients){
@@ -253,7 +269,6 @@ internal sealed partial class P2PService {
                 if(status!=null&&status.ContainsKey("remoteState")){
                     string remote=Convert.ToString(status["remoteState"]);
                     paused|=remote=="paused";
-                    result.Connected|=remote=="valid"||remote=="paused";
                     result.Accepted|=remote=="valid"||remote=="paused";
                     if(session.Size>0&&status.ContainsKey("globalBytes")&&Convert.ToInt64(status["globalBytes"])>=session.Size)
                         percent=(int)Math.Max(0,Math.Min(100,Convert.ToDouble(status["completion"])));

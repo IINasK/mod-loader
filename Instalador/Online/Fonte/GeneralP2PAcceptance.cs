@@ -47,6 +47,15 @@ internal sealed partial class P2PService {
     const string HostDecisionFile="host-decision.json";
     internal const string HostWaiting="waiting_for_host_choice",HostApproved="host_approved",HostDeclined="host_declined";
 
+    internal const string HostPreparing="host_preparing",HostPreparationFailed="host_preparation_failed",
+        HostSourceUnavailable="host_source_unavailable",HostPreparationPaused="host_preparation_paused",
+        HostWaitingForTransfer="host_waiting_for_transfer";
+
+    internal static bool HostAcknowledgedChoice(string phase){
+        return phase==HostPreparing||phase==HostPreparationFailed||phase==HostSourceUnavailable||phase==HostPreparationPaused||
+            phase==HostWaitingForTransfer;
+    }
+
     string HostDecisionRoot(P2PSession session){
         return Safe.In(Root,"connection-status/"+session.Id);
     }
@@ -94,7 +103,7 @@ internal sealed partial class P2PService {
             if(!File.Exists(path))return;
             string hash;
             string value=Safe.Json.Deserialize<string>(ReadSyncMessage(session,receiver,path,HostDecisionFile,out hash,1024));
-            if(value==HostWaiting||value==HostApproved||value==HostDeclined)phase=value;
+            if(value==HostWaiting||value==HostApproved||value==HostDeclined||HostAcknowledgedChoice(value))phase=value;
         });
         return phase;
     }

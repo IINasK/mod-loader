@@ -228,14 +228,21 @@ internal static class GeneralP2PLifecycleTests {
                     "Real contents identify matching, missing and different mods.");
                 if(full)
                     friend.CompareIncoming(received,report:(done,total,item)=>{throw new IOException("Full pack should not hash local files.");},full:true);
-                host.SetPreparationState(null);
+                var offerSource=sent.OfferSource;
+                sent.OfferSource=null;host.SetPreparationState(null);
                 friend.ChooseIncoming(received,full).GetAwaiter().GetResult();
                 Wait(()=>sent.Recipients.Single().SyncChoicePhase=="choice_sent",
                     "The host did not receive the fast receiver choice.");
                 Check(checks,sent.PayloadHash==null&&host.HasSyncChoice(sent),
                     "The host sees the confirmed choice before pack preparation, for both full and delta transfers.");
-                host.SetPreparationState(source.Item1);
+                Wait(()=>friend.TransferStatus(received).HostDecision==P2PService.HostSourceUnavailable,
+                    "The receiver must see that the host lacks the source project.");
+                Wait(()=>sent.ConnectedUtc!=null&&received.ConnectedUtc!=null,
+                    "Both peers should record when the transport connects.");
+                sent.OfferSource=offerSource;
                 Wait(()=>received.Phase=="review","The receiver did not reach the version confirmation. "+sent.Error+" "+received.Error);
+                Check(checks,friend.TransferStatus(received).HostDecision==P2PService.HostPreparing,
+                    "The receiver gets the host confirmation once preparation starts.");
                 var packed=InstalledSnapshot.Read(zip,sent.PayloadHash,Catalog);
                 Check(checks,packed.List.Mods.Count==3&&packed.Files.Single(file=>file.Path=="mods/same.txt").ReuseLocal==!full,
                     full?"The full option sends the complete pack.":"The delta keeps all records and reuses the matching file.");

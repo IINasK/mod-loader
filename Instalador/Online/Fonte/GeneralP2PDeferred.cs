@@ -28,6 +28,10 @@ internal sealed partial class P2PService {
         byte[] key=new byte[32];using(var random=RandomNumberGenerator.Create())random.GetBytes(key);
         var preset=exportAllPresets?null:state.List.Presets.FirstOrDefault(p=>p.Id==(exportPreset??state.SelectedPreset));
         var session=new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Sender=true,Mode="installed-zip",Deferred=true,Automatic=true,Lifecycle=lifecycle,CompareBeforePack=compareBeforePack,Destination=state.Destination,Hash=Safe.Hex(key),Name=preset==null?"Pacote instalado":preset.Name,SelectedMods=chosen,ExportPreset=exportPreset,ExportAllPresets=exportAllPresets};
+        if(compareBeforePack){
+            session.OfferSource=Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(state));
+            session.OfferSource.TemplateId=state.TemplateId;session.OfferSource.ProjectName=state.ProjectName;
+        }
         string folder=Folder(session);
         if(!String.IsNullOrEmpty(state.Destination)&&Path.GetFullPath(folder).StartsWith(Path.GetFullPath(state.Destination).TrimEnd('\\')+"\\",StringComparison.OrdinalIgnoreCase))throw new IOException("A transferência deve ficar fora da pasta do jogo.");
         if(Directory.Exists(folder)||File.Exists(folder))throw new IOException("Destino da transferência já existe.");

@@ -12,6 +12,10 @@ internal sealed class P2PSession {
     public bool Lifecycle, Held, ReceiptClosed, ExportAllPresets, CompareBeforePack;
     public volatile bool Discarded;
     public string Phase, TransactionId, ProjectError, ExportPreset;
+    public string CreatedUtc, ConnectedUtc, DisconnectedUtc;
+    [System.Web.Script.Serialization.ScriptIgnore] public bool ConnectionObserved;
+    [System.Web.Script.Serialization.ScriptIgnore] public DateTime NextChoiceScanUtc;
+    [System.Web.Script.Serialization.ScriptIgnore] public volatile GeneralModState OfferSource;
     public int? ModsOutsidePack;
     public List<OwnedChange> SyncCleanup;
     public int SyncLocalExtrasKept, SyncHostFilesDifferent;
@@ -176,7 +180,7 @@ internal sealed partial class P2PService : IDisposable {
             ForgetSession(session);
         }
     }
-    void AddSession(P2PSession session){lock(Sessions){Sessions.Add(session);try{Save();}catch{Sessions.Remove(session);throw;}}}
+    void AddSession(P2PSession session){lock(Sessions){session.CreatedUtc=DateTime.UtcNow.ToString("o");Sessions.Add(session);try{Save();}catch{Sessions.Remove(session);throw;}}}
     void ForgetSession(P2PSession session){
         lock(Sessions){
             int index=Sessions.IndexOf(session);
@@ -192,7 +196,9 @@ internal sealed partial class P2PService : IDisposable {
         try{
             try{DetectAcceptances();}catch(Exception ex){OnlineDiagnostics.Record("p2p.accept.waiting",null,ex.GetType().Name);}
             try{ObserveConnectionDiagnostics(DateTime.UtcNow);}catch(Exception ex){OnlineDiagnostics.Record("p2p.diagnostic.observe",null,ex.GetType().Name);}
-            foreach(var session in installedSessions){
+            var transfers=installedSessions;
+            try{TrackConnections(transfers);}catch(System.Net.WebException){/* Preserve the last observed connection. */}
+            foreach(var session in transfers){
                 if(disposed)break;
                 try{ProcessInstalled(session);}
                 catch(System.Net.WebException){/* The transport can reconnect without changing the installation state. */}
@@ -250,6 +256,12 @@ internal sealed partial class P2PService : IDisposable {
         if(s.Lifecycle&&s.Sender){ProcessOutgoing(s);return;}
         if(!s.Sender&&s.Completed&&s.Stage==null)PublishProject(s);
         if(s.Lifecycle&&(s.Completed||s.Discarded)){if(s.Stage==null)FinishIncoming(s);return;}
+        if(!s.Sender&&s.CompareBeforePack&&s.Phase==null&&s.PayloadHash==null&&s.AutoInstall&&
+            !s.Paused&&!s.Held&&!s.RecoveryPending&&s.Error==null&&HasSyncChoice(s)&&DateTime.UtcNow>=s.NextChoiceScanUtc&&
+            !HostAcknowledgedChoice(ReadHostDecision(s,Engine.Device))){
+            s.NextChoiceScanUtc=DateTime.UtcNow.AddSeconds(5);
+            ScanSyncFolder(ReceiptFolderId(s,Engine.Device),ChoiceName);
+        }
         if(s.Lifecycle&&!s.Sender&&(s.Phase!=null||s.CompareBeforePack&&(s.SyncMode!=0||HasSyncPreview(s))))PublishNotice(s);
         if(!s.Sender&&s.Stage!=null)return;
         if(s.Paused||s.Held||s.RecoveryPending||s.Discarded||!s.Completed&&s.Error!=null)return;
@@ -397,16 +409,50 @@ internal sealed partial class P2PService : IDisposable {
         }
     }
     internal void Pause(P2PSession s){lock(s){if(s.Stage!=null&&!s.Sender||s.Completed||s.Discarded||s.Held)throw new IOException("A transferência terminou ou a instalação já começou; aguarde terminar.");Engine.Pause(s.Id,!s.Paused);s.Paused=!s.Paused;Save();}}
-    internal P2PTransferStatus TransferStatus(P2PSession s){
-        Validate(s);if(s.Lifecycle&&s.Sender)return OutgoingStatus(s);var result=new P2PTransferStatus();if(s.Completed){result.Percent=100;return result;}if(s.Phase!=null&&s.Phase!="discarded")result.Percent=100;if(s.Peer==null)return result;
+    internal HashSet<string> ConnectedPeers(){
+        var connections=Engine.Get("system/connections")["connections"] as Dictionary<string,object>;
+        return new HashSet<string>((connections??new Dictionary<string,object>())
+            .Where(pair=>Convert.ToBoolean(((Dictionary<string,object>)pair.Value)["connected"])).Select(pair=>pair.Key),StringComparer.Ordinal);
+    }
+    static bool HasConnectedPeer(P2PSession session,HashSet<string> peers){
+        if(session.Discarded)return false;
+        if(session.Sender&&session.Lifecycle)
+            return session.Recipients.Any(peer=>!peer.ReceiptClosed&&peers.Contains(peer.Device));
+        return !session.ReceiptClosed&&session.Peer!=null&&(!session.Completed||session.Lifecycle)&&peers.Contains(session.Peer);
+    }
+    void TrackConnections(P2PSession[] transfers){
+        var tracked=transfers.Where(s=>!s.HistoryDismissed&&(s.Peer!=null||s.Recipients.Length>0)&&
+            (!s.Completed||s.ConnectionObserved)).ToArray();
+        if(tracked.Length==0)return;
+        var peers=ConnectedPeers();
+        string stamp=DateTime.UtcNow.ToString("o");
+        lock(Sessions){
+            bool changed=false;
+            foreach(var s in tracked){
+                bool connected=HasConnectedPeer(s,peers);
+                if(connected==s.ConnectionObserved)continue;
+                s.ConnectionObserved=connected;
+                if(connected){if(s.ConnectedUtc!=null)continue;s.ConnectedUtc=stamp;}
+                else s.DisconnectedUtc=stamp;
+                changed=true;
+            }
+            if(changed)Save();
+        }
+    }
+    internal P2PTransferStatus TransferStatus(P2PSession s,HashSet<string> peers=null){
+        Validate(s);
+        bool connected=HasConnectedPeer(s,peers??ConnectedPeers());
+        if(s.Lifecycle&&s.Sender)return OutgoingStatus(s,connected);
+        var result=new P2PTransferStatus{Connected=connected};
+        if(s.Completed){result.Percent=100;return result;}
+        if(s.Phase!=null&&s.Phase!="discarded")result.Percent=100;
+        if(s.Peer==null)return result;
         result.HostDecision=ReadHostDecision(s,Engine.Device);
-        var connections=Engine.Get("system/connections")["connections"] as Dictionary<string,object>;object raw;
-        if(connections!=null&&connections.TryGetValue(s.Peer,out raw))result.Connected=Convert.ToBoolean(((Dictionary<string,object>)raw)["connected"]);
-        if(!result.Connected||s.Paused)return result;
+        if(!connected)return result;
         var completion=Engine.Get("db/completion?folder="+s.Id+"&device="+s.Peer);
         result.Accepted=completion.ContainsKey("remoteState")&&(Convert.ToString(completion["remoteState"])=="valid"||Convert.ToString(completion["remoteState"])=="paused");
         result.RemotePaused=completion.ContainsKey("remoteState")&&Convert.ToString(completion["remoteState"])=="paused";
-        if(s.Size<=0||result.Percent==100)return result;
+        if(s.Paused||s.Size<=0||result.Percent==100)return result;
         if(s.Sender)result.Percent=(int)Math.Max(0,Math.Min(99,Convert.ToDouble(completion["completion"])));
         else{var local=Engine.Get("db/status?folder="+s.Id);long global=Convert.ToInt64(local["globalBytes"]),needed=Convert.ToInt64(local["needBytes"]);result.Percent=global==0?0:(int)Math.Max(0,Math.Min(99,(s.Size-needed)*100.0/s.Size));}
         long partial=PartialBytes(s);if(partial>0)result.Percent=Math.Max(result.Percent,(int)Math.Min(99,partial*100.0/s.Size));

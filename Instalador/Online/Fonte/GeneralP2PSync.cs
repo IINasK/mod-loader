@@ -93,8 +93,9 @@ internal sealed partial class P2PService {
         return preview;
     }
 
-    void ScanSyncFolder(string id) {
-        try{lock(startGate)Engine.Request("POST","db/scan?folder="+id,null);}
+    void ScanSyncFolder(string id,string file=null) {
+        string route="db/scan?folder="+id+(file==null?"":"&sub="+Uri.EscapeDataString(file));
+        try{lock(startGate)Engine.Request("POST",route,null);}
         catch(WebException){/* The transport watcher retries when it reconnects. */}
     }
 
@@ -331,7 +332,8 @@ internal sealed partial class P2PService {
             WriteSyncMessage(session,Engine.Device,ChoicePath(session,Engine.Device),ChoiceName,choice);
             OnlineDiagnostics.Record("p2p.choice.submitted",null,"Seleção de recebimento confirmada.",
                 new{Id=DiagnosticId(session.Id),Mode=full?"full":"update",Count=choice.Required.Length});
-            ScanSyncFolder(ReceiptFolderId(session,Engine.Device));
+            session.NextChoiceScanUtc=DateTime.UtcNow.AddSeconds(5);
+            ScanSyncFolder(ReceiptFolderId(session,Engine.Device),ChoiceName);
         }
     }
 }
