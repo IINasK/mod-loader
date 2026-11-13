@@ -218,12 +218,19 @@ internal sealed partial class P2PService {
         if(session.Discarded||DeferredPrepared(session))return;
         var state=session.OfferSource??preparationState;
         bool choiceReceived=session.CompareBeforePack&&HasSyncChoice(session);
-        if(choiceReceived){
+        if(session.CompareBeforePack&&session.Recipients.Length!=0){
             var recipient=session.Recipients[0];
             string phase=session.Error!=null?HostPreparationFailed:session.Paused?HostPreparationPaused:
                 state==null||installedCatalog==null||installedData==null?HostSourceUnavailable:
-                session.Stage!=null?HostPreparing:null;
-            if(phase!=null)PublishHostDecision(session,recipient.Device,phase);
+                choiceReceived?(session.Stage!=null?HostPreparing:null):HostApproved;
+            var scan=session.SyncProgress;
+            long total=System.Threading.Interlocked.Read(ref session.PreparationTotal);
+            if(phase==HostPreparing&&scan==null&&total>0){
+                long bytes=System.Threading.Interlocked.Read(ref session.PreparationBytes);
+                scan=new P2PSyncProgress{Done=(int)Math.Min(100,bytes*100.0/total),Total=100,Packing=true};
+            }
+            if(phase!=null)PublishHostDecision(session,recipient.Device,phase,
+                (phase==HostApproved||phase==HostPreparing)&&scan!=null&&ValidHostScan(scan.Done,scan.Total)?scan:null);
         }
         if(session.Paused||session.Stage!=null||session.Error!=null)return;
         if(state==null||installedCatalog==null||installedData==null)return;
@@ -236,12 +243,14 @@ internal sealed partial class P2PService {
             Save();
             return;
         }
-        InstalledSnapshotManifest delta=null;
-        if(session.CompareBeforePack&&session.PayloadHash==null&&!TryPrepareSync(session,state,out delta))return;
+        InstalledSnapshotManifest plan=null;
+        bool full=false;
+        if(session.CompareBeforePack&&session.PayloadHash==null&&!TryPrepareSync(session,state,out plan,out full))return;
+        session.PreparationBytes=0;session.PreparationTotal=0;
         session.Stage="Preparando pacote…";
         if(session.CompareBeforePack)PublishHostDecision(session,session.Recipients[0].Device,HostPreparing);
         Task.Run(()=>{
-            try{PrepareDeferred(session,state,installedCatalog,installedData,true,null,delta);}
+            try{PrepareDeferred(session,state,installedCatalog,installedData,true,null,plan,full);}
             catch(Exception ex){session.Stage=null;if(!disposed&&!session.Discarded){session.Error=ex.Message;Save();}}
         });
     }

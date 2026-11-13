@@ -41,7 +41,7 @@ internal sealed partial class P2PService {
         catch{Sessions.Remove(session);try{Engine.RemoveFolder(session.Id);}catch(Exception){}try{P2PPack.DeleteSnapshot(folder);}catch(Exception){}throw;}
         }
     }
-    internal void PrepareDeferred(P2PSession session,GeneralModState state,FixedCatalog catalog,string appData,bool includeConfigs,Action<string> report,InstalledSnapshotManifest delta=null){
+    internal void PrepareDeferred(P2PSession session,GeneralModState state,FixedCatalog catalog,string appData,bool includeConfigs,Action<string> report,InstalledSnapshotManifest plan=null,bool full=false){
         if(!SnapshotSessions().Contains(session)||!session.Sender||!session.Deferred||session.Completed||session.Discarded)throw new IOException("Envio antecipado inválido.");
         string zip=Safe.In(Folder(session),"pack.zip"),part=zip+".part";Safe.NoLinks(zip);Safe.NoLinks(part);
         DateTime nextCheck=DateTime.MinValue;bool remotePaused=false;
@@ -71,13 +71,16 @@ internal sealed partial class P2PService {
                 if(File.Exists(part))File.Delete(part);
                 if(report!=null)report(session.Stage);
                 Action<long,long> progress=(done,total)=>{session.PreparationBytes=done;session.PreparationTotal=total;};
-                if(delta==null){
+                if(plan==null){
                     Action<int,int,string> scan=(done,total,item)=>session.SyncProgress=item==null?null:new P2PSyncProgress{Done=done,Total=total,Item=item};
                     var manifest=InstalledSnapshot.Inspect(ExportState(state,session.ExportPreset,session.SelectedMods,session.ExportAllPresets),
                         session.SelectedMods,catalog,appData,includeConfigs,true,checkpoint,
                         (id,name,message)=>ReviewSnapshotProblem(session,id,name,message),scan);
                     InstalledSnapshot.Write(part,state.Destination,manifest,report,checkpoint,progress);
-                }else InstalledSnapshot.Write(part,state.Destination,delta,report,checkpoint,progress);
+                }else {
+                    if(full&&includeConfigs)InstalledSnapshot.AddFullPackConfigurations(plan,state,catalog,appData,checkpoint);
+                    InstalledSnapshot.Write(part,state.Destination,plan,report,checkpoint,progress);
+                }
                 checkpoint();
                 string hash=Safe.Hash(part);
                 lock(Sessions){session.PayloadHash=hash;session.Size=new FileInfo(part).Length;Save();}

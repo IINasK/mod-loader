@@ -42,6 +42,7 @@ internal sealed class P2PSession {
 internal sealed class P2PTransferStatus {
     internal int Percent;
     internal string HostDecision;
+    internal P2PSyncProgress HostScan;
     internal bool Connected,RemotePaused,Accepted,Unavailable;
     internal P2PRecipientProgress[] Recipients=new P2PRecipientProgress[0];
 }
@@ -473,7 +474,7 @@ internal sealed partial class P2PService : IDisposable {
         if(s.Completed){result.Percent=100;return result;}
         if(s.Phase!=null&&s.Phase!="discarded")result.Percent=100;
         if(s.Peer==null)return result;
-        result.HostDecision=ReadHostDecision(s,Engine.Device);
+        result.HostDecision=ReadHostDecision(s,Engine.Device,out result.HostScan);
         if(!connected)return result;
         var completion=Engine.Get("db/completion?folder="+s.Id+"&device="+s.Peer);
         result.Accepted=completion.ContainsKey("remoteState")&&(Convert.ToString(completion["remoteState"])=="valid"||Convert.ToString(completion["remoteState"])=="paused");

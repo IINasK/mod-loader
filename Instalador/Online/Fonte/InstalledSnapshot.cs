@@ -135,7 +135,7 @@ public static partial class InstalledSnapshot {
             string snapshotId;
             if(variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(work,out snapshotId)&&
                 MatchesBodyReceipt(receivedEngine,mod,variant,snapshotId)){
-                files=receivedEngine.ReadInstalledFiles(snapshotId,work);
+                files=receivedEngine.ReadInstalledFiles(snapshotId,work,includeConfigs);
             }
             else if(variant.CyberpunkId!=null) {
                 if(!cyberpunk)throw new IOException(mod.Name+": o destino não é Cyberpunk 2077.");
@@ -147,18 +147,10 @@ public static partial class InstalledSnapshot {
                 }).Select(file=>paths[file.Path]).ToList();
                 if(invalid.Count>0)throw new IOException("Arquivos ausentes ou alterados ("+invalid.Count+"): "+String.Join("; ",invalid.Take(30)));
                 foreach(var file in recipe.Files) {
-                    string installed=GeneralInstallRoutes.Resolve(root,paths[file.Path]);
-                    if(file.UserData) {
-                        if(includeConfigs&&File.Exists(installed))files.Add(Config(file.Path,"json",null,InstalledSnapshotConfig.Json(InstalledSnapshotConfig.Read(installed))));
-                        continue;
-                    }
+                    if(file.UserData)continue;
                     files.Add(new InstalledSnapshotFile{Path=paths[file.Path],Sha256=file.Sha256,Size=file.Size,Kind="file"});
                 }
-                if(includeConfigs&&catalog.Defaults!=null)foreach(var config in catalog.Defaults.Where(d=>d.ModId==recipe.Id)) {
-                    string path=Safe.In(root,config.Path);if(!File.Exists(path))continue;
-                    string content=config.Format=="json"?InstalledSnapshotConfig.Json(InstalledSnapshotConfig.Read(path)):InstalledSnapshotConfig.Section(InstalledSnapshotConfig.Read(path),config.Section);
-                    if(content!=null)files.Add(Config(config.Path,config.Format,config.Section,content));
-                }
+                if(includeConfigs)files.AddRange(FixedConfigurations(catalog,recipe,root,paths));
             }else if(cyberpunk&&HasManualHystFiles(mod.Id,root)&&
                 (state.CyberpunkImports==null||!Enumerable.Range(0,originalSources.Count).Any(sourceIndex=>{
                     string id;
@@ -305,6 +297,51 @@ public static partial class InstalledSnapshot {
                 stream.Flush(true);
             }
         }catch {if(created){Safe.NoLinks(output);File.Delete(output);}throw;}
+    }
+    internal static void AddFullPackConfigurations(InstalledSnapshotManifest plan,GeneralModState state,FixedCatalog catalog,string appData,Action checkpoint){
+        var receiver=new InstalledSnapshotInstaller(state.Destination,appData,catalog);
+        var indexed=new Dictionary<string,InstalledSnapshotFile>(StringComparer.OrdinalIgnoreCase);
+        foreach(var mod in plan.List.Mods){
+            if(checkpoint!=null)checkpoint();
+            var variant=mod.Variants.Single();
+            string owner=Owner(mod,variant);
+            string receipt;
+            var configs=new List<InstalledSnapshotFile>();
+            if(variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(owner,out receipt)&&
+                MatchesBodyReceipt(receiver,mod,variant,receipt))
+                configs=receiver.ReadInstalledFiles(receipt,owner,configsOnly:true);
+            else if(variant.CyberpunkId!=null){
+                var recipe=FixedRecipe(catalog,variant);
+                var paths=GeneralInstallRoutes.FixedPaths(catalog,recipe,variant.InstallRoutes);
+                configs.AddRange(FixedConfigurations(catalog,recipe,state.Destination,paths));
+            }
+            foreach(var config in configs){
+                string key=config.Path+"\n"+config.Section;
+                InstalledSnapshotFile existing;
+                if(!indexed.TryGetValue(key,out existing)){
+                    config.Owners=new List<string>{owner};
+                    indexed.Add(key,config);plan.Files.Add(config);
+                }else{
+                    if(existing.Kind!=config.Kind||existing.Sha256!=config.Sha256)
+                        throw new IOException("Configurações divergentes no pacote: "+config.Path);
+                    if(!existing.Owners.Contains(owner))existing.Owners.Add(owner);
+                }
+            }
+        }
+        Validate(plan,catalog);
+    }
+    static IEnumerable<InstalledSnapshotFile> FixedConfigurations(FixedCatalog catalog,FixedMod recipe,string root,Dictionary<string,string> paths){
+        foreach(var file in recipe.Files.Where(file=>file.UserData)){
+            string path=GeneralInstallRoutes.Resolve(root,paths[file.Path]);
+            if(File.Exists(path))yield return Config(file.Path,"json",null,InstalledSnapshotConfig.Json(InstalledSnapshotConfig.Read(path)));
+        }
+        foreach(var config in (catalog.Defaults??new List<FixedDefault>()).Where(item=>item.ModId==recipe.Id)){
+            string path=Safe.In(root,config.Path);
+            if(!File.Exists(path))continue;
+            var bytes=InstalledSnapshotConfig.Read(path);
+            string content=config.Format=="json"?InstalledSnapshotConfig.Json(bytes):InstalledSnapshotConfig.Section(bytes,config.Section);
+            if(content!=null)yield return Config(config.Path,config.Format,config.Section,content);
+        }
     }
     static InstalledSnapshotFile Config(string path,string kind,string section,string content){byte[] bytes=Utf8.GetBytes(content);return new InstalledSnapshotFile{Path=path,Kind=kind,Section=section,Content=content,Size=bytes.Length,Sha256=Hash(bytes)};}
     public static void Validate(InstalledSnapshotManifest manifest,FixedCatalog catalog) {

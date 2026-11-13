@@ -128,7 +128,8 @@ internal static class GeneralP2PUiTests {
                         check(!prep.Visible&&!pause.Visible&&active.Value==40&&Find<Label>(cards[1],"p2p-transfer-status").Text=="mods/example","Instalação troca as barras pela etapa, progresso e arquivo: "+theme+locale);
                         incoming.Completed=true;incoming.Stage=null;incoming.Phase="installed";
                         update();
-                        check(!pause.Visible&&active.Left==prep.Left&&active.Width==prep.Width&&active.Value==100,"Conclusão realinha a barra com o preparo: "+theme+locale);
+                        check(!prep.Visible&&!pause.Visible&&active.Width==active.Parent.ClientSize.Width&&active.Value==100,
+                            "Conclusão usa uma única barra na largura disponível: "+theme+locale);
                         incoming.ListImported=true;incoming.ModsOutsidePack=2;
                         update();
                         var status=Find<Label>(cards[1],"p2p-transfer-status");
@@ -204,8 +205,8 @@ internal static class GeneralP2PUiTests {
                                 check(reopened.SnapshotSessions().Single(session=>session.Id==activeSend.Id).Discarded,
                                     "An interrupted canceled send cannot resume on reopen.");
                         }
-                        incoming.Completed=false;incoming.Phase=null;incoming.PayloadHash=null;incoming.Size=0;incoming.Lifecycle=true;incoming.CompareBeforePack=true;
-                        views[incoming].Connected=false;views[incoming].Accepted=false;views[incoming].RemotePaused=false;
+                        incoming.Completed=false;incoming.Phase=null;incoming.PayloadHash=null;incoming.Size=0;incoming.Deferred=true;incoming.Lifecycle=true;incoming.CompareBeforePack=true;
+                        views[incoming].Connected=false;views[incoming].Accepted=false;views[incoming].RemotePaused=false;views[incoming].Percent=0;
                         update();
                         check(!Find<Button>(cards[1],"p2p-update").Enabled&&Find<Label>(cards[1],"p2p-transfer-status").Text.Contains(locale=="pt"?"Conectando":"Connecting"),"Pending connection has an explicit status.");
                         var cardMap=(System.Collections.IDictionary)typeof(GeneralP2PDialog).GetField("cards",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(dialog);
@@ -244,6 +245,21 @@ internal static class GeneralP2PUiTests {
                         var fullPack=Find<Button>(cards[1],"p2p-full");
                         check(updateMods.Visible&&updateMods.Enabled&&fullPack.Visible&&fullPack.Enabled,
                             "After connecting, both choices are immediately visible before the host preview arrives: "+theme+locale);
+                        incoming.SyncMode=2;
+                        views[incoming].HostScan=new P2PSyncProgress{Done=3,Total=10};
+                        update();
+                        check(prep.Visible&&!active.Visible&&!prep.Indeterminate&&prep.Value==30&&prep.Caption.Contains("3/10"),
+                            "The receiver displays the sender's scan with one determinate bar: "+theme+locale);
+                        views[incoming].HostScan=new P2PSyncProgress{Done=62,Total=100,Packing=true};
+                        views[incoming].HostDecision=P2PService.HostPreparing;
+                        update();
+                        check(prep.Visible&&!active.Visible&&prep.Value==62&&!prep.Caption.Contains("62/100"),
+                            "The same receiver bar shows actual package preparation: "+theme+locale);
+                        views[incoming].Percent=17;
+                        update();
+                        check(!prep.Visible&&active.Visible&&active.Value==17,
+                            "Once download progresses, only the download bar is visible: "+theme+locale);
+                        views[incoming].Percent=0;views[incoming].HostScan=null;
                         incoming.SyncMode=1;incoming.SyncProgress=new P2PSyncProgress{Done=2,Total=5,Item="mods/different.txt"};
                         update();
                         check(!updateMods.Enabled&&!fullPack.Enabled&&prep.Visible&&prep.Value==40&&

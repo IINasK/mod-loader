@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 internal sealed class P2PSyncProgress {
     internal int Done, Total;
     internal string Item;
+    internal bool Packing;
 }
 
 internal sealed class P2PSyncComparison {
@@ -33,7 +34,9 @@ internal sealed partial class P2PService {
     const string PreviewName = "sync-preview.json", ChoiceName = "sync-choice.json";
 
     sealed class SyncMessage {
-        public string Payload, Tag;
+        public string Payload, Tag, ProgressTag;
+        public int Done, Total;
+        public bool Packing;
     }
 
     sealed class SyncChoice {
@@ -55,17 +58,23 @@ internal sealed partial class P2PService {
         return session.Sender?recipient!=null&&File.Exists(ChoicePath(session,recipient.Device)):File.Exists(ChoicePath(session,Engine.Device));
     }
 
-    void WriteSyncMessage(P2PSession session,string device,string path,string kind,object value) {
+    void WriteSyncMessage(P2PSession session,string device,string path,string kind,object value,P2PSyncProgress progress=null) {
         string payload=Safe.Json.Serialize(value);
         var bytes=Encoding.UTF8.GetBytes(payload);
         var tag=ReadyTag(session.Hash,session.Id+"\n"+device+"\n"+kind,InstalledSnapshot.Hash(bytes),bytes.LongLength);
         var envelope=new SyncMessage{Payload=payload,Tag=tag};
+        if(progress!=null){
+            envelope.Done=progress.Done;
+            envelope.Total=progress.Total;
+            envelope.Packing=progress.Packing;
+            envelope.ProgressTag=HostScanTag(session,device,tag,progress.Done,progress.Total,progress.Packing);
+        }
         if(Encoding.UTF8.GetByteCount(Safe.Json.Serialize(envelope))>MaxSyncMessage)
             throw new IOException("A lista de comparação P2P é grande demais.");
         Safe.WriteJson(path,envelope);
     }
 
-    string ReadSyncMessage(P2PSession session,string device,string path,string kind,out string hash,int maximum=MaxSyncMessage) {
+    string ReadSyncMessage(P2PSession session,string device,string path,string kind,out string hash,int maximum=MaxSyncMessage,Action<SyncMessage> readEnvelope=null) {
         byte[] raw;
         using(var input=File.OpenRead(path))raw=InstalledSnapshot.ReadBytes(input,maximum);
         var envelope=Safe.Json.Deserialize<SyncMessage>(Encoding.UTF8.GetString(raw));
@@ -77,6 +86,7 @@ internal sealed partial class P2PService {
         int mismatch=0;
         for(int i=0;i<expected.Length;i++)mismatch|=expected[i]^envelope.Tag[i];
         if(mismatch!=0)throw new IOException("A mensagem de comparação não pertence a este convite.");
+        if(readEnvelope!=null)readEnvelope(envelope);
         return envelope.Payload;
     }
 
@@ -100,8 +110,8 @@ internal sealed partial class P2PService {
         catch(WebException){/* The transport watcher retries when it reconnects. */}
     }
 
-    bool TryPrepareSync(P2PSession session,GeneralModState state,out InstalledSnapshotManifest delta) {
-        delta=null;
+    bool TryPrepareSync(P2PSession session,GeneralModState state,out InstalledSnapshotManifest plan,out bool full) {
+        plan=null;full=false;
         if(session.Recipients.Length!=1)return false;
         string device=session.Recipients[0].Device;
         if(!HasSyncPreview(session)){
@@ -115,7 +125,6 @@ internal sealed partial class P2PService {
                     },skipProblem:(id,name,error)=>ReviewSnapshotProblem(session,id,name,error),
                       inspectProgress:(done,total,item)=>session.SyncProgress=new P2PSyncProgress{Done=done,Total=total,Item=item});
                     if(preview.Game=="cyberpunk2077"){
-                        session.SyncProgress=new P2PSyncProgress{Item="Arquivos do jogo fora do pacote"};
                         preview.SyncGameInventory=new FixedInstaller(installedCatalog,source.Destination,installedFixture).ReadSyncInventory(preview.Files,()=>{
                             if(disposed||session.Discarded)throw new OperationCanceledException();
                         },installedData);
@@ -146,9 +155,10 @@ internal sealed partial class P2PService {
             foreach(var file in previewManifest.Files){
                 file.ReuseLocal=file.Owners.All(owner=>!required.Contains(owner.Split('/')[0]));
             }
-            previewManifest.SyncGameInventory=null;
-            delta=previewManifest;
         }
+        previewManifest.SyncGameInventory=null;
+        plan=previewManifest;
+        full=choice.Full;
         return true;
     }
 

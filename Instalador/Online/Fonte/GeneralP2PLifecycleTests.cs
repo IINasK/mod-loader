@@ -209,6 +209,20 @@ internal static class GeneralP2PLifecycleTests {
         using(var install=new ManualResetEventSlim()){
             host.SetPreparationState(source.Item1);
             friend.ChooseVersion=_=>install.Wait(40000);
+            string broken=Safe.In(source.Item1.Destination,"mods/missing.txt");
+            File.WriteAllText(broken,"changed before the check");
+            var checking=host.BeginDeferred(source.Item1,ids,true,compareBeforePack:true);
+            var watching=friend.Accept(host.Invitation(checking),target,true);
+            ConnectTo(friend,host);
+            Wait(()=>checking.VerificationIssue!=null,"The scan did not pause on the changed file.");
+            Wait(()=>{
+                var progress=friend.TransferStatus(watching).HostScan;
+                return progress!=null&&progress.Done==2&&progress.Total==3&&progress.Item==null&&!progress.Packing;
+            },"The receiver did not get the authenticated scan counts.");
+            checks.Add("The receiver gets the host's real scan counts without its local path or mod name.");
+            host.CancelSend(checking);
+            Wait(()=>!host.SnapshotSessions().Contains(checking),"The scan did not cancel.");
+            File.WriteAllText(broken,"missing payload");
             foreach(bool full in new[]{false,true}){
                 install.Reset();
                 File.WriteAllText(different,"local version");

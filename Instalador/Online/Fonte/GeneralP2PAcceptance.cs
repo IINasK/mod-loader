@@ -78,33 +78,56 @@ internal sealed partial class P2PService {
         if(session.CompareBeforePack&&!session.Completed&&!session.Discarded)
             TryHostDecisionIo(()=>ConfigureHostDecision(session,session.Peer,false));
     }
-    void PublishHostDecision(P2PSession session,string receiver,string phase){
+    static bool ValidHostScan(int done,int total){
+        return total>0&&total<=InstalledSnapshot.MaxFiles&&done>=0&&done<=total;
+    }
+
+    static string HostScanTag(P2PSession session,string receiver,string phaseTag,int done,int total,bool packing){
+        var counts=Encoding.UTF8.GetBytes(done.ToString(CultureInfo.InvariantCulture)+"/"+total.ToString(CultureInfo.InvariantCulture)+(packing?"/pack":"/scan"));
+        return ReadyTag(session.Hash,session.Id+"\n"+receiver+"\nhost-scan\n"+phaseTag,InstalledSnapshot.Hash(counts),counts.Length);
+    }
+
+    void PublishHostDecision(P2PSession session,string receiver,string phase,P2PSyncProgress progress=null){
         TryHostDecisionIo(()=>{
             string folder=HostDecisionFolder(session,receiver);
             string path=Safe.In(folder,HostDecisionFile);
             Safe.NoLinks(path);
             if(File.Exists(path)){
-                if(ReadHostDecision(session,receiver)==phase)return;
+                P2PSyncProgress previous;
+                if(ReadHostDecision(session,receiver,out previous)==phase&&
+                    (progress==null?previous==null:previous!=null&&progress.Done==previous.Done&&progress.Total==previous.Total&&progress.Packing==previous.Packing))return;
             }else{
                 // The verified device gets only this status folder until the host approves the pack.
                 Engine.EnsurePeer(receiver);
                 ConfigureHostDecision(session,receiver,true);
             }
-            WriteSyncMessage(session,receiver,path,HostDecisionFile,phase);
+            WriteSyncMessage(session,receiver,path,HostDecisionFile,phase,progress);
             ScanSyncFolder(Path.GetFileName(folder));
         });
     }
     string ReadHostDecision(P2PSession session,string receiver){
+        P2PSyncProgress progress;
+        return ReadHostDecision(session,receiver,out progress);
+    }
+    string ReadHostDecision(P2PSession session,string receiver,out P2PSyncProgress progress){
+        progress=null;
         if(!session.CompareBeforePack||receiver==null)return null;
         string phase=null;
+        P2PSyncProgress verified=null;
         TryHostDecisionIo(()=>{
             string path=Safe.In(HostDecisionFolder(session,receiver),HostDecisionFile);
             Safe.NoLinks(path);
             if(!File.Exists(path))return;
             string hash;
-            string value=Safe.Json.Deserialize<string>(ReadSyncMessage(session,receiver,path,HostDecisionFile,out hash,1024));
+            SyncMessage envelope=null;
+            string value=Safe.Json.Deserialize<string>(ReadSyncMessage(session,receiver,path,HostDecisionFile,out hash,1024,item=>envelope=item));
+            if((value==HostApproved&&!envelope.Packing||value==HostPreparing)&&ValidHostScan(envelope.Done,envelope.Total)&&
+                (!envelope.Packing||envelope.Total==100)&&
+                SameNoticeTag(HostScanTag(session,receiver,envelope.Tag,envelope.Done,envelope.Total,envelope.Packing),envelope.ProgressTag))
+                verified=new P2PSyncProgress{Done=envelope.Done,Total=envelope.Total,Packing=envelope.Packing};
             if(value==HostWaiting||value==HostApproved||value==HostDeclined||HostAcknowledgedChoice(value))phase=value;
         });
+        progress=verified;
         return phase;
     }
     void CloseHostDecision(P2PSession session){

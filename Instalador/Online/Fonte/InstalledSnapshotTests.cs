@@ -154,6 +154,13 @@ internal static class InstalledSnapshotTests {
         check(fixedManifest.Files.Single(f=>f.Kind=="json").Content.Contains("volume"),"Lê UserData JSON instalado validado.");
         var withoutConfigs=InstalledSnapshot.Create(Path.Combine(root,"no-config.zip"),fixedState,new[]{addon.Id},fixedCatalog,fixedData,false,s=>{});
         check(withoutConfigs.Files.All(f=>f.Kind=="file"),"Opção sem configurações não inclui dados de perfil.");
+        var preview=Copy(withoutConfigs);
+        Write(fixedGame,addon.Files[0].Path,"changed after preview");
+        InstalledSnapshot.AddFullPackConfigurations(preview,fixedState,fixedCatalog,fixedData,null);
+        check(preview.Files.Count(f=>f.Kind!="file")==2,"O pacote completo reaproveita o manifesto e coleta as configurações sem reler os arquivos binários.");
+        refuse(()=>InstalledSnapshot.Write(Path.Combine(root,"changed-preview.zip"),fixedGame,preview,s=>{},null,null),
+            "A compactação bloqueia arquivo alterado após a primeira conferência.");
+        Write(fixedGame,addon.Files[0].Path,"pinned addon");
         corrupt=Copy(fixedManifest);corrupt.Files.RemoveAll(f=>f.Path==core.Files[0].Path);refuse(()=>InstalledSnapshot.Validate(corrupt,fixedCatalog),"Bloqueia ausência de código fixado da base.");
         corrupt=Copy(fixedManifest);corrupt.Files.Single(f=>f.Path==core.Files[0].Path).Sha256=new string('d',64);refuse(()=>InstalledSnapshot.Validate(corrupt,fixedCatalog),"Bloqueia hash diferente de RED4ext fixado.");
         corrupt=Copy(fixedManifest);corrupt.List.Mods.RemoveAll(m=>m.Id==core.Id);corrupt.Files.RemoveAll(f=>f.Owners.Contains(core.Id+"/default"));refuse(()=>InstalledSnapshot.Validate(corrupt,fixedCatalog),"Bloqueia pacote sem dependência transitiva.");

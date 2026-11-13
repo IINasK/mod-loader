@@ -252,11 +252,12 @@ public sealed partial class InstalledSnapshotInstaller {
         return expected;
     }
 
-    public List<InstalledSnapshotFile> ReadInstalledFiles(string receiptId, string workKey) {
+    public List<InstalledSnapshotFile> ReadInstalledFiles(string receiptId, string workKey, bool includeConfigs=true, bool configsOnly=false) {
         var receipt = Read(receiptId);
         if (receipt == null || receipt.Status != "installed" || !receipt.ActiveOwners.Contains(workKey))
             throw new IOException("O mod não tem recibo de snapshot instalado nesta pasta.");
-        var files = receipt.Manifest.Files.Where(f => f.Owners.Contains(workKey)).ToList();
+        var files = receipt.Manifest.Files.Where(f => f.Owners.Contains(workKey)&&
+            (f.Kind=="file"?!configsOnly:includeConfigs)).ToList();
         var exported = new List<InstalledSnapshotFile>();
         foreach (var file in files) {
             var change = receipt.Files.Single(f => f.Path.Equals(file.Path, StringComparison.OrdinalIgnoreCase));

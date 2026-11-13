@@ -642,22 +642,29 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             diagnostic.Visible=(delayed||view.Unavailable||session.Error!=null)&&owner.service.GetConnectionDiagnostic(session.Id)!=null;
             var scan=session.SyncProgress;
             var issue=session.VerificationIssue;
-            bool scanning=scan!=null||session.Sender&&awaiting&&!preview&&session.Stage!=null;
+            var hostScan=connectionView.HostScan;
+            bool scanningHost=!session.Sender&&hostScan!=null&&connectionView.Connected&&!connectionView.Unavailable&&
+                !session.Paused&&!view.RemotePaused&&!session.Held&&!session.RecoveryPending&&!prepared&&
+                session.Error==null&&session.Phase==null&&(!awaiting||!preview);
+            bool scanning=scan!=null||scanningHost||session.Sender&&awaiting&&!preview&&session.Stage!=null;
             string hostPreparation=IncomingPreparation(session,connectionView);
             bool waitingForHost=!session.Sender&&session.CompareBeforePack&&!prepared&&session.Error==null&&
-                !session.Held&&!session.RecoveryPending&&!session.Paused&&!view.RemotePaused&&(!awaiting||session.SyncMode!=0);
+                !session.Held&&!session.RecoveryPending&&!session.Paused&&!view.RemotePaused&&
+                (!awaiting||session.SyncMode!=0||!preview&&(view.Accepted||view.HostDecision==P2PService.HostApproved));
             if(scanning){
-                string phase=session.Sender?T("Conferindo mods do anfitrião","Checking host mods"):T("Comparando seus arquivos","Comparing your files");
-                preparation.Caption=phase+(scan!=null&&scan.Total>0?" · "+scan.Done+"/"+scan.Total:"");
-                preparation.Indeterminate=scan==null||scan.Total==0;
-                preparation.Value=scan!=null&&scan.Total>0?scan.Done*100/scan.Total:0;
+                var shownScan=scan??(scanningHost?hostScan:null);
+                string phase=session.Sender||scan==null&&scanningHost?T("Conferindo mods do anfitrião","Checking host mods"):T("Comparando seus arquivos","Comparing your files");
+                preparation.Caption=shownScan!=null&&shownScan.Packing?T("Preparando pacote no anfitrião","Host is preparing the pack"):
+                    phase+(shownScan!=null&&shownScan.Total>0?" · "+shownScan.Done+"/"+shownScan.Total:"");
+                preparation.Indeterminate=shownScan==null||shownScan.Total==0;
+                preparation.Value=shownScan!=null&&shownScan.Total>0?shownScan.Done*100/shownScan.Total:0;
             }else{
                 preparation.Indeterminate=waitingForHost&&connectionView.Connected&&
                     connectionView.HostDecision!=P2PService.HostPreparationFailed&&connectionView.HostDecision!=P2PService.HostSourceUnavailable&&
                     connectionView.HostDecision!=P2PService.HostPreparationPaused||
                     session.Sender&&session.Stage!=null&&session.PreparationTotal==0;
                 preparation.Caption=prepared?T("Pacote preparado","Pack prepared"):session.Sender?T("Preparando pacote","Preparing pack"):
-                    awaiting?T("Aguardando conferência do anfitrião","Waiting for host verification"):T("Preparo do pacote","Pack preparation");
+                    awaiting?T("Aguardando conferência do anfitrião","Waiting for host verification"):T("Preparando pacote no anfitrião","Host is preparing the pack");
                 preparation.Value=prepared?100:session.PreparationTotal>0?(int)(session.PreparationBytes*100/session.PreparationTotal):0;
             }
             bool syncDifferences=session.SyncLocalExtrasKept>0||session.SyncHostFilesDifferent>0;
@@ -676,6 +683,8 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             else if(message.Length==0&&issue!=null)
                 message=T("Erro ao verificar: ","Verification failed: ")+issue.ModName;
             else if(message.Length==0&&scanning&&scan!=null&&scan.Item!=null)message=scan.Item;
+            else if(message.Length==0&&scanningHost)message=hostScan.Packing?T("Compactando os arquivos para envio…","Compressing files for upload…"):
+                T("O anfitrião está verificando os mods…","The host is checking the mods…");
             else if(message.Length==0&&waitingConnection&&(awaiting||prepared||session.Sender||!session.CompareBeforePack)){
                 if(view.Unavailable)message=T("Sem resposta do serviço P2P local. Reabra o Mod Loader se persistir.","Local P2P service unavailable. Reopen Mod Loader if this persists.");
                 else if(view.HostDecision==P2PService.HostWaiting)message=T("Pedido recebido. Aguardando a decisão do anfitrião…",
@@ -727,9 +736,10 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
                 message=installProgress==null||installProgress.File==null?"":installProgress.File;
                 detail.Text=message;owner.tips.SetToolTip(detail,message);
             }
-            bool showPreparation=!installing&&(!awaiting||scanning||waitingForHost);
+            bool showTransfer=session.Sender?!awaiting:prepared||installing||session.Phase!=null||view.Percent>0;
+            bool showPreparation=session.Sender?(!awaiting||scanning):!showTransfer&&(scanning||waitingForHost);
             preparation.Visible=showPreparation;
-            bars.Visible=!awaiting;
+            bars.Visible=showTransfer;
             layout.RowStyles[2].Height=showPreparation?42:0;
             if(entries.Length==0)entries=new[]{new P2PRecipientProgress{
                 Caption=session.Sender?T("Envio do pacote","Pack upload"):session.Phase=="retry"?P2PService.PhaseLabel("retry"):T("Recebimento do pacote","Pack download"),
@@ -737,7 +747,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
                 Finished=session.Completed||session.Phase!=null
             }};
             int pauseRow=Array.FindIndex(entries,item=>!item.Finished);
-            bool canPause=!awaiting&&pauseRow>=0&&!session.Completed&&!session.Held&&!session.RecoveryPending&&(session.Sender||session.Stage==null);
+            bool canPause=showTransfer&&pauseRow>=0&&!session.Completed&&!session.Held&&!session.RecoveryPending&&(session.Sender||session.Stage==null);
             bars.SuspendLayout();
             // Collapse the grid column as well as its button so completed bars recover the full width.
             bars.ColumnStyles[1].Width=canPause?52:0;
@@ -782,7 +792,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             int titleHeight=dismiss.MinimumSize.Height;
             layout.RowStyles[0].Height=titleHeight;
             int actionsHeight=showChoices||showRetry||showImport||showReply?50:0;
-            layout.RowStyles[3].Height=awaiting?0:44*entries.Length;
+            layout.RowStyles[3].Height=showTransfer?44*entries.Length:0;
             layout.RowStyles[4].Height=message.Length==0?0:28;
             layout.RowStyles[5].Height=actionsHeight;
             Height=Frame.Padding.Vertical+layout.RowStyles.Cast<RowStyle>().Sum(row=>(int)row.Height);
