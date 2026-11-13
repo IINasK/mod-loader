@@ -430,28 +430,32 @@ public static partial class InstalledSnapshot {
         }
     }
     public static InstalledSnapshotManifest Read(string zipPath,string expectedHash,FixedCatalog catalog) {
-        if(!FixedData.HashValid(expectedHash))throw new IOException("Hash de pacote inválido.");Safe.NoLinks(zipPath);
-        using(var stream=new FileStream(zipPath,FileMode.Open,FileAccess.Read,FileShare.Read)) {
-            if(stream.Length>MaxTotalBytes)throw new IOException("Pacote grande demais.");
-            using(var sha=SHA256.Create())if(Safe.Hex(sha.ComputeHash(stream))!=expectedHash)throw new IOException("O pacote transferido não corresponde ao convite.");
-            stream.Position=0;
-            using(var zip=new ZipArchive(stream,ZipArchiveMode.Read,true)) {
-                if(zip.Entries.Count>MaxFiles+1)throw new IOException("Pacote com entradas demais.");
-                var entries=new Dictionary<string,ZipArchiveEntry>(StringComparer.Ordinal);
-                foreach(var entry in zip.Entries)if(!entries.TryAddCompat(entry.FullName,entry))throw new IOException("Entrada repetida no pacote.");
-                ZipArchiveEntry metadata;if(!entries.TryGetValue("manifest.json",out metadata)||metadata.Length>8000000)throw new IOException("Manifesto ausente ou grande demais.");
-                InstalledSnapshotManifest manifest;
-                using(var input=metadata.Open())manifest=Safe.Json.Deserialize<InstalledSnapshotManifest>(Utf8.GetString(ReadBytes(input,8000000)));
-                Validate(manifest,catalog);
-                var expected=manifest.Files.Where(f=>f.Kind=="file"&&!f.ReuseLocal).GroupBy(f=>f.Sha256).Select(g=>g.First()).ToList();
-                if(entries.Count!=expected.Count+1)throw new IOException("Arquivos não declarados no pacote.");
-                foreach(var file in expected) {
-                    ZipArchiveEntry entry;if(!entries.TryGetValue(Entry(file),out entry)||entry.Length!=file.Size)throw new IOException("Arquivo ausente ou tamanho divergente: "+file.Path);
-                    using(var input=entry.Open())if(HashStream(input,file.Size)!=file.Sha256)throw new IOException("Arquivo transferido divergente: "+file.Path);
-                }
-                foreach(var file in manifest.Files.Where(f=>f.Kind=="file"&&!f.ReuseLocal))using(var input=entries[Entry(file)].Open())ValidateCustomData(manifest,file,input);
-                return manifest;
+        Safe.NoLinks(zipPath);
+        using(var stream=new FileStream(zipPath,FileMode.Open,FileAccess.Read,FileShare.Read))
+            return Read(stream,expectedHash,catalog);
+    }
+
+    internal static InstalledSnapshotManifest Read(Stream stream,string expectedHash,FixedCatalog catalog) {
+        if(!FixedData.HashValid(expectedHash))throw new IOException("Hash de pacote inválido.");
+        if(stream.Length>MaxTotalBytes)throw new IOException("Pacote grande demais.");
+        using(var sha=SHA256.Create())if(Safe.Hex(sha.ComputeHash(stream))!=expectedHash)throw new IOException("O pacote transferido não corresponde ao convite.");
+        stream.Position=0;
+        using(var zip=new ZipArchive(stream,ZipArchiveMode.Read,true)) {
+            if(zip.Entries.Count>MaxFiles+1)throw new IOException("Pacote com entradas demais.");
+            var entries=new Dictionary<string,ZipArchiveEntry>(StringComparer.Ordinal);
+            foreach(var entry in zip.Entries)if(!entries.TryAddCompat(entry.FullName,entry))throw new IOException("Entrada repetida no pacote.");
+            ZipArchiveEntry metadata;if(!entries.TryGetValue("manifest.json",out metadata)||metadata.Length>8000000)throw new IOException("Manifesto ausente ou grande demais.");
+            InstalledSnapshotManifest manifest;
+            using(var input=metadata.Open())manifest=Safe.Json.Deserialize<InstalledSnapshotManifest>(Utf8.GetString(ReadBytes(input,8000000)));
+            Validate(manifest,catalog);
+            var expected=manifest.Files.Where(f=>f.Kind=="file"&&!f.ReuseLocal).GroupBy(f=>f.Sha256).Select(g=>g.First()).ToList();
+            if(entries.Count!=expected.Count+1)throw new IOException("Arquivos não declarados no pacote.");
+            foreach(var file in expected) {
+                ZipArchiveEntry entry;if(!entries.TryGetValue(Entry(file),out entry)||entry.Length!=file.Size)throw new IOException("Arquivo ausente ou tamanho divergente: "+file.Path);
+                using(var input=entry.Open())if(HashStream(input,file.Size)!=file.Sha256)throw new IOException("Arquivo transferido divergente: "+file.Path);
             }
+            foreach(var file in manifest.Files.Where(f=>f.Kind=="file"&&!f.ReuseLocal))using(var input=entries[Entry(file)].Open())ValidateCustomData(manifest,file,input);
+            return manifest;
         }
     }
     internal static void ValidateCustomData(InstalledSnapshotManifest manifest,InstalledSnapshotFile file,Stream input) {

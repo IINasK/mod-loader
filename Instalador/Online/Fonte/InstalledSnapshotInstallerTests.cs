@@ -78,6 +78,7 @@ public static class InstalledSnapshotInstallerTests {
         HistoricalSnapshot(root);
         ConfigTransactions(root);
         ResumeTransactions(root,catalog);
+        ParallelTransactions(root,catalog);
         if(testOfficialProject){
             TestPortableDestinations(root,parent,catalog);
             BuiltInProjectReceive(root,catalog);
@@ -342,6 +343,61 @@ public static class InstalledSnapshotInstallerTests {
         Check(restarted.Install(zip,Safe.Hash(zip),null)==id,"Reinício após concluir reaproveita recibo sem duplicar instalação ou backups.");
         receipt.Status="installing";typeof(InstalledSnapshotInstaller).GetMethod("Save",flags).Invoke(restarted,new object[]{receipt});File.WriteAllText(Safe.In(target,last.Path),"alteração do usuário");
         Throws(()=>restarted.Install(zip,Safe.Hash(zip),null),"Retomada recusa arquivo alterado pelo usuário após a interrupção.");Check(File.ReadAllText(Safe.In(target,last.Path))=="alteração do usuário"&&File.Exists(zip),"Falha na retomada preserva alteração local e pacote original.");
+    }
+
+    static void ParallelTransactions(string parent,FixedCatalog catalog) {
+        string target=Directory.CreateDirectory(Safe.In(parent,"parallel-game")).FullName;
+        string data=Safe.In(parent,"parallel-data");
+        File.WriteAllText(Safe.In(target,".fixture-only"),"fixture");
+        var engine=new InstalledSnapshotInstaller(target,data,catalog,true);
+        var files=Enumerable.Range(0,40).ToDictionary(i=>"mods/common/part-"+i+".txt",i=>"content "+i);
+        string zip=Pack(parent,"parallel",catalog,files), hash=Safe.Hash(zip), transaction=null;
+        var progress=new List<P2PInstallProgress>();
+        int cancel=0;
+        try {
+            engine.Install(zip,hash,null,transaction:id=>transaction=id,checkpoint:() => {
+                if(System.Threading.Volatile.Read(ref cancel)!=0)throw new OperationCanceledException();
+            },progress:value=>{
+                progress.Add(value);
+                if(value.Writing&&value.Done==1)System.Threading.Volatile.Write(ref cancel,1);
+            });
+            throw new Exception("A instalação deveria ter sido interrompida.");
+        } catch(OperationCanceledException) { }
+        int applied=files.Keys.Count(path=>File.Exists(Safe.In(target,path)));
+        Check(applied>0&&applied<files.Count,"O cancelamento interrompe o lote paralelo preservando os arquivos já aplicados.");
+        Check(progress.Where(value=>value.Writing).Select(value=>value.Done).SequenceEqual(Enumerable.Range(0,applied+1)),
+            "O progresso da instalação paralela acompanha a quantidade de arquivos concluídos em ordem.");
+
+        var restarted=new InstalledSnapshotInstaller(target,data,catalog,true);
+        string resumed=restarted.Install(zip,hash,null);
+        Check(resumed==transaction&&files.All(pair=>File.ReadAllText(Safe.In(target,pair.Key))==pair.Value),
+            "A retomada reconhece os arquivos do lote interrompido e completa a instalação com o mesmo recibo.");
+
+        var discard=files.ToDictionary(pair=>"discard/"+Path.GetFileName(pair.Key),pair=>pair.Value);
+        zip=Pack(parent,"discard",catalog,discard);hash=Safe.Hash(zip);
+        int stopped=0;
+        try {
+            restarted.Install(zip,hash,null,transaction:id=>transaction=id,checkpoint:() => {
+                if(System.Threading.Volatile.Read(ref stopped)!=0)throw new OperationCanceledException();
+            },progress:value=>{
+                if(value.Writing&&value.Done==1)System.Threading.Volatile.Write(ref stopped,1);
+            });
+            throw new Exception("A instalação a descartar deveria ter sido interrompida.");
+        } catch(OperationCanceledException) { }
+        restarted.DiscardInterrupted(transaction,zip,hash);
+        Check(discard.Keys.All(path=>!File.Exists(Safe.In(target,path)))&&files.Keys.All(path=>File.Exists(Safe.In(target,path))),
+            "Descartar desfaz o lote paralelo interrompido sem mexer na instalação anterior.");
+
+        var blocked=files.ToDictionary(pair=>"blocked/"+Path.GetFileName(pair.Key),pair=>pair.Value);
+        zip=Pack(parent,"blocked",catalog,blocked);hash=Safe.Hash(zip);
+        string collision=Safe.In(target,blocked.Keys.Last());
+        Throws(() => restarted.Install(zip,hash,null,progress:value=>{
+            if(!value.Writing||value.Done!=0)return;
+            Directory.CreateDirectory(Path.GetDirectoryName(collision));
+            File.WriteAllText(collision,"user-edit");
+        }),"Uma alteração após o preparo impede a gravação do destino conflitante.");
+        Check(File.ReadAllText(collision)=="user-edit"&&blocked.Keys.Count(path=>File.Exists(Safe.In(target,path)))==1,
+            "A reversão aguarda os trabalhadores e preserva o arquivo que causou o conflito.");
     }
 
     static void ConfigTransactions(string parent) {

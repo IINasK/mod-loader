@@ -8,6 +8,8 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Runtime.ExceptionServices;
+using System.Threading.Tasks;
 
 public sealed partial class InstalledSnapshotInstaller {
     public sealed class Receipt {
@@ -51,11 +53,8 @@ public sealed partial class InstalledSnapshotInstaller {
         // The archive is leased throughout verification and copying; no archive is kept in the receipt store.
         zipPath = Path.GetFullPath(zipPath); Safe.NoLinks(zipPath);
         using (var source = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
-            var manifest = InstalledSnapshot.Read(zipPath, expectedHash, catalog);
+            var manifest = InstalledSnapshot.Read(source, expectedHash, catalog);
             if(!allowReuse&&manifest.Files.Any(file=>file.ReuseLocal))throw new IOException("O recebimento não autorizou reutilizar arquivos locais.");
-            using (var hash = SHA256.Create()) if (Safe.Hex(hash.ComputeHash(source)) != expectedHash)
-                throw new IOException("O pacote foi alterado antes da instalação.");
-            source.Position = 0;
             using (AcquireLock(manifest.Game)) {
                 if(manifest.Schema!=2)ValidateEnvironment(manifest);
                 else Closed(manifest.Game);
@@ -74,111 +73,162 @@ public sealed partial class InstalledSnapshotInstaller {
                     skippedDestinations.AddRange(SkipIncompatibleMods(manifest,chooseVersion));
                     ValidateEnvironment(manifest);
                 }
-                if(manifest.Files.Select(file=>file.Path).Distinct(StringComparer.OrdinalIgnoreCase).GroupBy(Target,StringComparer.OrdinalIgnoreCase).Any(group=>group.Count()>1))
-                    throw new IOException("O pacote aponta mais de um arquivo para o mesmo destino.");
                 var complete=receipts.FirstOrDefault(r=>r.Status=="installed"&&r.ActiveOwners.Count==WorkKeys(manifest).Count()&&SameManifest(r.Manifest,manifest)&&r.Files.All(Matches));
                 if(complete!=null){CleanStage(Safe.In(destination,".mod-loader-snapshot-"+complete.Id));return complete.Id;}
                 var approvals=ConfirmVersions(manifest,chooseVersion,receipts,skippedDestinations);
+                var groups=manifest.Files.GroupBy(f=>f.Path,StringComparer.OrdinalIgnoreCase).ToArray();
+                CheckDistinctTargets(groups.Select(group=>group.Key));
                 CheckSpace(manifest);
-                var others = receipts.Where(r => r.Status == "installed" && r.ActiveOwners.Count > 0).ToList();
+                var ownership = receipts.Where(r => r.Status == "installed" && r.ActiveOwners.Count > 0)
+                    .SelectMany(r => r.Files.Where(f => !f.Reverted && f.Applied && f.Owned).Select(f => new { Receipt = r, File = f }))
+                    .ToLookup(x => x.File.Path, StringComparer.OrdinalIgnoreCase);
                 var receipt = new Receipt {
                     Id = Guid.NewGuid().ToString("N"), Root = destination, Status = "preparing", Manifest = manifest, Recoverable=true,
                     ActiveOwners = WorkKeys(manifest).ToList(), PackageHash=manifest.Schema==2?expectedHash:null, SkippedDestinations=skippedDestinations
                 };
                 string stage = Safe.In(destination, ".mod-loader-snapshot-" + receipt.Id);
                 var directories = new List<string>();
-                var beforeHashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 var writtenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 bool keepStage=false;
                 if(transaction!=null)transaction(receipt.Id);
                 Directory.CreateDirectory(stage);
                 try {
-                    var groups=manifest.Files.GroupBy(f=>f.Path,StringComparer.OrdinalIgnoreCase).ToArray();
-                    using (var zip = new ZipArchive(source, ZipArchiveMode.Read, true)) {
-                        foreach (var group in groups) {
-                            if(checkpoint!=null)checkpoint();
-                            if(progress!=null)progress(new P2PInstallProgress(false,receipt.Files.Count,groups.Length,group.Key));
-                            string target = Target(group.Key);
-                            if (Directory.Exists(target)) throw Conflict(group.Key);
-                            string before = HashOrNull(target);
-                            beforeHashes.Add(group.Key, before);
-                            string prepared = Safe.In(stage, Fingerprint(group.Key));
-                            var files = group.ToList();
-                            var local = files[0].ReuseLocal;
-                            if (local) {
-                                var file=files[0];
-                                if (before!=file.Sha256 || new FileInfo(target).Length!=file.Size)
-                                    throw new IOException(GeneralStyle.T("Arquivo local mudou após a comparação. Peça um novo convite: ","A local file changed after comparison. Ask for a new invitation: ")+file.Path);
-                                using (var input=File.OpenRead(target)) InstalledSnapshot.ValidateCustomData(manifest,file,input);
-                            } else if (files[0].Kind == "file") {
-                                var file = files[0];
-                                ZipArchiveEntry entry = zip.GetEntry("files/" + file.Sha256);
-                                if (entry == null || entry.Length != file.Size) throw new IOException("Arquivo ausente no pacote: " + file.Path);
-                                using (var input = entry.Open())
-                                using (var output = new FileStream(prepared, FileMode.CreateNew, FileAccess.Write, FileShare.None)) {
-                                    CopyBounded(input, output, file.Size);
+                    var prepared=new Change[groups.Length];
+                    if(progress!=null)progress(new P2PInstallProgress(false,0,groups.Length,null));
+                    int preparedCount=0;
+                    var prepareProgress=new object();
+                    RunFileWorkers(groups.Length,false,checkpoint,
+                        () => ZipFile.OpenRead(zipPath),
+                        (zip,index) => {
+                            var group=groups[index];
+                            var change=PrepareChange(group,zip,manifest,stage,approvals);
+                            if (change.Expected == change.After) {
+                                var previous=ownership[change.Path].FirstOrDefault(x=>x.File.After==change.Expected);
+                                if(previous!=null) {
+                                    change.Owned=true;
+                                    change.Before=previous.File.Before;
+                                    if(change.Before!=null)Backup(BackupPath(previous.Receipt,change.Path),BackupPath(receipt,change.Path),change.Before);
                                 }
-                                if (Safe.Hash(prepared) != file.Sha256) throw new IOException("Arquivo divergente no pacote: " + file.Path);
-                                if(before!=null&&before!=file.Sha256){string approved;if(!approvals.TryGetValue(file.Path,out approved)||approved!=before)throw Conflict(file.Path);}
-                            } else {
-                                byte[] content = File.Exists(target) ? InstalledSnapshotConfig.Read(target) : null;
-                                foreach (var file in files) content = InstalledSnapshotConfig.Apply(file, content);
-                                File.WriteAllBytes(prepared, content);
+                            } else if(change.Expected!=null) {
+                                // Approved replacements retain a verified backup in addition to the transaction rollback file.
+                                change.Owned=true;
+                                Backup(Target(change.Path),BackupPath(receipt,change.Path),change.Expected);
                             }
-                            string after = local ? before : Safe.Hash(prepared);
-                            if (before != null && before != after) Backup(target, Safe.In(stage, Fingerprint(group.Key) + ".rollback"), before);
-                            var change = new Change { Path = group.Key, Before = before, Expected=before, After = after, Size = local ? files[0].Size : new FileInfo(prepared).Length, Owned = before == null };
-                            var previous = others.SelectMany(r => r.Files.Select(f => new { Receipt = r, File = f }))
-                                .FirstOrDefault(x => x.File.Path.Equals(group.Key, StringComparison.OrdinalIgnoreCase)
-                                    && !x.File.Reverted && x.File.Applied && x.File.After == before && x.File.Owned);
-                            if (previous != null && before == after) {
-                                change.Owned = true; change.Before = previous.File.Before;
-                                if (change.Before != null) Backup(BackupPath(previous.Receipt, change.Path), BackupPath(receipt, change.Path), change.Before);
-                            } else if (before != null && before != after) {
-                                // Configuration changes and explicitly approved file replacements retain a verified backup.
-                                change.Owned = true;
-                                Backup(target, BackupPath(receipt, change.Path), before);
+                            prepared[index]=change;
+                            lock(prepareProgress) {
+                                Report(report,"Conferido: "+group.Key);
+                                if(progress!=null)progress(new P2PInstallProgress(false,++preparedCount,groups.Length,group.Key));
                             }
-                            receipt.Files.Add(change);
-                            Report(report, "Conferido: " + group.Key);
-                        }
-                    }
+                        });
+                    receipt.Files.AddRange(prepared);
+                    if(checkpoint!=null)checkpoint();
+                    receipt.Status = "installing";
+                    // The durable plan precedes all writes. Resume/discard also check actual file hashes.
                     Save(receipt);
-                    int written = 0;
                     try {
-                        receipt.Status = "installing"; Save(receipt);
-                        int processed=0;
-                        foreach (var change in receipt.Files) {
-                            if(checkpoint!=null)checkpoint();
-                            if(progress!=null)progress(new P2PInstallProgress(true,processed++,receipt.Files.Count,change.Path));
-                            Closed(manifest.Game);
-                            string target = Target(change.Path);
-                            string prepared = Safe.In(stage, Fingerprint(change.Path));
-                            string current = HashOrNull(target);
-                            string expectedCurrent = beforeHashes[change.Path];
-                            if (current != expectedCurrent) throw new IOException("O destino mudou durante a preparação: " + change.Path);
-                            if (current == change.After) { change.Applied = true; Save(receipt); continue; }
-                            CreateParents(change.Path, directories);
-                            ReplaceChecked(prepared, target, change.After, expectedCurrent,Safe.In(stage,"replace-"+Fingerprint(change.Path)));
-                            writtenPaths.Add(change.Path);
-                            change.Applied = true; Save(receipt);
-                            written++;
-                            if (failAfter >= 0 && written >= failAfter) throw new IOException("Falha de teste após a cópia.");
-                            Report(report, "Instalado: " + change.Path);
-                        }
+                        ApplyPrepared(receipt,stage,false,report,checkpoint,progress,directories,writtenPaths,failAfter);
                         receipt.Status = "installed"; Save(receipt);
-                        if(progress!=null)progress(new P2PInstallProgress(true,receipt.Files.Count,receipt.Files.Count,null));
                         return receipt.Id;
                     } catch(OperationCanceledException) {
                         keepStage=true;
                         throw;
                     } catch {
-                        Rollback(receipt, beforeHashes, writtenPaths, stage);
+                        Rollback(receipt, writtenPaths, stage);
                         foreach (string directory in directories.AsEnumerable().Reverse()) TryCleanup(() => DeleteEmpty(directory));
                         throw;
                     }
                 } finally { if(!keepStage)CleanStage(stage); }
             }
+        }
+    }
+
+    void CheckDistinctTargets(IEnumerable<string> paths) {
+        var targets=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach(var path in paths)
+            if(!targets.Add(Target(path)))throw new IOException("O pacote aponta mais de um arquivo para o mesmo destino.");
+        foreach(var target in targets)
+            for(var parent=Path.GetDirectoryName(target);parent!=null;parent=Path.GetDirectoryName(parent))
+                if(targets.Contains(parent))throw Conflict(parent);
+    }
+
+    Change PrepareChange(IGrouping<string,InstalledSnapshotFile> group,ZipArchive zip,InstalledSnapshotManifest manifest,string stage,Dictionary<string,string> approvals) {
+        string target=Target(group.Key);
+        if(Directory.Exists(target))throw Conflict(group.Key);
+        string before=HashOrNull(target);
+        string prepared=Safe.In(stage,Fingerprint(group.Key));
+        var file=group.First();
+        string after;
+        if(file.ReuseLocal) {
+            if(before!=file.Sha256||new FileInfo(target).Length!=file.Size)
+                throw new IOException(GeneralStyle.T("Arquivo local mudou após a comparação. Peça um novo convite: ","A local file changed after comparison. Ask for a new invitation: ")+file.Path);
+            using(var input=File.OpenRead(target))InstalledSnapshot.ValidateCustomData(manifest,file,input);
+            after=before;
+        } else if(file.Kind=="file") {
+            ZipArchiveEntry entry=zip.GetEntry("files/"+file.Sha256);
+            if(entry==null||entry.Length!=file.Size)throw new IOException("Arquivo ausente no pacote: "+file.Path);
+            if(before!=null&&before!=file.Sha256) {
+                string approved;
+                if(!approvals.TryGetValue(file.Path,out approved)||approved!=before)throw Conflict(file.Path);
+            }
+            // Matching destinations have already been checked and do not need to be extracted again.
+            if(before!=file.Sha256) {
+                using(var input=entry.Open())
+                using(var output=new FileStream(prepared,FileMode.CreateNew,FileAccess.Write,FileShare.None))
+                    CopyBounded(input,output,file.Size);
+                if(Safe.Hash(prepared)!=file.Sha256)throw new IOException("Arquivo divergente no pacote: "+file.Path);
+            }
+            after=file.Sha256;
+        } else {
+            byte[] content=before!=null?InstalledSnapshotConfig.Read(target):null;
+            foreach(var section in group)content=InstalledSnapshotConfig.Apply(section,content);
+            File.WriteAllBytes(prepared,content);
+            after=InstalledSnapshot.Hash(content);
+        }
+        if(before!=null&&before!=after)Backup(target,Safe.In(stage,Fingerprint(group.Key)+".rollback"),before);
+        long size=file.Kind=="file"?file.Size:new FileInfo(prepared).Length;
+        return new Change { Path=group.Key, Before=before, Expected=before, After=after, Size=size, Owned=before==null };
+    }
+
+    void ApplyPrepared(Receipt receipt,string stage,bool resume,Action<string> report,Action checkpoint,
+        Action<P2PInstallProgress> progress,List<string> directories,HashSet<string> writtenPaths,int failAfter=-1) {
+        int written=0,processed=0,total=receipt.Files.Count;
+        var state=new object();
+        Closed(receipt.Manifest.Game);
+        if(progress!=null)progress(new P2PInstallProgress(true,0,total,null));
+        RunFileWorkers<object>(total,failAfter>=0,checkpoint,() => null,(ignored,index) => {
+            var change=receipt.Files[index];
+            string target=Target(change.Path);
+            bool needsWrite=resume?HashOrNull(target)!=change.After:change.Expected!=change.After;
+            if(needsWrite) {
+                Closed(receipt.Manifest.Game);
+                lock(state)CreateParents(change.Path,directories);
+                string name=Fingerprint(change.Path);
+                ReplaceChecked(Safe.In(stage,name),target,change.After,change.Expected,Safe.In(stage,"replace-"+name));
+            } else if(!resume&&(Directory.Exists(target)||HashOrNull(target)!=change.Expected)) {
+                throw new IOException("O destino mudou durante a preparação: "+change.Path);
+            }
+            lock(state) {
+                if(needsWrite&&writtenPaths!=null)writtenPaths.Add(change.Path);
+                change.Applied=true;
+                if(needsWrite&&failAfter>=0&&++written>=failAfter)throw new IOException("Falha de teste após a cópia.");
+                if(needsWrite||resume)Report(report,(resume?"Retomado: ":"Instalado: ")+change.Path);
+                if(progress!=null)progress(new P2PInstallProgress(true,++processed,total,change.Path));
+            }
+        });
+    }
+
+    static void RunFileWorkers<T>(int count,bool serial,Action checkpoint,Func<T> open,Action<T,int> action) where T:class {
+        if(count==0)return;
+        var options=new ParallelOptions { MaxDegreeOfParallelism=serial?1:Math.Min(10,Environment.ProcessorCount) };
+        try {
+            Parallel.For(0,count,options,open,(index,state,worker) => {
+                if(checkpoint!=null)checkpoint();
+                action(worker,index);
+                return worker;
+            },worker => { var resource=worker as IDisposable;if(resource!=null)resource.Dispose(); });
+        } catch(AggregateException error) {
+            var failures=error.Flatten().InnerExceptions;
+            ExceptionDispatchInfo.Capture(failures.FirstOrDefault(failure=>!(failure is OperationCanceledException))??failures[0]).Throw();
         }
     }
 
@@ -280,23 +330,18 @@ public sealed partial class InstalledSnapshotInstaller {
     string Resume(Receipt receipt,Action<string> report,Action checkpoint,Action<P2PInstallProgress> progress){
         if(receipt.Files.Count!=receipt.Manifest.Files.Select(f=>f.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count())throw new IOException("Preparação interrompida incompleta. Preserve o pacote e o recibo.");
         string stage=Safe.In(destination,".mod-loader-snapshot-"+receipt.Id);Safe.NoLinks(stage);
-        foreach(var file in receipt.Files){
+        CheckDistinctTargets(receipt.Files.Select(file=>file.Path));
+        RunFileWorkers<object>(receipt.Files.Count,false,checkpoint,() => null,(ignored,index) => {
+            var file=receipt.Files[index];
             string current=HashOrNull(Target(file.Path));
-            if(current==file.After)continue;
+            if(current==file.After)return;
             string prepared=Safe.In(stage,Fingerprint(file.Path));
-            if(current!=file.Expected||!File.Exists(prepared)||new FileInfo(prepared).Length!=file.Size||Safe.Hash(prepared)!=file.After)throw new IOException("Não foi possível retomar: arquivo alterado ou preparação ausente em "+file.Path+". Sua alteração foi preservada.");
-        }
+            if(current!=file.Expected||!File.Exists(prepared)||new FileInfo(prepared).Length!=file.Size||Safe.Hash(prepared)!=file.After)
+                throw new IOException("Não foi possível retomar: arquivo alterado ou preparação ausente em "+file.Path+". Sua alteração foi preservada.");
+        });
         receipt.Status="installing";Save(receipt);
-        int processed=0;
-        foreach(var file in receipt.Files){
-            if(checkpoint!=null)checkpoint();
-            if(progress!=null)progress(new P2PInstallProgress(true,processed++,receipt.Files.Count,file.Path));
-            Closed(receipt.Manifest.Game);string target=Target(file.Path);
-            if(HashOrNull(target)!=file.After){CreateParents(file.Path,new List<string>());ReplaceChecked(Safe.In(stage,Fingerprint(file.Path)),target,file.After,file.Expected,Safe.In(stage,"replace-"+Fingerprint(file.Path)));}
-            file.Applied=true;Save(receipt);Report(report,"Retomado: "+file.Path);
-        }
+        ApplyPrepared(receipt,stage,true,report,checkpoint,progress,new List<string>(),null);
         receipt.Status="installed";Save(receipt);CleanStage(stage);
-        if(progress!=null)progress(new P2PInstallProgress(true,receipt.Files.Count,receipt.Files.Count,null));
         return receipt.Id;
     }
 
@@ -321,10 +366,9 @@ public sealed partial class InstalledSnapshotInstaller {
         using(AcquireLock(receipt.Manifest.Game)){
             Closed(receipt.Manifest.Game);
             string stage=Safe.In(destination,".mod-loader-snapshot-"+receipt.Id);
-            var before=receipt.Files.ToDictionary(f=>f.Path,f=>f.Expected,StringComparer.OrdinalIgnoreCase);
             var written=new HashSet<string>(receipt.Files.Where(f=>f.Expected!=f.After&&
                 (f.Applied||HashOrNull(Target(f.Path))==f.After)).Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
-            Rollback(receipt,before,written,stage);
+            Rollback(receipt,written,stage);
             CleanStage(stage);
         }
         return null;
@@ -691,14 +735,14 @@ public sealed partial class InstalledSnapshotInstaller {
         OnlineDiagnostics.Failure("scan.receipt.failed",error,"Ler o recibo local. A conferência dos outros recibos continua.");
     }
     bool Matches(Change file) { string path = Target(file.Path); return File.Exists(path) && new FileInfo(path).Length == file.Size && Safe.Hash(path) == file.After; }
-    void Rollback(Receipt receipt, Dictionary<string,string> beforeHashes, HashSet<string> written, string stage) {
+    void Rollback(Receipt receipt, HashSet<string> written, string stage) {
         int preserved = 0;
         foreach (var file in receipt.Files.AsEnumerable().Reverse()) {
             if (!written.Contains(file.Path)) continue;
             try {
                 string target = Target(file.Path);
                 if (HashOrNull(target) != file.After) { preserved++; continue; }
-                string before = beforeHashes[file.Path];
+                string before = file.Expected;
                 if (before == null) DeleteChecked(target, file.After);
                 else ReplaceChecked(Safe.In(stage, Fingerprint(file.Path) + ".rollback"), target, before, file.After);
                 file.Reverted = true;
