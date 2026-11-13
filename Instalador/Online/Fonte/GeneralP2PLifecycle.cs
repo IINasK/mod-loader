@@ -380,7 +380,7 @@ internal sealed partial class P2PService {
                     var choice=ChooseVersion;
                     bool replace=choice!=null&&choice(difference);
                     checkpoint();
-                    if(replace)SetPhase(session,"installing");
+                    if(replace||difference.SkipSelected)SetPhase(session,"installing");
                     return replace;
                 },id=>{session.TransactionId=id;Save();},checkpoint,value=>session.InstallProgress=value,allowReuse:AllowsLocalReuse(session),approveUserFolders:folders=>{
                     SetPhase(session,"review");
@@ -390,7 +390,9 @@ internal sealed partial class P2PService {
                     return allowed;
                 });
                 var manifest=installer.ReadManifest(session.ReceiptId);
-                ApplyApprovedSyncCleanup(session,manifest);
+                if(installer.ReadSkippedDestinations(session.ReceiptId).Length==0)
+                    ApplyApprovedSyncCleanup(session,manifest);
+                else session.SyncCleanup=null;
                 session.ModsOutsidePack=InstalledSnapshot.CountOutsidePack(manifest);
                 OnlineDiagnostics.Record("p2p.install.files",null,"Arquivos do pacote instalados.",
                     new{Id=DiagnosticId(session.Id),Milliseconds=elapsed.ElapsedMilliseconds});

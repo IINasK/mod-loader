@@ -21,6 +21,7 @@ public sealed partial class FixedInstaller {
                 .Select(m=>m.Id==NightCityDensity.ModId?NightCityDensity.Installed(catalog.Packages.Single(x=>x.Id==m.Id),game):m).ToList();
             var present=new List<FixedMod>();
             foreach(var mod in mods) {
+                report(GeneralStyle.T("Conferindo para desinstalar · ","Checking for uninstall · ")+mod.Name);
                 var scan=FixedData.Scan(mod,game,false);
                 if(scan.IsConflict)throw new IOException(mod.Name+": há arquivos diferentes ou não verificáveis. Seus arquivos foram preservados; resolva a divergência antes de remover o lote.");
                 if(scan.Correct+scan.Original>0)present.Add(mod);
@@ -41,6 +42,7 @@ public sealed partial class FixedInstaller {
                     if(protectedPaths.Contains(file.Path))continue;
                     string target=Safe.In(game,file.Path);Safe.NoLinks(target);
                     if(!File.Exists(target))continue;
+                    report(GeneralStyle.T("Desinstalando · ","Uninstalling · ")+file.Path);
                     if(!FpvCustomization.MatchesFile(file,new FileInfo(target).Length,Safe.Hash(target)))
                         throw new IOException("Arquivo alterado após a conferência: "+file.Path);
                     File.Delete(target);

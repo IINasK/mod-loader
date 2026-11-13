@@ -865,7 +865,7 @@ internal sealed partial class GeneralModWindow {
             if(sharingHome==null)await GeneralProjectHome.RecoverSharing(this,p2p);
             if(!p2p.SnapshotSessions().Any(s=>!s.Completed&&(!s.Discarded||s.Sender)||Directory.Exists(p2p.Folder(s))))return;
             await Task.Run(()=>p2p.Start(_=>{}));
-            if(!IsDisposed)detail.Text=T("Compartilhamento P2P retomado.","P2P sharing resumed.");
+            if(!IsDisposed&&!uninstalling)detail.Text=T("Compartilhamento P2P retomado.","P2P sharing resumed.");
         }
         catch(Exception ex){if(!IsDisposed)detail.Text=T("Retomada P2P: ","P2P resume: ")+ex.Message;}
     }

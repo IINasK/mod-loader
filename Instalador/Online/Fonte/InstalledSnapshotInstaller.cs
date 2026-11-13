@@ -57,22 +57,28 @@ public sealed partial class InstalledSnapshotInstaller {
                 throw new IOException("O pacote foi alterado antes da instalação.");
             source.Position = 0;
             using (AcquireLock(manifest.Game)) {
-                ValidateEnvironment(manifest);
+                if(manifest.Schema!=2)ValidateEnvironment(manifest);
+                else Closed(manifest.Game);
                 var receipts = AllReceipts().ToList();
                 var pending=receipts.Where(r=>r.Status=="preparing"||r.Status=="installing").ToList();
                 if(pending.Count!=0){
                     if(pending.Count!=1||!pending[0].Recoverable||!(pending[0].PackageHash==null?SameManifest(pending[0].Manifest,manifest):pending[0].PackageHash==expectedHash))throw new IOException("Há outra instalação interrompida nesta pasta. Preserve os recibos e restaure a operação antes de continuar.");
+                    if(manifest.Schema==2)ValidateEnvironment(pending[0].Manifest);
                     if(transaction!=null)transaction(pending[0].Id);
                     if(pending[0].Manifest.Schema==2)
                         GeneralInstallRoutes.CheckFolders(destination,pending[0].Manifest.List.Mods.SelectMany(mod=>mod.Variants.Single().InstallRoutes));
                     return Resume(pending[0],report,checkpoint,progress);
                 }
                 var skippedDestinations=InstalledSnapshot.SkipMissingDestinations(manifest,catalog,destination,approveUserFolders);
+                if(manifest.Schema==2){
+                    skippedDestinations.AddRange(SkipIncompatibleMods(manifest,chooseVersion));
+                    ValidateEnvironment(manifest);
+                }
                 if(manifest.Files.Select(file=>file.Path).Distinct(StringComparer.OrdinalIgnoreCase).GroupBy(Target,StringComparer.OrdinalIgnoreCase).Any(group=>group.Count()>1))
                     throw new IOException("O pacote aponta mais de um arquivo para o mesmo destino.");
                 var complete=receipts.FirstOrDefault(r=>r.Status=="installed"&&r.ActiveOwners.Count==WorkKeys(manifest).Count()&&SameManifest(r.Manifest,manifest)&&r.Files.All(Matches));
                 if(complete!=null){CleanStage(Safe.In(destination,".mod-loader-snapshot-"+complete.Id));return complete.Id;}
-                var approvals=ConfirmVersions(manifest,chooseVersion,receipts);
+                var approvals=ConfirmVersions(manifest,chooseVersion,receipts,skippedDestinations);
                 CheckSpace(manifest);
                 var others = receipts.Where(r => r.Status == "installed" && r.ActiveOwners.Count > 0).ToList();
                 var receipt = new Receipt {
@@ -176,7 +182,29 @@ public sealed partial class InstalledSnapshotInstaller {
         }
     }
 
-    Dictionary<string,string> ConfirmVersions(InstalledSnapshotManifest manifest,Func<ModVersionDifference,bool> choose,List<Receipt> receipts){
+    List<string> SkipIncompatibleMods(InstalledSnapshotManifest manifest,Func<ModVersionDifference,bool> choose){
+        var skipped=new HashSet<string>(StringComparer.Ordinal);
+        if(manifest.Game!="cyberpunk2077"||choose==null)return new List<string>();
+        if(!fixture)FixedData.ValidateGame(destination,new FixedMod[0],manifest.GameFileVersion);
+        var entries=manifest.List.Mods.Where(mod=>mod.Variants.Single().CyberpunkId!=null).ToArray();
+        var dependencies=entries.ToDictionary(mod=>mod.Id,mod=>new HashSet<string>(
+            FixedData.Expand(catalog,new[]{mod.Variants.Single().CyberpunkId}).Select(item=>item.Id),StringComparer.Ordinal));
+        var recipes=FixedData.Expand(catalog,entries.Select(mod=>mod.Variants.Single().CyberpunkId));
+        foreach(var recipe in recipes){
+            string conflict=FixedData.Incompatibility(recipe,destination);
+            if(conflict==null)continue;
+            var affected=entries.Where(mod=>dependencies[mod.Id].Contains(recipe.Id)).ToArray();
+            if(recipe.Immutable||affected.All(mod=>skipped.Contains(mod.Id)))continue;
+            var difference=new ModVersionDifference{Name=recipe.Name,Incoming=recipe.Version,
+                Current=GeneralStyle.T("Arquivos extras na instalação local","Extra files in the local installation"),
+                CanReplace=false,AllowSkip=true,Detail=conflict};
+            if(difference.Skip(choose))skipped.UnionWith(affected.Select(mod=>mod.Id));
+        }
+        return InstalledSnapshot.SkipMods(manifest,catalog,skipped);
+    }
+
+    Dictionary<string,string> ConfirmVersions(InstalledSnapshotManifest manifest,Func<ModVersionDifference,bool> choose,
+        List<Receipt> receipts,List<string> skippedMods){
         var ids=new HashSet<string>(manifest.List.Mods.Select(m=>m.Id),StringComparer.Ordinal);
         var paths=new HashSet<string>(manifest.Files.Where(f=>f.Kind=="file").Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
         var obsolete=receipts.Where(r=>r.Status=="installed").SelectMany(r=>r.Manifest.Files.Where(f=>f.Kind=="file"&&f.Owners.Any(o=>r.ActiveOwners.Contains(o)&&ids.Contains(o.Split('/')[0]))&&!paths.Contains(f.Path))).Where(f=>File.Exists(Target(f.Path))||Directory.Exists(Target(f.Path))).Select(f=>f.Path).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -193,10 +221,18 @@ public sealed partial class InstalledSnapshotInstaller {
         if(obsolete.Count>0)new ModVersionDifference{Name=manifest.Name,Current=GeneralStyle.T("Outra versão registrada","Another recorded version"),Incoming=manifest.Name,CanReplace=false,Detail=GeneralStyle.T("A versão anterior contém arquivos que não fazem parte do novo pacote. Remova a versão anterior pelo gerenciador para evitar misturar versões. Nada foi apagado.","The previous version contains files absent from the new pack. Remove the previous version through the manager to avoid mixing versions. Nothing was deleted.")+"\r\n"+String.Join("\r\n",obsolete.Take(6))}.Require(choose);
         var changed=manifest.Files.Where(f=>f.Kind=="file"&&!f.ReuseLocal).GroupBy(f=>f.Path,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()).Where(f=>File.Exists(Target(f.Path))&&HashOrNull(Target(f.Path))!=f.Sha256).ToList();
         var expected=changed.ToDictionary(f=>f.Path,f=>HashOrNull(Target(f.Path)),StringComparer.OrdinalIgnoreCase);
+        var skipped=new HashSet<string>(StringComparer.Ordinal);
         foreach(var group in changed.GroupBy(f=>String.Join(", ",manifest.List.Mods.Where(m=>f.Owners.Any(owner=>owner.StartsWith(m.Id+"/",StringComparison.Ordinal))).Select(m=>m.Name)))){
             var files=group.ToList();var known=catalog.Packages.FirstOrDefault(m=>m.Files.Any(f=>files.Any(p=>p.Path.Equals(f.Path,StringComparison.OrdinalIgnoreCase))));
-            new ModVersionDifference{Name=group.Key,Current=String.Join("; ",files.Select(f=>ModVersionDifference.FileVersion(Target(f.Path))).Distinct()),Incoming=known==null?GeneralStyle.T("Conteúdo do pacote recebido","Received pack content"):known.Version,CanReplace=!files.Any(f=>IsImmutable(f.Path)&&!NightCoopRelease.AllowsUpgrade(f,expected[f.Path],catalog)),Detail=String.Join("\r\n",files.Take(6).Select(f=>f.Path))+"\r\n"+GeneralStyle.T("O pacote aguarda sua escolha. A troca guarda os arquivos anteriores para reversão. A base protegida só aceita atualizações oficiais reconhecidas.","The pack waits for your choice. Replacement backs up previous files. The protected base only accepts recognized official updates.")}.Require(choose);
+            var affected=new HashSet<string>(files.SelectMany(file=>file.Owners).Select(owner=>owner.Split('/')[0]),StringComparer.Ordinal);
+            if(affected.All(skipped.Contains))continue;
+            var difference=new ModVersionDifference{Name=group.Key,AllowSkip=manifest.Schema==2&&choose!=null&&
+                !files.Any(file=>IsImmutable(file.Path)),Current=String.Join("; ",files.Select(f=>ModVersionDifference.FileVersion(Target(f.Path))).Distinct()),Incoming=known==null?GeneralStyle.T("Conteúdo do pacote recebido","Received pack content"):known.Version,CanReplace=!files.Any(f=>IsImmutable(f.Path)&&!NightCoopRelease.AllowsUpgrade(f,expected[f.Path],catalog)),Detail=String.Join("\r\n",files.Take(6).Select(f=>f.Path))+"\r\n"+GeneralStyle.T("O pacote aguarda sua escolha. A troca guarda os arquivos anteriores para reversão. A base protegida só aceita atualizações oficiais reconhecidas.","The pack waits for your choice. Replacement backs up previous files. The protected base only accepts recognized official updates.")};
+            if(difference.AllowSkip){
+                if(difference.Skip(choose))skipped.UnionWith(affected);
+            }else difference.Require(choose);
         }
+        skippedMods.AddRange(InstalledSnapshot.SkipMods(manifest,catalog,skipped));
         return expected;
     }
 

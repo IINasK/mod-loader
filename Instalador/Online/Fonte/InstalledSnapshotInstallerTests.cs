@@ -230,6 +230,18 @@ public static class InstalledSnapshotInstallerTests {
                 receiving.Status(receipt,"missing/default")==GeneralModInstaller.Missing&&
                 !Directory.Exists(Safe.In(receiverProfile,"ExampleGame/Optional")),
                 "Pasta ausente pula o mod inteiro, preserva os outros e não cria o destino.");
+            File.WriteAllText(Safe.In(receiver,"game/core.txt"),"different local file");
+            var skipInbox=Safe.In(root,"portable/skip-inbox");
+            var skipEngine=new InstalledSnapshotInstaller(receiver,skipInbox,catalog);
+            string skippedReceipt=skipEngine.Install(snapshot,hash,null,chooseVersion:difference=>{
+                if(!difference.AllowSkip||!difference.CanReplace)throw new IOException("Expected both conflict actions.");
+                difference.SkipSelected=true;return false;
+            },approveUserFolders:folders=>true);
+            Check(File.ReadAllText(Safe.In(receiver,"game/core.txt"))=="different local file"&&
+                skipEngine.ReadSkippedDestinations(skippedReceipt).Contains(plain.Id)&&
+                skipEngine.Status(skippedReceipt,mixed.Id+"/default")==GeneralModInstaller.Installed,
+                "Skipping a conflicting mod preserves its local file and still installs another mod.");
+            File.WriteAllText(Safe.In(receiver,"game/core.txt"),"game/core.txt");
             var store=new GeneralProjectStore(Safe.In(parent,"q"));
             var project=store.CreateReceived(new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Destination=receiver,ReceiptId=receipt},inbox,catalog);
             var received=store.Load(project);
@@ -365,6 +377,35 @@ public static class InstalledSnapshotInstallerTests {
         File.AppendAllText(ini, "\n; edit after install\n");
         engine.Remove(id, new[] { owner }, null);
         Check(File.ReadAllText(ini).Contains("; edit after install"), "Configuração editada depois é preservada.");
+
+        recipe.ExclusiveCodeDirectories=new[]{"r6/scripts/fixture"};
+        recipe.Files[0].Path="r6/scripts/fixture/current.reds";
+        manifest.Files[0].Path=recipe.Files[0].Path;
+        string oldFile=Safe.In(target,"r6/scripts/fixture/legacy.reds");
+        Directory.CreateDirectory(Path.GetDirectoryName(oldFile));
+        File.WriteAllText(oldFile,"previous version");
+        var independent=RoutedEntry("independent","https://www.nexusmods.com/cyberpunk2077/mods/123?tab=files&file_id=1");
+        manifest.List.Mods.Add(independent);
+        manifest.Schema=2;
+        manifest.Project=Safe.Json.Deserialize<GeneralModList>(Safe.Json.Serialize(manifest.List));
+        foreach(var item in manifest.Project.Mods)foreach(var variant in item.Variants)variant.CyberpunkId=null;
+        string independentPath="r6/scripts/independent.reds";
+        byte[] independentBytes=Encoding.UTF8.GetBytes("independent fixture");
+        string independentHash=InstalledSnapshot.Hash(independentBytes);
+        manifest.Files.Add(new InstalledSnapshotFile{Path=independentPath,Kind="file",Sha256=independentHash,
+            Size=independentBytes.Length,Owners=new List<string>{InstalledSnapshot.Owner(independent,independent.Variants.Single())}});
+        string skipZip=Path.Combine(parent,"skip-code.zip");
+        WritePack(skipZip,manifest,new Dictionary<string,byte[]>{{manifest.Files[0].Sha256,code},{independentHash,independentBytes}});
+        bool requested=false;
+        var skipEngine=new InstalledSnapshotInstaller(target,Path.Combine(parent,"skip-code-data"),catalog,true);
+        string receipt=skipEngine.Install(skipZip,Safe.Hash(skipZip),null,chooseVersion:difference=>{
+            requested=difference.AllowSkip&&!difference.CanReplace&&difference.Detail.Contains("legacy.reds");
+            difference.SkipSelected=true;return false;
+        });
+        Check(requested&&skipEngine.ReadSkippedDestinations(receipt).SequenceEqual(new[]{recipe.Id})&&
+            File.ReadAllText(oldFile)=="previous version"&&!File.Exists(Safe.In(target,recipe.Files[0].Path))&&
+            File.Exists(Safe.In(target,independentPath)),
+            "Código antigo impede sobrescrita, mas permite pular só o mod e instalar os independentes.");
     }
 
     static InstalledSnapshotFile Config(string path, string section, string content, string owner) {

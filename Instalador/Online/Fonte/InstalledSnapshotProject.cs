@@ -24,6 +24,10 @@ public static partial class InstalledSnapshot {
         if(personal.Count>0&&(approveUserFolders==null||!approveUserFolders(personal.Values.SelectMany(paths=>paths)
             .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(path=>path,StringComparer.OrdinalIgnoreCase).ToArray())))
             unavailable.UnionWith(personal.Keys);
+        return SkipMods(manifest,catalog,unavailable);
+    }
+
+    internal static List<string> SkipMods(InstalledSnapshotManifest manifest,FixedCatalog catalog,HashSet<string> unavailable){
         if(unavailable.Count==0)return new List<string>();
         bool changed;
         do{

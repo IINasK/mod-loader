@@ -1405,8 +1405,8 @@ internal sealed partial class GeneralModWindow : Form {
     void UpdateOperationButton(){
         if(next==null)return;
         next.Text=loadingPreset?T("Cancelar troca","Cancel switch"):T("Pular mod","Skip mod");
-        next.Visible=loadingPreset?presetCancellation!=null:working||scanning;
-        next.Enabled=loadingPreset?presetCancellation!=null&&!presetCancellation.IsCancellationRequested:working||scanning;
+        next.Visible=loadingPreset?presetCancellation!=null:!uninstalling&&(working||scanning);
+        next.Enabled=loadingPreset?presetCancellation!=null&&!presetCancellation.IsCancellationRequested:!uninstalling&&(working||scanning);
     }
     internal void Preview(string path){
         ShowInTaskbar=false;StartPosition=FormStartPosition.Manual;Location=new Point(-30000,-30000);Show();Application.DoEvents();PerformLayout();

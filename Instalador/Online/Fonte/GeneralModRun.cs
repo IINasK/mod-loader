@@ -1189,6 +1189,7 @@ internal sealed partial class GeneralModWindow {
             if(GeneralStatusPresentation.Kind(status)=="installed"||status==GeneralStatusPresentation.Disabled)yield return id;
         }
     }
+    bool uninstalling;
     async Task Uninstall(){
         if(projectDraft!=null&&!ConfirmProjectNavigation())return;
         if(working||scanning)return;
@@ -1200,22 +1201,45 @@ internal sealed partial class GeneralModWindow {
             if(GeneralDialog.Message(this,T("Desinstalar os mods selecionados e apagar suas cópias desabilitadas?","Uninstall the selected mods and delete their disabled copies?"),
                 T("Confirmar desinstalação","Confirm uninstall"),MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
             OnlineDiagnostics.Record("general.uninstall.begin",null,"Desinstalação confirmada.",new{Mods=checkedIds.ToArray(),Count=jobs.Count});
-            working=true;Busy(true);
+            uninstalling=working=true;Busy(true);
+            currentProgress.NotApplicable=false;
+            currentProgress.Value=0;
+            currentProgress.Caption=T("Preparando desinstalação…","Preparing uninstall…");
+            currentProgress.Indeterminate=true;
+            detail.Text=T("Conferindo os mods selecionados: ","Checking selected mods: ")+jobs.Count;
             try{
                 string result=await Task.Run(()=>{
                     var store=DisabledAt(root);
                     var disabled=new HashSet<string>(store.Read().Keys,StringComparer.Ordinal);
-                    foreach(var work in jobs.Where(work=>disabled.Contains(PresetRecipeKey(work))))disabled.Add(work.Key);string notes=RemoveManagedWorks(jobs,root,disabled);
+                    foreach(var work in jobs.Where(work=>disabled.Contains(PresetRecipeKey(work))))disabled.Add(work.Key);
+                    string notes=RemoveManagedWorks(jobs,root,disabled,ReportUninstall);
+                    ReportUninstall(T("Limpando registros da instalação…","Cleaning installation records…"));
                     store.Discard(jobs.Select(work=>PresetStoredKey(work,root)));
                     if(state.AppliedPreset!=null)new GeneralPresetDeployment(root,data,()=>EnsureGameClosed(root)).RecordRemoval(jobs.Select(PresetRecipeKey));
                     return notes;
                 });
                 Persist();detail.Text=result;
                 OnlineDiagnostics.Record("general.uninstall.complete",null,"Desinstalação processada.",new{Count=jobs.Count,Result=result});
-            }finally{working=false;Busy(false);}
+            }finally{uninstalling=working=false;currentProgress.Indeterminate=false;Busy(false);}
             await Scan();
-        }catch(Exception ex){Guard(()=>{throw new IOException(ex.Message,ex);});}
+            currentProgress.Caption=T("Desinstalação concluída","Uninstall finished");
+            currentProgress.Value=100;
+            currentProgress.NotApplicable=false;
+        }catch(Exception ex){
+            currentProgress.Caption=T("Desinstalação interrompida","Uninstall interrupted");
+            currentProgress.Value=0;
+            currentProgress.Indeterminate=false;
+            currentProgress.NotApplicable=false;
+            ShowError(ex);
+        }
     }
+
+    void ReportUninstall(string message){
+        if(!IsDisposed&&IsHandleCreated)BeginInvoke((Action)(()=>{
+            if(uninstalling)currentProgress.Caption=message;
+        }));
+    }
+
     async Task CyberpunkMaintenance(bool clean,string[] selectedExtras=null){
         if(working||scanning)return;
         string root=state.Destination;

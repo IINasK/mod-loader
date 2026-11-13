@@ -387,7 +387,11 @@ internal sealed partial class GeneralModWindow {
         await Scan();
     }
 
-    string RemoveManagedWorks(List<Work> jobs, string root, HashSet<string> disabled) {
+    string RemoveManagedWorks(List<Work> jobs, string root, HashSet<string> disabled,Action<string> progress=null) {
+        Action<string> report=progress??Report;
+        Action<Work> announce=work=>{
+            if(progress!=null)progress(T("Desinstalando · ","Uninstalling · ")+work.Entry.Name);
+        };
         EnsureGameClosed(root);
         KeepLinkedDependencies(jobs,root);
         var notes = new List<string>();
@@ -400,7 +404,8 @@ internal sealed partial class GeneralModWindow {
         foreach (var group in snapshots.GroupBy(work => new {
             Receipt=state.SnapshotReceipts[InstalledSnapshot.Owner(work.Entry,work.Variant)], Disabled=disabled.Contains(work.Key)
         })) {
-            notes.Add(Snapshot(root).Remove(group.Key.Receipt,group.Select(work=>InstalledSnapshot.Owner(work.Entry,work.Variant)),Report,group.Key.Disabled,preserveExternal));
+            announce(group.First());
+            notes.Add(Snapshot(root).Remove(group.Key.Receipt,group.Select(work=>InstalledSnapshot.Owner(work.Entry,work.Variant)),report,group.Key.Disabled,preserveExternal));
             foreach (var work in group) state.SnapshotReceipts.Remove(InstalledSnapshot.Owner(work.Entry,work.Variant));
         }
         var standard = jobs.Except(snapshots).ToList();
@@ -408,13 +413,16 @@ internal sealed partial class GeneralModWindow {
             .Select(work => work.Variant.CyberpunkId).Distinct().ToArray();
         if (fixedIds.Length > 0) {
             if (!IsCyberpunk(root)) throw new IOException(T("Selecione a pasta do Cyberpunk 2077.", "Select the Cyberpunk 2077 folder."));
-            notes.Add(Cyberpunk(root).DeactivateMany(fixedIds, Report, keepBackup: false));
+            notes.Add(Cyberpunk(root).DeactivateMany(fixedIds, report, keepBackup: false));
         }
         bool cyberpunk = IsCyberpunk(root);
-        foreach(var work in standard.Where(item=>item.Variant.CyberpunkId!=null&&item.Variant.InstallRoutes.Count>0))
+        foreach(var work in standard.Where(item=>item.Variant.CyberpunkId!=null&&item.Variant.InstallRoutes.Count>0)){
+            announce(work);
             using(Cyberpunk(root).LockForRouteChange())
                 notes.Add(Generic(root).Remove(work.Receipt(0),disabled.Contains(work.Key),null,preserveExternal));
+        }
         foreach (var work in standard.Where(item => item.Variant.CyberpunkId == null)) {
+            announce(work);
             for (int index = work.Variant.Sources.Count - 1; index >= 0; index--) {
                 string key = work.Receipt(index);
                 if (!cyberpunk) {
@@ -426,7 +434,7 @@ internal sealed partial class GeneralModWindow {
                     string id = CyberpunkImportId(work, index);
                     if (id == null) continue;
                     bool anotherOwner = state.CyberpunkImports.Any(pair => pair.Value == id && !jobs.Any(item => item.Key == WorkKeyFromReceipt(pair.Key)));
-                    if (!anotherOwner) notes.Add(Cyberpunk(root).RemoveImported(id, Report, disabled.Contains(work.Key)));
+                    if (!anotherOwner) notes.Add(Cyberpunk(root).RemoveImported(id, report, disabled.Contains(work.Key)));
                     state.CyberpunkImports.Remove(key);
                     string legacy=P2PPack.LegacySlot(work.Entry,work.Variant,index);
                     if(legacy!=null)state.CyberpunkImports.Remove(legacy);

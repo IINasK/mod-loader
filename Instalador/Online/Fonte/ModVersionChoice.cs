@@ -8,6 +8,15 @@ using System.Windows.Forms;
 public sealed class ModVersionDifference {
     public string Name,Current,Incoming,Detail;
     public bool CanReplace=true;
+    internal bool AllowSkip,SkipSelected;
+
+    internal bool Skip(Func<ModVersionDifference,bool> choose){
+        bool replace=choose!=null&&choose(this);
+        if(SkipSelected&&AllowSkip)return true;
+        if(!replace)throw new ModVersionKeptException(Name);
+        if(!CanReplace)throw new IOException(Detail);
+        return false;
+    }
     internal static string FileVersion(string path){
         string ext=Path.GetExtension(path).ToLowerInvariant();if(ext!=".dll"&&ext!=".exe"&&ext!=".asi")return GeneralStyle.T("Conteúdo diferente; versão não identificada","Different content; version unidentified");
         var v=FileVersionInfo.GetVersionInfo(path);return String.IsNullOrWhiteSpace(v.FileVersion)?GeneralStyle.T("Versão não identificada","Version unidentified"):v.FileVersion.Trim();
@@ -27,15 +36,29 @@ internal sealed class GeneralVersionChoiceDialog : GeneralDialog {
         RequiresDecision=true;Name="VersionChoice";ClientSize=new Size(680,400);
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(24,8,24,24)};
         layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        var text=new TextBox{Name="VersionDetails",Multiline=true,ReadOnly=true,WordWrap=true,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,Text=difference.Name+"\r\n\r\n"+GeneralStyle.T("Instalado: ","Installed: ")+difference.Current+"\r\n"+GeneralStyle.T("Solicitado: ","Requested: ")+difference.Incoming+"\r\n\r\n"+difference.Detail+"\r\n\r\n"+GeneralStyle.T("Manter atual adia este item/pacote inteiro; os outros itens da fila continuam. A escolha não vale para os próximos conflitos.","Keep current defers this entire item/pack; other queue items continue. The choice does not apply to future conflicts.")};
+        var text=new TextBox{Name="VersionDetails",Multiline=true,ReadOnly=true,WordWrap=true,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,Text=difference.Name+"\r\n\r\n"+GeneralStyle.T("Instalado: ","Installed: ")+difference.Current+"\r\n"+GeneralStyle.T("Solicitado: ","Requested: ")+difference.Incoming+"\r\n\r\n"+difference.Detail+"\r\n\r\n"+(difference.AllowSkip?GeneralStyle.T("Pular mod mantém a versão local e continua com os outros mods.","Skip mod keeps the local version and continues with the other mods."):GeneralStyle.T("Manter atual adia este item/pacote inteiro; os outros itens da fila continuam. A escolha não vale para os próximos conflitos.","Keep current defers this entire item/pack; other queue items continue. The choice does not apply to future conflicts."))};
         layout.Controls.Add(new GeneralScrollView(text),0,0);var actions=GeneralTableDialogLayout.Commands();
         var replace=GeneralStyle.Button(GeneralStyle.T("Usar do pacote","Use pack version"),()=>Complete(DialogResult.Yes),true);replace.Name="UseIncomingVersion";replace.Enabled=difference.CanReplace;
-        var keep=GeneralStyle.Button(GeneralStyle.T("Manter atual","Keep current"),()=>Complete(DialogResult.No));keep.Name="KeepInstalledVersion";
-        actions.Controls.Add(replace);actions.Controls.Add(keep);layout.Controls.Add(actions,0,1);Content.Controls.Add(layout);CancelButton=keep;AcceptButton=keep;GeneralStyle.Apply(this,GeneralStyle.Dark);text.BorderStyle=BorderStyle.None;
+        var keep=GeneralStyle.Button(GeneralStyle.T("Manter atual","Keep current"),()=>Complete(difference.AllowSkip?DialogResult.Ignore:DialogResult.No));keep.Name="KeepInstalledVersion";
+        actions.Controls.Add(replace);
+        if(difference.AllowSkip){
+            keep.Text=GeneralStyle.T("Pular mod","Skip mod");
+            var defer=GeneralStyle.Button(GeneralStyle.T("Adiar instalação","Defer installation"),()=>Complete(DialogResult.Cancel));
+            actions.Controls.Add(keep);actions.Controls.Add(defer);
+            CancelButton=AcceptButton=defer;
+        }else{
+            actions.Controls.Add(keep);
+            CancelButton=AcceptButton=keep;
+        }
+        layout.Controls.Add(actions,0,1);Content.Controls.Add(layout);GeneralStyle.Apply(this,GeneralStyle.Dark);text.BorderStyle=BorderStyle.None;
     }
     internal static bool Ask(Control owner,ModVersionDifference difference){
         if(owner==null||owner.IsDisposed||!owner.IsHandleCreated)return false;
         if(owner.InvokeRequired)return (bool)owner.Invoke((Func<bool>)(()=>Ask(owner,difference)));
-        using(var dialog=new GeneralVersionChoiceDialog(difference))return dialog.ShowDialog(owner)==DialogResult.Yes;
+        using(var dialog=new GeneralVersionChoiceDialog(difference)){
+            var result=dialog.ShowDialog(owner);
+            difference.SkipSelected=result==DialogResult.Ignore;
+            return result==DialogResult.Yes;
+        }
     }
 }
