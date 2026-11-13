@@ -356,7 +356,8 @@ internal sealed partial class GeneralModWindow {
             var elapsed=Stopwatch.StartNew();
             var reads=new ScanReads(this,root);
             if(audit!=null)audit.Reads=reads;
-            var inventory=reads.Exists?Task.Run(()=>TryReadGameInventory(root,reads)):null;
+            var zipLabels=reads.Exists?new Dictionary<string,InventoryZipLabel>(InventoryLinks.ZipLabels,InventoryPaths):null;
+            var inventory=reads.Exists?Task.Run(()=>TryReadGameInventory(root,reads,zipLabels)):null;
             int workers=workerLimit??Math.Max(1,Math.Min(4,Environment.ProcessorCount/2));
             var visibleRows=ModRows().ToDictionary(row=>(string)row.Tag);
             var pending=new Queue<Task<string>>();

@@ -303,12 +303,15 @@ internal sealed partial class GeneralModWindow : Form {
         menu.Opening+=(s,e)=>{var focused=FocusedEntry();removeEntry.Visible=focused!=null&&!IsBigBody(focused);};
         var linkInventory=GeneralMenuRenderer.Add(menu,T("Vincular link do Nexus…","Link Nexus URL…"),()=>
             SetInventorySource(grid.CurrentRow==null?null:grid.CurrentRow.Tag as P2PSyncDifference));
+        var zipOrigin=GeneralMenuRenderer.Add(menu,T("Conferir origem pelo ZIP…","Verify origin from ZIP…"),VerifyInventoryZip);
         var splitInventory=GeneralMenuRenderer.Add(menu,T("Desfazer agrupamento ou vínculo","Undo grouping or link"),()=>Guard(()=>{
             var group=SelectedInventoryLink();
             if(group!=null&&CanEditInventory)UpdateInventoryLinks(links=>links.Groups.RemoveAll(item=>item.Id==group.Id));
         }));
         menu.Opening+=(s,e)=>{
-            linkInventory.Visible=CanEditInventory&&grid.CurrentRow!=null&&grid.CurrentRow.Tag is P2PSyncDifference;
+            var item=grid.CurrentRow==null?null:grid.CurrentRow.Tag as P2PSyncDifference;
+            linkInventory.Visible=CanEditInventory&&item!=null&&item.VerifiedZip==null;
+            zipOrigin.Visible=CanEditInventory&&item!=null&&GeneralAppPaths.IsDevelopment;
             splitInventory.Visible=CanEditInventory&&SelectedInventoryLink()!=null;
         };
         menu.Items.Add(new ToolStripSeparator());
@@ -537,8 +540,11 @@ internal sealed partial class GeneralModWindow : Form {
                 row.Cells["Name"].ToolTipText=String.Join(Environment.NewLine,members.Select(file=>file.Path).Take(12)
                     .Concat(group==null||group.Source==null?Enumerable.Empty<string>():new[]{group.Source}));
                 row.Cells["Status"].Value=GameInventoryStatus;
-                row.Cells["Origin"].Value="?";
-                row.Cells["Origin"].ToolTipText=T(
+                row.Cells["Origin"].Value=entry.First().VerifiedZip==null?"?":"ZIP";
+                row.Cells["Origin"].ToolTipText=entry.First().VerifiedZip!=null
+                    ?T("Caminho e conteúdo conferidos com o ZIP.","Path and contents verified against the ZIP.")+
+                        Environment.NewLine+String.Join(Environment.NewLine,entry.Select(file=>file.VerifiedZip).Distinct(InventoryPaths))
+                    :T(
                     "Arquivos encontrados no jogo. Arraste sobre outro item não identificado para agrupar.",
                     "Game files found outside this project. Drag onto another unidentified item to group them.");
             }
@@ -846,7 +852,7 @@ internal sealed partial class GeneralModWindow : Form {
                 var icon=new Rectangle(bounds.X+(bounds.Width-20)/2,bounds.Y+(bounds.Height-20)/2,20,20);
                 ModLoaderBrand.Draw(e.Graphics,icon,true);
             }else if(item is P2PSyncDifference){
-                TextRenderer.DrawText(e.Graphics,"?",e.CellStyle.Font,bounds,GeneralStyle.Muted,
+                TextRenderer.DrawText(e.Graphics,Convert.ToString(e.FormattedValue),e.CellStyle.Font,bounds,GeneralStyle.Muted,
                     TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.PreserveGraphicsClipping);
             }
             e.Handled=true;return;

@@ -65,7 +65,7 @@ internal sealed partial class GeneralModWindow {
             int index=table.HitTest(e.X,e.Y).RowIndex;
             if(e.Button!=MouseButtons.Left||!CanEditInventory||index<0)return;
             var item=table.Rows[index].Tag as P2PSyncDifference;
-            if(item==null||item.Kind!="found")return;
+            if(item==null||item.Kind!="found"||item.VerifiedZip!=null)return;
             key=InventoryLinkStore.Key(item);down=e.Location;
         };
         table.MouseUp+=(s,e)=>key=null;
@@ -83,7 +83,7 @@ internal sealed partial class GeneralModWindow {
         if(target!=grid||!CanEditInventory||inventoryDragKey==null||
             !InventoryPaths.Equals(e.Data.GetData(InventoryDragFormat) as string,inventoryDragKey))return DragDropEffects.None;
         var item=InventoryRowAt(e.X,e.Y);
-        return item!=null&&item.Kind=="found"&&!InventoryPaths.Equals(InventoryLinkStore.Key(item),inventoryDragKey)
+        return item!=null&&item.Kind=="found"&&item.VerifiedZip==null&&!InventoryPaths.Equals(InventoryLinkStore.Key(item),inventoryDragKey)
             ?DragDropEffects.Move:DragDropEffects.None;
     }
 
@@ -132,7 +132,7 @@ internal sealed partial class GeneralModWindow {
         var link=GeneralNexusLink.Parse(value);
         if(link==null)throw new IOException(T("Cole um link de mod do Nexus.","Paste a Nexus mod link."));
         var files=InventoryRow(key);
-        if(files.Length==0)return;
+        if(files.Length==0||files.Any(file=>file.VerifiedZip!=null))return;
         string id=null;
         UpdateInventoryLinks(links=>{
             var group=InventoryLinkStore.Combine(links,key,files[0].Mod??files[0].Path,null,files.Select(file=>file.Path),link.Url);
@@ -143,6 +143,39 @@ internal sealed partial class GeneralModWindow {
             return;
         }
         await ReviewInventoryLinks(id);
+    }
+
+    async void VerifyInventoryZip() {
+        if(!CanEditInventory||inventoryLoadError!=null)return;
+        using(var dialog=new OpenFileDialog{Title=T("Escolher ZIP original do mod","Choose original mod ZIP"),
+            Filter="ZIP (*.zip)|*.zip",InitialDirectory=state.DownloadFolder,CheckFileExists=true}){
+            if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+            using(var name=new GeneralNameDialog(T("Nome do pacote","Package name"),Path.GetFileNameWithoutExtension(dialog.FileName),
+                fieldLabel:T("Nome do mod","Mod name"),maxLength:300)){
+                if(name.ShowDialog(this)!=DialogResult.OK)return;
+                try{
+                    int count=await VerifyInventoryZip(dialog.FileName,name.ResultName);
+                    detail.Text=count==0?T("Nenhum arquivo instalado bate com o ZIP.","No installed files match the ZIP."):
+                        T("Arquivos com origem confirmada: ","Files with verified origin: ")+count;
+                }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
+            }
+        }
+    }
+
+    async Task<int> VerifyInventoryZip(string zip,string name) {
+        string root=state.Destination;
+        var candidates=gameInventory.Where(file=>file.Kind=="found").Select(file=>file.Path).ToArray();
+        scanning=true;Busy(true);
+        detail.Text=T("Conferindo conteúdo do ZIP…","Verifying ZIP contents…");
+        Dictionary<string,InventoryZipLabel> matches;
+        try{matches=await Task.Run(()=>InventoryLinkStore.MatchZip(root,zip,name,IsCyberpunk(root),candidates));}
+        finally{scanning=false;if(!IsDisposed)Busy(false);}
+        if(IsDisposed||!InventoryPaths.Equals(root,state.Destination)||matches.Count==0)return 0;
+        UpdateInventoryLinks(links=>{
+            foreach(var item in matches)links.ZipLabels[item.Key]=item.Value;
+        });
+        await Scan();
+        return matches.Count;
     }
 
     bool NexusPreviewsAvailable {get{return testNexusPreviews!=null||!testMode&&GeneralAppPaths.IsDevelopment&&GeneralNexusInfo.HasTestKey;}}

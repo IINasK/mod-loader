@@ -131,13 +131,13 @@ internal sealed partial class GeneralModWindow {
         }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
     }
 
-    List<P2PSyncDifference> TryReadGameInventory(string destination,ScanReads reads) {
-        try{return ReadGameInventory(destination,reads);}
+    List<P2PSyncDifference> TryReadGameInventory(string destination,ScanReads reads,Dictionary<string,InventoryZipLabel> zipLabels) {
+        try{return ReadGameInventory(destination,reads,zipLabels);}
         catch(IOException ex){OnlineDiagnostics.Failure("scan.inventory.failed",ex,"Identificar os mods na pasta do jogo.");return null;}
         catch(UnauthorizedAccessException ex){OnlineDiagnostics.Failure("scan.inventory.failed",ex,"Ler a pasta do jogo.");return null;}
     }
 
-    List<P2PSyncDifference> ReadGameInventory(string destination,ScanReads reads=null) {
+    List<P2PSyncDifference> ReadGameInventory(string destination,ScanReads reads=null,Dictionary<string,InventoryZipLabel> zipLabels=null) {
         destination=Path.GetFullPath(destination).TrimEnd('\\');
         bool cyberpunk=IsCyberpunk(destination);
         var byWork=state.List.Mods.SelectMany(mod=>mod.Variants.Select(variant=>new{Mod=mod,Key=Key(mod,variant)}))
@@ -182,8 +182,25 @@ internal sealed partial class GeneralModWindow {
         Func<string,string> scope=cyberpunk?(Func<string,string>)FixedInstaller.ModFolder:InstalledFileOwnership.GenericScope;
         var associated=InstalledFileOwnership.FindAssociated(destination,registered,scope,
             cyberpunk?extras.Where(file=>file.Kind=="found").Select(file=>file.Path):null);
-        extras.RemoveAll(file=>file.Kind=="found"&&associated.ContainsKey(file.Path)&&names.ContainsKey(associated[file.Path]));
-        foreach(var pair in associated.Where(item=>names.ContainsKey(item.Value)))
+        var labels=zipLabels??new Dictionary<string,InventoryZipLabel>(InventoryPaths);
+        foreach(var file in extras.Where(item=>item.Kind=="found")){
+            InventoryZipLabel label;
+            if(!labels.TryGetValue(file.Path,out label))continue;
+            try {
+                string path=GeneralInstallRoutes.Resolve(destination,file.Path);
+                Safe.NoLinks(path);
+                if((reads==null?(Func<string,string>)Safe.Hash:reads.Hash)(path)!=label.Hash)continue;
+                file.Mod=label.Name;
+                file.VerifiedZip=label.Archive;
+                file.InventoryGroupId="zip:"+label.Name;
+            }catch(IOException){}catch(UnauthorizedAccessException){}
+        }
+        // A package match describes individual files. Folder association cannot inherit that proof.
+        var verifiedScopes=new HashSet<string>(extras.Where(file=>file.VerifiedZip!=null)
+            .Select(file=>scope(file.Path)).Where(folder=>folder!=null),InventoryPaths);
+        extras.RemoveAll(file=>file.Kind=="found"&&file.VerifiedZip==null&&associated.ContainsKey(file.Path)&&
+            names.ContainsKey(associated[file.Path])&&!labels.ContainsKey(file.Path)&&!verifiedScopes.Contains(scope(file.Path)));
+        foreach(var pair in associated.Where(item=>names.ContainsKey(item.Value)&&!labels.ContainsKey(item.Key)))
             extras.Add(new P2PSyncDifference{Kind="associated",Mod=names[pair.Value],ModId=pair.Value,Path=pair.Key});
         return extras;
     }

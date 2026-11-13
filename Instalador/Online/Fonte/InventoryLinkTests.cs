@@ -2,11 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
+    static void WriteZipEntry(ZipArchive zip,string path,string contents){
+        using(var writer=new StreamWriter(zip.CreateEntry(path).Open()))writer.Write(contents);
+    }
+
     internal static void RunInventoryLinkTests(string parent){
         string root=OnlineTests.NestedRoot(parent,"inv-links-");
         Directory.CreateDirectory(root);
@@ -101,6 +106,38 @@ internal sealed partial class GeneralModWindow {
                 "Undo restores the separate inventory rows.");
             check(state.SnapshotReceipts.Count==0&&state.CyberpunkImports.Count==0&&
                 paths.Select(path=>Safe.Hash(Safe.In(game,path))).SequenceEqual(hashes),"Grouping leaves installed content and all ownership records untouched.");
+
+            const string framework="bin/x64/plugins/cyber_engine_tweaks/mods/framework/";
+            string exact=framework+"projects/villa.json", changed=framework+"projects/changed.json",
+                unknown=framework+"projects/unknown.json", dependency=framework+"init.lua";
+            foreach(string relative in new[]{exact,changed,unknown,dependency}){
+                string file=Safe.In(game,relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(file));
+                File.WriteAllText(file,"installed");
+            }
+            string villa=Safe.In(root,"villa.zip"), nif=Safe.In(root,"nif.zip");
+            using(var zip=ZipFile.Open(villa,ZipArchiveMode.Create)){
+                WriteZipEntry(zip,exact,"installed");
+                WriteZipEntry(zip,changed,"different");
+            }
+            using(var zip=ZipFile.Open(nif,ZipArchiveMode.Create))WriteZipEntry(zip,dependency,"installed");
+            await form.Scan();
+            check(await form.VerifyInventoryZip(villa,"Villa V")==1&&await form.VerifyInventoryZip(nif,"Native Interactions")==1,
+                "ZIP verification confirms byte matches across packages sharing a folder.");
+            form.inventoryLinks=null;
+            await form.Scan();
+            var found=form.VisibleGameInventory().ToDictionary(file=>file.Path,InventoryPaths);
+            check(found[exact].Mod=="Villa V"&&found[dependency].Mod=="Native Interactions"&&
+                found[changed].VerifiedZip==null&&found[unknown].VerifiedZip==null,
+                "Reload preserves exact origins and keeps mismatched or unlisted neighbors unverified.");
+            check(form.grid.Rows.Cast<DataGridViewRow>().Any(row=>Equals(row.Cells["Origin"].Value,"ZIP")&&Equals(row.Cells["Name"].Value,"Villa V"))&&
+                form.grid.Rows.Cast<DataGridViewRow>().Any(row=>row.Tag is P2PSyncDifference&&
+                    InventoryLinkStore.Key((P2PSyncDifference)row.Tag)==InventoryLinkStore.Key(found[unknown])&&Equals(row.Cells["Origin"].Value,"?")),
+                "The inventory shows ZIP for verified files and a question mark for the remaining files.");
+            File.WriteAllText(Safe.In(game,exact),"modified!");
+            await form.Scan();
+            check(form.VisibleGameInventory().Single(file=>file.Path==exact).VerifiedZip==null,
+                "Changing the installed bytes removes the confirmed label on the next scan.");
         });
     }
 }
