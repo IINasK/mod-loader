@@ -86,7 +86,14 @@ internal sealed class GeneralReveal : IDisposable {
 internal sealed class GeneralPopupMenu : ContextMenuStrip {
     protected override void OnOpening(System.ComponentModel.CancelEventArgs e){
         base.OnOpening(e);
-        if(!e.Cancel)GeneralPopupPlacement.RoundMenu(this);
+        if(!e.Cancel){
+            PerformLayout();
+            GeneralPopupPlacement.RoundMenu(this);
+        }
+    }
+    protected override void OnSizeChanged(EventArgs e){
+        base.OnSizeChanged(e);
+        if(IsHandleCreated)GeneralPopupPlacement.RoundMenu(this);
     }
 }
 

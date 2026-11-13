@@ -60,9 +60,7 @@ internal sealed partial class GeneralModWindow {
         if(item==null||!CanEditInventory)return;
         var files=DisplayedInventory().Where(file=>file.Kind=="found"&&
             InventoryPaths.Equals(InventoryLinkStore.Key(file),InventoryLinkStore.Key(item))).ToArray();
-        using(var dialog=new GeneralSyncDifferencesDialog(files,true,
-            (owner,file)=>OpenInventoryTree(file.Path,owner),
-            file=>Guard(()=>GeneralInventoryTree.RevealInExplorer(state.Destination,file.Path)))){
+        using(var dialog=new GeneralSyncDifferencesDialog(files,true,showSource:true)){
             dialog.ShowDialog(this);
         }
     }

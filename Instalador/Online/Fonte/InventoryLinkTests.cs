@@ -217,19 +217,19 @@ internal sealed partial class GeneralModWindow {
                     form.InventoryHeaderActionAt(actions[1].Left+1,20)==2&&form.InventoryHeaderActionAt(actions[1].Left+1,1)==0,
                     "The two header labels have distinct click targets.");
             }
-            P2PSyncDifference internalFile=null,explorerFile=null;
-            using(var details=new GeneralSyncDifferencesDialog(new[]{found[exact],found[dependency]},true,
-                (owner,file)=>internalFile=file,file=>explorerFile=file)){
-                details.StartPosition=FormStartPosition.Manual;details.Location=form.Location;details.Show(form);
+            using(var details=new GeneralSyncDifferencesDialog(new[]{found[exact],found[dependency]},true,showSource:true)){
                 var table=(DataGridView)details.Controls.Find("SyncDifferenceFiles",true).Single();
                 var selected=table.Rows.Cast<DataGridViewRow>().Single(row=>row.Tag==found[exact]);
-                table.CurrentCell=selected.Cells[2];
-                check(Equals(selected.Cells[3].Value,"villa.zip"),"Details show the source ZIP of the selected file.");
-                ((Button)details.Controls.Find("OpenInventoryInternal",true).Single()).PerformClick();
-                ((Button)details.Controls.Find("OpenInventoryExplorer",true).Single()).PerformClick();
-                check(internalFile==found[exact]&&explorerFile==found[exact],"Both shortcuts target the selected file.");
-                details.Close();
+                check(Equals(selected.Cells[3].Value,"villa.zip"),"Details show the source ZIP.");
             }
+            var menu=form.grid.ContextMenuStrip;
+            var rowForVilla=form.grid.Rows.Cast<DataGridViewRow>().Single(row=>row.Tag is P2PSyncDifference && ((P2PSyncDifference)row.Tag).Path==exact);
+            form.grid.CurrentCell=rowForVilla.Cells["Name"];
+            menu.Show(form,new Point(20,20));
+            check(menu.Items.Cast<ToolStripItem>().Where(item=>item.Available).Select(item=>item.Text)
+                .SequenceEqual(new[]{"Detalhes","Abrir local no Mod Loader","Abrir local no Explorador"}),
+                "The inventory context menu exposes Details and both location actions directly.");
+            menu.Close();
             using(var local=new GeneralInventoryTree(game,form.DisplayedInventory(),found[exact].Path)){
                 var list=(ListBox)local.Controls.Find("InventoryFileTree",true).Single();
                 var selected=(GeneralInventoryTree.Entry)list.SelectedItem;

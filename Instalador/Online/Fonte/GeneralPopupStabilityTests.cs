@@ -115,6 +115,28 @@ internal static class GeneralPopupStabilityTests {
                                     CheckMenuLabel(bitmap,first,check);CheckMenuLabel(bitmap,second,check);
                                 }
                                 menu.Close();
+                                menu.Opening+=(ss,ee)=>second.Visible=false;
+                                menu.Show(owner,new Point(20,20));
+                                first.Select();
+                                var highlight=GeneralMenuRenderer.SelectionBounds(menu.ClientSize,first.Bounds);
+                                check(highlight.Width>0&&highlight.Left>=8&&highlight.Right<=menu.ClientSize.Width-8&&
+                                    highlight.Bottom<=menu.ClientSize.Height-6,"Selected item stays inside the rounded menu border.");
+                                using(var bitmap=new Bitmap(menu.Width,menu.Height))
+                                using(var composed=new Bitmap(menu.Width,menu.Height))
+                                using(var graphics=Graphics.FromImage(composed)){
+                                    menu.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));
+                                    graphics.Clear(Color.Magenta);
+                                    graphics.IntersectClip(menu.Region);
+                                    graphics.DrawImageUnscaled(bitmap,0,0);
+                                    composed.Save(Path.Combine(root,"context-menu-selected.png"));
+                                    CheckPopupFrame(composed,"Selected one-item menu",check);
+                                    check(composed.GetPixel(highlight.Left+highlight.Width-25,highlight.Top+highlight.Height/2)
+                                        .ToArgb()==GeneralStyle.Selection.ToArgb(),"The selected item paints a centered inner highlight.");
+                                }
+                                int bottom=menu.ClientSize.Height-1;
+                                check(!menu.Region.IsVisible(1,bottom)&&!menu.Region.IsVisible(menu.ClientSize.Width-2,bottom),
+                                    "Menu corners stay rounded when Opening hides all but one item.");
+                                menu.Close();
                             }
                             using(var picker=new GeneralPicker{Size=new Size(268,44),Location=new Point(320,126)}){
                                 owner.Controls.Add(picker);picker.Items.AddRange(new object[]{"Português","English"});picker.SelectedIndex=0;

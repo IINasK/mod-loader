@@ -336,11 +336,32 @@ internal sealed class GeneralProgress : Control {
 }
 
 internal sealed class GeneralMenuRenderer : ToolStripProfessionalRenderer {
-    protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e){GeneralStyle.PaintCard(e.Graphics,e.ToolStrip.Size);}
+    protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e){
+        var state=e.Graphics.Save();
+        try{
+            using(var shape=GeneralStyle.PopupShape(e.ToolStrip.ClientSize))
+            using(var mask=new Region(shape))e.Graphics.IntersectClip(mask);
+            GeneralStyle.PaintCard(e.Graphics,e.ToolStrip.ClientSize);
+        }finally{e.Graphics.Restore(state);}
+    }
     protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e){}
     protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e){
         if(!e.Item.Selected)return;
-        using(var brush=new SolidBrush(GeneralStyle.Selection))using(var shape=GeneralStyle.Round(new RectangleF(6,2,e.Item.Width-12,e.Item.Height-4),12))e.Graphics.FillPath(brush,shape);
+        var bounds=SelectionBounds(e.ToolStrip.ClientSize,e.Item.Bounds);
+        if(bounds.IsEmpty)return;
+        bounds.Offset(-e.Item.Bounds.X,-e.Item.Bounds.Y);
+        var state=e.Graphics.Save();
+        try{
+            e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
+            using(var brush=new SolidBrush(GeneralStyle.Selection))
+            using(var shape=GeneralStyle.Round(bounds,12))e.Graphics.FillPath(brush,shape);
+        }finally{e.Graphics.Restore(state);}
+    }
+    internal static Rectangle SelectionBounds(Size menu,Rectangle item){
+        var inset=new Rectangle(Point.Empty,menu);
+        inset.Inflate(-8,-6);
+        item.Inflate(-6,-2);
+        return Rectangle.Intersect(inset,item);
     }
     protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e){
         e.TextColor=e.Item.Enabled?GeneralStyle.Foreground:GeneralStyle.Muted;

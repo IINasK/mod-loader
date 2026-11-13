@@ -124,12 +124,9 @@ internal sealed class GeneralSyncReviewDialog : GeneralDialog {
 
 internal sealed class GeneralSyncDifferencesDialog : GeneralDialog {
     internal GeneralSyncDifferencesDialog(IReadOnlyList<P2PSyncDifference> differences,bool inventory=false,
-        Action<IWin32Window,P2PSyncDifference> openInternal=null,Action<P2PSyncDifference> openExplorer=null)
-        : base(openInternal!=null?T("Detalhes","Details"):
+        bool showSource=false)
+        : base(showSource?T("Detalhes","Details"):
             inventory?T("Arquivos no jogo fora da lista","Game files outside the list"):T("Diferenças fora do pacote", "Differences outside the pack")) {
-        bool showSource=openInternal!=null;
-        Func<P2PSyncDifference> currentFile=()=>null;
-        Button internalButton=null,explorerButton=null;
         ClientSize = new Size(810, 475);
         var layout = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(24, 8, 24, 18)
@@ -182,29 +179,11 @@ internal sealed class GeneralSyncDifferencesDialog : GeneralDialog {
                 grid.Rows[row].Cells[1].ToolTipText = difference.Mod ?? "";
                 grid.Rows[row].Cells[2].ToolTipText = difference.Path;
             }
-            if(showSource){
-                currentFile=()=>grid.CurrentRow==null?null:grid.CurrentRow.Tag as P2PSyncDifference;
-                grid.CurrentCell=grid.Rows[0].Cells[0];
-                grid.CurrentCellChanged+=(s,e)=>{
-                    if(internalButton!=null)internalButton.Enabled=explorerButton.Enabled=currentFile()!=null;
-                };
-            }
             layout.Controls.Add(new GeneralScrollView(grid), 0, 0);
         }
         var commands = GeneralTableDialogLayout.Commands();
         var close = GeneralStyle.Button(T("Fechar", "Close"), () => Complete(DialogResult.OK), true);
         commands.Controls.Add(close);
-        if(showSource){
-            internalButton=GeneralStyle.Button(T("Abrir local no Mod Loader","Open location in Mod Loader"),
-                ()=>{var file=currentFile();if(file!=null)openInternal(this,file);});
-            explorerButton=GeneralStyle.Button(T("Abrir local no Explorador","Open location in Explorer"),
-                ()=>{var file=currentFile();if(file!=null&&openExplorer!=null)openExplorer(file);});
-            internalButton.Name="OpenInventoryInternal";
-            explorerButton.Name="OpenInventoryExplorer";
-            internalButton.Enabled=explorerButton.Enabled=currentFile()!=null;
-            commands.Controls.Add(explorerButton);
-            commands.Controls.Add(internalButton);
-        }
         layout.Controls.Add(commands, 0, 1);
         Content.Controls.Add(layout);
         AcceptButton = CancelButton = close;

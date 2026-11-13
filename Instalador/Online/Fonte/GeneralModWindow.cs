@@ -307,6 +307,14 @@ internal sealed partial class GeneralModWindow : Form {
             var item=FocusedInventoryFile();
             if(item!=null)ShowInventoryDetails(item);else OpenRowEditor(grid.CurrentRow);
         });
+        var openInternal=GeneralMenuRenderer.Add(menu,T("Abrir local no Mod Loader","Open location in Mod Loader"),()=>{
+            var item=FocusedInventoryFile();
+            if(item!=null)OpenInventoryTree(item.Path);
+        });
+        var openExplorer=GeneralMenuRenderer.Add(menu,T("Abrir local no Explorador","Open location in Explorer"),()=>Guard(()=>{
+            var item=FocusedInventoryFile();
+            if(item!=null)GeneralInventoryTree.RevealInExplorer(state.Destination,item.Path);
+        }));
         var source=GeneralMenuRenderer.Add(menu,T("Abrir fonte no navegador","Open source in browser"),()=>Guard(()=>{
             var item=FocusedEntry();
             if(item==null)return;
@@ -335,6 +343,8 @@ internal sealed partial class GeneralModWindow : Form {
             var focused=FocusedEntry();
             details.Text=inventory?T("Detalhes","Details"):T("Detalhes e variantes","Details and variants");
             details.Enabled=!inventory||CanEditInventory;
+            openInternal.Visible=openExplorer.Visible=inventory;
+            openInternal.Enabled=openExplorer.Enabled=CanEditInventory;
             source.Visible=!inventory;
             removeEntry.Visible=!inventory&&focused!=null&&!IsBigBody(focused);
             showFiles.Visible=!inventory&&focused!=null&&DisplayedInventory().Any(file=>file.Kind=="associated"&&file.ModId==focused.Id);
