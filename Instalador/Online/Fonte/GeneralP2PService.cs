@@ -13,6 +13,9 @@ internal sealed class P2PSession {
     public volatile bool Discarded;
     public string Phase, TransactionId, ProjectError, ExportPreset;
     public string CreatedUtc, ConnectedUtc, DisconnectedUtc;
+    [System.Web.Script.Serialization.ScriptIgnore] public string LastPublishedNoticePhase;
+    [System.Web.Script.Serialization.ScriptIgnore] public DateTime NextProgressNoticeUtc;
+    [System.Web.Script.Serialization.ScriptIgnore] public System.Diagnostics.Stopwatch DownloadWatch;
     [System.Web.Script.Serialization.ScriptIgnore] public bool ConnectionObserved;
     [System.Web.Script.Serialization.ScriptIgnore] public DateTime NextChoiceScanUtc;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile GeneralModState OfferSource;
@@ -410,9 +413,22 @@ internal sealed partial class P2PService : IDisposable {
     }
     internal void Pause(P2PSession s){lock(s){if(s.Stage!=null&&!s.Sender||s.Completed||s.Discarded||s.Held)throw new IOException("A transferência terminou ou a instalação já começou; aguarde terminar.");Engine.Pause(s.Id,!s.Paused);s.Paused=!s.Paused;Save();}}
     internal HashSet<string> ConnectedPeers(){
+        return new HashSet<string>(ConnectedRoutes().Keys,StringComparer.Ordinal);
+    }
+    Dictionary<string,string> ConnectedRoutes(){
         var connections=Engine.Get("system/connections")["connections"] as Dictionary<string,object>;
-        return new HashSet<string>((connections??new Dictionary<string,object>())
-            .Where(pair=>Convert.ToBoolean(((Dictionary<string,object>)pair.Value)["connected"])).Select(pair=>pair.Key),StringComparer.Ordinal);
+        var routes=new Dictionary<string,string>(StringComparer.Ordinal);
+        if(connections==null)return routes;
+        foreach(var pair in connections){
+            var info=pair.Value as Dictionary<string,object>;
+            object active,kind;
+            if(info==null||!info.TryGetValue("connected",out active)||!Convert.ToBoolean(active))continue;
+            string type=info.TryGetValue("type",out kind)?Convert.ToString(kind):"";
+            routes[pair.Key]=type.StartsWith("relay-",StringComparison.Ordinal)?"relay":
+                type.StartsWith("tcp-",StringComparison.Ordinal)?"tcp":
+                type.StartsWith("quic-",StringComparison.Ordinal)?"quic":"unknown";
+        }
+        return routes;
     }
     static bool HasConnectedPeer(P2PSession session,HashSet<string> peers){
         if(session.Discarded)return false;
@@ -424,7 +440,8 @@ internal sealed partial class P2PService : IDisposable {
         var tracked=transfers.Where(s=>!s.HistoryDismissed&&(s.Peer!=null||s.Recipients.Length>0)&&
             (!s.Completed||s.ConnectionObserved)).ToArray();
         if(tracked.Length==0)return;
-        var peers=ConnectedPeers();
+        var routes=ConnectedRoutes();
+        var peers=new HashSet<string>(routes.Keys,StringComparer.Ordinal);
         string stamp=DateTime.UtcNow.ToString("o");
         lock(Sessions){
             bool changed=false;
@@ -432,7 +449,16 @@ internal sealed partial class P2PService : IDisposable {
                 bool connected=HasConnectedPeer(s,peers);
                 if(connected==s.ConnectionObserved)continue;
                 s.ConnectionObserved=connected;
-                if(connected){if(s.ConnectedUtc!=null)continue;s.ConnectedUtc=stamp;}
+                if(connected){
+                    var route=s.Sender&&s.Lifecycle
+                        ?String.Join(",",s.Recipients.Where(peer=>!peer.ReceiptClosed&&peers.Contains(peer.Device))
+                            .Select(peer=>routes[peer.Device]).Distinct())
+                        :routes[s.Peer];
+                    OnlineDiagnostics.Record("p2p.connection.route",null,"Transporte P2P conectado.",
+                        new{Id=DiagnosticId(s.Id),Route=route});
+                    if(s.ConnectedUtc!=null)continue;
+                    s.ConnectedUtc=stamp;
+                }
                 else s.DisconnectedUtc=stamp;
                 changed=true;
             }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -139,6 +140,9 @@ internal sealed partial class P2PService {
             phase=HasSyncChoice(session)?"choice_sent":session.Error!=null?"choice_failed":session.SyncMode!=0?"comparing":"choosing";
         }
         if(phase==null)return;
+        // Keep phase changes immediate and let the peer fetch a stable progress file between samples.
+        DateTime now=DateTime.UtcNow;
+        if(phase=="installing"&&session.LastPublishedNoticePhase==phase&&now<session.NextProgressNoticeUtc)return;
         var notice=new InstallNotice{Phase=phase,Hash=hash,Tag=NoticeTag(session,Engine.Device,phase,hash)};
         var progress=session.InstallProgress;
         if(session.Phase=="installing"&&progress!=null&&progress.Total>0){
@@ -150,7 +154,9 @@ internal sealed partial class P2PService {
         string json=Safe.Json.Serialize(notice);
         if(File.Exists(path)&&new FileInfo(path).Length<=2048&&File.ReadAllText(path)==json)return;
         Safe.WriteJson(path,notice);
-        Engine.Request("POST","db/scan?folder="+ReceiptFolderId(session,Engine.Device),null);
+        Engine.Request("POST","db/scan?folder="+ReceiptFolderId(session,Engine.Device)+"&sub=status.json",null);
+        session.LastPublishedNoticePhase=phase;
+        session.NextProgressNoticeUtc=now.AddSeconds(3);
     }
 
     InstallNotice ReadNotice(P2PSession session,P2PRecipient recipient) {
@@ -356,7 +362,12 @@ internal sealed partial class P2PService {
     void StartInstall(P2PSession session,string zip) {
         if(Interlocked.CompareExchange(ref installing,1,0)!=0)return;
         session.Stage="Conferindo e instalando…";
+        var download=session.DownloadWatch;
+        session.DownloadWatch=null;
+        OnlineDiagnostics.Record("p2p.download.ready",null,"Pacote disponível para instalação.",
+            new{Id=DiagnosticId(session.Id),Bytes=session.Size,ObservedMilliseconds=download==null?(long?)null:download.ElapsedMilliseconds});
         Task.Run(()=>{
+            var elapsed=Stopwatch.StartNew();
             try{
                 Action checkpoint=()=>{if(disposed)throw new OperationCanceledException();};
                 checkpoint();
@@ -381,13 +392,20 @@ internal sealed partial class P2PService {
                 var manifest=installer.ReadManifest(session.ReceiptId);
                 ApplyApprovedSyncCleanup(session,manifest);
                 session.ModsOutsidePack=InstalledSnapshot.CountOutsidePack(manifest);
+                OnlineDiagnostics.Record("p2p.install.files",null,"Arquivos do pacote instalados.",
+                    new{Id=DiagnosticId(session.Id),Milliseconds=elapsed.ElapsedMilliseconds});
                 var review=ReviewReceived;
                 if(review!=null){
                     session.NexusReviewing=true;
                     var project=manifest.Project??manifest.List;
+                    long started=elapsed.ElapsedMilliseconds;
                     try{review(project);session.ReviewedProject=project;}
                     catch(Exception ex){OnlineDiagnostics.Record("p2p.nexus.review",null,ex.GetType().Name);}
-                    finally{session.NexusReviewing=false;}
+                    finally{
+                        session.NexusReviewing=false;
+                        OnlineDiagnostics.Record("p2p.install.nexus",null,"Consulta ao Nexus concluída.",
+                            new{Id=DiagnosticId(session.Id),Milliseconds=elapsed.ElapsedMilliseconds-started});
+                    }
                 }
                 session.Completed=true;
                 session.Error=null;

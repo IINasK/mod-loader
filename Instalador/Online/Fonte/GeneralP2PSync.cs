@@ -106,6 +106,7 @@ internal sealed partial class P2PService {
         if(!HasSyncPreview(session)){
             session.Stage="Conferindo mods para comparação…";
             Task.Run(()=>{
+                var elapsed=System.Diagnostics.Stopwatch.StartNew();
                 try{
                     var source=ExportState(state,session.ExportPreset,session.SelectedMods,session.ExportAllPresets);
                     var preview=InstalledSnapshot.Inspect(source,session.SelectedMods,installedCatalog,installedData,false,true,()=>{
@@ -120,7 +121,9 @@ internal sealed partial class P2PService {
                     }
                     if(disposed||session.Completed||session.Discarded)return;
                     WriteSyncMessage(session,device,PreviewPath(session),PreviewName,preview);
-                    ScanSyncFolder(session.Id);
+                    ScanSyncFolder(session.Id,PreviewName);
+                    OnlineDiagnostics.Record("p2p.preview.ready",null,"Comparação do anfitrião disponível.",
+                        new{Id=DiagnosticId(session.Id),Files=preview.Files.Count,Milliseconds=elapsed.ElapsedMilliseconds});
                 }catch(Exception ex){
                     if(!disposed&&!session.Discarded){session.Error=ex.Message;Save();}
                 }finally{session.SyncProgress=null;session.Stage=null;}
@@ -251,6 +254,7 @@ internal sealed partial class P2PService {
             if(session.SyncMode!=0||session.Sender||session.Completed||session.Discarded||!session.CompareBeforePack||HasSyncChoice(session))return;
             session.SyncMode=full?2:1;
         }
+        var elapsed=System.Diagnostics.Stopwatch.StartNew();
         try{
             while(!HasSyncPreview(session)){
                 if(disposed||session.Discarded)return;
@@ -265,7 +269,11 @@ internal sealed partial class P2PService {
                     selected=reviewExtras(comparison);
                     if(selected==null)return;
                 }
-                if(!disposed&&!session.Discarded)SubmitSyncChoice(comparison,full,selected);
+                if(!disposed&&!session.Discarded){
+                    SubmitSyncChoice(comparison,full,selected);
+                    OnlineDiagnostics.Record("p2p.choice.duration",null,"Escolha do recebimento enviada.",
+                        new{Id=DiagnosticId(session.Id),Milliseconds=elapsed.ElapsedMilliseconds});
+                }
             }).ConfigureAwait(false);
         }catch(Exception ex){
             if(!disposed&&!session.Discarded){

@@ -153,6 +153,8 @@ internal static class InstalledSnapshotP2PTests {
                         phase("automatic preparation");await UIWait(()=>sending.Content.Controls.Find("p2p-output",true).Single().Text.StartsWith("ML-P2P1:",StringComparison.Ordinal)&&((Button)sending.Content.Controls.Find("p2p-copy",true).Single()).Enabled,"Conectar não gerou convite na UI.");
                         string offer=sending.Content.Controls.Find("p2p-output",true).Single().Text;Check(checks,P2PInvite.Decode(offer).Kind=="offer","Opening shows the invitation without preparing a ZIP or requiring a sender click.");
                         phase("receiver connect");receiving.Content.Controls.Find("p2p-input",true).Single().Text=offer;
+                        // Override the suggested host path as a receiver would when choosing their local folder.
+                        receiving.Content.Controls.Find("p2p-destination",true).Single().Text=target;
                         using(var confirm=new System.Windows.Forms.Timer{Interval=25}){
                             confirm.Tick+=(a,b)=>{var question=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(f=>f!=sending&&f!=receiving&&f.AcceptButton!=null);if(question!=null){((Button)question.AcceptButton).PerformClick();confirm.Stop();}};confirm.Start();
                             ((Button)receiving.Content.Controls.Find("p2p-connect",true).Single()).PerformClick();await UIWait(()=>receiver.SnapshotSessions().Length==1,"UI de recebimento não aceitou o convite.");
@@ -160,6 +162,10 @@ internal static class InstalledSnapshotP2PTests {
                         Check(checks,receiver.Sessions.Single().Automatic&&receiver.Sessions.Single().Destination==target,"Conectar com convite vincula o destino local e aceita automaticamente.");
                         phase("automatic sender authorization");receiver.Engine.ConfigurePeer(sender.Engine.Device,"tcp://127.0.0.1:"+sender.Engine.ListenPort);await UIWait(()=>sender.Sessions.Single().Recipients.Length!=0,"O anfitrião não detectou a aceitação automaticamente.");
                         Check(checks,sending.Content.Controls.Find("p2p-input",true).Single().Text.Length==0&&receiving.Content.Controls.Find("p2p-output",true).Single().Text.Length==0,"Neither participant needs to copy or paste a reply code; receiver hides the unused reply field.");
+                        phase("receiver choice");
+                        await UIWait(()=>receiving.Content.Controls.Find("p2p-full",true).OfType<Button>().Any(button=>button.Enabled&&button.Visible),
+                            "O receptor não pôde escolher o pacote completo.");
+                        ((Button)receiving.Content.Controls.Find("p2p-full",true).Single()).PerformClick();
                         phase("waiting install");
                         await UIWait(()=>receiving.Content.Controls.Find("p2p-import-list",true).Length==1,"O cartão de recebimento não apareceu.");
                         var import=(Button)receiving.Content.Controls.Find("p2p-import-list",true).Single();

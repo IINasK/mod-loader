@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Globalization;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -62,7 +63,9 @@ internal sealed partial class P2PService {
         };
         session.PreparationBytes=0;session.PreparationTotal=0;
         session.Stage=GeneralStyle.T("Conferindo e preparando o pacote…","Verifying and preparing the pack…");session.Error=null;Save();
+        var elapsed=Stopwatch.StartNew();
         try{
+            bool preparedHere=false;
             if(session.PayloadHash==null){
                 if(File.Exists(zip))throw new IOException("Pacote sem registro de conclusão; preservado.");
                 if(File.Exists(part))File.Delete(part);
@@ -78,12 +81,14 @@ internal sealed partial class P2PService {
                 checkpoint();
                 string hash=Safe.Hash(part);
                 lock(Sessions){session.PayloadHash=hash;session.Size=new FileInfo(part).Length;Save();}
+                preparedHere=true;
             }
             if(!File.Exists(zip)&&File.Exists(part)){
-                if(new FileInfo(part).Length!=session.Size||Safe.Hash(part)!=session.PayloadHash)throw new IOException("Preparação interrompida divergente; preservada.");
+                if(new FileInfo(part).Length!=session.Size||!preparedHere&&Safe.Hash(part)!=session.PayloadHash)
+                    throw new IOException("Preparação interrompida divergente; preservada.");
                 File.Move(part,zip);
-            }
-            if(!File.Exists(zip)||new FileInfo(zip).Length!=session.Size||Safe.Hash(zip)!=session.PayloadHash)throw new IOException("O pacote preparado foi alterado ou removido. Preserve os registros.");
+            }else if(!File.Exists(zip)||new FileInfo(zip).Length!=session.Size||Safe.Hash(zip)!=session.PayloadHash)
+                throw new IOException("O pacote preparado foi alterado ou removido. Preserve os registros.");
             lock(session){
                 if(session.Discarded)throw new OperationCanceledException();
                 var ready=new ReadyPack{Hash=session.PayloadHash,Size=session.Size};
@@ -91,6 +96,8 @@ internal sealed partial class P2PService {
                 Safe.WriteJson(Safe.In(Folder(session),"ready.json"),ready);
                 lock(startGate)Engine.Request("POST","db/scan?folder="+session.Id,null);
                 session.Error=null;session.Stage=null;Save();
+                OnlineDiagnostics.Record("p2p.pack.ready",null,"Pacote preparado para envio.",
+                    new{Id=DiagnosticId(session.Id),Bytes=session.Size,Milliseconds=elapsed.ElapsedMilliseconds});
             }
         }catch(Exception ex){session.Stage=null;if(!session.Discarded){session.Error=ex.Message;Save();}throw;}
         finally{session.SyncProgress=null;}
@@ -148,7 +155,11 @@ internal sealed partial class P2PService {
     bool ResolveDeferred(P2PSession session){
         var ready=ReadReady(Safe.In(Folder(session),"ready.json"),session.Hash,session.Id);if(ready==null)return false;
         if(session.PayloadHash!=null&&(session.PayloadHash!=ready.Hash||session.Size!=ready.Size))throw new IOException("O remetente mudou o pacote depois da autorização; preservado.");
-        if(session.PayloadHash==null){lock(Sessions){session.PayloadHash=ready.Hash;session.Size=ready.Size;Save();}}return true;
+        if(session.PayloadHash==null){
+            lock(Sessions){session.PayloadHash=ready.Hash;session.Size=ready.Size;Save();}
+            session.DownloadWatch=Stopwatch.StartNew();
+        }
+        return true;
     }
     internal bool DeferredPrepared(P2PSession session){return session.PayloadHash!=null&&File.Exists(Safe.In(Folder(session),"pack.zip"))&&File.Exists(Safe.In(Folder(session),"ready.json"));}
 }
