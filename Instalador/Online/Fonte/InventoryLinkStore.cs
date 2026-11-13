@@ -113,7 +113,7 @@ internal sealed class InventoryLinkStore {
             .SelectMany(group=>group.Paths.Select(file=>new{Path=file,Group=group}))
             .ToDictionary(item=>item.Path,item=>item.Group,Paths);
         foreach(var file in inventory){
-            if(file.Kind!="found"||file.VerifiedZip!=null){yield return file;continue;}
+            if(file.Kind!="found"||file.VerifiedZip!=null||file.ProvenOwner!=null||file.LocalInModFolder){yield return file;continue;}
             if(adopted.Contains(file.Path))continue;
             InventoryLinkGroup group;
             if(!byPath.TryGetValue(file.Path,out group)){yield return file;continue;}

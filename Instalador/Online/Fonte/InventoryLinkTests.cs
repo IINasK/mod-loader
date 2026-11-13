@@ -107,6 +107,27 @@ internal sealed partial class GeneralModWindow {
             check(state.SnapshotReceipts.Count==0&&state.CyberpunkImports.Count==0&&
                 paths.Select(path=>Safe.Hash(Safe.In(game,path))).SequenceEqual(hashes),"Grouping leaves installed content and all ownership records untouched.");
 
+            const string nightFolder="red4ext/plugins/NightCoop/";
+            const string nightDll=nightFolder+"NightCoop.dll", nightLog=nightFolder+"logs/nightcoop.log",
+                nightUnknownExtension=nightFolder+"output/session.custom";
+            foreach(string relative in new[]{nightDll,nightLog,nightUnknownExtension}){
+                string file=Safe.In(game,relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(file));
+                File.WriteAllText(file,"night fixture");
+            }
+            var night=NewEntry("NightCoop","https://www.nexusmods.com/cyberpunk2077/mods/9992");
+            night.Variants[0].CyberpunkId="night-fixture";
+            state.List.Mods.Add(night);
+            catalog.Packages.Add(new FixedMod{Id="night-fixture",Name="NightCoop",Version="1",
+                Dependencies=new string[0],Assets=new List<FixedAsset>(),
+                Files=new List<FixedFile>{new FixedFile{Path=nightDll,Sha256=Safe.Hash(Safe.In(game,nightDll)),Size=13}}});
+            var nightInventory=form.ReadGameInventory(game);
+            check(new[]{nightLog,nightUnknownExtension}.All(path=>nightInventory.Any(file=>
+                file.Path==path&&file.Kind=="associated"&&file.ModId==night.Id&&file.LocalInModFolder&&
+                file.ProvenOwner==null&&file.VerifiedZip==null)), "Dedicated NightCoop folder groups logs and files of any extension.");
+            state.List.Mods.Remove(night);
+            catalog.Packages.RemoveAt(catalog.Packages.Count-1);
+
             const string framework="bin/x64/plugins/cyber_engine_tweaks/mods/framework/";
             string exact=framework+"projects/villa.json", changed=framework+"projects/changed.json",
                 unknown=framework+"projects/unknown.json", dependency=framework+"init.lua";
@@ -115,6 +136,8 @@ internal sealed partial class GeneralModWindow {
                 Directory.CreateDirectory(Path.GetDirectoryName(file));
                 File.WriteAllText(file,"installed");
             }
+            string frameworkLog=framework+"nativeInteractions.log";
+            File.WriteAllText(Safe.In(game,frameworkLog),"runtime log");
             string villa=Safe.In(root,"villa.zip"), nif=Safe.In(root,"nif.zip");
             using(var zip=ZipFile.Open(villa,ZipArchiveMode.Create)){
                 WriteZipEntry(zip,exact,"installed");
@@ -128,7 +151,8 @@ internal sealed partial class GeneralModWindow {
             await form.Scan();
             var found=form.VisibleGameInventory().ToDictionary(file=>file.Path,InventoryPaths);
             check(found[exact].Mod=="Villa V"&&found[dependency].Mod=="Native Interactions"&&
-                found[changed].VerifiedZip==null&&found[unknown].VerifiedZip==null,
+                found[changed].VerifiedZip==null&&found[unknown].VerifiedZip==null&&
+                found[frameworkLog].ProvenOwner==null&&!found[frameworkLog].LocalInModFolder,
                 "Reload preserves exact origins and keeps mismatched or unlisted neighbors unverified.");
             check(form.grid.Rows.Cast<DataGridViewRow>().Any(row=>Equals(row.Cells["Origin"].Value,"ZIP")&&Equals(row.Cells["Name"].Value,"Villa V"))&&
                 form.grid.Rows.Cast<DataGridViewRow>().Any(row=>row.Tag is P2PSyncDifference&&

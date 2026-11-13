@@ -67,7 +67,7 @@ internal static class InstalledFileOwnership {
         return File.Exists(path)&&Safe.Hash(path)==anchor.Hash;
     }
 
-    static IEnumerable<string> Walk(string root,IEnumerable<string> scopes) {
+    internal static IEnumerable<string> Walk(string root,IEnumerable<string> scopes) {
         var visited=new HashSet<string>(Paths);
         var pending=new Stack<string>(scopes.Select(path=>Safe.In(root,path)));
         int files=0;

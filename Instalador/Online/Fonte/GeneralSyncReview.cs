@@ -161,6 +161,12 @@ internal sealed class GeneralSyncDifferencesDialog : GeneralDialog {
                 string status = difference.Kind == "found" ? T("Encontrado no jogo","Found in game")
                     : difference.Kind == "kept" ? T("Extra mantido", "Extra kept")
                     : difference.Kind == "missing" ? T("Ausente neste PC", "Missing on this PC") : T("Arquivo diferente", "Different file");
+                if(inventory){
+                    if(difference.VerifiedZip!=null)status=T("Confirmado pelo ZIP","Verified by ZIP");
+                    else if(difference.ProvenOwner!=null)status=T("Origem confirmada","Verified origin");
+                    else if(difference.LocalInModFolder)status=T("Arquivo local","Local file");
+                    else status="?";
+                }
                 int row = grid.Rows.Add(status, difference.Mod ?? "—", difference.Path);
                 grid.Rows[row].Cells[1].ToolTipText = difference.Mod ?? "";
                 grid.Rows[row].Cells[2].ToolTipText = difference.Path;

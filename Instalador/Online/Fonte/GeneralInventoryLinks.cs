@@ -47,7 +47,7 @@ internal sealed partial class GeneralModWindow {
     }
 
     P2PSyncDifference[] InventoryRow(string key){
-        return DisplayedInventory().Where(file=>file.Kind=="found"&&InventoryPaths.Equals(InventoryLinkStore.Key(file),key)).ToArray();
+        return DisplayedInventory().Where(file=>file.Kind=="found"&&!file.LocalInModFolder&&InventoryPaths.Equals(InventoryLinkStore.Key(file),key)).ToArray();
     }
 
     bool CanEditInventory {get{return !working&&!scanning&&associationChoice==null&&!String.IsNullOrWhiteSpace(state.Destination);}}
@@ -65,7 +65,7 @@ internal sealed partial class GeneralModWindow {
             int index=table.HitTest(e.X,e.Y).RowIndex;
             if(e.Button!=MouseButtons.Left||!CanEditInventory||index<0)return;
             var item=table.Rows[index].Tag as P2PSyncDifference;
-            if(item==null||item.Kind!="found"||item.VerifiedZip!=null)return;
+            if(item==null||item.Kind!="found"||item.VerifiedZip!=null||item.ProvenOwner!=null||item.LocalInModFolder)return;
             key=InventoryLinkStore.Key(item);down=e.Location;
         };
         table.MouseUp+=(s,e)=>key=null;
@@ -83,7 +83,7 @@ internal sealed partial class GeneralModWindow {
         if(target!=grid||!CanEditInventory||inventoryDragKey==null||
             !InventoryPaths.Equals(e.Data.GetData(InventoryDragFormat) as string,inventoryDragKey))return DragDropEffects.None;
         var item=InventoryRowAt(e.X,e.Y);
-        return item!=null&&item.Kind=="found"&&item.VerifiedZip==null&&!InventoryPaths.Equals(InventoryLinkStore.Key(item),inventoryDragKey)
+        return item!=null&&item.Kind=="found"&&item.VerifiedZip==null&&item.ProvenOwner==null&&!item.LocalInModFolder&&!InventoryPaths.Equals(InventoryLinkStore.Key(item),inventoryDragKey)
             ?DragDropEffects.Move:DragDropEffects.None;
     }
 
@@ -132,7 +132,7 @@ internal sealed partial class GeneralModWindow {
         var link=GeneralNexusLink.Parse(value);
         if(link==null)throw new IOException(T("Cole um link de mod do Nexus.","Paste a Nexus mod link."));
         var files=InventoryRow(key);
-        if(files.Length==0||files.Any(file=>file.VerifiedZip!=null))return;
+        if(files.Length==0||files.Any(file=>file.VerifiedZip!=null||file.ProvenOwner!=null))return;
         string id=null;
         UpdateInventoryLinks(links=>{
             var group=InventoryLinkStore.Combine(links,key,files[0].Mod??files[0].Path,null,files.Select(file=>file.Path),link.Url);
@@ -164,7 +164,7 @@ internal sealed partial class GeneralModWindow {
 
     async Task<int> VerifyInventoryZip(string zip,string name) {
         string root=state.Destination;
-        var candidates=gameInventory.Where(file=>file.Kind=="found").Select(file=>file.Path).ToArray();
+        var candidates=gameInventory.Where(file=>file.Kind=="found"||file.LocalInModFolder).Select(file=>file.Path).ToArray();
         scanning=true;Busy(true);
         detail.Text=T("Conferindo conteúdo do ZIP…","Verifying ZIP contents…");
         Dictionary<string,InventoryZipLabel> matches;

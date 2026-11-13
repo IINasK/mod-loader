@@ -152,13 +152,14 @@ internal sealed partial class GeneralModWindow {
         foreach(var file in Snapshot(destination).ProjectDeletionFiles(true,skipUnreadable:true))add(file,lookup);
         var exact=new HashSet<string>(state.List.Mods.SelectMany(mod=>mod.DetectedPaths),StringComparer.OrdinalIgnoreCase);
         var extras=new List<P2PSyncDifference>();
+        var registeredNames=new Dictionary<string,string>(names,StringComparer.Ordinal);
         if(cyberpunk){
             var engine=Cyberpunk(destination);
             var fixedOwners=state.List.Mods.SelectMany(mod=>mod.Variants.Where(variant=>variant.CyberpunkId!=null)
                 .Select(variant=>new{Id=variant.CyberpunkId,Owner=mod.Id})).ToLookup(item=>item.Id,item=>item.Owner,StringComparer.Ordinal);
             foreach(var anchor in engine.CatalogAnchors()){
                 var owners=fixedOwners[anchor.Owner].Distinct(StringComparer.Ordinal).ToArray();
-                if(owners.Length==0)registered.Add(new ModFileAnchor{Owner="catalog:"+anchor.Owner,Path=anchor.Path,Hash=anchor.Hash});
+                if(owners.Length==0)registered.Add(anchor);
                 else {
                     exact.Add(anchor.Path);
                     foreach(string owner in owners)registered.Add(new ModFileAnchor{Owner=owner,Path=anchor.Path,Hash=anchor.Hash});
@@ -175,8 +176,10 @@ internal sealed partial class GeneralModWindow {
                 extras.Add(new P2PSyncDifference{Kind="verified-variant",Mod=mod.Name,ModId=mod.Id,
                     VariantId=installed.Id,VerifiedBytes=files.Sum(file=>file.Size)});
             }
-            var listed=exact.Concat(registered.Where(file=>names.ContainsKey(file.Owner)).Select(file=>file.Path));
-            extras.AddRange(engine.ReadUnlistedModFiles(listed,data,reads==null?null:(Func<string,string>)reads.Hash));
+            exact.UnionWith(registered.Where(file=>names.ContainsKey(file.Owner)).Select(file=>file.Path));
+            extras.AddRange(engine.ReadUnlistedModFiles(exact,data,reads==null?null:(Func<string,string>)reads.Hash));
+            foreach(var owner in engine.OwnershipNames())
+                if(!registeredNames.ContainsKey(owner.Key))registeredNames.Add(owner.Key,owner.Value);
         }
         foreach(var file in Generic(destination).ProjectDeletionFiles(true))add(file,key=>lookup(WorkKeyFromReceipt(key)));
         Func<string,string> scope=cyberpunk?(Func<string,string>)FixedInstaller.ModFolder:InstalledFileOwnership.GenericScope;
@@ -185,7 +188,7 @@ internal sealed partial class GeneralModWindow {
         var labels=zipLabels??new Dictionary<string,InventoryZipLabel>(InventoryPaths);
         foreach(var file in extras.Where(item=>item.Kind=="found")){
             InventoryZipLabel label;
-            if(!labels.TryGetValue(file.Path,out label))continue;
+            if(file.ProvenOwner!=null||!labels.TryGetValue(file.Path,out label))continue;
             try {
                 string path=GeneralInstallRoutes.Resolve(destination,file.Path);
                 Safe.NoLinks(path);
@@ -195,14 +198,74 @@ internal sealed partial class GeneralModWindow {
                 file.InventoryGroupId="zip:"+label.Name;
             }catch(IOException){}catch(UnauthorizedAccessException){}
         }
-        // A package match describes individual files. Folder association cannot inherit that proof.
-        var verifiedScopes=new HashSet<string>(extras.Where(file=>file.VerifiedZip!=null)
-            .Select(file=>scope(file.Path)).Where(folder=>folder!=null),InventoryPaths);
-        extras.RemoveAll(file=>file.Kind=="found"&&file.VerifiedZip==null&&associated.ContainsKey(file.Path)&&
-            names.ContainsKey(associated[file.Path])&&!labels.ContainsKey(file.Path)&&!verifiedScopes.Contains(scope(file.Path)));
-        foreach(var pair in associated.Where(item=>names.ContainsKey(item.Value)&&!labels.ContainsKey(item.Key)))
+        var observedScopes=cyberpunk
+            ? GroupModFolders(destination,extras,registered,registeredNames,names,exact,labels,reads==null?(Func<string,string>)Safe.Hash:reads.Hash)
+            : new HashSet<string>(InventoryPaths);
+        extras.RemoveAll(file=>file.Kind=="found"&&file.VerifiedZip==null&&file.ProvenOwner==null&&!file.LocalInModFolder&&
+            associated.ContainsKey(file.Path)&&names.ContainsKey(associated[file.Path])&&!labels.ContainsKey(file.Path)&&
+            !observedScopes.Contains(scope(file.Path)));
+        foreach(var pair in associated.Where(item=>names.ContainsKey(item.Value)&&!labels.ContainsKey(item.Key)&&
+            !observedScopes.Contains(scope(item.Key))))
             extras.Add(new P2PSyncDifference{Kind="associated",Mod=names[pair.Value],ModId=pair.Value,Path=pair.Key});
         return extras;
+    }
+
+    static HashSet<string> GroupModFolders(string root,List<P2PSyncDifference> inventory,IEnumerable<ModFileAnchor> registered,
+        Dictionary<string,string> names,Dictionary<string,string> projectNames,HashSet<string> listed,
+        Dictionary<string,InventoryZipLabel> labels,Func<string,string> readHash) {
+        var files=inventory.Where(file=>file.Kind=="found").ToDictionary(file=>file.Path,InventoryPaths);
+        var confirmed=new Dictionary<string,string>(InventoryPaths);
+        foreach(var file in files.Values){
+            string owner=file.VerifiedZip!=null?file.InventoryGroupId:file.ProvenOwner;
+            if(owner!=null){
+                confirmed[file.Path]=owner;
+                if(!names.ContainsKey(owner))names[owner]=file.Mod;
+            }
+        }
+        foreach(var anchor in registered.Where(file=>FixedInstaller.ModFolder(file.Path)!=null&&
+            !GeneralInstallRoutes.External(file.Path)&&FixedData.HashValid(file.Hash))){
+            if(files.ContainsKey(anchor.Path))continue;
+            try{
+                string path=Safe.In(root,anchor.Path);Safe.NoLinks(path);
+                if(!File.Exists(path)||readHash(path)!=anchor.Hash)continue;
+                string existing;
+                confirmed[anchor.Path]=confirmed.TryGetValue(anchor.Path,out existing)&&existing!=anchor.Owner?"":anchor.Owner;
+            }catch(IOException){}catch(UnauthorizedAccessException){}
+        }
+        var scopes=confirmed.Where(pair=>FixedInstaller.ModFolder(pair.Key)!=null)
+            .ToLookup(pair=>FixedInstaller.ModFolder(pair.Key),InventoryPaths);
+        foreach(string path in InstalledFileOwnership.Walk(root,scopes.Select(group=>group.Key))){
+            if(listed.Contains(path)||confirmed.ContainsKey(path))continue;
+            string folder=FixedInstaller.ModFolder(path);
+            if(!scopes.Contains(folder))continue;
+            P2PSyncDifference item;
+            if(!files.TryGetValue(path,out item)){
+                item=new P2PSyncDifference{Kind="found",Path=path,Mod=Path.GetFileName(folder)};
+                files.Add(path,item);
+                inventory.Add(item);
+            }
+        }
+        var byFolder=files.Values.ToLookup(file=>FixedInstaller.ModFolder(file.Path),InventoryPaths);
+        var knownZipOwners=labels.Where(pair=>FixedInstaller.ModFolder(pair.Key)!=null)
+            .ToLookup(pair=>FixedInstaller.ModFolder(pair.Key),pair=>"zip:"+pair.Value.Name,InventoryPaths);
+        foreach(var group in scopes){
+            var owners=group.Select(pair=>pair.Value).Distinct(StringComparer.Ordinal).ToArray();
+            if(owners.Length!=1||owners[0].Length==0||
+                !group.Any(pair=>InventoryPaths.Equals(Path.GetDirectoryName(pair.Key).Replace('\\','/'),group.Key)))continue;
+            string owner=owners[0],name;
+            if(!names.TryGetValue(owner,out name)||
+                knownZipOwners[group.Key].Any(label=>!InventoryPaths.Equals(label,"zip:"+name)))continue;
+            bool inProject=projectNames.ContainsKey(owner);
+            foreach(var item in byFolder[group.Key]){
+                if(confirmed.ContainsKey(item.Path)||labels.ContainsKey(item.Path))continue;
+                item.Mod=name;
+                item.LocalInModFolder=true;
+                item.Kind=inProject?"associated":"found";
+                item.ModId=inProject?owner:null;
+                item.InventoryGroupId=owner.StartsWith("zip:",StringComparison.Ordinal)?owner:"owner:"+owner;
+            }
+        }
+        return new HashSet<string>(scopes.Select(group=>group.Key),InventoryPaths);
     }
 
     List<GeneralDependencyIssue> ReviewDependencies(ProjectVerification audit,Dictionary<string,Work> install) {

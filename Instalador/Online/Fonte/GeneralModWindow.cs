@@ -304,14 +304,26 @@ internal sealed partial class GeneralModWindow : Form {
         var linkInventory=GeneralMenuRenderer.Add(menu,T("Vincular link do Nexus…","Link Nexus URL…"),()=>
             SetInventorySource(grid.CurrentRow==null?null:grid.CurrentRow.Tag as P2PSyncDifference));
         var zipOrigin=GeneralMenuRenderer.Add(menu,T("Conferir origem pelo ZIP…","Verify origin from ZIP…"),VerifyInventoryZip);
+        var showFiles=GeneralMenuRenderer.Add(menu,T("Ver arquivos associados…","View associated files…"),()=>{
+            var row=grid.CurrentRow;
+            var item=row==null?null:row.Tag as P2PSyncDifference;
+            string id=row==null?null:row.Tag as string;
+            var files=DisplayedInventory().Where(file=>item!=null
+                ?file.Kind=="found"&&InventoryPaths.Equals(InventoryLinkStore.Key(file),InventoryLinkStore.Key(item))
+                :id!=null&&file.Kind=="associated"&&file.ModId==id).ToArray();
+            if(files.Length==0)return;
+            using(var dialog=new GeneralSyncDifferencesDialog(files,true))dialog.ShowDialog(this);
+        });
         var splitInventory=GeneralMenuRenderer.Add(menu,T("Desfazer agrupamento ou vínculo","Undo grouping or link"),()=>Guard(()=>{
             var group=SelectedInventoryLink();
             if(group!=null&&CanEditInventory)UpdateInventoryLinks(links=>links.Groups.RemoveAll(item=>item.Id==group.Id));
         }));
         menu.Opening+=(s,e)=>{
             var item=grid.CurrentRow==null?null:grid.CurrentRow.Tag as P2PSyncDifference;
-            linkInventory.Visible=CanEditInventory&&item!=null&&item.VerifiedZip==null;
+            linkInventory.Visible=CanEditInventory&&item!=null&&item.VerifiedZip==null&&item.ProvenOwner==null&&!item.LocalInModFolder;
             zipOrigin.Visible=CanEditInventory&&item!=null&&GeneralAppPaths.IsDevelopment;
+            var mod=FocusedEntry();
+            showFiles.Visible=item!=null||mod!=null&&DisplayedInventory().Any(file=>file.Kind=="associated"&&file.ModId==mod.Id);
             splitInventory.Visible=CanEditInventory&&SelectedInventoryLink()!=null;
         };
         menu.Items.Add(new ToolStripSeparator());
@@ -531,19 +543,21 @@ internal sealed partial class GeneralModWindow : Form {
             foreach(var entry in inventory){
                 int index=grid.Rows.Add();
                 var row=grid.Rows[index];
-                row.Tag=entry.First();
+                var members=inventoryMembers[entry.Key];
+                var primary=members.FirstOrDefault(file=>file.VerifiedZip!=null)??members.FirstOrDefault(file=>file.ProvenOwner!=null)??entry.First();
+                row.Tag=primary;
                 row.Cells["Mark"]=new DataGridViewTextBoxCell();
                 row.ReadOnly=true;
-                row.Cells["Name"].Value=entry.First().Mod??entry.First().Path;
-                var members=inventoryMembers[entry.Key];
+                row.Cells["Name"].Value=primary.Mod??primary.Path;
                 InventoryLinkGroup group;savedGroups.TryGetValue(entry.Key,out group);
-                row.Cells["Name"].ToolTipText=String.Join(Environment.NewLine,members.Select(file=>file.Path).Take(12)
+                row.Cells["Name"].ToolTipText=String.Join(Environment.NewLine,members.Select(file=>file.LocalInModFolder?T("Arquivo local · ","Local file · ")+file.Path:file.Path).Take(12)
                     .Concat(group==null||group.Source==null?Enumerable.Empty<string>():new[]{group.Source}));
                 row.Cells["Status"].Value=GameInventoryStatus;
-                row.Cells["Origin"].Value=entry.First().VerifiedZip==null?"?":"ZIP";
-                row.Cells["Origin"].ToolTipText=entry.First().VerifiedZip!=null
+                row.Cells["Origin"].Value=primary.VerifiedZip!=null?"ZIP":primary.ProvenOwner!=null?"✓":"?";
+                row.Cells["Origin"].ToolTipText=primary.VerifiedZip!=null
                     ?T("Caminho e conteúdo conferidos com o ZIP.","Path and contents verified against the ZIP.")+
-                        Environment.NewLine+String.Join(Environment.NewLine,entry.Select(file=>file.VerifiedZip).Distinct(InventoryPaths))
+                        Environment.NewLine+String.Join(Environment.NewLine,members.Where(file=>file.VerifiedZip!=null).Select(file=>file.VerifiedZip).Distinct(InventoryPaths))
+                    :primary.ProvenOwner!=null?T("Origem confirmada pelo catálogo ou recibo.","Origin verified against the catalog or an installation receipt.")
                     :T(
                     "Arquivos encontrados no jogo. Arraste sobre outro item não identificado para agrupar.",
                     "Game files found outside this project. Drag onto another unidentified item to group them.");

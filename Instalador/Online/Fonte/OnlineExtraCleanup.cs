@@ -309,7 +309,7 @@ public sealed partial class FixedInstaller {
             .OrderByDescending(extra=>extra.Proven).ThenBy(extra=>extra.Name).ToArray();
     }
 
-    Dictionary<string,string> OwnershipNames() {
+    internal Dictionary<string,string> OwnershipNames() {
         return catalog.Packages.Concat(HistoricalReceipts.CleanupRecipes(catalog))
             .Where(mod=>!String.IsNullOrWhiteSpace(mod.Name)).GroupBy(mod=>mod.Id,StringComparer.Ordinal)
             .ToDictionary(group=>group.Key,group=>group.First().Name,StringComparer.Ordinal);
