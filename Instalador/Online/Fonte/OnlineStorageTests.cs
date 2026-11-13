@@ -101,6 +101,7 @@ public static class OnlineStorageTests {
         string legacy=Path.Combine(backups,Path.GetFileNameWithoutExtension(legacyId),"saves");
         Directory.CreateDirectory(Path.GetDirectoryName(legacy));
         Directory.Move(latest,legacy);
+        Directory.SetLastWriteTimeUtc(legacy,new DateTime(2000,1,1,0,0,0,DateTimeKind.Utc));
         check(engine.PreviewOldSaveBackups().Count==0&&File.Exists(Path.Combine(legacy,"save.dat")),
             "Sem uma cópia rotativa, o backup legado mais recente fica disponível.");
         engine.Undo(s=>{});
@@ -132,6 +133,7 @@ public static class OnlineStorageTests {
         check(plan.Apply(out skipped)==0&&skipped==1&&File.Exists(added),
             "Uma cópia que mudou depois da prévia não é apagada.");
         File.Delete(added);
+        Directory.SetLastWriteTimeUtc(legacy,new DateTime(2000,1,1,0,0,0,DateTimeKind.Utc));
         string unknown=Path.Combine(backups,new string('f',32),"saves");
         Directory.CreateDirectory(unknown);
         File.WriteAllText(Path.Combine(unknown,"save.dat"),"unknown");
@@ -142,10 +144,39 @@ public static class OnlineStorageTests {
         check(plan.Apply(out skipped)==plan.Bytes&&skipped==0&&!Directory.Exists(legacy)&&File.Exists(Path.Combine(unknown,"save.dat"))&&
             File.ReadAllText(copy)=="new state"&&File.ReadAllText(original)=="new state"&&File.ReadAllText(modBackup)=="keep mod backup",
             "Limpeza libera o histórico aprovado e preserva os saves originais, o último backup e pastas sem registro.");
+        string missing=LegacySaveFixture(backups,'a',2001);
+        string unreadable=LegacySaveFixture(backups,'b',2002);
+        string unreadableReceipt=Path.Combine(data,new string('b',32)+".json");
+        File.WriteAllText(unreadableReceipt,"unreadable receipt");
+        string mixed=LegacySaveFixture(backups,'c',2003);
+        File.WriteAllText(Path.Combine(mixed,"unknown.bin"),"keep unknown");
+        string newest=LegacySaveFixture(backups,'d',2004);
+        Directory.SetLastWriteTimeUtc(latest,new DateTime(2000,1,1,0,0,0,DateTimeKind.Utc));
+        check(engine.PreviewOldSaveBackups().Count==2,"Uma cópia rotativa mais antiga não autoriza descartar a cópia legada mais recente.");
+        File.Delete(copy);
+        Directory.Delete(latest);
+        plan=engine.PreviewOldSaveBackups();
+        check(plan.Count==2,"A prévia reconhece a estrutura antiga em backups com recibo ausente ou ilegível.");
+        check(plan.Apply(out skipped)==plan.Bytes&&skipped==0&&!Directory.Exists(missing)&&!Directory.Exists(unreadable)&&
+            File.Exists(Path.Combine(newest,"ManualSave-0","sav.dat"))&&File.Exists(Path.Combine(mixed,"unknown.bin"))&&
+            File.ReadAllText(original)=="new state"&&File.ReadAllText(modBackup)=="keep mod backup"&&
+            File.ReadAllText(unreadableReceipt)=="unreadable receipt",
+            "A limpeza preserva a última cópia legada, arquivos desconhecidos, saves originais, recibos e mods desativados.");
+        File.Delete(unreadableReceipt);
         engine.Undo(s=>{});
         check(!File.Exists(Safe.In(game,catalog.Packages[1].Files[0].Path)),"Desfazer a instalação continua funcionando após limpar cópias de saves.");
         File.WriteAllText(original,"fixture preserved");
     }
+    static string LegacySaveFixture(string backups,char id,int year){
+        string root=Path.Combine(backups,new string(id,32),"saves");
+        string slot=Directory.CreateDirectory(Path.Combine(root,"ManualSave-0")).FullName;
+        File.WriteAllText(Path.Combine(slot,"sav.dat"),"save");
+        File.WriteAllText(Path.Combine(slot,"metadata.9.json"),"{}");
+        File.WriteAllText(Path.Combine(slot,"screenshot.png"),"fixture screenshot");
+        Directory.SetLastWriteTimeUtc(root,new DateTime(year,1,1,0,0,0,DateTimeKind.Utc));
+        return root;
+    }
+
     static void TestCyberpunkRoutes(string root,FixedCatalog catalog,DownloadCache cache,Action<bool,string> check){
         string game=OnlineTests.Fixture(root,"routes");
         string source=Safe.In(root,"routed.zip");

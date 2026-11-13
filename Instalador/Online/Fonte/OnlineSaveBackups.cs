@@ -80,6 +80,30 @@ public sealed partial class FixedInstaller {
         }
     }
 
+    static readonly Regex LegacySaveSlot=new Regex(
+        @"^(?:Auto|Manual|Quick|PointOfNoReturn|EndGame|Forced|Checkpoint)Save(?:-\d+)?$",
+        RegexOptions.IgnoreCase|RegexOptions.CultureInvariant);
+    static readonly HashSet<string> LegacySaveRootFiles=new HashSet<string>(
+        new[]{"EnabledMods.json","HDRUserSettings.json","steam_autocloud.vdf","user.gls"},StringComparer.OrdinalIgnoreCase);
+    static readonly HashSet<string> LegacySaveSlotFiles=new HashSet<string>(
+        new[]{"sav.dat","metadata.9.json","screenshot.png"},StringComparer.OrdinalIgnoreCase);
+
+    static bool HasLegacySaveLayout(string root,Dictionary<string,FileInfo> files){
+        // Without a readable receipt, only accept the on-disk layout of complete Cyberpunk save slots.
+        var slots=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach(string path in BackupEntries(root).Where(path=>Directory.Exists(path)&&path!=root)){
+            string slot=Path.GetFileName(path);
+            if(!String.Equals(Path.GetDirectoryName(path),root,StringComparison.OrdinalIgnoreCase)||!LegacySaveSlot.IsMatch(slot)
+                ||!files.ContainsKey(slot+"/sav.dat")||!files.ContainsKey(slot+"/metadata.9.json"))return false;
+            slots.Add(slot);
+        }
+        return slots.Count>0&&files.Keys.All(relative=>{
+            int slash=relative.IndexOf('/');
+            return slash<0?LegacySaveRootFiles.Contains(relative)
+                :slots.Contains(relative.Substring(0,slash))&&LegacySaveSlotFiles.Contains(relative.Substring(slash+1));
+        });
+    }
+
     internal sealed class SaveBackupCleanup {
         readonly FixedInstaller owner;
         readonly Dictionary<string,FileInfo> files;
@@ -103,6 +127,7 @@ public sealed partial class FixedInstaller {
             string mutex=Safe.In(owner.Data,"operacao.lock");
             Safe.NoLinks(mutex);
             using(new FileStream(mutex,FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None)){
+                var eligible=owner.PreviewOldSaveBackups().files;
                 long removed=0;
                 foreach(var group in files.Values.GroupBy(file=>LegacyRoot(file.FullName,owner.BackupRoot),StringComparer.OrdinalIgnoreCase)){
                     try{
@@ -112,6 +137,7 @@ public sealed partial class FixedInstaller {
                             skipped++;continue;
                         }
                         if(group.Any(file=>{
+                            if(!eligible.ContainsKey(file.FullName))return true;
                             var now=new FileInfo(file.FullName);
                             return !now.Exists||now.Length!=file.Length||now.LastWriteTimeUtc!=file.LastWriteTimeUtc;
                         })){skipped++;continue;}
@@ -136,24 +162,42 @@ public sealed partial class FixedInstaller {
         Closed();CheckBackupBoundary();
         var snapshots=new List<Dictionary<string,FileInfo>>();
         if(!Directory.Exists(BackupRoot))return new SaveBackupCleanup(this,snapshots);
-        var receipts=new List<OnlineReceipt>();
+        Safe.NoLinks(BackupRoot);
+        var receipts=new Dictionary<string,OnlineReceipt>(StringComparer.OrdinalIgnoreCase);
         foreach(string path in AllReceiptPaths()){
-            if(!Regex.IsMatch(Path.GetFileNameWithoutExtension(path),"^[a-f0-9]{32}$"))continue;
+            string id=Path.GetFileNameWithoutExtension(path);
+            if(!Regex.IsMatch(id,"^[a-f0-9]{32}$"))continue;
             try{
                 var receipt=ReadReceiptEnvelope(path,true);
-                if(receipt==null||receipt.CatalogId!=catalog.Id||receipt.Id!=Path.GetFileNameWithoutExtension(path))continue;
-                if(new[]{"instalado","desativado","desfeito","desfeito_com_preservados"}.Contains(receipt.Status))receipts.Add(receipt);
+                if(receipt==null||receipt.Id!=id)continue;
+                OnlineReceipt previous;
+                if(!receipts.TryGetValue(id,out previous)||FinishedSaveBackup(previous))receipts[id]=receipt;
             }catch(IOException){}catch(UnauthorizedAccessException){}
         }
-        bool keepOne=!SnapshotFiles(LatestSaves).Any();
-        foreach(var receipt in receipts.OrderByDescending(item=>item.CreatedUtc,StringComparer.Ordinal).GroupBy(item=>item.Id).Select(group=>group.First())){
+
+        var candidates=new List<Tuple<DateTime,Dictionary<string,FileInfo>>>();
+        foreach(string folder in Directory.EnumerateDirectories(BackupRoot)){
+            string id=Path.GetFileName(folder);
+            if(!Regex.IsMatch(id,"^[a-f0-9]{32}$"))continue;
+            OnlineReceipt receipt;
+            bool recorded=receipts.TryGetValue(id,out receipt);
+            if(recorded&&!FinishedSaveBackup(receipt))continue;
+            string root=Safe.In(BackupRoot,id+"/saves");
             try{
-                var files=SnapshotFiles(Safe.In(BackupRoot,receipt.Id+"/saves"));
+                var files=SnapshotFiles(root);
                 if(files.Count==0)continue;
-                if(keepOne){keepOne=false;continue;}
-                snapshots.Add(files);
+                if((!recorded||receipt.CatalogId!=catalog.Id)&&!HasLegacySaveLayout(root,files))continue;
+                candidates.Add(Tuple.Create(Directory.GetLastWriteTimeUtc(root),files));
             }catch(IOException){}catch(UnauthorizedAccessException){}
         }
+        DateTime newest=candidates.Select(item=>item.Item1).DefaultIfEmpty(DateTime.MinValue).Max();
+        bool keepNewest=!SnapshotFiles(LatestSaves).Any()||Directory.GetLastWriteTimeUtc(LatestSaves)<=newest;
+        snapshots.AddRange(candidates.Where(item=>!keepNewest||item.Item1<newest).Select(item=>item.Item2));
         return new SaveBackupCleanup(this,snapshots);
+    }
+
+    static bool FinishedSaveBackup(OnlineReceipt receipt){
+        return receipt.Status=="instalado"||receipt.Status=="desativado"||
+            receipt.Status=="desfeito"||receipt.Status=="desfeito_com_preservados";
     }
 }
