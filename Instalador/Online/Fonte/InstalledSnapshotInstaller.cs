@@ -13,7 +13,7 @@ public sealed partial class InstalledSnapshotInstaller {
     public sealed class Receipt {
         public string Id, Root, Status, PackageHash;
         public List<string> SkippedDestinations = new List<string>();
-        public bool Recoverable;
+        public bool Recoverable, ManualCapture;
         public InstalledSnapshotManifest Manifest;
         public List<string> ActiveOwners = new List<string>();
         public List<Change> Files = new List<Change>();

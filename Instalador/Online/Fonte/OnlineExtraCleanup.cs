@@ -29,6 +29,14 @@ public sealed partial class FixedInstaller {
         return path.StartsWith(folder + "/", StringComparison.OrdinalIgnoreCase);
     }
 
+    internal static string[] ManualCaptureRoots() {
+        return ExtraFileRoots.Concat(ExtraBundleRoots.Where(root=>root!=RedmodRoot)).ToArray();
+    }
+
+    internal static bool ManualCapturePath(string path) {
+        return SyncModPath(path)&&LocalModPackage.Allowed(path);
+    }
+
     static bool ExtraFilePath(string path) {
         var extension = Path.GetExtension(path).ToLowerInvariant();
         if (InFolder(path, ExtraFileRoots[0])) return extension == ".archive" || extension == ".xl";
@@ -188,29 +196,32 @@ public sealed partial class FixedInstaller {
         return Directory.Exists(path)&&!ExtraTreeFiles(path).Any();
     }
 
-    IEnumerable<string> EmptySyncBundles(bool localCleanup=false) {
-        foreach(string root in localCleanup?CleanupBundleRoots:ExtraBundleRoots){
+    IEnumerable<string> EmptyCleanupBundles() {
+        foreach(string root in CleanupBundleRoots){
             string directory=Safe.In(game,root);
             if(!Directory.Exists(directory))continue;
             foreach(string bundle in Directory.EnumerateDirectories(directory)){
                 string relative=RelativeGamePath(bundle);
-                if(SyncBundlePath(relative,localCleanup)&&(localCleanup?EmptySyncTree(bundle):EmptyDirectory(bundle)))
+                if(SyncBundlePath(relative,true)&&EmptySyncTree(bundle))
                     yield return relative;
             }
         }
     }
 
-    internal Dictionary<string,string> ReadSyncInventory(IReadOnlyCollection<InstalledSnapshotFile> packageFiles,Action checkpoint=null) {
+    internal Dictionary<string,string> ReadSyncInventory(IReadOnlyCollection<InstalledSnapshotFile> packageFiles,Action checkpoint=null,string appData=null) {
         var included=new HashSet<string>(packageFiles.Select(file=>file.Path),StringComparer.OrdinalIgnoreCase);
-        var candidates=FindExtraPaths(true);
-        var associated=AssociatedExtras(candidates,packageFiles);
-        var paths=candidates.Where(path=>SyncModPath(path)&&!included.Contains(path)&&!associated.ContainsKey(path))
-            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        var empty=EmptySyncBundles().ToArray();
-        if(paths.Length+empty.Length>InstalledSnapshot.MaxFiles)throw new IOException("Há mods demais fora do pacote para comparar.");
+        var ownership=SyncOwnership(appData);
+        var paths=ownership.Select(group=>group.Key).Where(path=>SyncModPath(path)&&!included.Contains(path));
         var result=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
-        foreach(string path in paths){if(checkpoint!=null)checkpoint();result.Add(path,Safe.Hash(Safe.In(game,path)));}
-        foreach(string path in empty)result.Add(path,null);
+        foreach(string path in paths){
+            if(checkpoint!=null)checkpoint();
+            string target=Safe.In(game,path);Safe.NoLinks(target);
+            if(!File.Exists(target))continue;
+            string hash=Safe.Hash(target);
+            if(!ownership[path].Any(file=>file.Hash==hash))continue;
+            if(result.Count>=InstalledSnapshot.MaxFiles)throw new IOException("Há mods demais fora do pacote para comparar.");
+            result.Add(path,hash);
+        }
         return result;
     }
 
@@ -246,7 +257,7 @@ public sealed partial class FixedInstaller {
         var anchors=CatalogAnchors().Concat(HistoricalReceipts.CleanupAnchors(catalog)).ToList();
         Action<Func<IEnumerable<ProjectDeleteFile>>> add=read=>{
             try {
-                var recorded=read().Where(file=>file.OwnerKeys!=null&&file.OwnerKeys.Count>0&&FixedData.HashValid(file.Hash))
+                var recorded=read().Where(file=>!file.PreserveManualOriginal&&file.OwnerKeys!=null&&file.OwnerKeys.Count>0&&FixedData.HashValid(file.Hash))
                     .SelectMany(file=>file.OwnerKeys.Select(key=>new ModFileAnchor{Path=file.Path,Hash=file.Hash,Owner=key.Split('/')[0]})).ToArray();
                 anchors.AddRange(recorded);
             } catch(IOException) { OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo indisponível; arquivos sem outra prova serão preservados."); }
@@ -276,7 +287,7 @@ public sealed partial class FixedInstaller {
         if(host.SyncGameInventory==null)return new P2PSyncExtra[0];
         var keep=SyncProtectedPaths(host);
         var paths=FindExtraPaths(true).Where(path=>SyncCleanupPath(path,keep)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        var empty=EmptySyncBundles(true).Where(path=>SyncCleanupBundle(path,keep)).ToArray();
+        var empty=EmptyCleanupBundles().Where(path=>SyncCleanupBundle(path,keep)).ToArray();
         if(paths.Length+empty.Length>ExtraResetLimit)throw new IOException("Há arquivos extras demais para revisar nesta sincronização.");
         var ownership=SyncOwnership(appData);
         var names=OwnershipNames();

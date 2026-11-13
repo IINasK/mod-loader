@@ -235,7 +235,8 @@ internal sealed class GeneralProjectStore {
         }
     }
 
-    internal GeneralProject Duplicate(GeneralProject source,string name,FixedCatalog catalog,GeneralModState edited=null){
+    internal GeneralProject Duplicate(GeneralProject source,string name,FixedCatalog catalog,GeneralModState edited=null,
+        Action<string,GeneralModState> register=null){
         lock(gate){
             name=ProjectName(name);var index=Read();var registered=Registered(index,source);
             if(index.Projects.Count>=200)throw new IOException("Use no máximo 200 projetos nesta biblioteca.");
@@ -254,6 +255,7 @@ internal sealed class GeneralProjectStore {
                 var links=new InventoryLinkStore(from,state.Destination).Load();
                 if(links.Groups.Count>0||links.Ignored.Count>0)new InventoryLinkStore(target,state.Destination).Save(links);
             }else state.SnapshotReceipts.Clear();
+            if(register!=null)register(target,state);
             new GeneralModLibrary(Path.Combine(target,"lista.json")).Save(state);
             index.Projects.Add(copy);Write(index);return copy;
         }

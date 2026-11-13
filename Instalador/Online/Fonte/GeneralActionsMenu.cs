@@ -5,7 +5,7 @@ using System.Windows.Forms;
 internal sealed class GeneralActionsMenu : GeneralDialog {
     internal string ActionId {get;private set;}
     internal GeneralActionsMenu(bool builtIn=false,bool home=false){
-        Text=GeneralStyle.T("Menu","Menu");ClientSize=new Size(350,home?184:builtIn?372:468);ShowCloseButton(false);
+        Text=GeneralStyle.T("Menu","Menu");ClientSize=new Size(350,home?184:builtIn?420:516);ShowCloseButton(false);
         var body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,Padding=new Padding(14,6,14,14),Margin=Padding.Empty};
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));Content.Controls.Add(body);
         if(!home){
@@ -14,6 +14,7 @@ internal sealed class GeneralActionsMenu : GeneralDialog {
             Add(body,"new","Novo projeto","New project","new");
             Add(body,"open","Abrir projeto","Open project","open");
             Add(body,"clone","Duplicar projeto","Duplicate project","copy");
+            Add(body,"manual","Registrar instalação manual","Record manual installation","new");
             if(!builtIn){Add(body,"export","Exportar projeto","Export project","export");Add(body,"import","Importar projeto","Import project","import");}
             int row=body.RowStyles.Count;body.RowStyles.Add(new RowStyle(SizeType.Absolute,18));
             var divider=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty,Name="MenuDivider"};

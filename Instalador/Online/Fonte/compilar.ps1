@@ -82,6 +82,7 @@ $extensions += @('GeneralP2PDeferred.cs','GeneralP2PDeferredTests.cs','GeneralP2
 $extensions += @('GeneralP2PPack.cs','GeneralP2PEngine.cs','P2PProcessJob.cs','GeneralP2PService.cs','GeneralSyncReview.cs','GeneralP2PDialog.cs','GeneralP2PTests.cs','GeneralP2PDiagnostics.cs','GeneralP2PDiagnosticDialog.cs','GeneralP2PDiagnosticTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += Join-Path $PSScriptRoot 'GeneralP2PUiTests.cs'
 $extensions += @('InstalledSnapshot.cs','InstalledSnapshotProject.cs','GeneralPackCoverage.cs','InstalledSnapshotConfig.cs','InstalledSnapshotOwnership.cs','InstalledSnapshotInstaller.cs','InstalledSnapshotTests.cs','InstalledSnapshotInstallerTests.cs','InstalledSnapshotP2PTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
+$extensions += Join-Path $PSScriptRoot 'ManualInstallCapture.cs'
 $extensions += @('GeneralUpdates.cs','GeneralUpdatesTests.cs','GeneralPresetIsolationTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += @('GeneralBrand.cs','GeneralBrandTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += @('GeneralProjectStore.cs','GeneralProjectStoreTests.cs','GeneralProjectHome.cs','GeneralProjectHomeTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}

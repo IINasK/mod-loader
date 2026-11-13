@@ -44,9 +44,10 @@ internal sealed partial class GeneralModWindow {
         projectDraft=null;
         if(p2p!=null)p2p.SetPreparationState(state);
     }
-    void SaveProjectEdits(){
+    void SaveProjectEdits(Action<string,GeneralModState> register=null){
         if(BuiltInProject&&projectDraft!=null){
-            var copy=projectStore.Duplicate(project,project.Name+T(" · Minha versão"," · My version"),catalog,state);
+            var copy=projectStore.Duplicate(project,project.Name+T(" · Minha versão"," · My version"),catalog,state,register);
+            if(register!=null)state.SnapshotReceipts=projectStore.Load(copy).SnapshotReceipts;
             if(p2p!=null)p2p.SetPreparationState(CommittedProject());
             ReleaseProjectSharing();
             project=copy;data=projectStore.DataPath(copy);
@@ -57,7 +58,10 @@ internal sealed partial class GeneralModWindow {
             Text=GeneralAppPaths.WindowTitle+" — "+copy.Name;
             storageGeneration++;
             RefreshStorageSize();
-        }else library.Save(state);
+        }else{
+            if(register!=null)register(data,state);
+            library.Save(state);
+        }
         startupIssue=null;
         EndProjectEdit();
         UpdatePresetCommands();

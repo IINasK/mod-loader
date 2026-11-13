@@ -254,7 +254,7 @@ internal static class GeneralP2PLifecycleTests {
         FixedAsset unused;
         var catalog=OnlineTests.MakeCatalog(root,out unused);
         string source=OnlineTests.Fixture(root,"game-host"),target=OnlineTests.Fixture(root,"game-friend");
-        string data=Safe.In(root,"cp-data");
+        string data=Safe.In(root,"cp-data"),hostData=Safe.In(root,"cp-source");
         var mods=GeneralModLibrary.Seed(catalog,new ModImportItem[0]);
         var state=new GeneralModState{Destination=source,List=mods};
         foreach(var file in catalog.Packages.SelectMany(mod=>mod.Files)){
@@ -265,7 +265,6 @@ internal static class GeneralP2PLifecycleTests {
         WriteSyncFile(target,stale,"old version");
         const string outside="r6/scripts/Outside/one.reds",remove="archive/pc/mod/remove.archive",
             sidecar="archive/pc/mod/remove.archive.xl",keep="r6/tweaks/keep.yaml",baseFile="red4ext/plugins/NightCoop/preference.ini";
-        WriteSyncFile(source,outside,"host-only version");
         WriteSyncFile(target,outside,"local version");
         const string empty="red4ext/plugins/stale-folder",sharedEmpty="red4ext/plugins/shared-empty",bundle="red4ext/plugins/stale-plugin";
         foreach(string path in new[]{remove,sidecar,keep,baseFile,bundle+"/mod.dll"})WriteSyncFile(target,path,path);
@@ -275,13 +274,18 @@ internal static class GeneralP2PLifecycleTests {
         foreach(string path in new[]{hotline+"/init.lua",hotline+"/NPCD_Hotline.log",hotline+"/db.sqlite3",
             stop+"/stopNCPD.log",stop+"/db.sqlite3",script+"/nested/mod.reds",sharedCet+"/db.sqlite3"})
             WriteSyncFile(target,path,path);
-        WriteSyncFile(source,sharedCet+"/init.lua","shared CET");
         WriteSyncFile(target,sharedCet+"/init.lua","shared CET");
         Directory.CreateDirectory(Safe.In(target,hotline+"/nested/empty"));
         Directory.CreateDirectory(Safe.In(target,oldShell+"/nested"));
         Directory.CreateDirectory(Safe.In(target,empty));
         Directory.CreateDirectory(Safe.In(source,sharedEmpty));
         Directory.CreateDirectory(Safe.In(target,sharedEmpty));
+        string hostPackage=Safe.In(root,"host-outside-mods.zip");
+        using(var zip=ZipFile.Open(hostPackage,ZipArchiveMode.Create)){
+            using(var writer=new StreamWriter(zip.CreateEntry(outside).Open()))writer.Write("host-only version");
+            using(var writer=new StreamWriter(zip.CreateEntry(sharedCet+"/init.lua").Open()))writer.Write("shared CET");
+        }
+        new GeneralModInstaller(source,Path.Combine(hostData,"Instalacoes")).Install(hostPackage,"outside-mod",_=>{});
         string oldPackage=Safe.In(root,"old-receiver-mods.zip");
         var installer=new GeneralModInstaller(target,Path.Combine(data,"Instalacoes"));
         foreach(var mod in new[]{
@@ -293,7 +297,7 @@ internal static class GeneralP2PLifecycleTests {
             installer.Install(oldPackage,Path.GetFileNameWithoutExtension(mod[0]),_=>{});
             File.Delete(oldPackage);
         }
-        using(var host=Service(root,"cp-host",Safe.In(root,"cp-source"),helper,catalog:catalog))
+        using(var host=Service(root,"cp-host",hostData,helper,catalog:catalog))
         using(var friend=Service(root,"cp-friend",data,helper,catalog:catalog)){
             host.SetPreparationState(state);
             friend.ChooseVersion=_=>true;
@@ -305,7 +309,7 @@ internal static class GeneralP2PLifecycleTests {
             friend.ChooseIncoming(received,false,review=>{
                 shown=true;
                 Check(checks,review.Different.Contains("Mod de teste")&&review.HostOutsideDifferences.SequenceEqual(new[]{outside}),
-                    "Comparison identifies an older package file and an actual host file outside the preset.");
+                    "Comparison identifies an older package file and a verified host file outside the preset.");
                 Check(checks,review.Extras.Single(extra=>extra.Proven&&extra.Name=="remove").Files.Length==2&&
                     !review.Extras.Single(extra=>extra.Name=="stale-folder").Proven,
                     "Registered archive sidecars have proof; empty folders alone do not prove ownership.");

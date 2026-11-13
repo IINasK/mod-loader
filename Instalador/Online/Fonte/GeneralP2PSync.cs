@@ -115,7 +115,7 @@ internal sealed partial class P2PService {
                         session.SyncProgress=new P2PSyncProgress{Item="Arquivos do jogo fora do pacote"};
                         preview.SyncGameInventory=new FixedInstaller(installedCatalog,source.Destination,installedFixture).ReadSyncInventory(preview.Files,()=>{
                             if(disposed||session.Discarded)throw new OperationCanceledException();
-                        });
+                        },installedData);
                     }
                     if(disposed||session.Completed||session.Discarded)return;
                     WriteSyncMessage(session,device,PreviewPath(session),PreviewName,preview);

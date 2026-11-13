@@ -242,7 +242,7 @@ internal sealed partial class GeneralModWindow {
             CaptureUi(form,Path.Combine(root,"tabela-clara.png"));
             using(var menu=new GeneralActionsMenu()){
                 menu.StartPosition=FormStartPosition.Manual;menu.Location=new Point(-30000,-30000);menu.Show(form);Application.DoEvents();
-                check(menu.Width==350&&menu.Height==468&&AllControls(menu).OfType<Button>().Count(button=>button.Name!="")==7,"Menu em coluna reúne listas, compartilhar e opções.");
+                check(menu.Width==350&&menu.Height==516&&AllControls(menu).OfType<Button>().Count(button=>button.Name!="")==8,"Menu em coluna inclui a captura manual.");
                 CaptureUi(menu,Path.Combine(root,"menu-unico.png"));menu.Close();
             }
             using(var editor=new GeneralCategoryDetails("Principal","",false,true)){

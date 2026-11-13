@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 internal sealed class ProjectDeleteFile {
     internal string Path,Hash,Reason;
     internal long Size;
-    internal bool Owned, ReplacesPrevious;
+    internal bool Owned, ReplacesPrevious, PreserveManualOriginal;
     internal List<string> OwnerKeys;
     internal List<GeneralInstallRoute> InstallRoutes;
     internal Dictionary<string,GeneralModVariant> OwnerRecipes;
@@ -178,7 +178,8 @@ public sealed partial class InstalledSnapshotInstaller {
             var recipes=receipt.Manifest.List.Mods.ToDictionary(m=>InstalledSnapshot.Owner(m,m.Variants.Single()),m=>m.Variants.Single());
             foreach(var file in receipt.Files.Where(file=>file.Applied&&!file.Reverted)){
                 List<string> keys;if(!owners.TryGetValue(file.Path,out keys)||keys.Count==0)continue;
-                yield return new ProjectDeleteFile{Path=file.Path,Hash=file.After,Size=file.Size,Owned=file.Owned&&file.Before==null,ReplacesPrevious=file.Before!=null,OwnerKeys=keys,OwnerRecipes=recipes};
+                yield return new ProjectDeleteFile{Path=file.Path,Hash=file.After,Size=file.Size,Owned=file.Owned&&file.Before==null,ReplacesPrevious=file.Before!=null,OwnerKeys=keys,OwnerRecipes=recipes,
+                    PreserveManualOriginal=receipt.ManualCapture&&!file.Owned};
             }
         }
     }

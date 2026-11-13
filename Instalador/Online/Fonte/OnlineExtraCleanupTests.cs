@@ -10,6 +10,56 @@ static class OnlineExtraCleanupTests {
         File.WriteAllText(path,content);
     }
 
+    static void RunManualCapture(string root,FixedCatalog catalog,Action<bool,string> check) {
+        string game=OnlineTests.Fixture(root,"m"),data=Safe.In(root,"manual-data");
+        const string lua="bin/x64/plugins/cyber_engine_tweaks/mods/Emoji/init.lua";
+        const string photo="bin/x64/plugins/cyber_engine_tweaks/mods/Emoji/fotos/photo.png";
+        const string script="r6/scripts/SomeOtherName/main.reds";
+        const string existing="r6/tweaks/Emoji/settings.yaml";
+        Put(game,existing,"old");
+        var capture=new ManualInstallCapture(game,true);
+        Put(game,lua,"load emoji");Put(game,script,"new script");Put(game,photo,"personal photo");Put(game,existing,"new");
+        var changes=capture.Changes();
+        check(changes.Count==4&&!changes.Single(file=>file.Path==existing).Added,
+            "A comparação distingue arquivo preexistente e detecta mudanças em três diretórios.");
+        var variant=new GeneralModVariant{Id="default",Name="Principal",Sources=new List<string>{"installed://emoji/default"}};
+        var entry=new GeneralModEntry{Id="emoji",Name="Emoji",DefaultVariant=variant.Id,Variants=new List<GeneralModVariant>{variant}};
+        var selected=changes.Where(file=>file.Path!=photo).ToArray();
+        var installer=new InstalledSnapshotInstaller(game,data,catalog,true);
+        Put(game,script,"changed after review");
+        bool refused=false;
+        try{installer.RegisterManual(entry,selected);}catch(IOException){refused=true;}
+        check(refused&&!installer.ProjectDeletionFiles().Any(),"Uma mudança após a captura invalida o registro inteiro.");
+        Put(game,script,"new script");
+        var receipt=installer.RegisterManual(entry,selected);
+        var state=new GeneralModState{Destination=game,List=new GeneralModList{Mods=new List<GeneralModEntry>{entry}}};
+        state.SnapshotReceipts.Add("emoji/default",receipt);
+        installer=new InstalledSnapshotInstaller(game,data,catalog,true);
+        check(installer.Status(receipt,"emoji/default")==GeneralModInstaller.Installed&&installer.ProjectDeletionFiles().Count()==3,
+            "O registro por arquivo continua disponível após reabrir.");
+        string zip=Safe.In(root,"manual-p2p.zip");
+        InstalledSnapshot.Create(zip,state,new[]{entry.Id},catalog,data,false,null);
+        var manifest=InstalledSnapshot.Read(zip,Safe.Hash(zip),catalog);
+        check(new HashSet<string>(manifest.Files.Select(file=>file.Path)).SetEquals(new[]{lua,script,existing}),
+            "O ZIP P2P contém somente os arquivos aprovados e preserva seus caminhos.");
+        var engine=new FixedInstaller(catalog,game,true);
+        var inventory=engine.ReadSyncInventory(new InstalledSnapshotFile[0],appData:data);
+        check(new HashSet<string>(inventory.Keys).SetEquals(new[]{lua,script}),
+            "A foto também fica fora do inventário enviado na comparação, mesmo sem o mod no pacote.");
+        var host=new InstalledSnapshotManifest{List=new GeneralModList(),SyncGameInventory=new Dictionary<string,string>()};
+        var extras=engine.PlanSyncExtras(host,appData:data).Where(extra=>extra.Proven).SelectMany(extra=>extra.Files).ToList();
+        check(new HashSet<string>(extras.Select(file=>file.Path)).SetEquals(new[]{lua,script}),
+            "A limpeza P2P só oferece os arquivos novos registrados.");
+        engine.ApplySyncCleanup(extras,host,new string[0],_=>{},data);
+        check(File.ReadAllText(Safe.In(game,photo))=="personal photo"&&File.ReadAllText(Safe.In(game,existing))=="new",
+            "A limpeza P2P preserva a pasta de fotos e o arquivo preexistente.");
+        engine.Undo(_=>{});
+        installer.Remove(receipt,new[]{"emoji/default"},null);
+        check(!File.Exists(Safe.In(game,lua))&&!File.Exists(Safe.In(game,script))&&
+            File.ReadAllText(Safe.In(game,photo))=="personal photo"&&File.ReadAllText(Safe.In(game,existing))=="new",
+            "A desinstalação remove o mod de várias pastas e preserva a foto e o arquivo preexistente.");
+    }
+
     internal static void RunSyncOwnership(string parent) {
         string root=OnlineTests.NestedRoot(parent,"sync-ownership-");Directory.CreateDirectory(root);
         FixedAsset asset;var catalog=OnlineTests.MakeCatalog(root,out asset);
@@ -17,6 +67,7 @@ static class OnlineExtraCleanupTests {
         var engine=new FixedInstaller(catalog,game,true);
         var checks=new List<string>();
         Action<bool,string> check=(ok,name)=>{if(!ok)throw new IOException("PROTEÇÃO SYNC: "+name);checks.Add(name);};
+        RunManualCapture(root,catalog,check);
         var host=new InstalledSnapshotManifest{List=new GeneralModList(),Files=new List<InstalledSnapshotFile>(),SyncGameInventory=new Dictionary<string,string>()};
         string known=catalog.Packages[1].Files[0].Path,baseFile=catalog.Packages[0].Files.Last().Path;
         Put(game,known,"test "+known);Put(game,baseFile,"test "+baseFile);

@@ -15,6 +15,7 @@ internal sealed partial class GeneralModWindow {
             if(action=="new")ProjectCommand("new");else if(action=="open")BackToProjects();
             else if(!BuiltInProject&&action=="import")ProjectCommand("import");else if(!BuiltInProject&&action=="export")ProjectCommand("export");
             else if(action=="clone")ProjectCommand("clone");else if(action=="share")ShowP2P();else if(action=="options")ShowOptions();
+            else if(action=="manual")CaptureManualInstall();
         }));
     }
     async void Replace(GeneralModList list){await ReplaceList(list);}
