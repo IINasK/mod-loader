@@ -8,6 +8,7 @@ using System.Windows.Forms;
 public sealed class ModVersionDifference {
     public string Name,Current,Incoming,Detail;
     public bool CanReplace=true;
+    internal string ReplaceLabel;
     internal bool AllowSkip,SkipSelected;
 
     internal bool Skip(Func<ModVersionDifference,bool> choose){
@@ -16,6 +17,11 @@ public sealed class ModVersionDifference {
         if(!replace)throw new ModVersionKeptException(Name);
         if(!CanReplace)throw new IOException(Detail);
         return false;
+    }
+    internal static string ReplacementDetail(System.Collections.Generic.IEnumerable<string> paths){
+        var files=paths.ToArray();
+        return GeneralStyle.T("Substituir pode causar erros se a versão for incompatível. O Mod Loader guarda os arquivos substituídos para desfazer. A troca usa os caminhos dos arquivos do mod.","Replacement can cause errors if the version is incompatible. Mod Loader backs up replaced files for undo. The replacement uses the mod's file paths.")
+            +"\r\n\r\n"+String.Join("\r\n",files.Take(6))+(files.Length>6?"\r\n"+GeneralStyle.T("Mais ","And ")+(files.Length-6)+GeneralStyle.T(" arquivo(s)."," more file(s)."):"");
     }
     internal static string FileVersion(string path){
         string ext=Path.GetExtension(path).ToLowerInvariant();if(ext!=".dll"&&ext!=".exe"&&ext!=".asi")return GeneralStyle.T("Conteúdo diferente; versão não identificada","Different content; version unidentified");
@@ -38,7 +44,7 @@ internal sealed class GeneralVersionChoiceDialog : GeneralDialog {
         layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         var text=new TextBox{Name="VersionDetails",Multiline=true,ReadOnly=true,WordWrap=true,Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,Text=difference.Name+"\r\n\r\n"+GeneralStyle.T("Instalado: ","Installed: ")+difference.Current+"\r\n"+GeneralStyle.T("Solicitado: ","Requested: ")+difference.Incoming+"\r\n\r\n"+difference.Detail+"\r\n\r\n"+(difference.AllowSkip?GeneralStyle.T("Pular mod mantém a versão local e continua com os outros mods.","Skip mod keeps the local version and continues with the other mods."):GeneralStyle.T("Manter atual adia este item/pacote inteiro; os outros itens da fila continuam. A escolha não vale para os próximos conflitos.","Keep current defers this entire item/pack; other queue items continue. The choice does not apply to future conflicts."))};
         layout.Controls.Add(new GeneralScrollView(text),0,0);var actions=GeneralTableDialogLayout.Commands();
-        var replace=GeneralStyle.Button(GeneralStyle.T("Usar do pacote","Use pack version"),()=>Complete(DialogResult.Yes),true);replace.Name="UseIncomingVersion";replace.Enabled=difference.CanReplace;
+        var replace=GeneralStyle.Button(difference.ReplaceLabel??GeneralStyle.T("Usar do pacote","Use pack version"),()=>Complete(DialogResult.Yes),true);replace.Name="UseIncomingVersion";replace.Enabled=difference.CanReplace;
         var keep=GeneralStyle.Button(GeneralStyle.T("Manter atual","Keep current"),()=>Complete(difference.AllowSkip?DialogResult.Ignore:DialogResult.No));keep.Name="KeepInstalledVersion";
         actions.Controls.Add(replace);
         if(difference.AllowSkip){

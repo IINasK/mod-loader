@@ -66,6 +66,21 @@ internal static class GeneralPresetTests {
         var missing=new PresetPackage{Key="missing/v1",StorageKey="missing/v1",ModId="missing",Name="Missing"};
         result=engine.Apply("missing","three",new[]{missing},new[]{first,second});check(result.Issues.Any(i=>i.Contains("Missing")),"An unavailable mod becomes a pending exception instead of blocking the list.");
 
+        string refreshedGame=Directory.CreateDirectory(Path.Combine(root,"rec-game")).FullName;
+        var refreshedEngine=new GeneralPresetDeployment(refreshedGame,Path.Combine(root,"rec-data"));
+        var baseline=Package(refreshedGame,"mod","old","mods/a.txt","old");
+        refreshedEngine.Apply("a","a",new[]{baseline},new[]{baseline});
+        var received=Package(refreshedGame,"mod","new","mods/a.txt","new");
+        result=refreshedEngine.Apply("a","b",new[]{received},new[]{received});
+        check(result.Protected.ContainsKey(received.ModId),"Matching a recipe without a bound receipt does not clear protection.");
+        received.VerifiedReceipt=true;
+        result=refreshedEngine.Apply("a","b",new[]{received},new[]{received});
+        check(result.Protected.Count==0&&result.Active.Single().Key==received.Key,"A verified received version replaces a stale baseline.");
+        File.WriteAllText(Path.Combine(refreshedGame,"mods/a.txt"),"unknown");
+        result=refreshedEngine.Apply("a","b",new[]{received},new[]{received});
+        check(result.Protected.ContainsKey(received.ModId)&&File.ReadAllText(Path.Combine(refreshedGame,"mods/a.txt"))=="unknown",
+            "A bound receipt does not authorize overwriting bytes it cannot verify.");
+
         string sharedGame=Directory.CreateDirectory(Path.Combine(root,"shared-game")).FullName,sharedData=Path.Combine(root,"shared-data");
         var sharedA=Package(sharedGame,"alpha","one","shared/file.txt","shared");var sharedB=GeneralPresetProfiles.Copy(sharedA);sharedB.ModId="beta";sharedB.Name="Beta";sharedB.Key=sharedB.StorageKey="beta/one";
         var sharedEngine=new GeneralPresetDeployment(sharedGame,sharedData);sharedEngine.Apply("both","a",new[]{sharedA,sharedB},new[]{sharedA,sharedB});

@@ -33,13 +33,14 @@ internal sealed partial class GeneralModWindow {
     string PresetStoredKey(Work work,string root) {
         var entries=DisabledAt(root).Read();string key=PresetRecipeKey(work);return entries.ContainsKey(key)||ActivePreset!=null?key:work.Key;
     }
-    async Task TrackPresetInstall(Work work,string root) {
-        if(state.AppliedPreset==null)return;
-        await Task.Run(()=>{
+    async Task TrackPresetInstall(Work work,string root,bool approved=false) {
+        if(state.AppliedPreset==null&&!approved)return;
+        bool tracked=await Task.Run(()=>{
             var receipts=PresetReceipts(root).ToArray();
             var package=PresetPackageFor(work,root,receipts,DisabledAt(root).Read());
-            new GeneralPresetDeployment(root,data,()=>EnsureGameClosed(root)).RecordInstalled(package);
+            return new GeneralPresetDeployment(root,data,()=>EnsureGameClosed(root)).RecordInstalled(package,approved);
         });
+        if(tracked&&approved)ReadPresetPresentation();
     }
     IEnumerable<Work> PresetWorks() {
         var preset=ActivePreset;if(preset==null)yield break;
@@ -104,13 +105,27 @@ internal sealed partial class GeneralModWindow {
             if(work.Variant.InstallRoutes.Count==0&&work.Entry.Id.StartsWith("file-",StringComparison.Ordinal))ids.Add(work.Entry.Id);
             evidence.AddRange(receipts.Where(f=>f.OwnerKeys.Any(ids.Contains)));
         }
-        if(work.Variant.CyberpunkId!=null) {
+        string snapshotId;
+        string snapshotOwner=InstalledSnapshot.Owner(work.Entry,work.Variant);
+        var received=state.SnapshotReceipts.TryGetValue(snapshotOwner,out snapshotId)
+            ?receipts.Where(f=>f.SnapshotCode&&f.SnapshotReceipt==snapshotId&&f.OwnerKeys.Contains(snapshotOwner)&&
+                f.OwnerRecipes!=null&&f.OwnerRecipes.ContainsKey(snapshotOwner)&&InstalledSnapshot.SameReceiptPayload(f.OwnerRecipes[snapshotOwner],work.Entry,work.Variant)).ToArray()
+            :new ProjectDeleteFile[0];
+        if(received.Length>0){
+            package.VerifiedReceipt=true;
+            package.Immutable=work.Variant.CyberpunkId!=null&&Recipe(work).Immutable||received.Any(f=>!f.Owned||f.ReplacesPrevious);
+            package.Files=received.Select(f=>new DisabledModFile{Path=f.Path,Hash=f.Hash,Size=f.Size}).ToList();
+        }else if(work.Variant.CyberpunkId!=null) {
             var recipe=ProfileRecipe(work);package.Immutable=recipe.Immutable||evidence.Any(f=>!f.Owned||f.ReplacesPrevious);
             var routed=work.Variant.InstallRoutes.Count==0?null:GeneralInstallRoutes.FixedPaths(catalog,recipe,work.Variant.InstallRoutes);
             package.Files=recipe.Files.Where(f=>!f.UserData).Select(f=>new DisabledModFile{Path=routed==null?f.Path:routed[f.Path],Hash=f.Sha256,Size=f.Size}).ToList();
-            package.RequiredMods.AddRange(recipe.Dependencies.Select(id=>state.List.Mods.FirstOrDefault(m=>m.Variants.Any(v=>v.CyberpunkId==id))).Where(m=>m!=null).Select(m=>m.Id));
         }else package.Files=evidence.GroupBy(f=>f.Path,StringComparer.OrdinalIgnoreCase).Where(g=>g.All(f=>f.Hash==g.First().Hash&&f.Size==g.First().Size))
             .Select(g=>new DisabledModFile{Path=g.Key,Hash=g.First().Hash,Size=g.First().Size}).ToList();
+        if(work.Variant.CyberpunkId!=null){
+            var fixedDependencies=ProfileRecipe(work).Dependencies;
+            package.RequiredMods.AddRange(fixedDependencies.Select(id=>state.List.Mods.FirstOrDefault(m=>m.Variants.Any(v=>v.CyberpunkId==id)))
+                .Where(m=>m!=null).Select(m=>m.Id));
+        }
         if(evidence.Any(f=>!f.Owned||f.ReplacesPrevious))package.Immutable=true;
         if(package.Files.Count==0&&IsCyberpunk(root)&&IsBigBody(work.Entry)&&work.Variant.InstallRoutes.Count==0) {
             var known=seed.Mods.FirstOrDefault(m=>m.Id==work.Entry.Id);
@@ -270,7 +285,10 @@ internal sealed partial class GeneralModWindow {
         if(String.IsNullOrWhiteSpace(state.Destination)||!Directory.Exists(state.Destination))return;
         try {
             var deployed=new GeneralPresetDeployment(state.Destination,data).Read();
-            presetIssues=deployed.Issues;presetProtected.UnionWith(deployed.Protected.Keys);state.AppliedPreset=deployed.Preset;state.AppliedPresetFingerprint=deployed.Fingerprint;UpdatePresetIssueLink();
+            presetIssues=deployed.Issues.Select(issue=>issue
+                .Replace("alterado fora do Mod Loader; mantido sem alterações.","arquivos divergentes do registro; instalação local preservada.")
+                .Replace("changed outside Mod Loader; left unchanged.","files differ from the record; local installation preserved.")).ToList();
+            presetProtected.UnionWith(deployed.Protected.Keys);state.AppliedPreset=deployed.Preset;state.AppliedPresetFingerprint=deployed.Fingerprint;UpdatePresetIssueLink();
         }catch(IOException ex){startupIssue=ex.Message;}catch(UnauthorizedAccessException ex){startupIssue=ex.Message;}
     }
     async Task RecoverPresetOnOpen() {

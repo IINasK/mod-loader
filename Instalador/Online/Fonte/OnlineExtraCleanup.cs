@@ -303,7 +303,7 @@ public sealed partial class FixedInstaller {
             catch(IOException){OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo inválido; arquivos sem outra prova serão preservados.");continue;}
             catch(UnauthorizedAccessException){OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo inacessível; arquivos sem outra prova serão preservados.");continue;}
             if(receipt.Status=="instalado"&&receipt.Mods.Count>0&&
-                (receipt.Operation==null||receipt.Operation=="install"||receipt.Operation==LocalModPackage.ReceiptOperation))
+                (receipt.Operation==null||receipt.Operation=="install"||receipt.Operation==ApprovedReplacementOperation||receipt.Operation==LocalModPackage.ReceiptOperation))
                 yield return receipt;
         }
     }

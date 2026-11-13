@@ -29,6 +29,7 @@ internal sealed partial class GeneralModWindow {
         readonly ConcurrentDictionary<string,Lazy<Task<List<GeneralNexusRequirement[]>>>> requirements=
             new ConcurrentDictionary<string,Lazy<Task<List<GeneralNexusRequirement[]>>>>();
         internal readonly List<Work> Checked=new List<Work>();
+        internal readonly List<Work> Divergent=new List<Work>();
         internal ScanReads Reads;
         internal bool InventoryUnavailable;
         internal int MetadataChanged,UnavailableMetadata,UnavailableRequirements;
@@ -55,8 +56,9 @@ internal sealed partial class GeneralModWindow {
                         ()=>Lookup(()=>GeneralNexusInfo.ReadRequirements(link)))).Value;
             }
         }
-        internal void Record(Work work) {
+        internal void Record(Work work,string status=null) {
             Checked.Add(work);
+            if(status=="Diferente/alterado"||status==GeneralModInstaller.Modified||status==GeneralModInstaller.Partial||status=="Parcial")Divergent.Add(work);
             int count=work.Entry.Tags.Count;
             bool adult=work.Entry.Nsfw;
             foreach(var link in Sources(work)){
@@ -107,9 +109,28 @@ internal sealed partial class GeneralModWindow {
                     :T("Dependências online do Nexus exigem autenticação.","Online Nexus dependencies require authentication."));
             if(audit.InventoryUnavailable)
                 summary+="\r\n"+T("Não foi possível ler os arquivos fora da lista.","Could not read files outside the list.");
-            detail.Text=issues.Count==0?T("Verificação concluída.","Verification complete."):T("Verificação concluída com dependências para revisar.","Verification complete with dependencies to review.");
-            using(var dialog=new GeneralDependencyReview(summary,issues,install.Count,launch,DisplayedInventory().Where(file=>file.Kind=="found").ToArray(),AddReviewedDependency)){
+            string verifyRoot=Root();
+            var repairs=new Dictionary<GeneralDependencyIssue,Work>();
+            foreach(var work in audit.Divergent.Where(CanReviewReplacement)){
+                var recipe=Recipe(work);
+                var scan=await Task.Run(()=>audit.Reads.Fixed(recipe));
+                if(scan.State!="Diferente/alterado"&&!presetProtected.Contains(work.Entry.Id))continue;
+                if(scan.State!="Diferente/alterado"&&scan.State!="Parcial")continue;
+                var issue=new GeneralDependencyIssue{Mod=work.Entry.Name,Requirement=recipe.Version,
+                    Status=T("Arquivos divergentes","Files differ"),CanRepair=true};
+                issues.Add(issue);repairs.Add(issue,work);
+            }
+            if(IsDisposed)return;
+            detail.Text=issues.Count==0?T("Verificação concluída.","Verification complete."):T("Verificação concluída com pendências para revisar.","Verification complete with issues to review.");
+            Work repair=null;
+            using(var dialog=new GeneralDependencyReview(summary,issues,install.Count,launch,DisplayedInventory().Where(file=>file.Kind=="found").ToArray(),
+                AddReviewedDependency,repairs.Count==0?null:(Action<GeneralDependencyIssue>)(issue=>repair=repairs[issue]))){
                 if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+            }
+            if(repair!=null){
+                repair.ReviewReplacement=true;
+                if(String.Equals(verifyRoot,Root(),StringComparison.OrdinalIgnoreCase))Enqueue(new[]{repair},false);
+                return;
             }
             string root=Root();
             var selected=ChooseAlternatives(install.Values.ToList(),entries=>{
@@ -129,6 +150,12 @@ internal sealed partial class GeneralModWindow {
                 ConfirmAndEnqueue(pending,root,downloads,false);
             }
         }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
+    }
+
+    bool CanReviewReplacement(Work work){
+        if(work.Variant.CyberpunkId==null||work.Variant.CyberpunkVariant!=null||work.Variant.InstallRoutes.Count!=0)return false;
+        var recipe=Recipe(work);
+        return !recipe.Immutable&&!EquipmentExOptions.Available(recipe)&&String.IsNullOrEmpty(recipe.BlockedReason);
     }
 
     List<P2PSyncDifference> TryReadGameInventory(string destination,ScanReads reads,Dictionary<string,InventoryZipLabel> zipLabels) {
@@ -455,11 +482,12 @@ internal sealed partial class GeneralModWindow {
 internal sealed class GeneralDependencyIssue {
     internal string Mod,Requirement,Status,Url;
     internal GeneralNexusRequirement Candidate;
+    internal bool CanRepair;
 }
 
 internal sealed class GeneralDependencyReview : GeneralDialog {
     internal GeneralDependencyReview(string summary,IReadOnlyList<GeneralDependencyIssue> issues,int installable,Action<string> open,
-        IReadOnlyList<P2PSyncDifference> inventory=null,Action<GeneralNexusRequirement> add=null)
+        IReadOnlyList<P2PSyncDifference> inventory=null,Action<GeneralNexusRequirement> add=null,Action<GeneralDependencyIssue> repair=null)
         :base(GeneralStyle.T("Resultado da verificação","Verification results")) {
         RequiresDecision=installable>0||add!=null;
         ClientSize=new Size(860,Math.Min(550,290+issues.Count*35));
@@ -502,13 +530,21 @@ internal sealed class GeneralDependencyReview : GeneralDialog {
             if(issue==null||issue.Candidate==null||add==null)return;
             try{add(issue.Candidate);issue.Candidate=null;addChoice.Enabled=false;}catch(Exception ex){Message(this,ex.Message,Text);}
         });
-        browser.Enabled=addChoice.Enabled=false;
+        var repairButton=GeneralStyle.Button(GeneralStyle.T("Revisar substituição","Review replacement"),()=>{
+            var issue=table.CurrentRow==null?null:table.CurrentRow.Tag as GeneralDependencyIssue;
+            if(issue==null||!issue.CanRepair||repair==null)return;
+            repair(issue);Complete(DialogResult.OK);
+        });
+        repairButton.Name="ReviewModReplacement";
+        browser.Enabled=addChoice.Enabled=repairButton.Enabled=false;
         table.CurrentCellChanged+=(s,e)=>{
             var issue=table.CurrentRow==null?null:table.CurrentRow.Tag as GeneralDependencyIssue;
             browser.Enabled=issue!=null&&GeneralModDownload.IsWebSource(issue.Url);
             addChoice.Enabled=issue!=null&&issue.Candidate!=null;
+            if(repair!=null)repairButton.Enabled=issue!=null&&issue.CanRepair;
         };
         commands.Controls.Add(done);commands.Controls.Add(browser);
+        if(repair!=null)commands.Controls.Add(repairButton);else repairButton.Dispose();
         if(add!=null&&issues.Any(issue=>issue.Candidate!=null))commands.Controls.Add(addChoice);
         if(inventory!=null&&inventory.Count>0){
             var outside=GeneralStyle.Button(GeneralStyle.T("Fora da lista","Outside the list")+" ("+inventory.Count+")",()=>{

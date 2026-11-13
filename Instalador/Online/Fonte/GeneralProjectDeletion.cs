@@ -7,7 +7,8 @@ using System.Linq;
 using System.Text.RegularExpressions;
 
 internal sealed class ProjectDeleteFile {
-    internal string Path,Hash,Reason;
+    internal string Path,Hash,Reason,SnapshotReceipt;
+    internal bool SnapshotCode;
     internal long Size;
     internal bool Owned, ReplacesPrevious, PreserveManualOriginal;
     internal List<string> OwnerKeys;
@@ -174,12 +175,14 @@ public sealed partial class InstalledSnapshotInstaller {
     internal IEnumerable<ProjectDeleteFile> ProjectDeletionFiles(bool inspection=false,bool skipUnreadable=false){
         foreach(var receipt in AllReceipts(inspection,skipUnreadable)){
             if(receipt.Status!="installed")continue;
+            var codePaths=new HashSet<string>(receipt.Manifest.Files.Where(file=>file.Kind=="file").Select(file=>file.Path),StringComparer.OrdinalIgnoreCase);
             var owners=receipt.Manifest.Files.GroupBy(payload=>payload.Path,StringComparer.OrdinalIgnoreCase).ToDictionary(group=>group.Key,group=>group.SelectMany(payload=>payload.Owners).Where(receipt.ActiveOwners.Contains).Distinct().ToList(),StringComparer.OrdinalIgnoreCase);
             var recipes=receipt.Manifest.List.Mods.ToDictionary(m=>InstalledSnapshot.Owner(m,m.Variants.Single()),m=>m.Variants.Single());
             foreach(var file in receipt.Files.Where(file=>file.Applied&&!file.Reverted)){
                 List<string> keys;if(!owners.TryGetValue(file.Path,out keys)||keys.Count==0)continue;
                 yield return new ProjectDeleteFile{Path=file.Path,Hash=file.After,Size=file.Size,Owned=file.Owned&&file.Before==null,ReplacesPrevious=file.Before!=null,OwnerKeys=keys,OwnerRecipes=recipes,
-                    PreserveManualOriginal=receipt.ManualCapture&&!file.Owned};
+                    PreserveManualOriginal=receipt.ManualCapture&&!file.Owned,SnapshotReceipt=receipt.Id,
+                    SnapshotCode=codePaths.Contains(file.Path)};
             }
         }
     }

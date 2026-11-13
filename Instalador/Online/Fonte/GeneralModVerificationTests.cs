@@ -92,6 +92,37 @@ internal sealed partial class GeneralModWindow {
                 File.Exists(dependencyPath)||File.ReadAllText(installedPath)!=owner.Id||File.ReadAllText(manualPath)!="manual")
                 throw new IOException("Cancelar na confirmação deve preservar os arquivos locais e deixar a fila vazia.");
 
+            File.WriteAllText(installedPath,"local version");
+            form.testVersionChoice=difference=>{
+                if(!difference.AllowSkip||!difference.CanReplace||!difference.Detail.Contains(owner.Files.Single().Path))
+                    throw new IOException("A revisão precisa listar o arquivo divergente e oferecer as duas escolhas.");
+                difference.SkipSelected=true;
+                return false;
+            };
+            using(var timer=new Timer{Interval=40}){
+                timer.Tick+=(s,e)=>{
+                    var review=Application.OpenForms.OfType<GeneralDependencyReview>().FirstOrDefault(item=>item.Visible);
+                    if(review==null)return;
+                    timer.Stop();
+                    try{
+                        var rows=AllControls(review).OfType<DataGridView>().Single(grid=>grid.Name=="DependencyResults");
+                        var repair=rows.Rows.Cast<DataGridViewRow>().Single(row=>((GeneralDependencyIssue)row.Tag).CanRepair);
+                        rows.CurrentCell=repair.Cells[0];
+                        AllControls(review).OfType<Button>().Single(button=>button.Name=="ReviewModReplacement").PerformClick();
+                    }catch(Exception ex){dialogFailure=ex;review.Close();}
+                };
+                timer.Start();
+                await form.VerifyProject();
+            }
+            var stop=DateTime.UtcNow.AddSeconds(5);
+            while(form.working&&DateTime.UtcNow<stop)await System.Threading.Tasks.Task.Delay(20);
+            if(dialogFailure!=null)throw dialogFailure;
+            if(form.working||form.statuses[form.MakeWork(form.state.List.Mods.Single(entry=>entry.Id==owner.Id)).Key]!="Pulado"||
+                File.ReadAllText(installedPath)!="local version"||File.ReadAllText(manualPath)!="manual")
+                throw new IOException("Pular a substituição na verificação deve preservar a versão e os arquivos locais.");
+            File.WriteAllText(installedPath,owner.Id);
+            form.testVersionChoice=null;
+
             const string related="r6/scripts/manual-tattoo.reds";
             string relatedPath=Safe.In(game,related);
             Directory.CreateDirectory(Path.GetDirectoryName(relatedPath));

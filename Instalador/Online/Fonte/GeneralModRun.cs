@@ -12,7 +12,7 @@ internal sealed partial class GeneralModWindow {
     sealed class Work {
         internal GeneralModEntry Entry;
         internal GeneralModVariant Variant;
-        internal bool Ended,Applied,SwitchAlternatives,DependencyQueue,SaveVariant;
+        internal bool Ended,Applied,SwitchAlternatives,DependencyQueue,SaveVariant,ReviewReplacement;
         internal HashSet<string> DropConflicts;
         internal string DropDensity, BodyChoice, ScanError, DiagnosticStage, DiagnosticVersion;
         internal double Fraction;
@@ -381,7 +381,7 @@ internal sealed partial class GeneralModWindow {
                 if(scheduled<works.Count)pending.Enqueue(verify(works[scheduled++]));
                 bool skipped=skipRequests.Contains(work);
                 string result=skipped?"Verificação pulada":found;
-                if(!skipped&&audit!=null)audit.Record(work);
+                if(!skipped&&audit!=null)audit.Record(work,found);
                 statusDetails.Remove(work.Key);
                 if(!skipped)ReportScanError(work);
                 statuses[work.Key]=result;progress.Remove(work.Key);
@@ -596,7 +596,7 @@ internal sealed partial class GeneralModWindow {
                     downloads.Add(work.Entry.Name+" — "+work.Variant.Name);
                 continue;
             }
-            if(SnapshotInstalled(work,root))continue;
+            if(!work.ReviewReplacement&&SnapshotInstalled(work,root))continue;
             if(status=="Requer Cyberpunk 2077"||status=="Requer Phantom Liberty"){pending.Add(work);continue;}
 
             var recipe=Recipe(work);
@@ -617,7 +617,7 @@ internal sealed partial class GeneralModWindow {
                 }
                 var scan=reads.Fixed(mod);
                 if(scan.IsCorrect)continue;
-                if(scan.IsConflict||!String.IsNullOrEmpty(mod.BlockedReason)||GameEdition.NeedsPL(mod)&&!reads.PhantomLiberty){blocked=true;break;}
+                if((scan.IsConflict&&(!work.ReviewReplacement||mod.Id!=recipe.Id))||!String.IsNullOrEmpty(mod.BlockedReason)||GameEdition.NeedsPL(mod)&&!reads.PhantomLiberty){blocked=true;break;}
                 unresolved.Add(mod);
             }
             if(!blocked&&unresolved.Count==0)continue;
@@ -737,7 +737,7 @@ internal sealed partial class GeneralModWindow {
                 Name=work.Entry.Name,Variant=work.Variant.Id,VariantName=work.Variant.Name,ModVersion=work.DiagnosticVersion,
                 Expected="Instalar e verificar a variante selecionada."
             });
-            if(presetProtected.Contains(work.Entry.Id))throw new IOException(T("Mod alterado fora do Mod Loader; mantido sem alterações.","Mod changed outside Mod Loader; left unchanged."));
+            if(presetProtected.Contains(work.Entry.Id)&&!work.ReviewReplacement)throw new IOException(T("Os arquivos do mod divergem do registro; a instalação local foi preservada. Use Verificar para revisar a substituição.","Mod files differ from the record; the local installation was preserved. Use Verify to review replacement."));
             if(GeneralModLibrary.NeedsDependencyVersion(work.Entry,work.Variant)){
                 RowStatus(work,GeneralStatusPresentation.ChooseDependency);
                 return;
@@ -748,16 +748,16 @@ internal sealed partial class GeneralModWindow {
                 try{GeneralInstallRoutes.CheckFolders(root,work.Variant.InstallRoutes);}
                 catch(DirectoryNotFoundException ex){RowStatus(work,"Pulado",null,work.Entry.Name+": "+ex.Message);return;}
             }
-            if(SnapshotInstalled(work,root)){await TrackPresetInstall(work,root);RememberInstalledVariant(work);RowStatus(work,"Instalado",100);return;}
+            if(!work.ReviewReplacement&&SnapshotInstalled(work,root)){await TrackPresetInstall(work,root);RememberInstalledVariant(work);RowStatus(work,"Instalado",100);return;}
             if(work.SaveVariant&&work.BodyChoice!=null&&await Task.Run(()=>IsSharedBodySwitch(work,Status(work,root)))){
                 RememberInstalledVariant(work);RowStatus(work,"Instalado",100);return;
             }
-            if(work.Variant.InstallRoutes.Count==0&&await Task.Run(()=>MatchesNexusInstallation(work,root))){
+            if(!work.ReviewReplacement&&work.Variant.InstallRoutes.Count==0&&await Task.Run(()=>MatchesNexusInstallation(work,root))){
                 RowStatus(work,GeneralStatusPresentation.NexusManual);
                 return;
             }
             var conflicts=await Task.Run(()=>ConflictingAlternatives(work,root));
-            if(conflicts.Any(old=>presetProtected.Contains(old.Entry.Id)))throw new IOException(T("A versão em uso está protegida por alterações externas.","The current version is protected because it was changed externally."));
+            if(conflicts.Any(old=>presetProtected.Contains(old.Entry.Id)))throw new IOException(T("A versão em uso está protegida porque os arquivos divergem do registro.","The current version is protected because its files differ from the record."));
             if(conflicts.Count>0&&!work.SwitchAlternatives&&
                 (work.DropConflicts==null||!work.DropConflicts.IsSupersetOf(conflicts.Select(old=>old.Key))))
                 throw new IOException(T("Use Mudar versão para trocar: ","Use Change version to switch: ")+conflicts[0].Entry.Name);
@@ -801,7 +801,7 @@ internal sealed partial class GeneralModWindow {
                     incomingStarted=true;
                     await InstallGeneral(work,root,prepared);
                 }
-                var final=await Task.Run(()=>Status(work,root));
+                var final=await Task.Run(()=>work.ReviewReplacement&&FixedData.Scan(Recipe(work),root).IsCorrect?"Instalado":Status(work,root));
                 if(!InstalledVersion(final))
                     throw new IOException(T("A conferência final não confirmou esta variante: ","Final verification did not confirm this variant: ")+GeneralStyle.Status(final));
             }catch(Exception ex){switchFailure=ex;}
@@ -826,8 +826,12 @@ internal sealed partial class GeneralModWindow {
             }
             foreach(var old in suspended.Where(old=>IsBigBody(old.Entry)&&old.Entry.Id!=work.Entry.Id))
                 state.ChosenVariants[old.Entry.Id]=old.Variant.Id;
+            if(work.ReviewReplacement){
+                var owner=InstalledSnapshot.Owner(work.Entry,work.Variant);
+                if(!SnapshotInstalled(work,root)&&state.SnapshotReceipts.Remove(owner))Persist();
+            }
             RememberInstalledVariant(work);
-            await TrackPresetInstall(work,root);completed=true;
+            await TrackPresetInstall(work,root,work.ReviewReplacement);completed=true;
             RowStatus(work,"Instalado",100,work.Entry.Name+T(": instalado e conferido.",": installed and verified."));
             OnlineDiagnostics.Record("general.install.complete",work.Entry.Id,"Instalação conferida.",new{Variant=work.Variant.Id});
         }catch(ModVersionKeptException ex){RowStatus(work,"Versão mantida",null,ex.Message);OnlineDiagnostics.Record("general.version.kept",work.Entry.Id,ex.Message);}
@@ -937,6 +941,7 @@ internal sealed partial class GeneralModWindow {
         var routes=work.Variant.InstallRoutes;
         var mapped=routes.Count==0?null:GeneralInstallRoutes.FixedPaths(catalog,recipe,routes);
         var pending=new List<FixedMod>();
+        var replacements=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
         foreach(var mod in variants){
             CheckSkip(work);
             if(mapped!=null&&mod.Id==recipe.Id){
@@ -967,7 +972,14 @@ internal sealed partial class GeneralModWindow {
             }else{
                 var scan=await Task.Run(()=>FixedData.Scan(mod,root));
                 if(scan.IsCorrect)continue;
-                if(scan.Original>0||scan.IsConflict){
+                if(work.ReviewReplacement&&mod.Id==recipe.Id&&(scan.State=="Diferente/alterado"||scan.State=="Parcial")){
+                    var changes=await Task.Run(()=>FixedInstaller.ReplacementFiles(mod,root));
+                    var difference=new ModVersionDifference{Name=work.Entry.Name,Current=scan.State,Incoming=mod.Version,
+                        AllowSkip=true,CanReplace=changes.Count==scan.Different,ReplaceLabel=T("Usar versão do catálogo","Use catalog version"),
+                        Detail=ModVersionDifference.ReplacementDetail(changes.Keys)};
+                    if(difference.Skip(ChooseVersion))throw new OperationCanceledException();
+                    foreach(var pair in changes)replacements.Add(pair.Key,pair.Value);
+                }else if(scan.Original>0||scan.IsConflict){
                     var file=mod.Files.FirstOrDefault(f=>!f.UserData&&File.Exists(Safe.In(root,f.Path))&&Safe.Hash(Safe.In(root,f.Path))!=f.Sha256);
                     var difference=new ModVersionDifference{Name=mod.Name,Current=mod.Id=="NightCoop"&&scan.State=="Atualização disponível"?"0.1.2-beta":file!=null&&FpvCustomization.IsWeaveUpgrade(file)&&scan.Original>0?"Equipment-EX 1.2.10":file==null?scan.State:ModVersionDifference.FileVersion(Safe.In(root,file.Path)),Incoming=mod.Version,CanReplace=!scan.IsConflict,Detail=scan.IsConflict?T("Há conteúdo não reconhecido ou incompatível. Resolva o conflito antes de substituir; a base protegida permanece intacta.","Unrecognized or incompatible content was found. Resolve the conflict before replacing; the protected base remains intact."):T("Versão anterior reconhecida. A troca usa o backup e a conferência de arquivos do instalador.","Recognized previous version. Replacement uses the installer's backup and file verification.")};
                     difference.Require(ChooseVersion);
@@ -1009,7 +1021,7 @@ internal sealed partial class GeneralModWindow {
                 if (pending.Any(mod => mod.Id == recipe.Id)) engine.ApplyEquipmentExProfile(work.Variant.Id, Report);
                 return;
             }
-            if(work.Variant.CyberpunkVariant==null){engine.Install(new[]{recipe.Id},true,Report);return;}
+            if(work.Variant.CyberpunkVariant==null){engine.Install(new[]{recipe.Id},true,Report,approvedReplacements:replacements);return;}
             if(recipe.Dependencies.Length>0)engine.Install(recipe.Dependencies,true,Report);
             if(pending.Any(mod=>mod.Id==recipe.Id))engine.ApplyDensityProfile(work.Variant.CyberpunkVariant,Report);
         };

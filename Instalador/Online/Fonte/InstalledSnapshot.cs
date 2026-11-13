@@ -37,6 +37,9 @@ public static partial class InstalledSnapshot {
         var installed=manifest.List.Mods.FirstOrDefault(entry=>entry.Id==mod.Id);
         var recipe=installed==null?null:installed.Variants.FirstOrDefault(v=>v.Id==variant.Id);
         if(recipe==null)return false;
+        return SameReceiptPayload(recipe,mod,variant);
+    }
+    internal static bool SameReceiptPayload(GeneralModVariant recipe,GeneralModEntry mod,GeneralModVariant variant){
         var expected=Clone(variant);
         MakeSourcesPortable(expected,mod.Id);
         return GeneralModLibrary.SamePayload(recipe,expected);

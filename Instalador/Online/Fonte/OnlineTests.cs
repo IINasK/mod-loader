@@ -76,6 +76,17 @@ public static class OnlineTests {
             var ca=Clone(c).Packages[1];ca.Assets[0].Sha256=Safe.Hash(zipPath);ca.Assets[0].Size=new FileInfo(zipPath).Length;cache.Import(zipPath,ca.Assets[0]);Refuse(()=>cache.Stage(ca,NewDir(root,"bad-"+kind),noop),"ZIP "+kind+" recusado");if(kind=="symlink"){ca.Assets[0].Format="tar";Refuse(()=>cache.Stage(ca,NewDir(root,"bad-tar-link"),noop),"Tar recusa metadados de link antes de extrair");}
         }
         string conflictGame=Fixture(root,"conflito");Text(conflictGame,mod.Files[0].Path,"arquivo alheio");var conflictEngine=new FixedInstaller(c,cache,conflictGame,null,true);Refuse(()=>conflictEngine.Install(new[]{"Extra"},true,noop),"Conflito bloqueia instalação");Check(File.ReadAllText(Safe.In(conflictGame,mod.Files[0].Path))=="arquivo alheio","Arquivo alheio preservado no conflito");
+        conflictEngine.Install(new[]{"NightCoop"},true,noop);
+        Text(conflictGame,"archive/pc/mod/alheio.archive","outro mod");
+        var approval=FixedInstaller.ReplacementFiles(mod,conflictGame);
+        Check(approval.Keys.SequenceEqual(new[]{mod.Files[0].Path}),"A revisão oferece somente arquivos divergentes com caminho no catálogo.");
+        Text(conflictGame,mod.Files[0].Path,"mudou depois da aprovação");
+        Refuse(()=>conflictEngine.Install(new[]{"Extra"},true,noop,approvedReplacements:approval),"A aprovação expira se o arquivo local mudar.");
+        approval=FixedInstaller.ReplacementFiles(mod,conflictGame);
+        conflictEngine.Install(new[]{"Extra"},true,noop,approvedReplacements:approval);
+        Check(FixedData.Scan(mod,conflictGame).IsCorrect&&File.ReadAllText(Safe.In(conflictGame,"archive/pc/mod/alheio.archive"))=="outro mod","Substitui somente os arquivos aprovados e preserva vizinhos.");
+        conflictEngine.Undo(noop);
+        Check(File.ReadAllText(Safe.In(conflictGame,mod.Files[0].Path))=="mudou depois da aprovação","Desfazer restaura a versão local substituída.");
         string mutation=Fixture(root,"instalar");foreach(var f in c.Packages[0].Files)Text(mutation,f.Path,"test "+f.Path);Text(mutation,"archive/pc/mod/alheio.archive","alheio");string saves=NewDir(root,"saves-falsos");Text(saves,"slot/sav.dat","save de teste");var engine=new FixedInstaller(c,cache,mutation,saves,true);
         Refuse(()=>engine.Install(new[]{"Extra"},false,noop),"Plano de instalação precisa de confirmação explícita");engine.Install(new[]{"Extra"},true,noop);Check(FixedData.Scan(mod,mutation).IsCorrect,"Instalação em fixture concluída");
         Check(Directory.GetFiles(Path.Combine(mutation,".CoopModsOnline","backups"),"sav.dat",SearchOption.AllDirectories).Length==1,"Backup dos saves de teste realizado");

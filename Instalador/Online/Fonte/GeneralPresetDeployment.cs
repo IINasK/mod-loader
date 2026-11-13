@@ -11,6 +11,7 @@ internal sealed class PresetPackage {
     public List<string> RequiredMods=new List<string>();
     public List<DisabledModFile> Files=new List<DisabledModFile>();
     public bool Immutable;
+    [System.Web.Script.Serialization.ScriptIgnore] internal bool VerifiedReceipt;
 }
 internal sealed class PresetDeploymentState {
     public string Preset,Fingerprint;
@@ -93,11 +94,12 @@ internal sealed class GeneralPresetDeployment {
             state.Protected.Remove(modId);Safe.WriteJson(stateFile,state);
         }
     }
-    internal void RecordInstalled(PresetPackage package) {
+    internal bool RecordInstalled(PresetPackage package,bool approved=false) {
         using(Lock()) {
-            Validate(new[]{package});if(package.Files.Count==0||!package.Files.All(Matches))return;
-            var state=Read();if(state.Protected.ContainsKey(package.ModId))return;
-            state.Active.RemoveAll(p=>p.ModId==package.ModId);state.Active.Add(package);Safe.WriteJson(stateFile,state);
+            Validate(new[]{package});if(package.Files.Count==0||!package.Files.All(Matches))return false;
+            var state=Read();if(state.Protected.ContainsKey(package.ModId)&&!approved)return false;
+            if(approved&&state.Protected.Remove(package.ModId))state.Issues.RemoveAll(issue=>issue.StartsWith(package.Name+":",StringComparison.Ordinal));
+            state.Active.RemoveAll(p=>p.ModId==package.ModId);state.Active.Add(package);Safe.WriteJson(stateFile,state);return true;
         }
     }
     internal void RecordRemoval(IEnumerable<string> keys) {
@@ -169,7 +171,25 @@ internal sealed class GeneralPresetDeployment {
                 var proven=state.Active.FirstOrDefault(a=>a.Key==p.Key);
                 if(proven!=null)p.Files=GeneralPresetProfiles.Copy(proven.Files);
             }
-            // Never replace an existing baseline with current bytes: that would hide external changes.
+            // A newer bound receipt can supersede a stale baseline only when its recorded bytes still match.
+            foreach(var package in inventory.Where(p=>p.VerifiedReceipt&&p.Files.Count>0&&!cached.ContainsKey(p.StorageKey))){
+                var previous=state.Active.Where(p=>p.ModId==package.ModId).ToArray();
+                if((previous.Length==0&&!state.Protected.ContainsKey(package.ModId))||
+                    (previous.Length==1&&previous[0].Key==package.Key&&!state.Protected.ContainsKey(package.ModId)&&
+                     previous[0].Files.Count==package.Files.Count&&previous[0].Files.Zip(package.Files,(old,next)=>
+                         old.Path==next.Path&&old.Hash==next.Hash&&old.Size==next.Size).All(same=>same))||
+                    !package.Files.All(Matches))continue;
+                var paths=package.Files.ToDictionary(f=>Target(f),StringComparer.OrdinalIgnoreCase);
+                if(previous.SelectMany(p=>p.Files).Any(f=>!paths.ContainsKey(Target(f))&&(File.Exists(Target(f))||Directory.Exists(Target(f)))))continue;
+                if(state.Active.Where(p=>p.ModId!=package.ModId).SelectMany(p=>p.Files).Any(f=>{
+                    DisabledModFile next;
+                    return paths.TryGetValue(Target(f),out next)&&next.Hash!=f.Hash;
+                }))continue;
+                state.Active.RemoveAll(p=>p.ModId==package.ModId);
+                state.Active.Add(package);
+                state.Protected.Remove(package.ModId);
+            }
+            // Current bytes without a verified receipt never replace an existing baseline.
             var activeHashes=new Dictionary<string,HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             foreach(var package in state.Active)IndexHashes(activeHashes,package,Target);
             var candidates=inventory.Where(p=>p.Files.Count>0&&!cached.ContainsKey(p.StorageKey)).ToList();
@@ -194,7 +214,7 @@ internal sealed class GeneralPresetDeployment {
                 (done,total)=>{if(progress!=null)progress(checkingActive,done,total);},cancellation,workers);
             for(int index=0;index<state.Active.Count;index++) {
                 var package=state.Active[index];
-                if(changedFiles[index])state.Protected[package.ModId]=GeneralStyle.T("alterado fora do Mod Loader; mantido sem alterações.","changed outside Mod Loader; left unchanged.");
+                if(changedFiles[index])state.Protected[package.ModId]=GeneralStyle.T("arquivos divergentes do registro; instalação local preservada.","files differ from the record; local installation preserved.");
             }
             foreach(var package in inventory.Where(p=>p.Files.Count>0&&!state.Active.Any(a=>a.Key==p.Key)&&!cached.ContainsKey(p.StorageKey))) {
                 if(package.Files.Any(f=>File.Exists(Target(f)))&&package.Files.Any(f=>!Matches(f))&&

@@ -207,7 +207,10 @@ public sealed partial class InstalledSnapshotInstaller {
         List<Receipt> receipts,List<string> skippedMods){
         var ids=new HashSet<string>(manifest.List.Mods.Select(m=>m.Id),StringComparer.Ordinal);
         var paths=new HashSet<string>(manifest.Files.Where(f=>f.Kind=="file").Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
-        var obsolete=receipts.Where(r=>r.Status=="installed").SelectMany(r=>r.Manifest.Files.Where(f=>f.Kind=="file"&&f.Owners.Any(o=>r.ActiveOwners.Contains(o)&&ids.Contains(o.Split('/')[0]))&&!paths.Contains(f.Path))).Where(f=>File.Exists(Target(f.Path))||Directory.Exists(Target(f.Path))).Select(f=>f.Path).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var obsolete=receipts.Where(r=>r.Status=="installed").SelectMany(r=>r.Manifest.Files
+            .Where(f=>f.Kind=="file"&&!paths.Contains(f.Path)&&(File.Exists(Target(f.Path))||Directory.Exists(Target(f.Path))))
+            .SelectMany(f=>f.Owners.Where(o=>r.ActiveOwners.Contains(o)).Select(o=>new{Id=o.Split('/')[0],f.Path})))
+            .Where(item=>ids.Contains(item.Id)).ToLookup(item=>item.Id,item=>item.Path,StringComparer.Ordinal);
         var stock = manifest.List.Mods.SelectMany(mod => mod.Variants)
             .FirstOrDefault(variant => variant.CyberpunkId == EquipmentExOptions.ModId && variant.CyberpunkVariant == EquipmentExOptions.StockId);
         if (stock != null) {
@@ -218,16 +221,29 @@ public sealed partial class InstalledSnapshotInstaller {
                 throw new IOException(GeneralStyle.T("O pacote usa Equipment-EX sem WEAVE. Troque para Original no Mod Loader e tente novamente.",
                     "This pack uses Equipment-EX without WEAVE. Switch to Stock in Mod Loader and try again."));
         }
-        if(obsolete.Count>0)new ModVersionDifference{Name=manifest.Name,Current=GeneralStyle.T("Outra versão registrada","Another recorded version"),Incoming=manifest.Name,CanReplace=false,Detail=GeneralStyle.T("A versão anterior contém arquivos que não fazem parte do novo pacote. Remova a versão anterior pelo gerenciador para evitar misturar versões. Nada foi apagado.","The previous version contains files absent from the new pack. Remove the previous version through the manager to avoid mixing versions. Nothing was deleted.")+"\r\n"+String.Join("\r\n",obsolete.Take(6))}.Require(choose);
-        var changed=manifest.Files.Where(f=>f.Kind=="file"&&!f.ReuseLocal).GroupBy(f=>f.Path,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()).Where(f=>File.Exists(Target(f.Path))&&HashOrNull(Target(f.Path))!=f.Sha256).ToList();
-        var expected=changed.ToDictionary(f=>f.Path,f=>HashOrNull(Target(f.Path)),StringComparer.OrdinalIgnoreCase);
         var skipped=new HashSet<string>(StringComparer.Ordinal);
+        foreach(var group in obsolete){
+            var mod=manifest.List.Mods.Single(entry=>entry.Id==group.Key);
+            var difference=new ModVersionDifference{Name=mod.Name,Current=GeneralStyle.T("Outra versão registrada","Another recorded version"),
+                Incoming=manifest.Name,CanReplace=false,AllowSkip=manifest.Schema==2&&choose!=null&&!group.Any(IsImmutable),
+                Detail=GeneralStyle.T("A versão instalada tem arquivos extras que não estão no pacote. Remova a versão anterior pelo gerenciador para evitar misturar versões.",
+                    "The installed version has extra files absent from the pack. Remove the previous version through the manager to avoid mixing versions.")
+                    +"\r\n"+String.Join("\r\n",group.Distinct(StringComparer.OrdinalIgnoreCase).Take(6))};
+            if(difference.AllowSkip){if(difference.Skip(choose))skipped.Add(mod.Id);}
+            else difference.Require(choose);
+        }
+        var expected=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+        var changed=manifest.Files.Where(f=>f.Kind=="file"&&!f.ReuseLocal).GroupBy(f=>f.Path,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()).Where(f=>{
+            string hash=HashOrNull(Target(f.Path));
+            if(hash==null||hash==f.Sha256)return false;
+            expected.Add(f.Path,hash);return true;
+        }).ToList();
         foreach(var group in changed.GroupBy(f=>String.Join(", ",manifest.List.Mods.Where(m=>f.Owners.Any(owner=>owner.StartsWith(m.Id+"/",StringComparison.Ordinal))).Select(m=>m.Name)))){
             var files=group.ToList();var known=catalog.Packages.FirstOrDefault(m=>m.Files.Any(f=>files.Any(p=>p.Path.Equals(f.Path,StringComparison.OrdinalIgnoreCase))));
             var affected=new HashSet<string>(files.SelectMany(file=>file.Owners).Select(owner=>owner.Split('/')[0]),StringComparer.Ordinal);
             if(affected.All(skipped.Contains))continue;
             var difference=new ModVersionDifference{Name=group.Key,AllowSkip=manifest.Schema==2&&choose!=null&&
-                !files.Any(file=>IsImmutable(file.Path)),Current=String.Join("; ",files.Select(f=>ModVersionDifference.FileVersion(Target(f.Path))).Distinct()),Incoming=known==null?GeneralStyle.T("Conteúdo do pacote recebido","Received pack content"):known.Version,CanReplace=!files.Any(f=>IsImmutable(f.Path)&&!NightCoopRelease.AllowsUpgrade(f,expected[f.Path],catalog)),Detail=String.Join("\r\n",files.Take(6).Select(f=>f.Path))+"\r\n"+GeneralStyle.T("O pacote aguarda sua escolha. A troca guarda os arquivos anteriores para reversão. A base protegida só aceita atualizações oficiais reconhecidas.","The pack waits for your choice. Replacement backs up previous files. The protected base only accepts recognized official updates.")};
+                !files.Any(file=>IsImmutable(file.Path)),Current=String.Join("; ",files.Select(f=>ModVersionDifference.FileVersion(Target(f.Path))).Distinct()),Incoming=known==null?GeneralStyle.T("Conteúdo do pacote recebido","Received pack content"):known.Version,CanReplace=!files.Any(f=>IsImmutable(f.Path)&&!NightCoopRelease.AllowsUpgrade(f,expected[f.Path],catalog)),Detail=ModVersionDifference.ReplacementDetail(files.Select(f=>f.Path))};
             if(difference.AllowSkip){
                 if(difference.Skip(choose))skipped.UnionWith(affected);
             }else difference.Require(choose);

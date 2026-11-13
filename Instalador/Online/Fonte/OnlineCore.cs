@@ -288,6 +288,7 @@ public sealed partial class NexusClient {
 }
 
 public sealed partial class FixedInstaller {
+    internal const string ApprovedReplacementOperation="approved-replacement";
     readonly FixedCatalog catalog; readonly DownloadCache cache; readonly string game,saves; readonly bool fixture;
     public FixedInstaller(FixedCatalog c,DownloadCache downloads,string gameRoot,string saveRoot,bool isFixture=false) {
         cache=downloads;game=Path.GetFullPath(gameRoot).TrimEnd('\\');saves=saveRoot;
@@ -299,16 +300,17 @@ public sealed partial class FixedInstaller {
     }
     string Data { get{return Safe.In(game,".CoopModsOnline");} }
     void Closed(){if(fixture)return;foreach(var p in Process.GetProcessesByName("Cyberpunk2077")){p.Dispose();throw new IOException("Feche o jogo antes de instalar ou desfazer.");}}
-    public string Install(IEnumerable<string> chosen,bool acceptPlan,Action<string> report,int failAfter=-1) {
+    public string Install(IEnumerable<string> chosen,bool acceptPlan,Action<string> report,int failAfter=-1,Dictionary<string,string> approvedReplacements=null) {
         if(!acceptPlan)throw new IOException("Confirme o plano de instalação.");
         var ids=chosen.ToArray();var mods=FixedData.Expand(catalog,ids,!ids.Contains(EquipmentExOptions.ModId)&&EquipmentExOptions.StockActive(catalog,game)).Select(m=>NightCityDensity.ForInstall(m,game)).ToList();if(mods.Count==0)throw new IOException("Marque pelo menos um mod.");
-        return InstallTransaction(mods,report,failAfter,false);
+        return InstallTransaction(mods,report,failAfter,false,approvedReplacements);
     }
-    string InstallTransaction(List<FixedMod> mods,Action<string> report,int failAfter,bool localImport) {
+    string InstallTransaction(List<FixedMod> mods,Action<string> report,int failAfter,bool localImport,Dictionary<string,string> approvedReplacements=null) {
         OnlineDiagnostics.Record("install.request",null,"Motor de instalação acionado.",new{Game=game,Mods=mods.Select(m=>m.Id).ToArray(),Accepted=true,Fixture=fixture});
         FixedData.RequireInstallable(mods);
         FixedData.ValidateGame(game,mods,catalog.GameFileVersion);Closed();
-        foreach(var m in mods){var scan=FixedData.Scan(m,game);if(scan.IsConflict)throw new IOException(m.Name+": "+scan.State+". Resolva o conflito antes de instalar.");}
+        foreach(var m in mods){var scan=FixedData.Scan(m,game);if(scan.IsConflict&&(scan.State!="Diferente/alterado"||m.Immutable||approvedReplacements==null||
+            ReplacementFiles(m,game).Count(pair=>approvedReplacements.ContainsKey(pair.Key)&&approvedReplacements[pair.Key]==pair.Value)!=scan.Different))throw new IOException(m.Name+": "+scan.State+". Resolva o conflito antes de instalar.");}
         Directory.CreateDirectory(Data);
         using(var mutex=new FileStream(Safe.In(Data,"operacao.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None)) {
             EnsureNoIncomplete();
@@ -328,7 +330,7 @@ public sealed partial class FixedInstaller {
             var stageLease=cache.HoldPreparation(stage);
             try {
             foreach(var m in pending){report("Preparando "+m.Name);cache.Stage(m,stage,report);}
-            var receipt=new OnlineReceipt{Id=id,CatalogId=catalog.Id,Status="preparando",CreatedUtc=DateTime.UtcNow.ToString("o"),Mods=mods.Select(x=>x.Id).ToList(),Operation=localImport?LocalModPackage.ReceiptOperation:null};
+            var receipt=new OnlineReceipt{Id=id,CatalogId=catalog.Id,Status="preparando",CreatedUtc=DateTime.UtcNow.ToString("o"),Mods=mods.Select(x=>x.Id).ToList(),Operation=localImport?LocalModPackage.ReceiptOperation:approvedReplacements!=null&&approvedReplacements.Count>0?ApprovedReplacementOperation:null};
             string ledger=Safe.In(Data,(localImport?"importados/":"")+id+".json");Save(ledger,receipt);
             OnlineDiagnostics.Record("install.begin",null,"Pacotes preparados; iniciando cópia para o jogo.",new{Game=game,Receipt=id,Mods=pending.Select(m=>m.Id).ToArray(),Files=pending.Sum(m=>m.Files.Count)});
             try {
@@ -341,13 +343,13 @@ public sealed partial class FixedInstaller {
                         if(localImport)throw new IOException("O destino foi ocupado: "+f.Path+". O arquivo existente foi preservado.");
                         long size=new FileInfo(dest).Length;string hash=Safe.Hash(dest);
                         if(FpvCustomization.MatchesFile(f,size,hash)&&!FpvCustomization.IsOriginal(f,size,hash))continue;
-                        if(!FpvCustomization.IsOriginal(f,size,hash))throw new IOException("Arquivo mudou após a conferência: "+f.Path);
+                        if(!FpvCustomization.IsOriginal(f,size,hash)&&!ApprovedReplacement(m,f,hash,approvedReplacements))throw new IOException("Arquivo mudou após a conferência: "+f.Path);
                     }
                     if(Directory.Exists(dest))throw new IOException("Uma pasta ocupa o destino: "+f.Path);
                     string before=File.Exists(dest)?Safe.Hash(dest):null;
                     if(before!=null){
-                        if(!FpvCustomization.IsOriginal(f,new FileInfo(dest).Length,before))throw new IOException("Origem mudou antes do backup.");
-                        receipt.BackupLayout="fpv-flat-v1";string backup=UpgradeBackup(receipt,f.Path);
+                        if(!FpvCustomization.IsOriginal(f,new FileInfo(dest).Length,before)&&!ApprovedReplacement(m,f,before,approvedReplacements))throw new IOException("Origem mudou antes do backup.");
+                        receipt.BackupLayout=receipt.Operation==ApprovedReplacementOperation?"replacement-v1":"fpv-flat-v1";string backup=UpgradeBackup(receipt,f.Path);
                         Directory.CreateDirectory(Path.GetDirectoryName(backup));Safe.NoLinks(backup);File.Copy(dest,backup,false);
                         if(Safe.Hash(backup)!=before)throw new IOException("Backup da versão anterior não conferiu.");
                     }
@@ -371,6 +373,22 @@ public sealed partial class FixedInstaller {
             }finally{stageLease.Dispose();cache.CleanPreparation(stage);}
         }
     }
+    static bool ApprovedReplacement(FixedMod mod,FixedFile file,string hash,Dictionary<string,string> approvals) {
+        string expected;
+        return !mod.Immutable&&!file.UserData&&approvals!=null&&approvals.TryGetValue(file.Path,out expected)&&expected==hash;
+    }
+    internal static Dictionary<string,string> ReplacementFiles(FixedMod mod,string root) {
+        var result=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+        if(mod.Immutable)return result;
+        foreach(var file in mod.Files.Where(f=>!f.UserData)){
+            string path=Safe.In(root,file.Path);Safe.NoLinks(path);
+            if(!File.Exists(path))continue;
+            string hash=Safe.Hash(path);
+            long size=new FileInfo(path).Length;
+            if(!FpvCustomization.MatchesFile(file,size,hash)&&!FpvCustomization.IsOriginal(file,size,hash))result.Add(file.Path,hash);
+        }
+        return result;
+    }
     void Save(string path,OnlineReceipt r){var plain=Encoding.UTF8.GetBytes(Safe.Json.Serialize(r));Safe.WriteJson(path,new ReceiptEnvelope{Protected=Convert.ToBase64String(ProtectedData.Protect(plain,null,DataProtectionScope.CurrentUser))});}
     OnlineReceipt ReadReceipt(string path){return ReadReceiptCore(path,false);}
     OnlineReceipt ReadReceiptEnvelope(string path,bool inspection) {
@@ -388,7 +406,7 @@ public sealed partial class FixedInstaller {
             LocalModPackage.ValidateReceipt(r);foreach(var file in r.Files)Safe.In(game,file.Path);return r;
         }
         bool disabling=r.Operation=="deactivate";
-        if(r.BackupLayout!=null&&!(disabling?r.BackupLayout=="flat-v1":r.BackupLayout=="fpv-flat-v1"))throw new IOException("Formato de backup desconhecido no registro.");
+        if(r.BackupLayout!=null&&!(disabling?r.BackupLayout=="flat-v1":(r.BackupLayout=="fpv-flat-v1"||r.BackupLayout=="replacement-v1"&&r.Operation==ApprovedReplacementOperation)))throw new IOException("Formato de backup desconhecido no registro.");
 
         if (r.Operation == EquipmentExOptions.Operation) {
             EquipmentExOptions.ValidateReceipt(catalog, r);
@@ -396,12 +414,20 @@ public sealed partial class FixedInstaller {
             return r;
         }
         if(r.Operation=="density"){NightCityDensity.ValidateReceipt(catalog,r);return r;}
-        if(r.Operation!=null&&r.Operation!="install"&&!disabling)throw new IOException("Operação desconhecida no registro.");
+        bool approvedReplacement=r.Operation==ApprovedReplacementOperation;
+        if(r.Operation!=null&&r.Operation!="install"&&!disabling&&!approvedReplacement)throw new IOException("Operação desconhecida no registro.");
         var mods=HistoricalReceipts.Expand(catalog,r.Mods);
         if(disabling&&(r.Mods.Count==0||r.Mods.Count!=r.Mods.Distinct().Count()||mods.Any(m=>r.Mods.Contains(m.Id)&&m.Immutable)))throw new IOException("Registro de desativação inválido.");
         var allowed=(disabling?mods.Where(m=>r.Mods.Contains(m.Id)).SelectMany(m=>NightCityDensity.KnownFiles(m)):mods.SelectMany(x=>NightCityDensity.KnownFiles(x))).ToList();var seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var approvedPaths=new HashSet<string>(approvedReplacement?mods.Where(m=>!m.Immutable).SelectMany(m=>m.Files)
+            .Where(file=>!file.UserData).Select(file=>file.Path):Enumerable.Empty<string>(),StringComparer.OrdinalIgnoreCase);
+        approvedPaths.ExceptWith(catalog.Packages.Where(m=>m.Immutable).SelectMany(m=>m.Files).Select(file=>file.Path));
         foreach(var f in r.Files){
-            if(f==null||!seen.Add(f.Path)||!allowed.Any(known=>known.Path==f.Path&&FpvCustomization.KnownHash(known,disabling?f.Before:f.After))||(disabling?f.After!=null:f.Before!=null&&(r.BackupLayout!="fpv-flat-v1"||!allowed.Any(known=>known.Path==f.Path&&FpvCustomization.UpgradePair(known,f.Before,f.After)))))throw new IOException("Registro não corresponde ao catálogo.");
+            if(f==null||!seen.Add(f.Path)||!allowed.Any(known=>known.Path==f.Path&&FpvCustomization.KnownHash(known,disabling?f.Before:f.After)))
+                throw new IOException("Registro não corresponde ao catálogo.");
+            bool validBefore=f.Before==null||!disabling&&(r.BackupLayout=="fpv-flat-v1"||r.BackupLayout=="replacement-v1")&&
+                (approvedPaths.Contains(f.Path)&&FixedData.HashValid(f.Before)||allowed.Any(known=>known.Path==f.Path&&FpvCustomization.UpgradePair(known,f.Before,f.After)));
+            if(disabling?f.After!=null:!validBefore)throw new IOException("Registro não corresponde ao catálogo.");
             Safe.In(game,f.Path);
         }return r;
     }
@@ -451,6 +477,6 @@ public sealed partial class FixedInstaller {
         }finally{if(File.Exists(temp)){Safe.NoLinks(temp);File.Delete(temp);}}
     }
     string UpgradeBackup(OnlineReceipt receipt,string relative) {
-        using(var sha=SHA256.Create())return Safe.In(Data,"backups/"+receipt.Id+"/fpv-originais/"+Safe.Hex(sha.ComputeHash(Encoding.UTF8.GetBytes(relative)))+".bin");
+        using(var sha=SHA256.Create())return Safe.In(Data,"backups/"+receipt.Id+(receipt.BackupLayout=="replacement-v1"?"/":"/fpv-originais/")+Safe.Hex(sha.ComputeHash(Encoding.UTF8.GetBytes(relative)))+".bin");
     }
 }

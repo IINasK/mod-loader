@@ -241,7 +241,16 @@ public static class InstalledSnapshotInstallerTests {
                 skipEngine.ReadSkippedDestinations(skippedReceipt).Contains(plain.Id)&&
                 skipEngine.Status(skippedReceipt,mixed.Id+"/default")==GeneralModInstaller.Installed,
                 "Skipping a conflicting mod preserves its local file and still installs another mod.");
-            File.WriteAllText(Safe.In(receiver,"game/core.txt"),"game/core.txt");
+            File.WriteAllText(Safe.In(receiver,"game/unrelated.txt"),"other mod");
+            var replacement=new InstalledSnapshotInstaller(receiver,Safe.In(root,"portable/replacement"),catalog);
+            bool reviewed=false;
+            string replacementReceipt=replacement.Install(snapshot,hash,null,chooseVersion:difference=>{
+                reviewed=difference.CanReplace&&difference.Detail.Contains("game/core.txt")&&difference.AllowSkip;
+                return reviewed;
+            },approveUserFolders:folders=>true);
+            Check(reviewed&&replacement.Status(replacementReceipt,plain.Id+"/default")==GeneralModInstaller.Installed&&
+                File.ReadAllText(Safe.In(receiver,"game/unrelated.txt"))=="other mod",
+                "The receiver can use the sender's files while preserving unrelated files in the same directory.");
             var store=new GeneralProjectStore(Safe.In(parent,"q"));
             var project=store.CreateReceived(new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Destination=receiver,ReceiptId=receipt},inbox,catalog);
             var received=store.Load(project);
