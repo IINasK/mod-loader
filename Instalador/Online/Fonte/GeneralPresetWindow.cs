@@ -292,25 +292,41 @@ internal sealed partial class GeneralModWindow {
     }
     void ShowPresetIssues() {
         if(presetIssues.Count==0)return;
-        using(var dialog=new GeneralDialog(T("Exceções do preset","Preset exceptions")) {ClientSize=new System.Drawing.Size(720,460)}) {
-            var list=new DataGridView{Dock=DockStyle.Fill,ReadOnly=true,AllowUserToAddRows=false,AllowUserToDeleteRows=false,AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill,RowHeadersVisible=false,BackgroundColor=GeneralStyle.Surface,BorderStyle=BorderStyle.None};
-            var engine=new GeneralPresetDeployment(Root(),data,()=>EnsurePresetGameClosed(Root()));var deployment=engine.Read();
-            list.Columns.Add("issue",T("Mod e motivo","Mod and reason"));foreach(var issue in presetIssues) {
-                int row=list.Rows.Add(issue);
-                list.Rows[row].Tag=deployment.Protected.Keys.FirstOrDefault(id=>issue.StartsWith((deployment.Active.FirstOrDefault(p=>p.ModId==id)??new PresetPackage{Name=id}).Name+":",StringComparison.Ordinal));
+        using(var dialog=CreatePresetIssuesDialog())dialog.ShowDialog(this);
+    }
+    GeneralDialog CreatePresetIssuesDialog() {
+        var dialog=new GeneralDialog(T("Exceções do preset","Preset exceptions")) {ClientSize=new System.Drawing.Size(720,460)};
+        var list=GeneralTableDialogLayout.SingleColumnTable("PresetIssues",
+            dialog.Text,T("Mod e motivo","Mod and reason"));
+        list.Columns[0].DefaultCellStyle.WrapMode=DataGridViewTriState.True;
+        list.DefaultCellStyle.Padding=new Padding(8,6,8,6);
+        Action sizeRows=()=>{
+            var style=list.DefaultCellStyle;
+            int width=Math.Max(1,list.Columns[0].Width-style.Padding.Horizontal-4);
+            foreach(DataGridViewRow row in list.Rows){
+                var size=TextRenderer.MeasureText(Convert.ToString(row.Cells[0].Value),style.Font,
+                    new System.Drawing.Size(width,0),TextFormatFlags.WordBreak|TextFormatFlags.NoPrefix);
+                row.Height=Math.Max(list.RowTemplate.Height,size.Height+style.Padding.Vertical);
             }
-            var shell=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(16)};
-            shell.RowStyles.Add(new RowStyle(SizeType.Percent,100));shell.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            var resume=GeneralStyle.Button(T("Retomar gerenciamento","Resume management"),()=>{
-                string id=list.CurrentRow==null?null:list.CurrentRow.Tag as string;if(id==null)return;
-                if(GeneralDialog.Message(dialog,T("Adotar os arquivos atuais deste mod como referência? Os arquivos desconhecidos continuam preservados.","Adopt this mod's current files as the reference? Unknown files remain protected."),T("Retomar gerenciamento","Resume management"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-                Guard(()=>{engine.ReleaseProtection(id);presetProtected.Remove(id);state.AppliedPresetFingerprint=null;Persist();dialog.Complete(DialogResult.OK);RefreshPrimaryAction();});
-            });
-            resume.Anchor=AnchorStyles.Right;resume.Margin=new Padding(0,12,0,0);resume.Enabled=false;
-            list.SelectionChanged+=(s,e)=>resume.Enabled=list.CurrentRow!=null&&list.CurrentRow.Tag is string;
-            shell.Controls.Add(new GeneralScrollView(list),0,0);shell.Controls.Add(resume,0,1);
-            dialog.Content.Controls.Add(shell);GeneralStyle.Apply(dialog,GeneralStyle.Dark);dialog.ShowDialog(this);
+        };
+        list.ColumnWidthChanged+=(s,e)=>{if(list.IsHandleCreated)list.BeginInvoke(sizeRows);};
+        dialog.Shown+=(s,e)=>sizeRows();
+        var engine=new GeneralPresetDeployment(Root(),data,()=>EnsurePresetGameClosed(Root()));var deployment=engine.Read();
+        foreach(var issue in presetIssues) {
+            int row=list.Rows.Add(issue);
+            list.Rows[row].Tag=deployment.Protected.Keys.FirstOrDefault(id=>issue.StartsWith((deployment.Active.FirstOrDefault(p=>p.ModId==id)??new PresetPackage{Name=id}).Name+":",StringComparison.Ordinal));
         }
+        var shell=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(16)};
+        shell.RowStyles.Add(new RowStyle(SizeType.Percent,100));shell.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var resume=GeneralStyle.Button(T("Retomar gerenciamento","Resume management"),()=>{
+            string id=list.CurrentRow==null?null:list.CurrentRow.Tag as string;if(id==null)return;
+            if(GeneralDialog.Message(dialog,T("Adotar os arquivos atuais deste mod como referência? Os arquivos desconhecidos continuam preservados.","Adopt this mod's current files as the reference? Unknown files remain protected."),T("Retomar gerenciamento","Resume management"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
+            Guard(()=>{engine.ReleaseProtection(id);presetProtected.Remove(id);state.AppliedPresetFingerprint=null;Persist();dialog.Complete(DialogResult.OK);RefreshPrimaryAction();});
+        });
+        resume.Anchor=AnchorStyles.Right;resume.Margin=new Padding(0,12,0,0);resume.Enabled=false;
+        list.SelectionChanged+=(s,e)=>resume.Enabled=list.CurrentRow!=null&&list.CurrentRow.Tag is string;
+        shell.Controls.Add(GeneralTableDialogLayout.TableSurface(list),0,0);shell.Controls.Add(resume,0,1);
+        dialog.Content.Controls.Add(shell);GeneralStyle.Apply(dialog,GeneralStyle.Dark);return dialog;
     }
     // A single scope decision is made when applying an edit, never on every keystroke.
     bool? PresetEditScope(GeneralModEntry entry,bool removing=false) {

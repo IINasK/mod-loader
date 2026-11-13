@@ -158,6 +158,34 @@ internal sealed class GeneralModAlternativeDialog : GeneralDialog {
     }
 }
 internal static class GeneralTableDialogLayout {
+    internal static GeneralModWindow.ModListGrid SingleColumnTable(string name, string accessibleName, string heading) {
+        var table = new GeneralModWindow.ModListGrid {
+            Name = name, AccessibleName = accessibleName,
+            Dock = DockStyle.Fill, ReadOnly = true, MultiSelect = false, RowHeadersVisible = false,
+            AllowUserToAddRows = false, AllowUserToDeleteRows = false, AllowUserToResizeRows = false, AllowUserToResizeColumns = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect, BackgroundColor = GeneralStyle.Surface,
+            BorderStyle = BorderStyle.None, CellBorderStyle = DataGridViewCellBorderStyle.None,
+            ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None, EnableHeadersVisualStyles = false,
+            ColumnHeadersHeight = 34, ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+        };
+        table.DefaultCellStyle = new DataGridViewCellStyle {
+            BackColor = GeneralStyle.Surface, ForeColor = GeneralStyle.Foreground, SelectionBackColor = GeneralStyle.Selection,
+            SelectionForeColor = GeneralStyle.Foreground, Font = GeneralStyle.Font(11), Padding = new Padding(8, 0, 8, 0)
+        };
+        table.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle {
+            BackColor = GeneralStyle.Surface, ForeColor = GeneralStyle.Muted, Font = GeneralStyle.Font(11, true), Padding = new Padding(8, 0, 8, 0)
+        };
+        table.RowTemplate.Height = 34;
+        table.Columns.Add(new DataGridViewTextBoxColumn {
+            HeaderText = heading, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, SortMode = DataGridViewColumnSortMode.NotSortable
+        });
+        return table;
+    }
+    internal static GeneralSurface TableSurface(DataGridView table) {
+        var surface = new GeneralSurface { Dock = DockStyle.Fill, Padding = new Padding(12), Margin = Padding.Empty };
+        surface.Controls.Add(new GeneralScrollView(table));
+        return surface;
+    }
     internal static GeneralSurface Input(TextBox text) {
         var field = new GeneralSurface { Dock = DockStyle.Top, Height = 44, MinimumSize = new Size(120, 44), MaximumSize = new Size(0, 44), Padding = new Padding(14, 10, 14, 0), Margin = Padding.Empty };
         field.Controls.Add(text); return field;
@@ -195,33 +223,13 @@ internal sealed class GeneralInstallConfirmation : GeneralDialog {
         layout.Controls.Add(summary, 0, 1);
 
         if (downloads.Count > 0) {
-            var table = new GeneralModWindow.ModListGrid {
-                Name = "PendingDownloads", AccessibleName = GeneralStyle.T("Mods com download pendente", "Mods with pending downloads"),
-                Dock = DockStyle.Fill, ReadOnly = true, MultiSelect = false, RowHeadersVisible = false,
-                AllowUserToAddRows = false, AllowUserToDeleteRows = false, AllowUserToResizeRows = false, AllowUserToResizeColumns = false,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect, BackgroundColor = GeneralStyle.Surface,
-                BorderStyle = BorderStyle.None, CellBorderStyle = DataGridViewCellBorderStyle.None,
-                ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None, EnableHeadersVisualStyles = false,
-                ColumnHeadersHeight = 34, ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
-            };
-            table.DefaultCellStyle = new DataGridViewCellStyle {
-                BackColor = GeneralStyle.Surface, ForeColor = GeneralStyle.Foreground, SelectionBackColor = GeneralStyle.Selection,
-                SelectionForeColor = GeneralStyle.Foreground, Font = GeneralStyle.Font(11), Padding = new Padding(8, 0, 8, 0)
-            };
-            table.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle {
-                BackColor = GeneralStyle.Surface, ForeColor = GeneralStyle.Muted, Font = GeneralStyle.Font(11, true), Padding = new Padding(8, 0, 8, 0)
-            };
-            table.RowTemplate.Height = 34;
-            table.Columns.Add(new DataGridViewTextBoxColumn {
-                HeaderText = GeneralStyle.T("Mod", "Mod"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, SortMode = DataGridViewColumnSortMode.NotSortable
-            });
+            var table = GeneralTableDialogLayout.SingleColumnTable("PendingDownloads",
+                GeneralStyle.T("Mods com download pendente", "Mods with pending downloads"), GeneralStyle.T("Mod", "Mod"));
             foreach (string name in downloads) {
                 int row = table.Rows.Add(name);
                 table.Rows[row].Cells[0].ToolTipText = name;
             }
-            var surface = new GeneralSurface { Dock = DockStyle.Fill, Padding = new Padding(12), Margin = Padding.Empty };
-            surface.Controls.Add(new GeneralScrollView(table));
-            layout.Controls.Add(surface, 0, 2);
+            layout.Controls.Add(GeneralTableDialogLayout.TableSurface(table), 0, 2);
         }
 
         var actions = GeneralTableDialogLayout.Commands();

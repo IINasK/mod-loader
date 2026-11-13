@@ -210,6 +210,35 @@ internal sealed partial class GeneralModWindow {
         int passed=0;Action<bool,string> check=(ok,message)=>{if(!ok)throw new IOException(message);passed++;};
         TestForm(FixedData.Load(),state,data,root,async form=>{
             form.testPresetEditScope=()=>false;
+            string longIssue="Mod de teste: "+String.Join(" ",Enumerable.Repeat("Arquivos existentes não correspondem ao registro e foram preservados.",4));
+            form.presetIssues=Enumerable.Repeat(longIssue,20).ToList();
+            string initialTheme=form.state.Theme;
+            try{
+                foreach(string theme in new[]{"dark","black","light"}){
+                    GeneralStyle.UseTheme(theme);
+                    using(var exceptions=form.CreatePresetIssuesDialog()){
+                        exceptions.StartPosition=FormStartPosition.Manual;exceptions.Location=new System.Drawing.Point(-30000,-30000);
+                        exceptions.Show();Application.DoEvents();
+                        var table=AllControls(exceptions).OfType<DataGridView>().Single(control=>control.Name=="PresetIssues");
+                        var scroll=AllControls(exceptions).OfType<GeneralScrollView>().Single();
+                        table.CurrentCell=table.Rows[0].Cells[0];
+                        var selected=table.Rows[0].Cells[0].InheritedStyle;
+                        check(table.Rows[0].Selected&&selected.BackColor==GeneralStyle.Surface&&
+                            selected.SelectionBackColor==GeneralStyle.Selection&&selected.SelectionForeColor==GeneralStyle.Foreground&&
+                            table.ColumnHeadersDefaultCellStyle.BackColor==GeneralStyle.Surface&&!table.EnableHeadersVisualStyles,
+                            "Preset exceptions apply the theme to the header, rows and selection: "+theme);
+                        scroll.RefreshScroll();
+                        check(selected.WrapMode==DataGridViewTriState.True&&table.Rows[0].Height>table.RowTemplate.Height&&scroll.Bar.Visible&&table.ScrollBars==ScrollBars.None,
+                            "Long exception text wraps and uses the custom scrollbar: "+theme+"; row="+table.Rows[0].Height+"; width="+table.Width+"; bar="+scroll.Bar.Visible+"; size="+table.Size);
+                        using(var image=new System.Drawing.Bitmap(exceptions.Width,exceptions.Height)){
+                            exceptions.DrawToBitmap(image,new System.Drawing.Rectangle(System.Drawing.Point.Empty,image.Size));
+                            image.Save(Path.Combine(root,"preset-exceptions-"+theme+".png"));
+                        }
+                        scroll.ScrollTo(19);
+                        check(table.Rows[19].Displayed,"Preset exception scrolling reaches the last reason: "+theme);
+                    }
+                }
+            }finally{GeneralStyle.UseTheme(initialTheme);form.presetIssues.Clear();}
             var settingsStore=new GeneralProjectStore(Path.Combine(root,"preferences"));
             var defaults=settingsStore.Read().SwitchSettings;
             check(defaults.CpuPercent==50&&defaults.AskBeforeSwitch,"Existing projects default to asking at 50 percent.");
