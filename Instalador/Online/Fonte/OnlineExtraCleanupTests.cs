@@ -160,7 +160,7 @@ static class OnlineExtraCleanupTests {
             "O NCPD manual é reconhecido pela assinatura do pacote anterior, mas seu log gerado continua desconhecido.");
         check(official.ReadUnlistedModFiles(new string[0]).Any(file=>file.Path==oldSetting&&file.Mod=="Immersive NCPD Hotline"),
             "O inventário identifica o NPCD pelo nome do pacote histórico.");
-        check(historical.Any(extra=>extra.Proven&&extra.Name=="Immersive NCPD Hotline"),"A sincronização agrupa o NPCD comprovado.");
+        check(historical.Any(extra=>extra.Proven&&!extra.Managed&&extra.Name=="Immersive NCPD Hotline"),"O NPCD conferido pelo catálogo histórico aparece na tabela externa, separado dos recibos locais.");
         var selection=new[]{oldSetting,oldLog};
         var selectedPlan=official.PlanExtraReset(historicalData,selection);
         check(selectedPlan.Count==1&&selectedPlan[0].Path==oldFile.Path,"Retirar só o mod escolhido preserva arquivos desconhecidos na mesma pasta.");

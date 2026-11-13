@@ -523,8 +523,8 @@ internal sealed partial class GeneralModWindow {
     }
 
     static void TestSyncRemovalReview(GeneralModWindow owner,string root,Action<bool,string> check){
-        var extras=new[]{new P2PSyncExtra{Name="Extra 1",Proven=true,Files=new[]{new OwnedChange{Path="r6/tweaks/one.yaml"}}},
-            new P2PSyncExtra{Name="Extra 2",Proven=true,Files=new[]{new OwnedChange{Path="r6/tweaks/two.yaml"}}},
+        var extras=new[]{new P2PSyncExtra{Name="Extra 1",Proven=true,Managed=true,Files=new[]{new OwnedChange{Path="r6/tweaks/one.yaml"}}},
+            new P2PSyncExtra{Name="Hotline",Proven=true,Files=new[]{new OwnedChange{Path="r6/tweaks/two.yaml"}}},
             new P2PSyncExtra{Name="cache",Files=new[]{new OwnedChange{Path="r6/scripts/cache/runtime.reds"}}}};
         using(var review=new GeneralSyncReviewDialog(new P2PSyncComparison{Extras=extras}))
         using(var timer=new Timer{Interval=40}){
@@ -535,13 +535,18 @@ internal sealed partial class GeneralModWindow {
             var remove=buttons.Single(button=>button.Name=="RemoveSelectedSyncExtras");
             check(review.SelectedExtras.Length==0&&!remove.Enabled,"A revisão começa sem itens autorizados para remoção.");
             all.PerformClick();
-            check(review.SelectedExtras.SequenceEqual(new[]{0,1})&&remove.Enabled,"Selecionar todos inclui só os extras comprovados, preservando a pasta cache desconhecida.");
-            var choices=AllControls(review).OfType<CheckedListBox>().Single();
-            choices.SetItemChecked(2,true);
-            check(!choices.GetItemChecked(2)&&review.SelectedExtras.SequenceEqual(new[]{0,1}),"Nem o clique individual autoriza remover um item sem vínculo comprovado.");
+            check(review.SelectedExtras.SequenceEqual(new[]{0})&&remove.Enabled,"Selecionar mods ML não marca extras externos.");
+            var choices=AllControls(review).OfType<CheckedListBox>().Single(list=>list.Name=="SyncExternalFiles");
+            choices.SetItemChecked(1,true);
+            check(!choices.GetItemChecked(1)&&review.SelectedExtras.SequenceEqual(new[]{0}),"Nem o clique individual autoriza remover um item sem vínculo comprovado.");
+            choices.SetItemChecked(0,true);
+            check(review.SelectedExtras.SequenceEqual(new[]{0,1}),"O Hotline conferido pode ser marcado na tabela externa.");
             all.PerformClick();
-            check(review.SelectedExtras.Length==0&&!remove.Enabled,"Desmarcar todos retorna ao estado seguro.");
+            check(review.SelectedExtras.SequenceEqual(new[]{1})&&remove.Enabled,"Desmarcar os mods ML mantém a seleção externa.");
+            choices.SetItemChecked(0,false);
+            check(review.SelectedExtras.Length==0&&!remove.Enabled,"O Hotline pode ser desmarcado sem autorizar outra remoção.");
             all.PerformClick();
+            choices.SetItemChecked(0,true);
             bool answered=false;
             timer.Tick+=(s,e)=>{
                 var dialog=Application.OpenForms.Cast<Form>().FirstOrDefault(item=>item.Name=="ConfirmSyncRemoval");

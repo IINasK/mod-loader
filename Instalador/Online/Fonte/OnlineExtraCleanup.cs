@@ -8,7 +8,7 @@ using System.Windows.Forms;
 
 internal sealed class P2PSyncExtra {
     internal string Name, GroupKey;
-    internal bool Proven;
+    internal bool Proven, Managed;
     internal OwnedChange[] Files;
     public override string ToString(){
         return Name+(Proven?"":" · "+GeneralStyle.T("Origem desconhecida — preservado","Unknown origin — preserved"))+" · "+(Files.Length==1&&Files[0].Before==null
@@ -258,7 +258,7 @@ public sealed partial class FixedInstaller {
         Action<Func<IEnumerable<ProjectDeleteFile>>> add=read=>{
             try {
                 var recorded=read().Where(file=>!file.PreserveManualOriginal&&file.OwnerKeys!=null&&file.OwnerKeys.Count>0&&FixedData.HashValid(file.Hash))
-                    .SelectMany(file=>file.OwnerKeys.Select(key=>new ModFileAnchor{Path=file.Path,Hash=file.Hash,Owner=key.Split('/')[0]})).ToArray();
+                    .SelectMany(file=>file.OwnerKeys.Select(key=>new ModFileAnchor{Path=file.Path,Hash=file.Hash,Owner=key.Split('/')[0],LocalReceipt=true})).ToArray();
                 anchors.AddRange(recorded);
             } catch(IOException) { OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo indisponível; arquivos sem outra prova serão preservados."); }
               catch(UnauthorizedAccessException) { OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo inacessível; arquivos sem outra prova serão preservados."); }
@@ -274,7 +274,7 @@ public sealed partial class FixedInstaller {
                     if(receipt.Status!="instalado"||receipt.Mods.Count==0||
                         receipt.Operation!=null&&receipt.Operation!="install"&&receipt.Operation!=LocalModPackage.ReceiptOperation)continue;
                     anchors.AddRange(receipt.Files.Where(file=>file.Applied&&!file.Reverted&&!file.UndoStarted&&FixedData.HashValid(file.After))
-                        .Select(file=>new ModFileAnchor{Path=file.Path,Hash=file.After,Owner=receipt.Mods.Count==1?receipt.Mods[0]:null}));
+                        .Select(file=>new ModFileAnchor{Path=file.Path,Hash=file.After,Owner=receipt.Mods.Count==1?receipt.Mods[0]:null,LocalReceipt=true}));
                 } catch(IOException) { OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo inválido; arquivos sem outra prova serão preservados."); }
                   catch(UnauthorizedAccessException) { OnlineDiagnostics.Record("p2p.sync.ownership.unavailable",null,"Recibo inacessível; arquivos sem outra prova serão preservados."); }
             }
@@ -298,12 +298,13 @@ public sealed partial class FixedInstaller {
             var matches=ownership[path].Where(file=>file.Hash==hash).ToArray();
             string owner=UniqueOwner(matches);
             string name=ExtraName(path,owner,names);
-            string group=owner!=null?"owner:"+owner:matches.Length>0?"file:"+path:"unknown:"+name;
-            files.Add(new P2PSyncExtra{Name=name,GroupKey=group,Proven=matches.Length>0,Files=new[]{new OwnedChange{Path=path,Before=hash}}});
+            bool managed=matches.Any(match=>match.LocalReceipt);
+            string group=owner!=null?(managed?"managed:":"catalog:")+owner:matches.Length>0?"file:"+path:"unknown:"+name;
+            files.Add(new P2PSyncExtra{Name=name,GroupKey=group,Proven=matches.Length>0,Managed=managed,Files=new[]{new OwnedChange{Path=path,Before=hash}}});
         }
         // Unknown files stay separate even when their folder has the name of a registered mod.
         return files.GroupBy(extra=>extra.GroupKey,StringComparer.Ordinal)
-            .Select(group=>new P2PSyncExtra{Name=group.First().Name,Proven=group.First().Proven,Files=group.SelectMany(extra=>extra.Files).ToArray()})
+            .Select(group=>new P2PSyncExtra{Name=group.First().Name,Proven=group.First().Proven,Managed=group.First().Managed,Files=group.SelectMany(extra=>extra.Files).ToArray()})
             .Concat(empty.Select(path=>new P2PSyncExtra{Name=Path.GetFileName(path),Files=new[]{new OwnedChange{Path=path}}}))
             .OrderByDescending(extra=>extra.Proven).ThenBy(extra=>extra.Name).ToArray();
     }

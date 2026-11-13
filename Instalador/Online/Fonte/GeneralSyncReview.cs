@@ -5,41 +5,27 @@ using System.Linq;
 using System.Windows.Forms;
 
 internal sealed class GeneralSyncReviewDialog : GeneralDialog {
-    readonly CheckedListBox choices = new CheckedListBox {
-        Name = "SyncExtraMods", Dock = DockStyle.Fill, CheckOnClick = true, IntegralHeight = false
-    };
-    internal int[] SelectedExtras { get { return choices.CheckedIndices.Cast<int>().Where(index=>((P2PSyncExtra)choices.Items[index]).Proven).ToArray(); } }
+    sealed class Choice {
+        internal int Index;
+        internal P2PSyncExtra Extra;
+        public override string ToString(){return Extra.ToString();}
+    }
+    readonly List<CheckedListBox> sections=new List<CheckedListBox>();
+    internal int[] SelectedExtras {get{return sections.SelectMany(list=>list.CheckedItems.Cast<Choice>())
+        .Where(row=>row.Extra.Proven).Select(row=>row.Index).OrderBy(index=>index).ToArray();}}
 
     internal GeneralSyncReviewDialog(P2PSyncComparison comparison)
         : base(T("Mods extras neste PC", "Extra mods on this PC")) {
         RequiresDecision = true;
         Name = "SyncExtraReview";
-        ClientSize = new Size(720, 450);
+        ClientSize = new Size(800, 550);
         var layout = new TableLayoutPanel {
             Dock = DockStyle.Fill, Padding = new Padding(24, 6, 24, 20), ColumnCount = 1, RowCount = 4
         };
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        choices.Items.AddRange(comparison.Extras.Cast<object>().ToArray());
-        var selectAll = GeneralStyle.Button(T("Selecionar todos", "Select all"), () => {
-            bool check = SelectedExtras.Length < comparison.Extras.Count(extra=>extra.Proven);
-            choices.BeginUpdate();
-            try { for (int index = 0; index < choices.Items.Count; index++) choices.SetItemChecked(index, check&&comparison.Extras[index].Proven); }
-            finally { choices.EndUpdate(); }
-        });
-        selectAll.Name = "SelectAllSyncExtras";
-        selectAll.Anchor = AnchorStyles.Left;
-        selectAll.Margin = new Padding(0, 0, 0, 8);
-        selectAll.Visible = comparison.Extras.Any(extra=>extra.Proven);
-        layout.Controls.Add(selectAll, 0, 0);
-        var surface = new GeneralSurface { Dock = DockStyle.Fill, Padding = new Padding(12), Margin = Padding.Empty };
-        if (choices.Items.Count > 0) surface.Controls.Add(new GeneralScrollView(choices));
-        else surface.Controls.Add(new Label {
-            Text = T("Nenhum mod extra neste PC.", "No extra mods on this PC."), Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter
-        });
-        layout.Controls.Add(surface, 0, 1);
         if (comparison.HostOutsideDifferences.Length > 0)
             layout.Controls.Add(new Label {
                 Text = String.Format(T("{0} diferenças fora do pacote", "{0} differences outside the pack"), comparison.HostOutsideDifferences.Length),
@@ -53,22 +39,58 @@ internal sealed class GeneralSyncReviewDialog : GeneralDialog {
         remove.Name = "RemoveSelectedSyncExtras";
         ((GeneralButton)remove).Destructive = true;
         remove.Enabled = false;
-        choices.ItemCheck += (s, e) => {
-            if(!comparison.Extras[e.Index].Proven){e.NewValue=CheckState.Unchecked;return;}
-            int count = choices.CheckedItems.Count + (e.NewValue == CheckState.Checked ? 1 : -1);
-            remove.Enabled = count > 0;
-            selectAll.Text = count == comparison.Extras.Count(extra=>extra.Proven) ? T("Desmarcar todos", "Clear all") : T("Selecionar todos", "Select all");
-        };
+        var choices=comparison.Extras.Select((extra,index)=>new Choice{Extra=extra,Index=index}).ToArray();
+        layout.Controls.Add(BuildSection(T("Desinstalar mods do Mod Loader","Uninstall Mod Loader mods"),
+            choices.Where(row=>row.Extra.Managed).ToArray(),remove,true),0,0);
+        layout.Controls.Add(BuildSection(T("Remover mods e pastas externos","Remove external mods and folders"),
+            choices.Where(row=>!row.Extra.Managed).ToArray(),remove,false),0,1);
         commands.Controls.Add(remove);
         commands.Controls.Add(keep);
         layout.Controls.Add(commands, 0, 3);
         Content.Controls.Add(layout);
         GeneralStyle.Apply(this, GeneralStyle.Dark);
-        choices.BorderStyle = BorderStyle.None;
+        foreach(var list in sections)list.BorderStyle=BorderStyle.None;
+    }
+
+    Control BuildSection(string title,Choice[] rows,Button remove,bool managed){
+        var section=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=new Padding(0,0,0,8)};
+        section.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        section.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        section.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        section.Controls.Add(new Label{Text=title,AutoSize=true,Font=GeneralStyle.Font(11,true)},0,0);
+        var surface=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(10),Margin=Padding.Empty};
+        section.Controls.Add(surface,0,1);
+        var list=new CheckedListBox{ Name=managed?"SyncExtraMods":"SyncExternalFiles",Dock=DockStyle.Fill,
+            CheckOnClick=true,IntegralHeight=false,AccessibleName=title};
+        sections.Add(list);
+        list.Items.AddRange(rows.Cast<object>().ToArray());
+        if(rows.Length==0)surface.Controls.Add(new Label{Text=T("Nenhum item","No items"),Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleCenter});
+        else surface.Controls.Add(new GeneralScrollView(list));
+        Button all=null;
+        int selectable=rows.Count(row=>row.Extra.Proven);
+        if(managed&&selectable>0){
+            all=GeneralStyle.Button(T("Selecionar mods ML","Select Mod Loader mods"),()=>{
+                bool check=list.CheckedItems.Count<selectable;
+                for(int i=0;i<rows.Length;i++)if(rows[i].Extra.Proven)list.SetItemChecked(i,check);
+            });
+            all.Name="SelectAllSyncExtras";
+            section.Controls.Add(all,0,2);
+        }else if(!managed&&rows.Length>0){
+            section.Controls.Add(new Label{Text=T("Marque cada item conferido. Itens de origem desconhecida ficam protegidos.",
+                "Check verified items individually. Items of unknown origin are protected."),AutoSize=true},0,2);
+        }
+        list.ItemCheck+=(s,e)=>{
+            if(!rows[e.Index].Extra.Proven){e.NewValue=CheckState.Unchecked;return;}
+            int delta=(e.NewValue==CheckState.Checked?1:0)-(e.CurrentValue==CheckState.Checked?1:0);
+            remove.Enabled=SelectedExtras.Length+delta>0;
+            if(all!=null)all.Text=list.CheckedItems.Count+delta==selectable
+                ?T("Desmarcar mods ML","Clear Mod Loader mods"):T("Selecionar mods ML","Select Mod Loader mods");
+        };
+        return section;
     }
 
     void ConfirmRemoval() {
-        int count = choices.CheckedItems.Count;
+        int count = SelectedExtras.Length;
         if (count == 0) return;
         using (var dialog = new GeneralDialog(T("Confirmar remoção", "Confirm removal")) {
             RequiresDecision = true, Name = "ConfirmSyncRemoval", ClientSize = new Size(525, 210)
@@ -77,8 +99,8 @@ internal sealed class GeneralSyncReviewDialog : GeneralDialog {
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.Controls.Add(new Label {
-                Text = String.Format(T("Atenção: {0} mod(s) selecionado(s) serão removidos do jogo.",
-                    "Warning: {0} selected mod(s) will be removed from the game."), count), Dock = DockStyle.Fill
+                Text = String.Format(T("Os {0} itens marcados serão retirados do jogo e guardados para restauração.",
+                    "{0} checked items will be removed from the game and kept for restoration."), count), Dock = DockStyle.Fill
             }, 0, 0);
             var commands = GeneralTableDialogLayout.Commands();
             var remove = GeneralStyle.Button(T("Confirmar remoção", "Confirm removal"), () => dialog.Complete(DialogResult.Yes), true);

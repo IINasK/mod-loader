@@ -37,7 +37,8 @@ internal sealed partial class GeneralModWindow {
             form.searchBox.Text="pendente";await Task.Delay(220);check(form.VisibleMods().Single()==c,"Search finds pending status.");
             state.Language="en";form.BuildInterface();form.searchBox.Text="installed";await Task.Delay(220);check(form.VisibleMods().Single()==a,"Status is searchable in the active English language.");
             form.searchBox.Text="principal";await Task.Delay(220);form.statusFilters=new HashSet<string>{"Failed"};form.DrawRows();check(form.VisibleMods().Single()==b,"Search composes with status and variant values.");
-            form.statusFilters=null;form.searchBox.Text="feminina";await Task.Delay(220);form.preset.SelectedIndex=1;check(form.VisibleMods().Single()==a,"Preset membership and search are combined.");
+            form.statusFilters=null;form.searchBox.Text="feminina";await Task.Delay(220);form.preset.SelectedIndex=1;
+            check(form.state.SelectedPreset=="kit"&&form.VisibleMods().Single().Id==a.Id,"Preset membership and search are combined.");
             form.searchBox.Text="radio";await Task.Delay(220);check(form.VisibleMods().Count==0,"Search never leaks items outside the current preset.");
             form.preset.SelectedIndex=0;form.searchBox.Clear();await Task.Delay(220);check(form.VisibleMods().Count==3&&form.marked.Contains(b.Id),"Clearing restores rows without changing selection.");
             foreach(string theme in new[]{"light-red","light","dark"}){
@@ -46,7 +47,7 @@ internal sealed partial class GeneralModWindow {
                 check(form.tableName.PointToScreen(Point.Empty).Y+form.tableName.Height<=field.PointToScreen(Point.Empty).Y&&field.PointToScreen(Point.Empty).Y+field.Height<=form.grid.PointToScreen(Point.Empty).Y,"Search fits between title and column headers: "+theme);
                 check(form.searchBox.BackColor==GeneralStyle.Surface&&form.searchBox.ForeColor==GeneralStyle.Foreground&&form.searchBox.BorderStyle==BorderStyle.None,"Search text uses the active palette without a square native border: "+theme);
                 check(field.Height>=44&&form.searchBox.Width>350,"Search remains usable at minimum window width: "+theme);
-                form.searchBox.Text="gtr";await Task.Delay(220);form.expandList.PerformClick();check(form.searchBox.Visible&&form.VisibleMods().Single()==b,"Expanded list retains live search: "+theme);
+                form.searchBox.Text="gtr";await Task.Delay(220);form.expandList.PerformClick();check(form.searchBox.Visible&&form.VisibleMods().Single().Id==b.Id,"Expanded list retains live search: "+theme);
                 CaptureUi(form,Path.Combine(root,"search-expanded-"+theme+".png"));form.expandList.PerformClick();CaptureUi(form,Path.Combine(root,"search-"+theme+".png"));
             }
             form.ResetColumnFilters();form.DrawRows();check(form.searchBox.Text==""&&form.VisibleMods().Count==3,"Reset clears the query and column filters together.");

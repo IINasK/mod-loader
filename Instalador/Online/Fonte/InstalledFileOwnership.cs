@@ -5,6 +5,7 @@ using System.Linq;
 
 internal sealed class ModFileAnchor {
     internal string Path, Hash, Owner;
+    internal bool LocalReceipt;
 }
 
 // Companion files provide context, never ownership for export or deletion.
