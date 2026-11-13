@@ -123,8 +123,13 @@ internal sealed class GeneralSyncReviewDialog : GeneralDialog {
 }
 
 internal sealed class GeneralSyncDifferencesDialog : GeneralDialog {
-    internal GeneralSyncDifferencesDialog(IReadOnlyList<P2PSyncDifference> differences,bool inventory=false)
-        : base(inventory?T("Arquivos no jogo fora da lista","Game files outside the list"):T("Diferenças fora do pacote", "Differences outside the pack")) {
+    internal GeneralSyncDifferencesDialog(IReadOnlyList<P2PSyncDifference> differences,bool inventory=false,
+        Action<IWin32Window,P2PSyncDifference> openInternal=null,Action<P2PSyncDifference> openExplorer=null)
+        : base(openInternal!=null?T("Detalhes","Details"):
+            inventory?T("Arquivos no jogo fora da lista","Game files outside the list"):T("Diferenças fora do pacote", "Differences outside the pack")) {
+        bool showSource=openInternal!=null;
+        Func<P2PSyncDifference> currentFile=()=>null;
+        Button internalButton=null,explorerButton=null;
         ClientSize = new Size(810, 475);
         var layout = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(24, 8, 24, 18)
@@ -157,6 +162,7 @@ internal sealed class GeneralSyncDifferencesDialog : GeneralDialog {
             grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = T("Situação", "Status"), Width = 166 });
             grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = inventory?T("Nome encontrado","Detected name"):"Mod", Width = 215 });
             grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = T("Arquivo ou pasta", "File or folder"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+            if(showSource)grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = T("ZIP de origem","Source ZIP"), Width = 210 });
             foreach (var difference in differences.OrderBy(item => item.Kind).ThenBy(item => item.Mod).ThenBy(item => item.Path)) {
                 string status = difference.Kind == "found" ? T("Encontrado no jogo","Found in game")
                     : difference.Kind == "kept" ? T("Extra mantido", "Extra kept")
@@ -168,14 +174,37 @@ internal sealed class GeneralSyncDifferencesDialog : GeneralDialog {
                     else status="?";
                 }
                 int row = grid.Rows.Add(status, difference.Mod ?? "—", difference.Path);
+                grid.Rows[row].Tag=difference;
+                if(showSource){
+                    grid.Rows[row].Cells[3].Value=difference.VerifiedZip??"—";
+                    grid.Rows[row].Cells[3].ToolTipText=difference.VerifiedZip??T("Sem ZIP confirmado","No verified ZIP");
+                }
                 grid.Rows[row].Cells[1].ToolTipText = difference.Mod ?? "";
                 grid.Rows[row].Cells[2].ToolTipText = difference.Path;
+            }
+            if(showSource){
+                currentFile=()=>grid.CurrentRow==null?null:grid.CurrentRow.Tag as P2PSyncDifference;
+                grid.CurrentCell=grid.Rows[0].Cells[0];
+                grid.CurrentCellChanged+=(s,e)=>{
+                    if(internalButton!=null)internalButton.Enabled=explorerButton.Enabled=currentFile()!=null;
+                };
             }
             layout.Controls.Add(new GeneralScrollView(grid), 0, 0);
         }
         var commands = GeneralTableDialogLayout.Commands();
         var close = GeneralStyle.Button(T("Fechar", "Close"), () => Complete(DialogResult.OK), true);
         commands.Controls.Add(close);
+        if(showSource){
+            internalButton=GeneralStyle.Button(T("Abrir local no Mod Loader","Open location in Mod Loader"),
+                ()=>{var file=currentFile();if(file!=null)openInternal(this,file);});
+            explorerButton=GeneralStyle.Button(T("Abrir local no Explorador","Open location in Explorer"),
+                ()=>{var file=currentFile();if(file!=null&&openExplorer!=null)openExplorer(file);});
+            internalButton.Name="OpenInventoryInternal";
+            explorerButton.Name="OpenInventoryExplorer";
+            internalButton.Enabled=explorerButton.Enabled=currentFile()!=null;
+            commands.Controls.Add(explorerButton);
+            commands.Controls.Add(internalButton);
+        }
         layout.Controls.Add(commands, 0, 1);
         Content.Controls.Add(layout);
         AcceptButton = CancelButton = close;

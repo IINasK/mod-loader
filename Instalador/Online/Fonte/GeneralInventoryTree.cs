@@ -31,7 +31,7 @@ internal sealed class GeneralInventoryTree : GeneralDialog {
     Entry Selected {get{return list.SelectedItem as Entry;}}
     protected override bool AnimateAppearance {get{return false;}}
 
-    internal GeneralInventoryTree(string root,IEnumerable<P2PSyncDifference> files)
+    internal GeneralInventoryTree(string root,IEnumerable<P2PSyncDifference> files,string selectedPath=null)
         :base(T("Arquivos de mods no jogo","Mod files in the game")){
         this.root=root;
         tree=BuildTree(files,T("Pasta do jogo","Game folder"));
@@ -89,7 +89,15 @@ internal sealed class GeneralInventoryTree : GeneralDialog {
             }else return;
             e.Handled=true;e.SuppressKeyPress=true;
         };
-        RefreshTree(tree);
+        var selected=tree;
+        foreach(string part in (selectedPath??"").Split(new[]{'/'},StringSplitOptions.RemoveEmptyEntries)){
+            Entry child;
+            if(!selected.Children.TryGetValue(part,out child))break;
+            selected.Open=true;
+            selected=child;
+        }
+        RefreshTree(selected);
+        if(list.SelectedIndex>=0)list.TopIndex=list.SelectedIndex;
         GeneralStyle.Apply(this,GeneralStyle.Dark);
     }
 
@@ -181,14 +189,18 @@ internal sealed class GeneralInventoryTree : GeneralDialog {
         var entry=Selected;
         if(entry==null)return;
         try{
-            string target=entry.Path.Length==0?root:Safe.In(root,entry.Path);
-            Safe.NoLinks(target);
-            if(Directory.Exists(target))Process.Start(new ProcessStartInfo(target){UseShellExecute=true});
-            else if(File.Exists(target))Process.Start("explorer.exe","/select,\""+target+"\"");
-            else throw new IOException(T("O arquivo ou a pasta não existe mais.","The file or folder no longer exists."));
+            RevealInExplorer(root,entry.Path);
         }catch(IOException ex){ShowOpenError(ex);}
         catch(UnauthorizedAccessException ex){ShowOpenError(ex);}
         catch(System.ComponentModel.Win32Exception ex){ShowOpenError(ex);}
+    }
+
+    internal static void RevealInExplorer(string root,string relative){
+        string target=String.IsNullOrEmpty(relative)?root:Safe.In(root,relative);
+        Safe.NoLinks(target);
+        if(Directory.Exists(target))Process.Start(new ProcessStartInfo(target){UseShellExecute=true});
+        else if(File.Exists(target))Process.Start("explorer.exe","/select,\""+target+"\"");
+        else throw new IOException(T("O arquivo ou a pasta não existe mais.","The file or folder no longer exists."));
     }
 
     void ShowOpenError(Exception ex){

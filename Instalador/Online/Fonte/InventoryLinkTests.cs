@@ -193,7 +193,7 @@ internal sealed partial class GeneralModWindow {
                 "Modified and unknown files are distinguished inside the same folder.");
             check(tree.Children.ContainsKey("archive")&&!node("archive/pc/mod").ContainsRecord,
                 "A folder without a receipt does not inherit the Mod Loader mark from another branch.");
-            var inventoryHeading=form.grid.Rows.Cast<DataGridViewRow>().Single(row=>row.Cells["Name"].ToolTipText=="Explorar arquivos");
+            var inventoryHeading=form.grid.Rows.Cast<DataGridViewRow>().Single(row=>row.Cells["Name"].ToolTipText==InventoryInternalLabel);
             Exception dialogError=null;
             using(var timer=new Timer{Interval=30}){
                 timer.Tick+=(s,e)=>{
@@ -211,6 +211,30 @@ internal sealed partial class GeneralModWindow {
                 form.HandleSection((SectionRow)inventoryHeading.Tag);
             }
             if(dialogError!=null)throw dialogError;
+            using(var font=GeneralStyle.Font(11,true)){
+                var actions=form.InventoryHeaderActions(new Rectangle(0,0,form.CategoryContentRight,54),font);
+                check(form.InventoryHeaderActionAt(actions[0].Left+1,20)==1&&
+                    form.InventoryHeaderActionAt(actions[1].Left+1,20)==2&&form.InventoryHeaderActionAt(actions[1].Left+1,1)==0,
+                    "The two header labels have distinct click targets.");
+            }
+            P2PSyncDifference internalFile=null,explorerFile=null;
+            using(var details=new GeneralSyncDifferencesDialog(new[]{found[exact],found[dependency]},true,
+                (owner,file)=>internalFile=file,file=>explorerFile=file)){
+                details.StartPosition=FormStartPosition.Manual;details.Location=form.Location;details.Show(form);
+                var table=(DataGridView)details.Controls.Find("SyncDifferenceFiles",true).Single();
+                var selected=table.Rows.Cast<DataGridViewRow>().Single(row=>row.Tag==found[exact]);
+                table.CurrentCell=selected.Cells[2];
+                check(Equals(selected.Cells[3].Value,"villa.zip"),"Details show the source ZIP of the selected file.");
+                ((Button)details.Controls.Find("OpenInventoryInternal",true).Single()).PerformClick();
+                ((Button)details.Controls.Find("OpenInventoryExplorer",true).Single()).PerformClick();
+                check(internalFile==found[exact]&&explorerFile==found[exact],"Both shortcuts target the selected file.");
+                details.Close();
+            }
+            using(var local=new GeneralInventoryTree(game,form.DisplayedInventory(),found[exact].Path)){
+                var list=(ListBox)local.Controls.Find("InventoryFileTree",true).Single();
+                var selected=(GeneralInventoryTree.Entry)list.SelectedItem;
+                check(selected.Path==exact&&selected.Parent.Open,"The internal shortcut opens the file's containing branch.");
+            }
             File.WriteAllText(Safe.In(game,exact),"modified!");
             await form.Scan();
             check(form.VisibleGameInventory().Single(file=>file.Path==exact).VerifiedZip==null,

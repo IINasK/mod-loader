@@ -255,7 +255,13 @@ internal sealed partial class GeneralModWindow : Form {
             var section=row.Tag as SectionRow;
             if(section!=null){
                 int x=grid.GetCellDisplayRectangle(e.ColumnIndex,e.RowIndex,false).X+e.X;
-                if(section.Kind=="heading"&&x>=CategoryContentRight-CategoryToggleWidth)ToggleCategory(row,section);
+                if(section.Kind=="inventory"){
+                    if(CanEditInventory){
+                        int action=InventoryHeaderActionAt(x,e.Y);
+                        if(action==2)Guard(()=>GeneralInventoryTree.RevealInExplorer(state.Destination,null));
+                        else if(action==1)OpenInventoryTree();
+                    }
+                }else if(section.Kind=="heading"&&x>=CategoryContentRight-CategoryToggleWidth)ToggleCategory(row,section);
                 else HandleSection(section);
                 return;
             }
@@ -297,50 +303,49 @@ internal sealed partial class GeneralModWindow : Form {
         grid.MouseLeave+=(s,e)=>SetHover(-1);
         grid.DataError+=(s,e)=>{e.ThrowException=false;};
         var menu=GeneralMenuRenderer.Create();
-        GeneralMenuRenderer.Add(menu,T("Detalhes e variantes","Details and variants"),()=>OpenRowEditor(grid.CurrentRow));
-        GeneralMenuRenderer.Add(menu,T("Abrir fonte no navegador","Open source in browser"),()=>Guard(()=>{var item=FocusedEntry();if(item!=null){var url=Selected(item).Sources.FirstOrDefault(GeneralModDownload.IsWebSource);if(url!=null)GeneralModDownload.OpenSource(url);}}));
+        var details=GeneralMenuRenderer.Add(menu,T("Detalhes e variantes","Details and variants"),()=>{
+            var item=FocusedInventoryFile();
+            if(item!=null)ShowInventoryDetails(item);else OpenRowEditor(grid.CurrentRow);
+        });
+        var source=GeneralMenuRenderer.Add(menu,T("Abrir fonte no navegador","Open source in browser"),()=>Guard(()=>{
+            var item=FocusedEntry();
+            if(item==null)return;
+            var url=Selected(item).Sources.FirstOrDefault(GeneralModDownload.IsWebSource);
+            if(url!=null)GeneralModDownload.OpenSource(url);
+        }));
         var removeEntry=GeneralMenuRenderer.Add(menu,T("Tirar da lista","Remove from list"),()=>Guard(RemoveEntry));
-        menu.Opening+=(s,e)=>{var focused=FocusedEntry();removeEntry.Visible=focused!=null&&!IsBigBody(focused);};
-        var linkInventory=GeneralMenuRenderer.Add(menu,T("Vincular link do Nexus…","Link Nexus URL…"),()=>
-            SetInventorySource(grid.CurrentRow==null?null:grid.CurrentRow.Tag as P2PSyncDifference));
-        var zipOrigin=GeneralMenuRenderer.Add(menu,T("Conferir origem pelo ZIP…","Verify origin from ZIP…"),VerifyInventoryZip);
-        var inventoryTree=GeneralMenuRenderer.Add(menu,T("Explorar arquivos de mods…","Browse mod files…"),OpenInventoryTree);
-        menu.Opening+=(s,e)=>inventoryTree.Visible=CanEditInventory&&gameInventory.Any(file=>file.Path!=null);
         var showFiles=GeneralMenuRenderer.Add(menu,T("Ver arquivos associados…","View associated files…"),()=>{
-            var row=grid.CurrentRow;
-            var item=row==null?null:row.Tag as P2PSyncDifference;
-            string id=row==null?null:row.Tag as string;
-            var files=DisplayedInventory().Where(file=>item!=null
-                ?file.Kind=="found"&&InventoryPaths.Equals(InventoryLinkStore.Key(file),InventoryLinkStore.Key(item))
-                :id!=null&&file.Kind=="associated"&&file.ModId==id).ToArray();
+            var mod=FocusedEntry();
+            if(mod==null)return;
+            var files=DisplayedInventory().Where(file=>file.Kind=="associated"&&file.ModId==mod.Id).ToArray();
             if(files.Length==0)return;
             using(var dialog=new GeneralSyncDifferencesDialog(files,true))dialog.ShowDialog(this);
         });
-        var splitInventory=GeneralMenuRenderer.Add(menu,T("Desfazer agrupamento ou vínculo","Undo grouping or link"),()=>Guard(()=>{
-            var group=SelectedInventoryLink();
-            if(group!=null&&CanEditInventory)UpdateInventoryLinks(links=>links.Groups.RemoveAll(item=>item.Id==group.Id));
-        }));
-        menu.Opening+=(s,e)=>{
-            var item=grid.CurrentRow==null?null:grid.CurrentRow.Tag as P2PSyncDifference;
-            linkInventory.Visible=CanEditInventory&&item!=null&&item.VerifiedZip==null&&item.ProvenOwner==null&&!item.LocalInModFolder;
-            zipOrigin.Visible=CanEditInventory&&item!=null&&GeneralAppPaths.IsDevelopment;
-            var mod=FocusedEntry();
-            showFiles.Visible=item!=null||mod!=null&&DisplayedInventory().Any(file=>file.Kind=="associated"&&file.ModId==mod.Id);
-            splitInventory.Visible=CanEditInventory&&SelectedInventoryLink()!=null;
-        };
-        menu.Items.Add(new ToolStripSeparator());
+        var separator=new ToolStripSeparator();
+        menu.Items.Add(separator);
         var failureDetails=GeneralMenuRenderer.Add(menu,T("Ver erro da instalação","View installation error"),ShowFocusedFailure);
         failureDetails.Name="ViewInstallFailure";
-        var copyFailures=GeneralMenuRenderer.Add(menu,T("Copiar erros da instalação","Copy installation errors"),CopyFailures);copyFailures.Name="CopyInstallFailures";
+        var copyFailures=GeneralMenuRenderer.Add(menu,T("Copiar erros da instalação","Copy installation errors"),CopyFailures);
+        copyFailures.Name="CopyInstallFailures";
         var undo=GeneralMenuRenderer.Add(menu,T("Cyberpunk: desfazer operação","Cyberpunk: undo operation"),async()=>await CyberpunkMaintenance(false));
         var clean=GeneralMenuRenderer.Add(menu,T("Cyberpunk: limpar extras","Cyberpunk: remove extra mods"),async()=>await CyberpunkMaintenance(true));
-        var removeExtra=GeneralMenuRenderer.Add(menu,T("Retirar este mod do jogo…","Remove this mod from the game…"),async()=>{
-            var selected=grid.CurrentRow==null?null:grid.CurrentRow.Tag as P2PSyncDifference;
-            if(selected!=null)await CyberpunkMaintenance(true,InventoryRow(InventoryLinkStore.Key(selected)).Select(item=>item.Path).ToArray());
-        });
-        menu.Opening+=(s,e)=>removeExtra.Visible=CanEditInventory&&IsCyberpunk(state.Destination)&&
-            grid.CurrentRow!=null&&grid.CurrentRow.Tag is P2PSyncDifference;
-        menu.Opening+=(s,e)=>{if(associationChoice!=null){e.Cancel=true;return;}bool available=!working&&!scanning&&IsCyberpunk(state.Destination);undo.Visible=available;clean.Visible=available;var focused=FocusedEntry();string status;failureDetails.Visible=focused!=null&&statuses.TryGetValue(Key(focused,Selected(focused)),out status)&&GeneralStatusPresentation.Kind(status)=="error";copyFailures.Visible=statuses.Values.Any(value=>GeneralStatusPresentation.Kind(value)=="error");e.Cancel=focused==null&&(grid.CurrentRow==null||!(grid.CurrentRow.Tag is P2PSyncDifference));};
+        menu.Opening+=(s,e)=>{
+            if(associationChoice!=null){e.Cancel=true;return;}
+            bool inventory=FocusedInventoryFile()!=null;
+            var focused=FocusedEntry();
+            details.Text=inventory?T("Detalhes","Details"):T("Detalhes e variantes","Details and variants");
+            details.Enabled=!inventory||CanEditInventory;
+            source.Visible=!inventory;
+            removeEntry.Visible=!inventory&&focused!=null&&!IsBigBody(focused);
+            showFiles.Visible=!inventory&&focused!=null&&DisplayedInventory().Any(file=>file.Kind=="associated"&&file.ModId==focused.Id);
+            bool maintenance=!inventory&&!working&&!scanning&&IsCyberpunk(state.Destination);
+            undo.Visible=clean.Visible=maintenance;
+            string status;
+            failureDetails.Visible=!inventory&&focused!=null&&statuses.TryGetValue(Key(focused,Selected(focused)),out status)&&GeneralStatusPresentation.Kind(status)=="error";
+            copyFailures.Visible=!inventory&&statuses.Values.Any(value=>GeneralStatusPresentation.Kind(value)=="error");
+            separator.Visible=maintenance||failureDetails.Visible||copyFailures.Visible;
+            e.Cancel=focused==null&&!inventory;
+        };
         grid.CellMouseDown+=(s,e)=>{
             if(e.RowIndex<0)return;
             var row=grid.Rows[e.RowIndex];
@@ -605,7 +610,7 @@ internal sealed partial class GeneralModWindow : Form {
     DataGridViewRow AddSection(string kind,string category,int height){
         int i=grid.Rows.Add();var row=grid.Rows[i];row.Tag=new SectionRow(kind,category);row.Height=height;row.ReadOnly=true;
         row.Cells["Name"].Value=kind=="heading"?category??UncatName():kind=="inventory"?category:kind=="add"?T("Adicionar item","Add item"):kind=="new"?T("Criar nova categoria","Create new category"):"";
-        if(kind=="inventory")foreach(DataGridViewCell cell in row.Cells)cell.ToolTipText=T("Explorar arquivos","Browse files");
+        if(kind=="inventory")row.Cells["Name"].ToolTipText=InventoryInternalLabel;
         return row;
     }
 
@@ -757,6 +762,28 @@ internal sealed partial class GeneralModWindow : Form {
     internal sealed class ModListGrid : DataGridView {
         public ModListGrid(){DoubleBuffered=true;}
     }
+    static string InventoryInternalLabel {get{return T("Explorador de arquivos Mod Loader","Mod Loader File Explorer");}}
+    static string InventoryLocalLabel {get{return T("Explorar arquivos locais","Browse local files");}}
+
+    Rectangle[] InventoryHeaderActions(Rectangle row,Font font){
+        int right=row.Right-20;
+        int localWidth=TextRenderer.MeasureText(InventoryLocalLabel,font).Width+16;
+        int internalWidth=TextRenderer.MeasureText(InventoryInternalLabel,font).Width+16;
+        return new[]{
+            new Rectangle(right-localWidth-12-internalWidth,row.Y+12,internalWidth,30),
+            new Rectangle(right-localWidth,row.Y+12,localWidth,30)
+        };
+    }
+
+    int InventoryHeaderActionAt(int x,int y){
+        using(var font=GeneralStyle.Font(11,true)){
+            var buttons=InventoryHeaderActions(new Rectangle(0,0,CategoryContentRight,54),font);
+            if(buttons[0].Contains(x,y))return 1;
+            if(buttons[1].Contains(x,y))return 2;
+            return 0;
+        }
+    }
+
     void PaintSection(object sender,DataGridViewRowPrePaintEventArgs e){
         var section=grid.Rows[e.RowIndex].Tag as SectionRow;if(section==null)return;
         e.Handled=true;var g=e.Graphics;var bounds=e.RowBounds;bounds.Width=CategoryContentRight;
@@ -783,15 +810,13 @@ internal sealed partial class GeneralModWindow : Form {
             const TextFormatFlags flags=TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis|TextFormatFlags.PreserveGraphicsClipping|TextFormatFlags.VerticalCenter;
             bool toggle=section.Kind=="heading"&&CanToggleCategory;
             int x=bounds.X+18+(section.Kind=="add"?CategoryIndent:0);
-            string inventoryAction=section.Kind=="inventory"?T("Explorar arquivos","Browse files"):null;
             int right=bounds.Right-(toggle?CategoryToggleWidth:20);
-            if(inventoryAction!=null){
+            if(section.Kind=="inventory"){
                 using(var actionFont=GeneralStyle.Font(11,true)){
-                    int actionWidth=TextRenderer.MeasureText(inventoryAction,actionFont).Width+25;
-                    int start=Math.Max(x,right-actionWidth);
-                    LucideIcons.Draw(g,"folder",new Rectangle(start,y+6,16,16),GeneralStyle.Accent);
-                    TextRenderer.DrawText(g,inventoryAction,actionFont,new Rectangle(start+22,y,Math.Max(0,right-start-22),30),GeneralStyle.Accent,flags);
-                    right=start-12;
+                    var buttons=InventoryHeaderActions(bounds,actionFont);
+                    TextRenderer.DrawText(g,InventoryInternalLabel,actionFont,buttons[0],GeneralStyle.Accent,flags|TextFormatFlags.HorizontalCenter);
+                    TextRenderer.DrawText(g,InventoryLocalLabel,actionFont,buttons[1],GeneralStyle.Accent,flags|TextFormatFlags.HorizontalCenter);
+                    right=buttons[0].Left-12;
                 }
             }
             using(var font=GeneralStyle.Font(heading?15:12,heading))
