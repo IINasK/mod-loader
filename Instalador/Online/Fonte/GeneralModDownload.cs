@@ -44,7 +44,7 @@ internal sealed class GeneralModDownload : IDisposable {
 
     public void Dispose() { foreach(var watch in watches)watch.Cancel(); }
 
-    static IEnumerable<string> WatchFolders(string configured) {
+    internal static IEnumerable<string> WatchFolders(string configured) {
         foreach(var folder in new[]{configured,OnlineDownloadWatch.DefaultFolder()}.Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase)){
             string verified;
             try{verified=new OnlineDownloadWatch(folder).Folder;}

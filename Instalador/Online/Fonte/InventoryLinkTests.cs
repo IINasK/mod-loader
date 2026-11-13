@@ -32,7 +32,7 @@ internal sealed partial class GeneralModWindow {
             Sources=new List<string>{"installed://"+registered.Id+"/unmapped"}});
         registered.DetectedPaths.Add(catalogBase);
         var catalog=new FixedCatalog{Schema=1,Id="inventory-links-fixture",GameVersion="2.5",GameFileVersion="2.5.0.0",Packages=new List<FixedMod>()};
-        var state=new GeneralModState{List=new GeneralModList{Mods=new List<GeneralModEntry>{registered}},Language="pt"};
+        var state=new GeneralModState{List=new GeneralModList{Mods=new List<GeneralModEntry>{registered}},Language="pt",DownloadFolder=root};
         Action<bool,string> check=(ok,message)=>{if(!ok)throw new IOException(message);};
         TestForm(catalog,state,appData,root,async form=>{
             form.SetDestination(game);
@@ -144,7 +144,17 @@ internal sealed partial class GeneralModWindow {
                 WriteZipEntry(zip,changed,"different");
             }
             using(var zip=ZipFile.Open(nif,ZipArchiveMode.Create))WriteZipEntry(zip,dependency,"installed");
+            File.WriteAllText(Safe.In(root,"corrupt.zip"),"not an archive");
             await form.Scan();
+            check(form.VisibleGameInventory().Any(file=>file.Path==exact&&file.VerifiedZip=="villa.zip")&&
+                form.VisibleGameInventory().Any(file=>file.Path==dependency&&file.VerifiedZip=="nif.zip"),
+                "A regular scan uses the existing download ZIPs without manual verification.");
+            string duplicate=Safe.In(root,"another origin.zip");
+            File.Copy(villa,duplicate);
+            await form.Scan();
+            check(form.VisibleGameInventory().Any(file=>file.Path==exact&&file.VerifiedZip==null&&!file.LocalInModFolder),
+                "Two packages claiming the same file leave it unknown.");
+            File.Delete(duplicate);
             check(await form.VerifyInventoryZip(villa,"Villa V")==1&&await form.VerifyInventoryZip(nif,"Native Interactions")==1,
                 "ZIP verification confirms byte matches across packages sharing a folder.");
             form.inventoryLinks=null;

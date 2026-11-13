@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 internal sealed class InventoryLinkGroup {
     public string Id,Name,Source,CatalogId;
@@ -70,9 +71,38 @@ internal sealed class InventoryLinkStore {
         }
     }
 
+    internal static HashSet<string> DiscoverZips(string root,IEnumerable<string> folders,IEnumerable<string> candidates,
+        Dictionary<string,InventoryZipLabel> labels,Func<string,string> readHash) {
+        var remaining=new HashSet<string>(candidates.Where(path=>!labels.ContainsKey(path)),Paths);
+        var ambiguous=new HashSet<string>(Paths);
+        if(remaining.Count==0)return ambiguous;
+        var discovered=new Dictionary<string,InventoryZipLabel>(Paths);
+        foreach(string folder in folders){
+            try{
+                Safe.NoLinks(folder);
+                foreach(string zip in Directory.EnumerateFiles(folder,"*.zip").Take(10000)){
+                    string stem=Path.GetFileNameWithoutExtension(zip);
+                    // Strip the Nexus packaging suffix; the name is only a display label.
+                    stem=Regex.Replace(stem,@" \(\d+\)$","");
+                    string name=Regex.Replace(stem,@"(?:-\d+-\d[\d-]*-\d{9,}| \d+ \S+ \d{4}-\d{2}-\d{2}T.*)$","").Trim();
+                    if(String.IsNullOrEmpty(name)||name.Length>300||name.Any(Char.IsControl))continue;
+                    try{
+                        foreach(var entry in MatchZip(root,zip,name,true,remaining,readHash)){
+                            InventoryZipLabel previous;
+                            if(!discovered.TryGetValue(entry.Key,out previous))discovered.Add(entry.Key,entry.Value);
+                            else if(!Paths.Equals(previous.Name,entry.Value.Name))ambiguous.Add(entry.Key);
+                        }
+                    }catch(IOException){}catch(UnauthorizedAccessException){}catch(ArgumentException){}catch(InvalidDataException){}catch(NotSupportedException){}
+                }
+            }catch(IOException){}catch(UnauthorizedAccessException){}
+        }
+        foreach(var item in discovered.Where(item=>!ambiguous.Contains(item.Key)))labels.Add(item.Key,item.Value);
+        return ambiguous;
+    }
+
     internal static Dictionary<string,InventoryZipLabel> MatchZip(string root,string zipPath,string name,bool cyberpunk,
-        IEnumerable<string> candidates) {
-        var remaining=new HashSet<string>(candidates,Paths);
+        IEnumerable<string> candidates,Func<string,string> readHash=null) {
+        var remaining=candidates as HashSet<string>??new HashSet<string>(candidates,Paths);
         var matches=new Dictionary<string,InventoryZipLabel>(Paths);
         string archiveName=Path.GetFileName(zipPath);
         Safe.NoLinks(zipPath);
@@ -95,7 +125,7 @@ internal sealed class InventoryLinkStore {
                 if(!File.Exists(target)||new FileInfo(target).Length!=entry.Length)continue;
                 string expected;
                 using(var stream=entry.Open())expected=Safe.Hex(hash.ComputeHash(stream));
-                if(Safe.Hash(target)==expected)matches.Add(pair.Value,new InventoryZipLabel{Name=name,Hash=expected,Archive=archiveName});
+                if((readHash??Safe.Hash)(target)==expected)matches.Add(pair.Value,new InventoryZipLabel{Name=name,Hash=expected,Archive=archiveName});
             }
         }
         return matches;

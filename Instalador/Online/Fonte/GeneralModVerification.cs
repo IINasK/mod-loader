@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
@@ -186,6 +186,11 @@ internal sealed partial class GeneralModWindow {
         var associated=InstalledFileOwnership.FindAssociated(destination,registered,scope,
             cyberpunk?extras.Where(file=>file.Kind=="found").Select(file=>file.Path):null);
         var labels=zipLabels??new Dictionary<string,InventoryZipLabel>(InventoryPaths);
+        Func<string,string> readHash=reads==null?(Func<string,string>)Safe.Hash:reads.Hash;
+        var ambiguous=cyberpunk&&reads!=null?InventoryLinkStore.DiscoverZips(destination,
+            testMode?new[]{state.DownloadFolder}:GeneralModDownload.WatchFolders(state.DownloadFolder),
+            extras.Where(file=>file.Kind=="found"&&file.ProvenOwner==null).Select(file=>file.Path),labels,readHash)
+            :new HashSet<string>(InventoryPaths);
         foreach(var file in extras.Where(item=>item.Kind=="found")){
             InventoryZipLabel label;
             if(file.ProvenOwner!=null||!labels.TryGetValue(file.Path,out label))continue;
@@ -199,12 +204,12 @@ internal sealed partial class GeneralModWindow {
             }catch(IOException){}catch(UnauthorizedAccessException){}
         }
         var observedScopes=cyberpunk
-            ? GroupModFolders(destination,extras,registered,registeredNames,names,exact,labels,reads==null?(Func<string,string>)Safe.Hash:reads.Hash)
+            ? GroupModFolders(destination,extras,registered,registeredNames,names,exact,labels,readHash,ambiguous)
             : new HashSet<string>(InventoryPaths);
         extras.RemoveAll(file=>file.Kind=="found"&&file.VerifiedZip==null&&file.ProvenOwner==null&&!file.LocalInModFolder&&
             associated.ContainsKey(file.Path)&&names.ContainsKey(associated[file.Path])&&!labels.ContainsKey(file.Path)&&
-            !observedScopes.Contains(scope(file.Path)));
-        foreach(var pair in associated.Where(item=>names.ContainsKey(item.Value)&&!labels.ContainsKey(item.Key)&&
+            !observedScopes.Contains(scope(file.Path))&&!ambiguous.Contains(file.Path));
+        foreach(var pair in associated.Where(item=>names.ContainsKey(item.Value)&&!labels.ContainsKey(item.Key)&&!ambiguous.Contains(item.Key)&&
             !observedScopes.Contains(scope(item.Key))))
             extras.Add(new P2PSyncDifference{Kind="associated",Mod=names[pair.Value],ModId=pair.Value,Path=pair.Key});
         return extras;
@@ -212,9 +217,10 @@ internal sealed partial class GeneralModWindow {
 
     static HashSet<string> GroupModFolders(string root,List<P2PSyncDifference> inventory,IEnumerable<ModFileAnchor> registered,
         Dictionary<string,string> names,Dictionary<string,string> projectNames,HashSet<string> listed,
-        Dictionary<string,InventoryZipLabel> labels,Func<string,string> readHash) {
+        Dictionary<string,InventoryZipLabel> labels,Func<string,string> readHash,HashSet<string> ambiguous) {
         var files=inventory.Where(file=>file.Kind=="found").ToDictionary(file=>file.Path,InventoryPaths);
         var confirmed=new Dictionary<string,string>(InventoryPaths);
+        foreach(string path in ambiguous)confirmed[path]=String.Empty;
         foreach(var file in files.Values){
             string owner=file.VerifiedZip!=null?file.InventoryGroupId:file.ProvenOwner;
             if(owner!=null){
