@@ -29,9 +29,12 @@ internal sealed partial class GeneralModWindow {
             string id=InstalledSnapshot.Hash(Encoding.UTF8.GetBytes(Path.GetFullPath(state.Destination).TrimEnd('\\').ToUpperInvariant())).Substring(0,24);
             string path=Safe.In(data,"Presets/"+id+"/pending.json");Safe.NoLinks(path);return File.Exists(path);}
     }
-    bool NeedsPresetLoad {get{return ActivePreset!=null&&(PresetRecoveryPending||state.AppliedPreset!=state.SelectedPreset||state.AppliedPresetFingerprint!=PresetFingerprint);}}
+    bool UnappliedDefaultPreset {get{return state.AppliedPreset==null&&state.SelectedPreset==GeneralPresetProfiles.DefaultPresetId;}}
+    bool NeedsPresetLoad {get{return ActivePreset!=null&&(PresetRecoveryPending||!UnappliedDefaultPreset&&
+        (state.AppliedPreset!=state.SelectedPreset||state.AppliedPresetFingerprint!=PresetFingerprint));}}
     string PresetStoredKey(Work work,string root) {
-        var entries=DisabledAt(root).Read();string key=PresetRecipeKey(work);return entries.ContainsKey(key)||ActivePreset!=null?key:work.Key;
+        var entries=DisabledAt(root).Read();string key=PresetRecipeKey(work);
+        return entries.ContainsKey(key)||ActivePreset!=null&&!UnappliedDefaultPreset?key:work.Key;
     }
     async Task TrackPresetInstall(Work work,string root,bool approved=false) {
         if(state.AppliedPreset==null&&!approved)return;
@@ -118,6 +121,7 @@ internal sealed partial class GeneralModWindow {
         }else if(work.Variant.CyberpunkId!=null) {
             var recipe=ProfileRecipe(work);package.Immutable=recipe.Immutable||evidence.Any(f=>!f.Owned||f.ReplacesPrevious);
             var routed=work.Variant.InstallRoutes.Count==0?null:GeneralInstallRoutes.FixedPaths(catalog,recipe,work.Variant.InstallRoutes);
+            package.OfficialNightCoop=recipe.Id=="NightCoop"&&recipe.Version==NightCoopRelease.Version&&recipe.Immutable&&routed==null;
             package.Files=recipe.Files.Where(f=>!f.UserData).Select(f=>new DisabledModFile{Path=routed==null?f.Path:routed[f.Path],Hash=f.Sha256,Size=f.Size}).ToList();
         }else package.Files=evidence.GroupBy(f=>f.Path,StringComparer.OrdinalIgnoreCase).Where(g=>g.All(f=>f.Hash==g.First().Hash&&f.Size==g.First().Size))
             .Select(g=>new DisabledModFile{Path=g.Key,Hash=g.First().Hash,Size=g.First().Size}).ToList();
@@ -289,6 +293,22 @@ internal sealed partial class GeneralModWindow {
                 .Replace("alterado fora do Mod Loader; mantido sem alterações.","arquivos divergentes do registro; instalação local preservada.")
                 .Replace("changed outside Mod Loader; left unchanged.","files differ from the record; local installation preserved.")).ToList();
             presetProtected.UnionWith(deployed.Protected.Keys);state.AppliedPreset=deployed.Preset;state.AppliedPresetFingerprint=deployed.Fingerprint;UpdatePresetIssueLink();
+        }catch(IOException ex){startupIssue=ex.Message;}catch(UnauthorizedAccessException ex){startupIssue=ex.Message;}
+    }
+    void AdoptReceivedPreset() {
+        if(state.AppliedPreset!=null||state.SnapshotReceipts.Count==0||String.IsNullOrWhiteSpace(state.Destination)||!Directory.Exists(state.Destination))return;
+        try {
+            string received=state.ReceivedPreset;
+            if(received==null){
+                var receipts=state.SnapshotReceipts.Values.Distinct().Take(2).ToArray();
+                if(receipts.Length!=1)return;
+                var manifest=Snapshot(state.Destination).ReadManifest(receipts[0]);
+                received=(manifest.Project??manifest.List).Presets.Select(preset=>preset.Id).FirstOrDefault();
+            }
+            if(received!=state.SelectedPreset)return;
+            string fingerprint=PresetFingerprint;
+            if(!new GeneralPresetDeployment(state.Destination,data).AdoptReceived(received,fingerprint))return;
+            state.AppliedPreset=received;state.AppliedPresetFingerprint=fingerprint;RefreshPrimaryAction();
         }catch(IOException ex){startupIssue=ex.Message;}catch(UnauthorizedAccessException ex){startupIssue=ex.Message;}
     }
     async Task RecoverPresetOnOpen() {

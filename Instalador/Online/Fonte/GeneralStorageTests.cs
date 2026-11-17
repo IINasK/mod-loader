@@ -15,7 +15,9 @@ internal sealed partial class GeneralModWindow {
         string source=TestZip(root,"shared.zip","mods/shared.txt","share"),zero=TestZip(root,"zero.zip","mods/empty.txt","");
         var first=NewEntry("Primeiro compartilhado",source);var second=NewEntry("Segundo compartilhado",source);var empty=NewEntry("Arquivo vazio",zero);var absent=NewEntry("Ainda não instalado","https://example.test/uninstalled.zip");
         absent.Variants[0].SourceInfo[absent.Variants[0].Sources[0]]=new GeneralSourceInfo{Name="Expected",FileName="uninstalled.zip",Bytes=99999999};
-        var list=new GeneralModList{Mods=new List<GeneralModEntry>{first,second,empty,absent}};list.Presets.Add(new GeneralModPreset{Id="subset",Name="Dois itens",ModIds=new List<string>{first.Id,absent.Id}});
+        var list=new GeneralModList{Mods=new List<GeneralModEntry>{first,second,empty,absent}};
+        list.Presets.Add(new GeneralModPreset{Id="full",Name="Quatro itens",ModIds=list.Mods.Select(mod=>mod.Id).ToList()});
+        list.Presets.Add(new GeneralModPreset{Id="subset",Name="Dois itens",ModIds=new List<string>{first.Id,absent.Id}});
         var project=store.Create("Projeto de espaço",list,"light","pt",game);string data=store.DataPath(project);var engine=new GeneralModInstaller(game,Path.Combine(data,"Instalacoes"));
         foreach(var mod in new[]{first,second,empty})engine.Install(mod.Variants[0].Sources[0],mod.Id+"/default/0/"+mod.Variants[0].Sources[0],null);
         string unknown=Safe.In(game,"untracked.txt");File.WriteAllText(unknown,new string('x',9000));var size=GeneralProjectStorage.Measure(store,catalog,cache,project);
@@ -37,7 +39,7 @@ internal sealed partial class GeneralModWindow {
         check(size.Identified==3&&size.Mods==5&&size.Total==size.Mods+size.Cache,"Deleting original downloads does not erase installed size knowledge or create another cache copy.");
         File.WriteAllText(Safe.In(game,"mods/shared.txt"),"larger content");size=GeneralProjectStorage.Measure(store,catalog,cache,project);
         check(size.ModBytes[first.Id]==14&&size.Mods==14,"Occupied bytes come from current file metadata rather than old receipt size.");File.WriteAllText(Safe.In(game,"mods/shared.txt"),"share");
-        var visibleState=store.Load(project);visibleState.SelectedPreset=null;
+        var visibleState=store.Load(project);
         TestForm(catalog,visibleState,data,root,async form=>{
             form.AttachProject(store,project);form.RefreshStorageSize();await Until(()=>!form.storageReading);form.DrawRows();
             var section=(SectionRow)form.grid.Rows[0].Tag;

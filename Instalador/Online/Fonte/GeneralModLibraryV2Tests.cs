@@ -75,7 +75,8 @@ public static class GeneralModLibraryV2Tests {
         File.WriteAllText(Path.Combine(root, "estado.json"), "{\"List\":" + File.ReadAllText(export) + "}");
         var oldState = library.Load();
         check(legacy.Presets.Count == 0 && legacy.CategoryDescriptions.Count == 0 && legacy.Mods[0].Tags.Count == 0 && !legacy.Mods[0].Nsfw && legacy.Mods[0].Description == "" && legacy.UncategorizedName == "Sem categoria", "JSON 1.1 migra sem campos novos obrigatórios.");
-        check(oldState.Theme == "light" && oldState.Language == "pt" && oldState.SelectedPreset == null, "Preferências ausentes recebem os padrões.");
+        check(oldState.Theme == "light" && oldState.Language == "pt" && oldState.SelectedPreset == GeneralPresetProfiles.DefaultPresetId&&
+            oldState.List.Presets.Single().ModIds.SequenceEqual(new[]{"old"}), "Preferências ausentes recebem os padrões e uma lista antiga mantém seus mods no preset padrão.");
         legacy.CategoryDescriptions = null;
         legacy.Presets = null;
         legacy.Mods[0].Tags = null;
@@ -87,7 +88,7 @@ public static class GeneralModLibraryV2Tests {
         editable.Presets[0].Name = "Meu grupo";
         editable.Presets[0].ModIds.Clear();
         library.Save(new GeneralModState { List = editable, SelectedPreset = "removed" });
-        check(library.Load().List.Presets[0].ModIds.Count == 0 && library.Load().SelectedPreset == null, "Preset all é editável e seleção excluída é limpa.");
+        check(library.Load().List.Presets[0].ModIds.Count == 0 && library.Load().SelectedPreset == "all", "Preset all é editável e substitui uma seleção que já não existe.");
 
         Action<Action<GeneralModList>> rejectList = mutate => {
             var invalid = Example();

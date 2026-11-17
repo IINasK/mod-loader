@@ -143,7 +143,7 @@ internal sealed class GeneralProjectStore {
             }
             var state=new GeneralModState{
                 List=list,Theme=index.Theme,Language=index.Language,Destination=session.Destination,
-                DownloadFolder=index.DownloadFolder,SelectedPreset=incoming.Presets.Select(preset=>preset.Id).FirstOrDefault(),
+                DownloadFolder=index.DownloadFolder,SelectedPreset=(manifest.Project??manifest.List).Presets.Select(preset=>preset.Id).FirstOrDefault(),
                 BodyChoice=manifest.BodyChoice??(previous!=null&&manifest.TemplateSubset&&
                     !manifest.List.Mods.Any(mod=>GeneralModLibrary.IsHystBody(mod.Id))?previous.BodyChoice:null)
             };
@@ -157,6 +157,7 @@ internal sealed class GeneralProjectStore {
             }
             var receivedDefinitions=state.List.Mods.ToDictionary(m=>m.Id,StringComparer.Ordinal);
             GeneralPresetProfiles.Project(state);
+            state.ReceivedPreset=state.SelectedPreset;
             BindReceivedVariants(state,manifest,session.ReceiptId,receivedDefinitions);
             if(!String.Equals(Path.GetFullPath(sourceData),data,StringComparison.OrdinalIgnoreCase))
                 source.CopyReceivedRecognition(session.ReceiptId,data);

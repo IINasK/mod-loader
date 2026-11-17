@@ -236,7 +236,7 @@ internal sealed partial class GeneralModWindow {
         bool cyberpunk=reads==null?IsCyberpunk(root):reads.Cyberpunk;
         if(exists){
             var off=reads==null?new HashSet<string>(DisabledAt(root).Read().Keys,StringComparer.Ordinal):reads.Disabled.Value;
-            if(off.Contains(PresetRecipeKey(work))||ActivePreset==null&&off.Contains(work.Key))return GeneralStatusPresentation.Disabled;
+            if(off.Contains(PresetRecipeKey(work))||(ActivePreset==null||UnappliedDefaultPreset)&&off.Contains(work.Key))return GeneralStatusPresentation.Disabled;
         }
         Func<string,string> hash=reads==null?null:(Func<string,string>)reads.Hash;
         string snapshot;
@@ -341,6 +341,7 @@ internal sealed partial class GeneralModWindow {
         if(String.IsNullOrWhiteSpace(state.Destination)){
             RefreshPrimaryAction();
             RefreshStorageSize();
+            BeginModUpdateCheck();
             return;
         }
         scanning=true;Busy(true);
@@ -438,7 +439,7 @@ internal sealed partial class GeneralModWindow {
         }catch(Exception ex){
             OnlineDiagnostics.Failure("general.scan.failed",ex,"Conferir os arquivos instalados e atualizar a situação dos mods.");
             throw;
-        }finally{scanCurrent=null;detail.Text=previous;scanning=false;Busy(false);}
+        }finally{scanCurrent=null;detail.Text=previous;scanning=false;Busy(false);BeginModUpdateCheck();}
     }
     async Task ScanNexusPreviews(List<Work> works,string root,ScanReads reads) {
         if(IsDisposed||!reads.Exists||!NexusPreviewsAvailable)return;
@@ -690,8 +691,19 @@ internal sealed partial class GeneralModWindow {
         Enqueue(jobs,urgent);
     }
 
-    void ConfirmUrgentInstall(GeneralModEntry entry,string bodyChoice=null){
-        if(NeedsPresetLoad){detail.Text=T("Carregue o preset antes de instalar os mods.","Load the preset before installing mods.");return;}if(GeneralModLibrary.NeedsDependencyVersion(entry,Selected(entry)))return;
+    async Task ConfirmUrgentInstall(GeneralModEntry entry,string bodyChoice=null){
+        if(NeedsPresetLoad){
+            string presetId=state.SelectedPreset;
+            if(GeneralDialog.Message(this,
+                T("Carregue o preset selecionado para continuar a instalação de ","Load the selected preset to continue installing ")+entry.Name+".",
+                T("Carregar preset","Load preset"),MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2,
+                yesLabel:T("Carregar preset","Load preset"),noLabel:T("Cancelar","Cancel"))!=DialogResult.Yes)return;
+            int workers=ChooseSwitchWorkers();
+            if(workers<=0)return;
+            await LoadPreset(workers);
+            if(IsDisposed||exitApproved||NeedsPresetLoad||state.SelectedPreset!=presetId||!state.List.Mods.Contains(entry))return;
+        }
+        if(GeneralModLibrary.NeedsDependencyVersion(entry,Selected(entry)))return;
         if(entry.AlternativeGroup!=null&&normal.Concat(priority).Concat(new[]{current,priorityCurrent}).Any(work=>
             work!=null&&work.Entry.Id!=entry.Id&&work.Entry.AlternativeGroup==entry.AlternativeGroup)){
             detail.Text=T("Outra alternativa deste grupo já está na fila.","Another alternative from this group is already queued.");
@@ -981,7 +993,9 @@ internal sealed partial class GeneralModWindow {
                     foreach(var pair in changes)replacements.Add(pair.Key,pair.Value);
                 }else if(scan.Original>0||scan.IsConflict){
                     var file=mod.Files.FirstOrDefault(f=>!f.UserData&&File.Exists(Safe.In(root,f.Path))&&Safe.Hash(Safe.In(root,f.Path))!=f.Sha256);
-                    var difference=new ModVersionDifference{Name=mod.Name,Current=mod.Id=="NightCoop"&&scan.State=="Atualização disponível"?"0.1.2-beta":file!=null&&FpvCustomization.IsWeaveUpgrade(file)&&scan.Original>0?"Equipment-EX 1.2.10":file==null?scan.State:ModVersionDifference.FileVersion(Safe.In(root,file.Path)),Incoming=mod.Version,CanReplace=!scan.IsConflict,Detail=scan.IsConflict?T("Há conteúdo não reconhecido ou incompatível. Resolva o conflito antes de substituir; a base protegida permanece intacta.","Unrecognized or incompatible content was found. Resolve the conflict before replacing; the protected base remains intact."):T("Versão anterior reconhecida. A troca usa o backup e a conferência de arquivos do instalador.","Recognized previous version. Replacement uses the installer's backup and file verification.")};
+                    string nightCoopVersion=mod.Id=="NightCoop"&&file!=null&&NightCoopRelease.IsUpgradeTarget(file)
+                        ?NightCoopRelease.PriorVersion(Safe.Hash(Safe.In(root,file.Path))):null;
+                    var difference=new ModVersionDifference{Name=mod.Name,Current=nightCoopVersion??(file!=null&&FpvCustomization.IsWeaveUpgrade(file)&&scan.Original>0?"Equipment-EX 1.2.10":file==null?scan.State:ModVersionDifference.FileVersion(Safe.In(root,file.Path))),Incoming=mod.Version,CanReplace=!scan.IsConflict,Detail=scan.IsConflict?T("Há conteúdo não reconhecido ou incompatível. Resolva o conflito antes de substituir; a base protegida permanece intacta.","Unrecognized or incompatible content was found. Resolve the conflict before replacing; the protected base remains intact."):T("Versão anterior reconhecida. A troca usa o backup e a conferência de arquivos do instalador.","Recognized previous version. Replacement uses the installer's backup and file verification.")};
                     difference.Require(ChooseVersion);
                 }
             }

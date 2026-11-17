@@ -6,8 +6,21 @@ using System.Reflection;
 
 // Presets share mod identity and payloads; only their configuration is independent.
 internal static class GeneralPresetProfiles {
+    internal const string DefaultPresetId="default-preset";
     internal static T Copy<T>(T value) { return Safe.Json.Deserialize<T>(Safe.Json.Serialize(value)); }
     internal static GeneralModPreset Selected(GeneralModState state) { return state.List.Presets.SingleOrDefault(p=>p.Id==state.SelectedPreset); }
+    internal static bool EnsureSelection(GeneralModState state) {
+        if(state.List.Presets==null)state.List.Presets=new List<GeneralModPreset>();
+        bool created=state.List.Presets.Count==0;
+        if(created)state.List.Presets.Add(new GeneralModPreset{
+            Id=DefaultPresetId,Name=state.Language=="en"?"Default preset":"Preset padrão",
+            ModIds=state.List.Mods.Select(mod=>mod.Id).ToList(),Categories=(state.List.Categories??new List<string>()).ToList(),
+            BodyChoice=state.BodyChoice,VariantChoices=new Dictionary<string,string>(state.ChosenVariants??new Dictionary<string,string>()),
+            Groups=Copy(state.List.AlternativeGroups??new Dictionary<string,GeneralAlternativeGroup>())
+        });
+        if(Selected(state)==null)state.SelectedPreset=state.List.Presets.First().Id;
+        return created;
+    }
     internal static void Initialize(GeneralModState state) {
         if(state==null||state.List==null||state.List.Mods==null||state.List.Mods.Any(m=>m==null))throw new IOException("Configuração de presets inválida.");
         if(state.List.Presets==null)state.List.Presets=new List<GeneralModPreset>();
@@ -41,10 +54,13 @@ internal static class GeneralPresetProfiles {
         preset.BodyChoice=state.BodyChoice;preset.Groups=Copy(state.List.AlternativeGroups);
     }
     internal static void Switch(GeneralModState state,string selected) {
+        if(!state.List.Presets.Any(preset=>preset.Id==selected))return;
         Capture(state);state.SelectedPreset=selected;Project(state);
     }
     internal static void Project(GeneralModState state) {
-        Initialize(state);var preset=Selected(state);if(preset==null)return;
+        bool created=EnsureSelection(state);Initialize(state);
+        if(created)return;
+        var preset=Selected(state);
         for(int i=0;i<state.List.Mods.Count;i++) {
             GeneralModEntry configured;
             if(preset.ModIds.Contains(state.List.Mods[i].Id)&&preset.Configurations.TryGetValue(state.List.Mods[i].Id,out configured))state.List.Mods[i]=Copy(configured);

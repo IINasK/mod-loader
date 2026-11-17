@@ -17,7 +17,8 @@ internal static class GeneralProjectStoreTests {
         check(initial.Projects.Count == 0 && initial.Theme == "light-red" && initial.Language == "pt", "Biblioteca nova começa sem projetos nem pacote Cyberpunk automático.");
         var empty = store.Create("Meu projeto", null, "light-red", "pt");
         var emptyState = store.Load(empty);
-        check(emptyState.List.Mods.Count == 0 && emptyState.List.Categories.Count == 0 && emptyState.List.Presets.Count == 0, "Projeto novo aceita lista vazia sem sugestões ou seed.");
+        check(emptyState.List.Mods.Count == 0 && emptyState.List.Categories.Count == 0 && emptyState.List.Presets.Single().Id == emptyState.SelectedPreset,
+            "Projeto novo começa com um preset vazio selecionado.");
         check(emptyState.Destination == null && !String.IsNullOrEmpty(emptyState.DownloadFolder) && emptyState.Theme == "light-red", "Novo projeto guarda preferências e downloads sem escolher ou alterar um jogo.");
         check(store.Read().Projects.Single().Name == "Meu projeto" && store.DataPath(empty).EndsWith(Path.Combine("Projetos", empty.Id)), "Metadados e pasta identificada por GUID persistem.");
 

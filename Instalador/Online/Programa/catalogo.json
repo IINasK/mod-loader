@@ -7,22 +7,22 @@
     {
       "Id": "NightCoop",
       "Name": "NightCoop + RED4ext 1.31.0",
-      "Version": "0.2.0-beta",
+      "Version": "0.2.1-beta",
       "Profile": "Kit inicial",
       "GameVersion": "2.5",
       "RequiresPL": false,
       "RequiresRedmod": false,
       "Immutable": true,
       "Dependencies": [],
-      "Warning": "NightCoop 0.2.0-beta (protocolo 164) com RED4ext 1.31.0.",
+      "Warning": "NightCoop 0.2.1-beta (protocolo 183) com RED4ext 1.31.0.",
       "Assets": [
         {
           "Id": "a0",
-          "Name": "NightCoop-0.2.0-beta-2.5.zip",
-          "Sha256": "ca070aa296519fb4147dadf14a625a538df59d6a20d289fa3e335ae3da3cace5",
-          "Size": 10117378,
+          "Name": "NightCoop-0.2.1-beta-2.5.zip",
+          "Sha256": "fa6e6eb24dd935cac432da3f58736ab6a76633f05c28615a0aa05ca54d7c4807",
+          "Size": 11031633,
           "Format": "zip",
-          "Url": "https://nightcoop.net/dl/0.2.0-beta/NightCoop-0.2.0-beta-2.5.zip",
+          "Url": "https://nightcoop.net/dl/0.2.1-beta/NightCoop-0.2.1-beta-2.5.zip",
           "ModId": 0,
           "FileId": 0
         }
@@ -60,8 +60,8 @@
           "Asset": "a0",
           "Entry": "red4ext/plugins/NightCoop/NightCoop.dll",
           "Path": "red4ext/plugins/NightCoop/NightCoop.dll",
-          "Sha256": "447ee81cb5200de2b372372a5c68dd36275c7b172eeee009f56e5d5d606c55f7",
-          "Size": 21416448
+          "Sha256": "03c621297ffb5e634e42ccbae542e7435d237986ca527dc40bd91cd93e68b19a",
+          "Size": 23604224
         },
         {
           "Asset": "a0",

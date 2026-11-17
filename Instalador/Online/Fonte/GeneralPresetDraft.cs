@@ -110,7 +110,7 @@ internal sealed partial class GeneralModWindow {
         if(presetSettings==null)return;bool available=!working&&!scanning&&(p2p==null||!p2p.Installing);
         bool valid=ActivePreset==null||!String.IsNullOrWhiteSpace(draftName)&&draftName.Length<=120&&!draftName.Any(Char.IsControl);
         presetSettings.Enabled=available&&valid&&(projectDraft!=null||(ActivePreset==null?marked.Any():DraftNameChanged||DraftSelectionChanged));
-        if(deletePreset!=null)deletePreset.Enabled=available&&ActivePreset!=null;
+        if(deletePreset!=null)deletePreset.Enabled=available&&state.List.Presets.Count>1;
         if(clearFilters!=null)clearFilters.Enabled=available&&associationChoice==null&&HasListFilters;
     }
     bool ConfirmPresetNavigation(){

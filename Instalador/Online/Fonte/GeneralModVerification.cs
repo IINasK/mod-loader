@@ -258,7 +258,7 @@ internal sealed partial class GeneralModWindow {
             !observedScopes.Contains(scope(file.Path))&&!ambiguous.Contains(file.Path));
         foreach(var pair in associated.Where(item=>names.ContainsKey(item.Value)&&!labels.ContainsKey(item.Key)&&!ambiguous.Contains(item.Key)&&
             !observedScopes.Contains(scope(item.Key))))
-            extras.Add(new P2PSyncDifference{Kind="associated",Mod=names[pair.Value],ModId=pair.Value,Path=pair.Key});
+            extras.Add(new P2PSyncDifference{Kind="associated",Mod=names[pair.Value],ModId=pair.Value,Path=pair.Key,LocalInModFolder=true});
         var recordedFiles=RecordedInventory(destination,recorded,readHash).ToArray();
         extras.AddRange(recordedFiles);
         if(!cyberpunk){

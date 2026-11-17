@@ -83,8 +83,7 @@ internal sealed partial class GeneralModWindow : Form {
         }
         if(String.IsNullOrWhiteSpace(state.DownloadFolder))state.DownloadFolder=OnlineDownloadWatch.DefaultFolder();
         if(!testMode)this.cache=new DownloadCache(Path.Combine(data,"Cache"),()=>state.DownloadFolder,cache.Root);
-        if(state.SelectedPreset==null&&state.List.Presets.Any(p=>p.Id=="all"))state.SelectedPreset="all";
-        GeneralPresetProfiles.Initialize(state);GeneralPresetProfiles.Project(state);
+        GeneralPresetProfiles.Project(state);
         Text=GeneralAppPaths.WindowTitle;Icon=ModLoaderBrand.AppIcon;ClientSize=new Size(1240,820);MinimumSize=new Size(1000,680);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
         BuildInterface();
         FormClosing+=CloseModWindow;
@@ -95,7 +94,7 @@ internal sealed partial class GeneralModWindow : Form {
 #if !VELOPACK
             CheckUpdatesOnStartup();
 #endif
-            await RecoverPresetOnOpen();ReadPresetPresentation();await Scan();if(!IsDisposed)RenderPresetResult();if(!IsDisposed&&!exitApproved)await ResumeP2P();
+            await RecoverPresetOnOpen();ReadPresetPresentation();await Scan();if(!IsDisposed){AdoptReceivedPreset();RenderPresetResult();}if(!IsDisposed&&!exitApproved)await ResumeP2P();
         };
     }
     bool exitApproved,waitingToExit;
@@ -193,6 +192,7 @@ internal sealed partial class GeneralModWindow : Form {
         });
         summary.Controls.Add(temporary);
         AddUpdateNotice(summary);
+        AddModUpdateNotice(summary);
         var tableHeading=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=6,Height=52,Margin=Padding.Empty,Padding=new Padding(14,4,0,4),BackColor=GeneralStyle.Surface};
         tableHeading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));for(int i=1;i<tableHeading.ColumnCount;i++)tableHeading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         tableName=new TextBox{Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,Font=GeneralStyle.Font(16,true),MaxLength=120,Margin=new Padding(0,8,12,0),BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground};
@@ -412,8 +412,14 @@ internal sealed partial class GeneralModWindow : Form {
         RebuildPresets();
         preset.SelectedIndexChanged+=(s,e)=>{
             if(drawing)return;
-            string requested=preset.SelectedIndex>0?state.List.Presets[preset.SelectedIndex-1].Id:null;
-            if(ConfirmPresetNavigation()){
+            int index=preset.SelectedIndex;
+            if(index==state.List.Presets.Count){
+                RebuildPresets();
+                if(ConfirmPresetNavigation())SavePresetSelection(true);
+                return;
+            }
+            if(index>=0&&index<state.List.Presets.Count&&ConfirmPresetNavigation()){
+                string requested=state.List.Presets[index].Id;
                 if(state.SelectedPreset!=requested)coverageFilter=null;
                 GeneralPresetProfiles.Switch(state,requested);pendingVersion=null;CapturePresetDraft();Guard(Persist);
             }
@@ -495,8 +501,10 @@ internal sealed partial class GeneralModWindow : Form {
     void Persist(){GeneralPresetProfiles.Capture(state);library.Save(CommittedProject());startupIssue=null;}
     string UncatName(){return state.List.UncategorizedName=="Sem categoria"?T("Sem categoria","Uncategorized"):state.List.UncategorizedName;}
     void RebuildPresets(){
-        drawing=true;preset.Items.Clear();preset.Items.Add(T("Todos os itens","All items"));preset.Items.AddRange(state.List.Presets.Select(p=>p.Name).Cast<object>().ToArray());
-        int selected=state.List.Presets.FindIndex(p=>p.Id==state.SelectedPreset);preset.SelectedIndex=selected+1;drawing=false;UpdateTableTitle();DrawRows();
+        if(ActivePreset==null)GeneralPresetProfiles.Project(state);
+        drawing=true;preset.Items.Clear();preset.Items.AddRange(state.List.Presets.Select(p=>p.Name).Cast<object>().ToArray());
+        preset.Items.Add(T("Novo preset…","New preset…"));
+        preset.SelectedIndex=state.List.Presets.FindIndex(p=>p.Id==state.SelectedPreset);drawing=false;UpdateTableTitle();DrawRows();
     }
     List<GeneralModEntry> VisibleMods(){
         if(associationChoice!=null)
@@ -1113,7 +1121,7 @@ internal sealed partial class GeneralModWindow : Form {
         FinishProjectEdit();
         DrawRows();
         if(dialog.InstallRequested||moved.Value)SaveProjectEdits();
-        if(dialog.InstallRequested&&!NeedsPresetLoad)ConfirmUrgentInstall(state.List.Mods.Single(entry=>entry.Id==(selected==null?dialog.SelectedVariant:selected.Entry.Id)),dialog.SelectedVariant);
+        if(dialog.InstallRequested)await ConfirmUrgentInstall(state.List.Mods.Single(entry=>entry.Id==(selected==null?dialog.SelectedVariant:selected.Entry.Id)),dialog.SelectedVariant);
         else await Scan();
         return true;
     }
@@ -1180,7 +1188,7 @@ internal sealed partial class GeneralModWindow : Form {
                 GeneralPresetProfiles.Edit(state,item,dialog.Result,dialog.SelectedVariant,scope.Value,existing?dialog.ChangedPresetIds:dialog.PresetIds,selected.Id);
                 FinishProjectEdit();DrawRows();
                 if(fromInventory||moved.Value)SaveProjectEdits();
-                if(dialog.InstallRequested){SaveProjectEdits();if(!NeedsPresetLoad)ConfirmUrgentInstall(state.List.Mods.Single(m=>m.Id==dialog.Result.Id));}
+                if(dialog.InstallRequested){SaveProjectEdits();await ConfirmUrgentInstall(state.List.Mods.Single(m=>m.Id==dialog.Result.Id));}
                 else if(!working&&needsScan)await Scan();
             }
         }catch(Exception ex){ShowError(ex);}
@@ -1387,7 +1395,7 @@ internal sealed partial class GeneralModWindow : Form {
                         association = file;
                     } else {
                         ApplyEdited(added, editor.Result, editor.SelectedVariant, false, editor.NewCategories);
-                        if (editor.InstallRequested) ConfirmUrgentInstall(editor.Result);
+                        if (editor.InstallRequested) await ConfirmUrgentInstall(editor.Result);
                     }
                 }
             }

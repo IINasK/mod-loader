@@ -29,6 +29,7 @@ internal sealed partial class GeneralModWindow {
         var three=NewEntry("Outro mod",archive);three.Category="Principal";three.Nsfw=true;three.Description="Descrição opcional de exemplo";
         var list=new GeneralModList{Categories=new List<string>{"Principal","Veículos"},Mods=new List<GeneralModEntry>{one,two,three}};
         list.CategoryDescriptions["Principal"]="Componentes que o criador deste pack considera essenciais.";
+        list.Presets.Add(new GeneralModPreset{Id=GeneralPresetProfiles.DefaultPresetId,Name="Preset padrão",ModIds=list.Mods.Select(mod=>mod.Id).ToList(),Categories=list.Categories.ToList()});
         list.Presets.Add(new GeneralModPreset{Id="example",Name="Preset de exemplo",ModIds=new List<string>{two.Id}});
         var saved=new GeneralModState{List=list,Destination=target,DownloadFolder=root};
         var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
@@ -175,7 +176,7 @@ internal sealed partial class GeneralModWindow {
             }
             form.marked.Clear();
             var dependency=form.CreateDependency(new GeneralNexusRequirement{Name="Dependência teste",
-                Source=new GeneralNexusLink{Game="cyberpunk2077",Mod=8000},MinFile=123},null);
+                Source=new GeneralNexusLink{Game="cyberpunk2077",Mod=8000},MinFile=123},form.ActivePreset);
             form.DrawRows();
             var dependencyRow=form.ModRows().Single(row=>Equals(row.Tag,dependency.Id));
             check(Equals(dependencyRow.Cells["Status"].Value,"Escolher versão")&&Equals(dependencyRow.Cells["Size"].Value,"")&&
@@ -193,6 +194,7 @@ internal sealed partial class GeneralModWindow {
             check(!GeneralModLibrary.NeedsDependencyVersion(dependency,dependency.Variants[0]),"O arquivo explícito da origem libera a ação normal.");
             form.grid.CurrentCell=null;
             form.state.List.Mods.Remove(dependency);
+            form.ActivePreset.ModIds.Remove(dependency.Id);
             form.state.List.Categories.Remove(DependencyCategory);
             form.DrawRows();
             await TestDependencyPicking(form,one,two,three,root,check);
@@ -227,7 +229,8 @@ internal sealed partial class GeneralModWindow {
             form.categoryFilters=null;
             await TestPrimaryActions(form,one,two,archive,root,check);
             form.state.Theme="dark";form.state.Language="en";form.Persist();form.BuildInterface();form.ClientSize=new Size(1100,760);form.PerformLayout();Application.DoEvents();
-            check(form.grid.Columns["Status"].HeaderText=="Status"&&form.preset.Items[0].ToString()=="All items","Idioma inglês alcança a tabela e os filtros.");
+            check(form.grid.Columns["Status"].HeaderText=="Status"&&form.preset.Items.Count==3&&form.preset.Items[0].ToString()=="Preset padrão"&&
+                form.preset.Items[2].ToString()=="New preset…","Idioma inglês alcança a tabela e preserva os nomes dos presets.");
             check(form.BackColor==GeneralStyle.Background&&GeneralStyle.Dark,"Tema escuro atualiza toda a janela.");
             check(GeneralStyle.Status("Instalado")=="Installed"&&GeneralStyle.Status("Pulado")=="Skipped","Estados têm rótulos em inglês.");
             check(!form.next.Visible,"Pular fica oculto em repouso após trocar tema e idioma.");
@@ -368,11 +371,14 @@ internal sealed partial class GeneralModWindow {
 
     static async Task TestPrimaryActions(GeneralModWindow form,GeneralModEntry first,GeneralModEntry second,
         string archive,string root,Action<bool,string> check){
+        first=form.state.List.Mods.Single(mod=>mod.Id==first.Id);
+        second=form.state.List.Mods.Single(mod=>mod.Id==second.Id);
         form.state.List.Mods.Add(NewEntry("Download pendente","https://example.test/missing.zip"));
         var remote=form.state.List.Mods.Last();
         var replacement=NewEntry("Alternativa local",TestZip(root,"alternative.zip","mods/test.txt","alternative"));
         GeneralModLibrary.AssociateAlternative(replacement,first);
         form.state.List.Mods.Add(replacement);
+        form.ActivePreset.ModIds.AddRange(new[]{remote.Id,replacement.Id});
         var original=form.MakeWork(first);
         var incoming=form.MakeWork(replacement);
         string target=Path.Combine(form.state.Destination,"mods","test.txt");
@@ -417,6 +423,7 @@ internal sealed partial class GeneralModWindow {
             "Desinstalar a variante desabilitada apaga só seu cache e mantém a variante ativa e o download original.");
         form.RemoveManagedWorks(new List<Work>{original},form.state.Destination,new HashSet<string>());
         form.state.List.Mods.RemoveAll(item=>item.Id==remote.Id||item.Id==replacement.Id);
+        form.ActivePreset.ModIds.RemoveAll(id=>id==remote.Id||id==replacement.Id);
         first.AlternativeGroup=null;
         form.marked.Clear();
         form.DrawRows();
@@ -436,6 +443,7 @@ internal sealed partial class GeneralModWindow {
         mod.Variants.Add(new GeneralModVariant{Id="broken",Name="Versão inválida",Sources=new List<string>{invalid}});
         var sibling=NewEntry("Próximo item da categoria",original);
         form.state.List.Mods.AddRange(new[]{mod,sibling});
+        form.ActivePreset.ModIds.AddRange(new[]{mod.Id,sibling.Id});
         var first=form.MakeWork(mod);
         form.Generic(game).Install(original,first.Receipt(0),null);
         await form.Scan();
@@ -479,6 +487,7 @@ internal sealed partial class GeneralModWindow {
         form.BuildInterface();
         form.RebuildPresets();
         form.state.List.Mods.Remove(sibling);
+        form.ActivePreset.ModIds.Remove(sibling.Id);
         form.DrawRows();
         check(children().All(row=>row.Cells["CategoryIndent"].Tag==null),
             "A última gaveta da categoria termina no próprio item principal.");
@@ -518,6 +527,7 @@ internal sealed partial class GeneralModWindow {
         form.RemoveManagedWorks(new List<Work>{first,second},game,new HashSet<string>(store.Read().Keys));
         store.Discard(new[]{second.Key});
         form.state.List.Mods.Remove(mod);
+        form.ActivePreset.ModIds.Remove(mod.Id);
         form.pendingVersion=null;
         form.DrawRows();
     }

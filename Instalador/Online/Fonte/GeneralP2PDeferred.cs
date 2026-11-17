@@ -28,7 +28,7 @@ internal sealed partial class P2PService {
         if(chosen.Length==0||chosen.Any(id=>!state.List.Mods.Any(m=>m.Id==id)))throw new IOException("Escolha um preset com mods para compartilhar.");
         byte[] key=new byte[32];using(var random=RandomNumberGenerator.Create())random.GetBytes(key);
         var preset=exportAllPresets?null:state.List.Presets.FirstOrDefault(p=>p.Id==(exportPreset??state.SelectedPreset));
-        var session=new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Sender=true,Mode="installed-zip",Deferred=true,Automatic=true,Lifecycle=lifecycle,CompareBeforePack=compareBeforePack,Destination=state.Destination,Hash=Safe.Hex(key),Name=preset==null?"Pacote instalado":preset.Name,SelectedMods=chosen,ExportPreset=exportPreset,ExportAllPresets=exportAllPresets};
+        var session=new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Sender=true,Mode="installed-zip",Deferred=true,Automatic=true,Lifecycle=lifecycle,CompareBeforePack=compareBeforePack,Destination=state.Destination,Hash=Safe.Hex(key),Name=preset==null?"Pacote instalado":preset.Name,SelectedMods=chosen,ExportPreset=exportAllPresets?state.SelectedPreset:exportPreset,ExportAllPresets=exportAllPresets};
         if(compareBeforePack){
             session.OfferSource=Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(state));
             session.OfferSource.TemplateId=state.TemplateId;session.OfferSource.ProjectName=state.ProjectName;
@@ -82,15 +82,15 @@ internal sealed partial class P2PService {
                     InstalledSnapshot.Write(part,state.Destination,plan,report,checkpoint,progress);
                 }
                 checkpoint();
-                string hash=Safe.Hash(part);
+                string hash=SnapshotVerification.Hash(part,checkpoint);
                 lock(Sessions){session.PayloadHash=hash;session.Size=new FileInfo(part).Length;Save();}
                 preparedHere=true;
             }
             if(!File.Exists(zip)&&File.Exists(part)){
-                if(new FileInfo(part).Length!=session.Size||!preparedHere&&Safe.Hash(part)!=session.PayloadHash)
+                if(new FileInfo(part).Length!=session.Size||!preparedHere&&SnapshotVerification.Hash(part,checkpoint)!=session.PayloadHash)
                     throw new IOException("Preparação interrompida divergente; preservada.");
                 File.Move(part,zip);
-            }else if(!File.Exists(zip)||new FileInfo(zip).Length!=session.Size||Safe.Hash(zip)!=session.PayloadHash)
+            }else if(!File.Exists(zip)||new FileInfo(zip).Length!=session.Size||SnapshotVerification.Hash(zip,checkpoint)!=session.PayloadHash)
                 throw new IOException("O pacote preparado foi alterado ou removido. Preserve os registros.");
             lock(session){
                 if(session.Discarded)throw new OperationCanceledException();
@@ -131,7 +131,13 @@ internal sealed partial class P2PService {
         if(presetId==null&&!exportAllPresets)return state;
         var copy=Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(state));
         copy.TemplateId=state.TemplateId;copy.ProjectName=state.ProjectName;
-        if(exportAllPresets){copy.SelectedPreset=null;return copy;}
+        if(exportAllPresets){
+            if(presetId!=null&&copy.SelectedPreset!=presetId){
+                if(!copy.List.Presets.Any(item=>item.Id==presetId))throw new IOException("O preset escolhido para este envio não existe mais.");
+                GeneralPresetProfiles.Switch(copy,presetId);
+            }
+            return copy;
+        }
         copy.TemplateSubset=copy.TemplateId!=null;
         var preset=copy.List.Presets.SingleOrDefault(item=>item.Id==presetId);
         if(preset==null)throw new IOException("O preset escolhido para este envio não existe mais.");

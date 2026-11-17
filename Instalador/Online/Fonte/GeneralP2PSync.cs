@@ -178,22 +178,32 @@ internal sealed partial class P2PService {
 
         var missing=new HashSet<string>(StringComparer.Ordinal);
         var different=new HashSet<string>(StringComparer.Ordinal);
-        int done=0;
-        foreach(var file in preview.Files){
-            if(disposed||session.Discarded)throw new OperationCanceledException();
-            if(report!=null)report(done,preview.Files.Count,file.Path);
-            done++;
+        int done=0;object progressGate=new object();
+        if(report!=null&&preview.Files.Count>0)report(0,preview.Files.Count,null);
+        var fileStates=SnapshotVerification.Map(preview.Files,(file,poll)=>{
+            int status=0;
+            try{
             string path;
             try{path=GeneralInstallRoutes.Resolve(destination,file.Path);}
-            catch(DirectoryNotFoundException){missing.UnionWith(file.Owners);continue;}
+            catch(DirectoryNotFoundException){return 1;}
             if(File.Exists(path)){
                 bool matching;
-                try{matching=new FileInfo(path).Length==file.Size&&Safe.Hash(path)==file.Sha256;}
+                try{matching=SnapshotVerification.Matches(path,file.Size,file.Sha256,poll);}
                 catch(IOException){matching=false;}
                 catch(UnauthorizedAccessException){matching=false;}
-                if(!matching)different.UnionWith(file.Owners);
-            }else if(Directory.Exists(path))different.UnionWith(file.Owners);
-            else missing.UnionWith(file.Owners);
+                if(!matching)status=2;
+            }else if(Directory.Exists(path))status=2;
+            else status=1;
+            return status;
+            }finally{
+                lock(progressGate){done++;if(report!=null&&done<preview.Files.Count)report(done,preview.Files.Count,file.Path);}
+            }
+        },()=>{
+            if(disposed||session.Discarded)throw new OperationCanceledException();
+        });
+        for(int index=0;index<preview.Files.Count;index++){
+            if(fileStates[index]==1)missing.UnionWith(preview.Files[index].Owners);
+            else if(fileStates[index]==2)different.UnionWith(preview.Files[index].Owners);
         }
         if(report!=null)report(preview.Files.Count,preview.Files.Count,null);
         var absentNames=new List<string>();

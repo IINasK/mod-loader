@@ -12,7 +12,7 @@ internal sealed class ModFileAnchor {
 internal static class InstalledFileOwnership {
     static readonly StringComparer Paths=StringComparer.OrdinalIgnoreCase;
     static readonly HashSet<string> DataExtensions=new HashSet<string>(
-        new[]{".json",".jsonc",".ini",".cfg",".conf",".toml",".txt",".log",".db",".sqlite",".sqlite3",".bak",".preset",".png"},Paths);
+        new[]{".json",".jsonc",".ini",".cfg",".conf",".toml",".txt",".log",".db",".sqlite",".sqlite3",".bak",".preset",".png",".sav",".cache"},Paths);
 
     internal static bool Companion(string path) {
         string name=Path.GetFileName(path);
@@ -22,8 +22,8 @@ internal static class InstalledFileOwnership {
 
     internal static bool PrivateState(string path) {
         string extension=Path.GetExtension(path);
-        return Paths.Equals(extension,".sqlite3")||Paths.Equals(extension,".preset")||
-            path.Split('/').Any(part=>Paths.Equals(part,"saves-archive"));
+        return Paths.Equals(extension,".sqlite3")||Paths.Equals(extension,".preset")||Paths.Equals(extension,".sav")||
+            path.Replace('\\','/').Split('/').Any(part=>Paths.Equals(part,"saves-archive")||Paths.Equals(part,"saves")||Paths.Equals(part,"savegames"));
     }
 
     internal static string GenericScope(string path) {
@@ -63,8 +63,10 @@ internal static class InstalledFileOwnership {
 
     static bool Matches(string root,ModFileAnchor anchor) {
         if(!FixedData.HashValid(anchor.Hash))return false;
-        string path=Safe.In(root,anchor.Path);Safe.NoLinks(path);
-        return File.Exists(path)&&Safe.Hash(path)==anchor.Hash;
+        try {
+            string path=Safe.In(root,anchor.Path);Safe.NoLinks(path);
+            return File.Exists(path)&&Safe.Hash(path)==anchor.Hash;
+        }catch(IOException){return false;}catch(UnauthorizedAccessException){return false;}
     }
 
     internal static IEnumerable<string> Walk(string root,IEnumerable<string> scopes) {
@@ -75,7 +77,11 @@ internal static class InstalledFileOwnership {
             string dir=pending.Pop();
             if(!visited.Add(dir))continue;
             Safe.NoLinks(dir);
-            foreach(string path in Directory.EnumerateFileSystemEntries(dir)) {
+            if(!Directory.Exists(dir))continue;
+            using(var children=Directory.EnumerateFileSystemEntries(dir).GetEnumerator())while(true) {
+                string path;
+                try{if(!children.MoveNext())break;path=children.Current;}
+                catch(DirectoryNotFoundException){break;}
                 if(++files>20000)throw new IOException("Há arquivos demais nas pastas de mods para conferir.");
                 Safe.NoLinks(path);
                 if(Directory.Exists(path))pending.Push(path);

@@ -22,21 +22,22 @@ internal sealed partial class GeneralModWindow {
         var b=NewEntry("Nissan GTR","https://example.com/b.zip");b.Category="Veículos";b.Variants[0].Name="Principal";
         var c=NewEntry("Radio Ext","https://example.com/c.zip");c.Category="Principal";
         var list=new GeneralModList{Categories=new List<string>{a.Category,b.Category,c.Category},Mods=new List<GeneralModEntry>{a,b,c}};
+        list.Presets.Add(new GeneralModPreset{Id="full",Name="Kit completo",ModIds=list.Mods.Select(mod=>mod.Id).ToList()});
         list.Presets.Add(new GeneralModPreset{Id="kit",Name="Meu kit",ModIds=new List<string>{a.Id,b.Id}});
         var state=new GeneralModState{Destination=root,DownloadFolder=root,List=list};
         TestForm(FixedData.Load(),state,Path.Combine(root,"state"),root,async form=>{
             form.statuses[Key(a,form.Selected(a))]="Instalado";form.statuses[Key(b,form.Selected(b))]="Falhou";form.DrawRows();form.Persist();string original=Safe.Hash(Path.Combine(form.data,"lista.json"));string projectBefore=ModAuditTests.Canonical(Safe.Json.DeserializeObject(Safe.Json.Serialize(state.List)));
             form.marked.Add(b.Id);
             form.searchBox.Text="wlofcut feminina instalado";await Task.Delay(220);
-            check(form.VisibleMods().Single()==a,"The native search field combines name typo, variant and visible status.");
+            check(form.VisibleMods().Single().Id==a.Id,"The native search field combines name typo, variant and visible status.");
             check(original==Safe.Hash(Path.Combine(form.data,"lista.json")),"Typing a query does not save or replace the project.");
             check(form.ModRows().Count()==1&&form.marked.Contains(b.Id),"Filtering hides unmatched rows and preserves hidden checked items.");
             form.categoryFilters=new HashSet<string>{b.Category};form.DrawRows();check(form.VisibleMods().Count==0,"Search composes with category filters.");
             check(form.grid.Rows.Cast<DataGridViewRow>().Any(row=>row.Tag is SectionRow&&((SectionRow)row.Tag).Kind=="empty"),"No results has an explicit empty-state message.");
-            form.categoryFilters=null;form.searchBox.Text="falha";await Task.Delay(220);check(form.VisibleMods().Single()==b,"Search finds failed status.");
-            form.searchBox.Text="pendente";await Task.Delay(220);check(form.VisibleMods().Single()==c,"Search finds pending status.");
-            state.Language="en";form.BuildInterface();form.searchBox.Text="installed";await Task.Delay(220);check(form.VisibleMods().Single()==a,"Status is searchable in the active English language.");
-            form.searchBox.Text="principal";await Task.Delay(220);form.statusFilters=new HashSet<string>{"Failed"};form.DrawRows();check(form.VisibleMods().Single()==b,"Search composes with status and variant values.");
+            form.categoryFilters=null;form.searchBox.Text="falha";await Task.Delay(220);check(form.VisibleMods().Single().Id==b.Id,"Search finds failed status.");
+            form.searchBox.Text="pendente";await Task.Delay(220);check(form.VisibleMods().Single().Id==c.Id,"Search finds pending status.");
+            state.Language="en";form.BuildInterface();form.searchBox.Text="installed";await Task.Delay(220);check(form.VisibleMods().Single().Id==a.Id,"Status is searchable in the active English language.");
+            form.searchBox.Text="principal";await Task.Delay(220);form.statusFilters=new HashSet<string>{"Failed"};form.DrawRows();check(form.VisibleMods().Single().Id==b.Id,"Search composes with status and variant values.");
             form.statusFilters=null;form.searchBox.Text="feminina";await Task.Delay(220);form.preset.SelectedIndex=1;
             check(form.state.SelectedPreset=="kit"&&form.VisibleMods().Single().Id==a.Id,"Preset membership and search are combined.");
             form.searchBox.Text="radio";await Task.Delay(220);check(form.VisibleMods().Count==0,"Search never leaks items outside the current preset.");

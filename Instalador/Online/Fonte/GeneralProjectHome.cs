@@ -6,7 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-internal sealed class GeneralProjectHome : Form {
+internal sealed partial class GeneralProjectHome : Form {
     readonly FixedCatalog catalog;
     readonly DownloadCache cache;
     readonly GeneralProjectStore store;
@@ -36,6 +36,7 @@ internal sealed class GeneralProjectHome : Form {
         FormClosing+=CloseHome;
         Shown+=(s,e)=>RefreshStorageSize();
         if(!fixture)Shown+=async(s,e)=>await RestoreSharing();
+        if(!fixture)Shown+=async(s,e)=>await CheckHomeModVersions();
 #if !VELOPACK
         if(!fixture&&!GeneralAppPaths.IsDevelopment)Shown+=async(s,e)=>{available=await GeneralUpdateChecker.Session.CheckOnce();if(!IsDisposed)UpdateNotice();};
 #endif
@@ -55,6 +56,7 @@ internal sealed class GeneralProjectHome : Form {
         var brandTitle=new Label{Text="MOD LOADER",AutoSize=true,Font=GeneralStyle.Font(27,true),ForeColor=GeneralStyle.Accent,Margin=Padding.Empty};brand.Controls.Add(brandTitle);header.Controls.Add(brand,0,0);
         var menu=(GeneralButton)GeneralStyle.Button("",ToggleHomeMenu);menu.Name="HomeMenu";menu.Bare=true;menu.IconKind="menu";menu.AccessibleName=T("Menu","Menu");menu.Size=new Size(44,44);menu.AutoSize=false;menu.MinimumSize=new Size(44,44);menu.Dock=DockStyle.Fill;menu.Margin=Padding.Empty;header.Controls.Add(menu,1,0);layout.Controls.Add(header,0,0);
         var intro=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.TopDown,WrapContents=false,Margin=Padding.Empty};
+        AddHomeModVersionNotice(intro);
         intro.Controls.Add(new Label{Name="HomeIntro",Text=T("Criado por Nask e Codex. Se achou ruim, faz você.","Made by Nask and Codex. If you don't like it, make your own."),AutoSize=true,ForeColor=GeneralStyle.Muted,Margin=new Padding(0,10,0,4)});
         storageSize=new GeneralStorageLabel(cache){Name="HomeStorage",Text=T("Calculando espaço…","Calculating size…"),AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(0,0,0,18),MaximumSize=new Size(Math.Max(200,ClientSize.Width-68),0)};intro.Controls.Add(storageSize);layout.Controls.Add(intro,0,1);
         var actions=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=new Padding(0,0,0,22)};actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
@@ -406,7 +408,7 @@ internal sealed partial class GeneralModWindow {
         }
         if(action=="export"){
             using(var save=new SaveFileDialog{Filter=T("Projeto Mod Loader|*.json","Mod Loader project|*.json"),FileName=project==null?"projeto.json":String.Concat(project.Name.Where(c=>!Path.GetInvalidFileNameChars().Contains(c)))+".json"})
-                if(save.ShowDialog(this)==DialogResult.OK)library.Export(save.FileName,state.List);
+                if(save.ShowDialog(this)==DialogResult.OK)library.Export(save.FileName,state.List,state.SelectedPreset);
             return;
         }
         if(action=="delete-project"){

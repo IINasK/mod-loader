@@ -234,7 +234,10 @@ internal sealed partial class GeneralModWindow {
             check(storedBody.Variants.Single(variant => variant.Id == "default").Name.Contains("Natural (EBBN)") &&
                 storedBody.Variants.Single(variant => variant.Id == "with-refit-base").Name == "Meu refit",
                 "A opção Natural aparece em um projeto oficial antigo sem alterar nomes personalizados.");
-            form.preset.SelectedIndex=0;
+            var initialPreset=GeneralPresetProfiles.Copy(form.ActivePreset);
+            initialPreset.Id=GeneralPresetProfiles.DefaultPresetId;
+            form.state.List.Presets.Add(initialPreset);
+            GeneralPresetProfiles.Switch(form.state,initialPreset.Id);form.RebuildPresets();
             var bodyRows=form.VisibleMods().Where(IsBigBody).ToList();
             check(bodyRows.Count==1&&form.ModDisplayName(bodyRows[0])=="Big Body",
                 "A tabela mostra o Big Body em uma única linha.");

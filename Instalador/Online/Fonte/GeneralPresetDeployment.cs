@@ -12,6 +12,7 @@ internal sealed class PresetPackage {
     public List<DisabledModFile> Files=new List<DisabledModFile>();
     public bool Immutable;
     [System.Web.Script.Serialization.ScriptIgnore] internal bool VerifiedReceipt;
+    [System.Web.Script.Serialization.ScriptIgnore] internal bool OfficialNightCoop;
 }
 internal sealed class PresetDeploymentState {
     public string Preset,Fingerprint;
@@ -102,6 +103,14 @@ internal sealed class GeneralPresetDeployment {
             state.Active.RemoveAll(p=>p.ModId==package.ModId);state.Active.Add(package);Safe.WriteJson(stateFile,state);return true;
         }
     }
+    internal bool AdoptReceived(string preset,string fingerprint) {
+        using(Lock()) {
+            if(RecoveryPending)return false;
+            var state=Read();if(state.Preset!=null)return false;
+            state.Preset=preset;state.Fingerprint=fingerprint;
+            Safe.WriteJson(stateFile,state);return true;
+        }
+    }
     internal void RecordRemoval(IEnumerable<string> keys) {
         using(Lock()) {
             var state=Read();var removed=new HashSet<string>(keys,StringComparer.Ordinal);
@@ -171,9 +180,10 @@ internal sealed class GeneralPresetDeployment {
                 var proven=state.Active.FirstOrDefault(a=>a.Key==p.Key);
                 if(proven!=null)p.Files=GeneralPresetProfiles.Copy(proven.Files);
             }
-            // A newer bound receipt can supersede a stale baseline only when its recorded bytes still match.
-            foreach(var package in inventory.Where(p=>p.VerifiedReceipt&&p.Files.Count>0&&!cached.ContainsKey(p.StorageKey))){
+            // Rebase only from newer installation evidence or a pinned NightCoop upgrade.
+            foreach(var package in inventory.Where(p=>(p.VerifiedReceipt||p.OfficialNightCoop)&&p.Files.Count>0&&!cached.ContainsKey(p.StorageKey))){
                 var previous=state.Active.Where(p=>p.ModId==package.ModId).ToArray();
+                if(!package.VerifiedReceipt&&(previous.Length!=1||!NightCoopRelease.IsPresetUpgrade(previous[0],package)))continue;
                 if((previous.Length==0&&!state.Protected.ContainsKey(package.ModId))||
                     (previous.Length==1&&previous[0].Key==package.Key&&!state.Protected.ContainsKey(package.ModId)&&
                      previous[0].Files.Count==package.Files.Count&&previous[0].Files.Zip(package.Files,(old,next)=>
@@ -189,7 +199,7 @@ internal sealed class GeneralPresetDeployment {
                 state.Active.Add(package);
                 state.Protected.Remove(package.ModId);
             }
-            // Current bytes without a verified receipt never replace an existing baseline.
+            // The remaining packages cannot replace an existing baseline.
             var activeHashes=new Dictionary<string,HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             foreach(var package in state.Active)IndexHashes(activeHashes,package,Target);
             var candidates=inventory.Where(p=>p.Files.Count>0&&!cached.ContainsKey(p.StorageKey)).ToList();

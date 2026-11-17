@@ -34,7 +34,8 @@ internal sealed partial class GeneralModWindow {
             var restored=new GeneralModLibrary(Path.Combine(root,"state","lista.json")).Load();
             check(restored.List.Presets.Single(p=>p.Id==active.Id).Categories.SequenceEqual(new[]{"Minhas escolhas"}),"Categoria escolhida persiste após reabrir.");
             state.SelectedPreset="old";form.RebuildPresets();check(form.PresetCategories().SequenceEqual(new[]{"Lojas"}),"Trocar de preset não mostra a categoria vazia do outro.");
-            state.SelectedPreset=null;form.RebuildPresets();check(form.PresetCategories().Count()==5,"Todos os itens mantém acesso à organização completa.");
+            form.preset.SelectedIndex=-1;check(state.SelectedPreset=="old"&&form.preset.SelectedIndex==0,"Limpar o seletor mantém o preset selecionado.");
+            state.SelectedPreset=active.Id;form.RebuildPresets();
             GeneralModLibrary.DeleteCategory(list,"Minhas escolhas");form.DrawRows();check(active.Categories.Count==0&&added.Category==null&&active.ModIds.Contains(added.Id),"Excluir categoria limpa sua referência nos presets e preserva os mods.");
             foreach(bool dark in new[]{false,true}){
                 state.Theme=dark?"dark":"light";form.BuildInterface();form.PerformLayout();await Task.Delay(60);

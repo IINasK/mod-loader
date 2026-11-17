@@ -79,21 +79,19 @@ public sealed partial class FixedInstaller {
         string folder=Safe.In(Data,"importados");
         return Directory.Exists(folder)&&Directory.GetFiles(folder,"*.json").Select(ReadReceipt).Any(r=>r.Operation==LocalModPackage.ReceiptOperation&&r.Status=="instalado"&&r.Mods.Contains(id));
     }
-    internal List<InstalledSnapshotFile> ExportSnapshotImportedFiles(string id) {
+    internal List<InstalledSnapshotFile> ExportSnapshotImportedFiles(string id,Action checkpoint=null) {
         string folder=Safe.In(Data,"importados");
         if(!Directory.Exists(folder))throw new IOException("A instalação personalizada não tem recibo nesta pasta.");
         var receipt=Directory.GetFiles(folder,"*.json").Select(ReadReceipt)
             .Where(r=>r.Operation==LocalModPackage.ReceiptOperation && r.Status=="instalado" && r.Mods.Count==1 && r.Mods[0]==id)
             .OrderByDescending(r=>r.CreatedUtc).FirstOrDefault();
         if(receipt==null || receipt.Files.Count==0)throw new IOException("A instalação personalizada não tem recibo concluído.");
-        var result=new List<InstalledSnapshotFile>();
-        foreach(var file in receipt.Files) {
+        return SnapshotVerification.Map(receipt.Files,(file,poll)=>{
             string path=Safe.In(game,file.Path);
-            if(!file.Applied || file.Reverted || file.UndoStarted || !File.Exists(path) || Safe.Hash(path)!=file.After)
+            if(!file.Applied || file.Reverted || file.UndoStarted || !File.Exists(path) || SnapshotVerification.Hash(path,poll)!=file.After)
                 throw new IOException("O arquivo instalado está ausente ou alterado: "+file.Path);
-            result.Add(new InstalledSnapshotFile{Path=file.Path,Sha256=file.After,Size=new FileInfo(path).Length,Kind="file"});
-        }
-        return result;
+            return new InstalledSnapshotFile{Path=file.Path,Sha256=file.After,Size=new FileInfo(path).Length,Kind="file"};
+        },checkpoint).ToList();
     }
 }
 
@@ -107,18 +105,16 @@ public sealed partial class GeneralModInstaller {
         }
     }
     internal bool HasSnapshotRecord(string key){return ReadRecord(RecordPath(key))!=null;}
-    internal List<InstalledSnapshotFile> ExportSnapshotFiles(string key,List<GeneralInstallRoute> installRoutes=null) {
+    internal List<InstalledSnapshotFile> ExportSnapshotFiles(string key,List<GeneralInstallRoute> installRoutes=null,Action checkpoint=null) {
         Record record=ReadRecord(RecordPath(key));
         if(record==null)throw new IOException("O mod não tem recibo de instalação nesta pasta.");
         if(installRoutes!=null&&!GeneralInstallRoutes.Same(installRoutes,record.InstallRoutes))
             throw new IOException("O destino registrado é diferente do escolhido para a versão.");
-        var result=new List<InstalledSnapshotFile>();
-        foreach(var file in record.Files) {
+        return SnapshotVerification.Map(record.Files,(file,poll)=>{
             string path=Target(file.Path);
-            if(!Matches(path,file))throw new IOException("O arquivo instalado está ausente ou alterado: "+file.Path);
-            result.Add(new InstalledSnapshotFile{Path=file.Path,Sha256=file.Sha256,Size=file.Size,Kind="file"});
-        }
-        return result;
+            if(!SnapshotVerification.Matches(path,file.Size,file.Sha256,poll))throw new IOException("O arquivo instalado está ausente ou alterado: "+file.Path);
+            return new InstalledSnapshotFile{Path=file.Path,Sha256=file.Sha256,Size=file.Size,Kind="file"};
+        },checkpoint).ToList();
     }
 }
 

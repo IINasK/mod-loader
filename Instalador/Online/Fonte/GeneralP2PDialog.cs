@@ -346,8 +346,9 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         try{if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));}
         catch{output.Clear();throw;}
         var sessions=service.SnapshotSessions();
-        offer=sessions.LastOrDefault(s=>service.InvitationOpen(s)&&s.Deferred&&s.CompareBeforePack&&s.ExportPreset==preset&&
-            (preset!=null||s.ExportAllPresets||state.SelectedPreset==null)&&s.SelectedMods!=null&&
+        string packagePreset=preset??state.SelectedPreset;
+        offer=sessions.LastOrDefault(s=>service.InvitationOpen(s)&&s.Deferred&&s.CompareBeforePack&&s.ExportPreset==packagePreset&&
+            s.ExportAllPresets==(preset==null)&&s.SelectedMods!=null&&
             new HashSet<string>(s.SelectedMods,StringComparer.Ordinal).SetEquals(selected));
         if(offer==null){
             service.SetPreparationState(state);
@@ -826,11 +827,12 @@ internal sealed partial class GeneralModWindow {
         var saved=projectStore.Load(received);
         GeneralModLibrary.RestoreKnownMappings(saved.List,seed);
         state.List=saved.List;state.Destination=saved.Destination;state.SelectedPreset=saved.SelectedPreset;
+        state.BodyChoice=saved.BodyChoice;state.ReceivedPreset=saved.ReceivedPreset;
         state.ChosenVariants=saved.ChosenVariants;state.ResolvedDownloads=saved.ResolvedDownloads;
         state.CyberpunkImports=saved.CyberpunkImports;state.SnapshotReceipts=saved.SnapshotReceipts;
         marked.Clear();statuses.Clear();statusDetails.Clear();progress.Clear();
         ResetColumnFilters();CapturePresetDraft();RebuildPresets();
-        BeginInvoke((Action)(async()=>{if(!IsDisposed&&!working&&!scanning)await Scan();}));
+        BeginInvoke((Action)(async()=>{if(!IsDisposed&&!working&&!scanning){ReadPresetPresentation();await Scan();if(!IsDisposed)AdoptReceivedPreset();}}));
     }
 
     void PrepareP2P(){

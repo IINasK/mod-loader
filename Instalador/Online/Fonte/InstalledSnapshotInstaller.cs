@@ -302,18 +302,17 @@ public sealed partial class InstalledSnapshotInstaller {
         return expected;
     }
 
-    public List<InstalledSnapshotFile> ReadInstalledFiles(string receiptId, string workKey, bool includeConfigs=true, bool configsOnly=false) {
+    public List<InstalledSnapshotFile> ReadInstalledFiles(string receiptId, string workKey, bool includeConfigs=true, bool configsOnly=false,Action checkpoint=null) {
         var receipt = Read(receiptId);
         if (receipt == null || receipt.Status != "installed" || !receipt.ActiveOwners.Contains(workKey))
             throw new IOException("O mod não tem recibo de snapshot instalado nesta pasta.");
         var files = receipt.Manifest.Files.Where(f => f.Owners.Contains(workKey)&&
             (f.Kind=="file"?!configsOnly:includeConfigs)).ToList();
-        var exported = new List<InstalledSnapshotFile>();
-        foreach (var file in files) {
+        return SnapshotVerification.Map(files,(file,poll)=>{
             var change = receipt.Files.Single(f => f.Path.Equals(file.Path, StringComparison.OrdinalIgnoreCase));
             if (file.Kind == "file") {
-                if (!Matches(change)) throw new IOException("O arquivo instalado está ausente ou alterado: " + file.Path);
-                exported.Add(file);
+                if (!SnapshotVerification.Matches(Target(change.Path),change.Size,change.After,poll)) throw new IOException("O arquivo instalado está ausente ou alterado: " + file.Path);
+                return file;
             } else {
                 string target = Target(file.Path);
                 if (!File.Exists(target) || new FileInfo(target).Length > 1048576) throw new IOException("Configuração instalada ausente ou excessiva: " + file.Path);
@@ -321,11 +320,10 @@ public sealed partial class InstalledSnapshotInstaller {
                 string content = file.Kind == "json" ? InstalledSnapshotConfig.Json(current) : InstalledSnapshotConfig.Section(current, file.Section);
                 if (content == null) throw new IOException("Seção de configuração instalada ausente: " + file.Section);
                 byte[] bytes = Encoding.UTF8.GetBytes(content);
-                exported.Add(new InstalledSnapshotFile { Path = file.Path, Kind = file.Kind, Section = file.Section,
-                    Content = content, Size = bytes.LongLength, Sha256 = InstalledSnapshot.Hash(bytes), Owners = new List<string>(file.Owners) });
+                return new InstalledSnapshotFile { Path = file.Path, Kind = file.Kind, Section = file.Section,
+                    Content = content, Size = bytes.LongLength, Sha256 = InstalledSnapshot.Hash(bytes), Owners = new List<string>(file.Owners) };
             }
-        }
-        return exported;
+        },checkpoint).ToList();
     }
     string Resume(Receipt receipt,Action<string> report,Action checkpoint,Action<P2PInstallProgress> progress){
         if(receipt.Files.Count!=receipt.Manifest.Files.Select(f=>f.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count())throw new IOException("Preparação interrompida incompleta. Preserve o pacote e o recibo.");

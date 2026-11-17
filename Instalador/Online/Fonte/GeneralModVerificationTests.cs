@@ -123,6 +123,17 @@ internal sealed partial class GeneralModWindow {
             File.WriteAllText(installedPath,owner.Id);
             form.testVersionChoice=null;
 
+            string movedByUser=Path.Combine(root,"moved-by-user.archive");
+            File.Move(installedPath,movedByUser);
+            await form.Scan();
+            var movedWork=form.MakeWork(form.state.List.Mods.Single(entry=>entry.Id==owner.Id));
+            if(form.Status(movedWork,game)==GeneralModInstaller.Installed||!File.Exists(movedByUser)||File.Exists(installedPath))
+                throw new IOException("Mover um arquivo manualmente deve invalidar o estado instalado sem desfazer a movimentação do usuário.");
+            File.Move(movedByUser,installedPath);
+            await form.Scan();
+            if(form.Status(movedWork,game)!=GeneralModInstaller.Installed)
+                throw new IOException("Devolver o arquivo original deve restaurar o reconhecimento por conteúdo.");
+
             const string related="r6/scripts/manual-tattoo.reds";
             string relatedPath=Safe.In(game,related);
             Directory.CreateDirectory(Path.GetDirectoryName(relatedPath));

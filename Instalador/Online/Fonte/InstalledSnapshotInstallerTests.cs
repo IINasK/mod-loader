@@ -319,7 +319,7 @@ public static class InstalledSnapshotInstallerTests {
         var refreshed=store.Load(result);
         Check(result.Id==official.Id&&store.Read().Projects.Count==2&&Directory.GetDirectories(Safe.In(store.Root,"Projetos")).Length==2,
             "Receber o pacote oficial reutiliza o projeto e a pasta existentes, preservando o projeto personalizado.");
-        Check(refreshed.SelectedPreset=="no-pl"&&refreshed.List.Presets.Any(item=>item.Id=="all")&&
+        Check(refreshed.SelectedPreset=="no-pl"&&refreshed.ReceivedPreset=="no-pl"&&refreshed.List.Presets.Any(item=>item.Id=="all")&&
             refreshed.SnapshotReceipts[mod.Id+"/alternate"]==receipt&&refreshed.ChosenVariants[mod.Id]=="alternate"&&
             refreshed.List.Mods.Single(item=>item.Id==mod.Id).DefaultVariant=="default",
             "O projeto oficial preserva o outro preset e ativa a variante efetivamente instalada, mesmo quando o padrão da lista é diferente.");

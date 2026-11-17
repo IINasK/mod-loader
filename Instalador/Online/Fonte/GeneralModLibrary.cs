@@ -66,7 +66,7 @@ public sealed class GeneralModState {
     public string Destination, DownloadFolder;
     internal string TemplateId, ProjectName;
     internal bool TemplateSubset;
-    public string Theme = "light", Language = "pt", SelectedPreset, BodyChoice;
+    public string Theme = "light", Language = "pt", SelectedPreset, BodyChoice, ReceivedPreset;
     public GeneralModList List = new GeneralModList();
     public Dictionary<string, string> ChosenVariants = new Dictionary<string, string>();
     public Dictionary<string, string> ResolvedDownloads = new Dictionary<string, string>();
@@ -130,14 +130,14 @@ public sealed class GeneralModLibrary {
         Write(statePath, state);
     }
 
-    public void Export(string path, GeneralModList list) {
+    public void Export(string path, GeneralModList list, string selectedPreset = null) {
         ValidateList(list, true);
         ApplyAuditedAdultFlags(list);
         string fullPath = Path.GetFullPath(path);
         if (String.Equals(fullPath, statePath, StringComparison.OrdinalIgnoreCase))
             throw new IOException("Escolha outro nome para a lista exportada.");
         Write(fullPath, new {
-            list.Schema, list.Categories, list.CategoryDescriptions, Presets=list.Presets.Select(ExportPreset).ToList(), list.UncategorizedName, list.UncategorizedDescription, list.AlternativeGroups,
+            list.Schema, list.Categories, list.CategoryDescriptions, Presets=list.Presets.OrderByDescending(preset=>preset.Id==selectedPreset).Select(ExportPreset).ToList(), list.UncategorizedName, list.UncategorizedDescription, list.AlternativeGroups,
             Mods = list.Mods.Select(mod => new {
                 mod.Id, mod.Name, mod.Category, mod.DefaultVariant, mod.Description, mod.Tags, mod.CompatibilityGroups, mod.Nsfw, mod.NsfwOverride, mod.AlternativeGroup, mod.DependencySource, mod.DependencyFile,
                 Variants = mod.Variants.Select(ExportVariant).ToList()
@@ -282,9 +282,9 @@ public sealed class GeneralModLibrary {
             }
             foreach (var variant in entry.Variants) {
                 var original = trusted.Variants.FirstOrDefault(candidate => candidate.Id == variant.Id && candidate.Sources.SequenceEqual(variant.Sources, StringComparer.Ordinal));
-                if(original==null&&entry.Id=="NightCoop"&&variant.Sources.SequenceEqual(new[]{NightCoopRelease.PriorUrl})){
+                if(original==null&&entry.Id=="NightCoop"&&NightCoopRelease.IsPriorSource(variant.Sources)){
                     original=trusted.Variants.SingleOrDefault(candidate=>candidate.Id==variant.Id&&candidate.Sources.SequenceEqual(new[]{NightCoopRelease.Url}));
-                    if(original!=null)variant.Sources=original.Sources.ToList();
+                    if(original!=null){variant.Sources=original.Sources.ToList();variant.SourceInfo.Clear();}
                 }
                 if(original==null&&entry.Id==NightCityDensity.ModId&&variant.Id=="legacy-low")original=trusted.Variants.FirstOrDefault(candidate=>candidate.CyberpunkVariant=="medium"&&candidate.Sources.SequenceEqual(variant.Sources,StringComparer.Ordinal));
                 if (original == null) continue;
@@ -532,7 +532,8 @@ public sealed class GeneralModLibrary {
         if (state.Theme != "light" && state.Theme != "dark" && state.Theme != "light-red" && state.Theme != "black") throw new IOException("Tema inválido.");
         if (state.Language != "pt" && state.Language != "en") throw new IOException("Idioma inválido.");
         if (!String.IsNullOrEmpty(state.SelectedPreset) && !ValidId(state.SelectedPreset)) throw new IOException("Preset selecionado inválido.");
-        if (!state.List.Presets.Any(preset => preset.Id == state.SelectedPreset)) state.SelectedPreset = null;
+        GeneralPresetProfiles.EnsureSelection(state);
+        if (!state.List.Presets.Any(preset=>preset.Id==state.ReceivedPreset))state.ReceivedPreset=null;
         if (state.ChosenVariants == null) state.ChosenVariants = new Dictionary<string, string>();
         if (state.ResolvedDownloads == null) state.ResolvedDownloads = new Dictionary<string, string>();
         if (state.CyberpunkImports == null) state.CyberpunkImports = new Dictionary<string, string>();

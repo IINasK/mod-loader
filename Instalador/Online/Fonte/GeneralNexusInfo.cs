@@ -69,7 +69,7 @@ internal static partial class GeneralNexusInfo {
 
     static string TestKey() {
         // Personal keys are for local testing until the application is registered.
-        string key = Environment.GetEnvironmentVariable(ApiKeyVariable);
+        string key = NexusCredentials.Read();
         return String.IsNullOrWhiteSpace(key) || key.Length > 256 || key.Any(c => Char.IsControl(c) || Char.IsWhiteSpace(c)) ? null : key;
     }
 

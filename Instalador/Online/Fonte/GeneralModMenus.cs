@@ -23,7 +23,7 @@ internal sealed partial class GeneralModWindow {
         if(working||scanning||list==null||!ConfirmProjectNavigation())return false;
         if(state.List.Mods.Count!=0&&GeneralDialog.Message(this,T("Trocar a lista atual? Exporte primeiro se quiser guardar uma cópia. Os arquivos instalados permanecem no lugar.","Replace the current list? Export it first to keep a copy. Installed files will stay in place."),T("Trocar lista","Replace list"),MessageBoxButtons.OKCancel,MessageBoxIcon.Question)!=DialogResult.OK)return false;
         try{
-            GeneralModLibrary.RestoreKnownMappings(list,seed);state.List=list;state.SelectedPreset=list.Presets.FirstOrDefault()==null?null:list.Presets[0].Id;state.ChosenVariants.Clear();state.BodyChoice=null;state.AppliedPreset=null;state.AppliedPresetFingerprint=null;GeneralPresetProfiles.Initialize(state);GeneralPresetProfiles.Project(state);marked.Clear();statuses.Clear();statusDetails.Clear();progress.Clear();ResetColumnFilters();hasPresetDraft=false;
+            GeneralModLibrary.RestoreKnownMappings(list,seed);state.List=list;state.SelectedPreset=list.Presets.FirstOrDefault()==null?null:list.Presets[0].Id;state.ChosenVariants.Clear();state.BodyChoice=null;state.ReceivedPreset=null;state.AppliedPreset=null;state.AppliedPresetFingerprint=null;GeneralPresetProfiles.Project(state);marked.Clear();statuses.Clear();statusDetails.Clear();progress.Clear();ResetColumnFilters();hasPresetDraft=false;
             if(clearBindings){
                 foreach(string key in state.ResolvedDownloads.Keys.Where(key=>list.Mods.Any(mod=>key.StartsWith(mod.Id+"/",StringComparison.Ordinal))).ToArray())state.ResolvedDownloads.Remove(key);
                 foreach(string key in state.CyberpunkImports.Keys.Where(key=>list.Mods.Any(mod=>key.StartsWith(mod.Id+"/",StringComparison.Ordinal))).ToArray())state.CyberpunkImports.Remove(key);
@@ -32,9 +32,10 @@ internal sealed partial class GeneralModWindow {
             if(snapshotReceipt!=null){
                 var manifest=new InstalledSnapshotInstaller(newDestination??state.Destination,data,catalog,testMode).ReadManifest(snapshotReceipt);
                 GeneralProjectStore.BindReceivedVariants(state,manifest,snapshotReceipt);
+                state.ReceivedPreset=state.SelectedPreset;
             }
             if(newDestination!=null)state.Destination=newDestination;
-            Persist();RebuildPresets();await Scan();
+            Persist();RebuildPresets();ReadPresetPresentation();await Scan();if(!IsDisposed)AdoptReceivedPreset();
             OnlineDiagnostics.Record("project.list.replaced",null,"Lista importada.",new{Count=list.Mods.Count});
             return true;
         }catch(Exception ex){ShowError(ex);return false;}
@@ -54,9 +55,9 @@ internal sealed partial class GeneralModWindow {
         }catch(Exception ex){ShowError(ex);}
     }
     void DeletePreset(){
-        if(working||scanning)return;var item=state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);if(item==null)return;
+        if(working||scanning||state.List.Presets.Count<=1)return;var item=ActivePreset;if(item==null)return;
         if(GeneralDialog.Message(this,T("Excluir este preset? Os mods permanecem na lista.","Delete this preset? Mods will remain in the list.")+"\n"+item.Name,T("Excluir preset","Delete preset"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-        BeginProjectEdit();state.List.Presets.Remove(item);state.SelectedPreset=null;FinishProjectEdit();RebuildPresets();
+        BeginProjectEdit();state.List.Presets.Remove(item);GeneralPresetProfiles.Project(state);FinishProjectEdit();RebuildPresets();
     }
     void EditCategory(string category,bool create){
         if(working||scanning)return;
@@ -106,7 +107,7 @@ internal sealed partial class GeneralModWindow {
     }
     bool SetDestination(string destination){
         if(String.Equals(state.Destination??"",destination,StringComparison.OrdinalIgnoreCase))return false;
-        state.Destination=destination;state.AppliedPreset=null;state.AppliedPresetFingerprint=null;ReadPresetPresentation();
+        state.Destination=destination;state.ReceivedPreset=null;state.AppliedPreset=null;state.AppliedPresetFingerprint=null;ReadPresetPresentation();
         pendingVersion=null;
         gameInventory=new P2PSyncDifference[0];
         nexusManual.Clear();

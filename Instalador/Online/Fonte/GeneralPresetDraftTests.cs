@@ -11,7 +11,8 @@ internal sealed partial class GeneralModWindow {
         string root=OnlineTests.NestedRoot(parent,"preset-draft-");Directory.CreateDirectory(root);
         var a=NewEntry("Primeiro","https://example.com/a.zip");var b=NewEntry("Segundo","https://example.com/b.zip");
         var saved=new GeneralModPreset{Id="kit",Name="Original",ModIds=new List<string>{a.Id,b.Id}};
-        var state=new GeneralModState{Destination=root,DownloadFolder=root,SelectedPreset="kit",List=new GeneralModList{Mods=new List<GeneralModEntry>{a,b},Presets=new List<GeneralModPreset>{saved}}};
+        var spare=new GeneralModPreset{Id="spare",Name="Alternativo",ModIds=new List<string>{a.Id,b.Id}};
+        var state=new GeneralModState{Destination=root,DownloadFolder=root,SelectedPreset="kit",List=new GeneralModList{Mods=new List<GeneralModEntry>{a,b},Presets=new List<GeneralModPreset>{saved,spare}}};
         var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
         TestForm(FixedData.Load(),state,Path.Combine(root,"state"),root,async form=>{
             form.Persist();form.CapturePresetDraft();form.UpdateTableTitle();
@@ -22,10 +23,10 @@ internal sealed partial class GeneralModWindow {
             check(form.preset.IconOnly&&form.preset.Parent==form.tableName.Parent&&form.presetSettings.Parent==form.tableName.Parent&&form.mainLayout.GetControlFromPosition(0,2)==null,"Seletor e ações integrados ao título, sem a linha Preset duplicada.");
             check(!form.grid.Columns.Contains("ResetPreset"),"A lixeira antiga não fica duplicada no cabeçalho da tabela.");
             form.tableName.Text="Rascunho";form.marked.Add(a.Id);form.DrawRows();
-            check(form.ActivePreset.Name=="Original"&&form.library.Load().List.Presets.Single().Name=="Original"&&form.presetSettings.Enabled,"Nome digitado e seleção são rascunhos até salvar.");
+            check(form.ActivePreset.Name=="Original"&&form.library.Load().List.Presets.Single(p=>p.Id=="kit").Name=="Original"&&form.presetSettings.Enabled,"Nome digitado e seleção são rascunhos até salvar.");
             form.marked.Clear();form.DrawRows();
             form.tableName.Text="Renomeado";form.presetSettings.PerformClick();
-            check(form.ActivePreset.Name=="Renomeado"&&form.ActivePreset.ModIds.Count==2&&form.library.Load().List.Presets.Single().Name=="Renomeado","Salvar só o nome preserva os membros do preset.");
+            check(form.ActivePreset.Name=="Renomeado"&&form.ActivePreset.ModIds.Count==2&&form.library.Load().List.Presets.Single(p=>p.Id=="kit").Name=="Renomeado","Salvar só o nome preserva os membros do preset.");
             form.marked.Add(a.Id);form.DrawRows();form.presetSettings.PerformClick();
             check(form.ActivePreset.ModIds.SequenceEqual(new[]{a.Id})&&form.state.List.Mods.Count==2,"Disquete salva a seleção sem excluir mods da biblioteca.");
             form.marked.Add(b.Id);form.statusFilters=new HashSet<string>();form.DrawRows();form.presetSettings.PerformClick();
@@ -35,11 +36,12 @@ internal sealed partial class GeneralModWindow {
             using(var timer=new Timer{Interval=60}){
                 timer.Tick+=(s,e)=>{var dialog=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(item=>item.Text=="Excluir preset");if(dialog==null)return;timer.Stop();((Button)dialog.AcceptButton).PerformClick();};timer.Start();form.deletePreset.PerformClick();
             }
-            check(form.state.List.Presets.Count==0&&form.state.List.Mods.Count==2&&!form.deletePreset.Enabled,"Lixeira exclui somente o preset e fica desativada em Todos os itens.");
-            check(form.projectDraft!=null&&form.library.Load().List.Presets.Count==1,"Excluir o preset prepara o rascunho antes de gravar.");
+            check(form.state.List.Presets.Single().Id==form.state.SelectedPreset&&form.state.SelectedPreset=="spare"&&
+                form.state.List.Mods.Count==2&&!form.deletePreset.Enabled,"Excluir o preset seleciona outro e a lixeira desativa quando resta um só.");
+            check(form.projectDraft!=null&&form.library.Load().List.Presets.Count==2,"Excluir o preset prepara o rascunho antes de gravar.");
             form.presetSettings.PerformClick();
-            CompleteProjectName("Meu novo preset",()=>form.presetSettings.PerformClick());
-            check(form.ActivePreset!=null&&form.ActivePreset.Name=="Meu novo preset"&&form.ActivePreset.ModIds.SequenceEqual(new[]{a.Id}),"Disquete em Todos os itens cria preset a partir da seleção.");
+            CompleteProjectName("Meu novo preset",()=>form.preset.SelectedIndex=form.state.List.Presets.Count);
+            check(form.ActivePreset!=null&&form.ActivePreset.Name=="Meu novo preset"&&form.ActivePreset.ModIds.SequenceEqual(new[]{a.Id}),"A ação Novo preset cria e seleciona um preset com os itens marcados.");
             form.BeginProjectEdit();form.state.List.Mods.First().Tags.Add("tag rascunho");form.FinishProjectEdit();
             form.Persist();
             check(form.projectDraft!=null&&!form.library.Load().List.Mods.First().Tags.Contains("tag rascunho"),

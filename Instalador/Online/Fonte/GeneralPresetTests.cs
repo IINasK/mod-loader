@@ -290,6 +290,18 @@ internal sealed partial class GeneralModWindow {
             form.Generic(game).Install(archiveB,new Work{Entry=b,Variant=b.Variants[0]}.Receipt(0),null);
             await form.Scan();form.RefreshPrimaryAction();
             check(form.primaryAction.Text=="Carregar preset"&&form.NeedsPresetLoad,"Opening an unapplied preset offers Load preset instead of download.");
+            bool sawInstallPrompt=false;
+            using(var timer=new Timer{Interval=30}){
+                timer.Tick+=(sender,args)=>{
+                    var prompt=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(dialog=>dialog.Text=="Carregar preset");
+                    if(prompt==null)return;
+                    sawInstallPrompt=true;timer.Stop();prompt.CancelButton.PerformClick();
+                };
+                timer.Start();
+                await form.ConfirmUrgentInstall(a);
+            }
+            check(sawInstallPrompt&&form.NeedsPresetLoad&&File.Exists(Path.Combine(game,"mods/b.txt")),
+                "An install request offers to load the preset and cancelling leaves the previous files active.");
             check(form.preset.PopupAnchor==form.tableName,"The popup is anchored to the full preset name field.");
             var screen=Screen.PrimaryScreen.WorkingArea;
             var placements=new List<object>();
@@ -317,11 +329,22 @@ internal sealed partial class GeneralModWindow {
                 "The footer keeps the result after the list refresh.");
             check(File.Exists(Path.Combine(game,"mods/a.txt"))&&!File.Exists(Path.Combine(game,"mods/b.txt")),"The actual window loads the selected preset using generic installation receipts.");
             check(!form.NeedsPresetLoad&&form.state.AppliedPreset=="a","After loading, normal mod actions become available.");
-            form.preset.SelectedIndex=2;
+            form.preset.SelectedIndex=1;
             check(form.PresetWorks().Single().Entry.Id==b.Id,"The selected preset chooses exactly one alternative in a group.");check(form.NeedsPresetLoad&&File.Exists(Path.Combine(game,"mods/a.txt")),"Browsing another preset changes the button without moving files.");
-            await form.LoadPreset();
-            check(!File.Exists(Path.Combine(game,"mods/a.txt"))&&File.Exists(Path.Combine(game,"mods/b.txt")),"Loading another preset restores its compressed mod.");
-            form.preset.SelectedIndex=1;await form.LoadPreset();
+            using(var timer=new Timer{Interval=30}){
+                timer.Tick+=(sender,args)=>{
+                    var prompt=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(dialog=>dialog.Text=="Carregar preset");
+                    if(prompt==null)return;
+                    timer.Stop();AllControls(prompt).OfType<Button>().Single(button=>button.Text=="Carregar preset").PerformClick();
+                };
+                timer.Start();
+                await form.ConfirmUrgentInstall(form.state.List.Mods.Single(mod=>mod.Id==b.Id));
+            }
+            await Until(()=>!form.working);
+            check(!form.NeedsPresetLoad&&form.operationFinished==1&&
+                !File.Exists(Path.Combine(game,"mods/a.txt"))&&File.Exists(Path.Combine(game,"mods/b.txt")),
+                "Confirming loads the new preset, restores its compressed mod and continues the requested installation.");
+            form.preset.SelectedIndex=0;await form.LoadPreset();
             check(File.Exists(Path.Combine(game,"mods/a.txt"))&&!File.Exists(Path.Combine(game,"mods/b.txt")),"Returning to the previous preset restores its files.");
             using(var editor=new GeneralModEditor(a,new string[0],a.DefaultVariant,false,"")) {
                 editor.ConfigurePresets(form.state.List.Presets,"a",a.Id,true);
@@ -362,13 +385,40 @@ internal sealed partial class GeneralModWindow {
         });
         var reopened=new GeneralModLibrary(Path.Combine(data,"lista.json")).Load();
         TestForm(FixedData.Load(),reopened,data,root,async form=>{
-            form.preset.SelectedIndex=2;
+            form.preset.SelectedIndex=1;
             var retry=form.LoadPreset();
             form.next.PerformClick();
             await retry;
             check(form.state.AppliedPreset=="a"&&form.NeedsPresetLoad&&
                 File.Exists(Path.Combine(game,"mods/a.txt"))&&!File.Exists(Path.Combine(game,"mods/b.txt")),
                 "Reopening, starting another switch and cancelling again keeps the applied files and choice.");
+        });
+        var catalog=FixedData.Load();
+        var sourceState=new GeneralModLibrary(Path.Combine(data,"lista.json")).Load();
+        GeneralPresetProfiles.Switch(sourceState,"a");
+        sourceState.List.Presets.Reverse();
+        string pack=Path.Combine(root,"received.zip"),receiver=Directory.CreateDirectory(Path.Combine(root,"rg")).FullName;
+        string inbox=Path.Combine(root,"in");
+        File.WriteAllText(Path.Combine(receiver,".fixture-only"),"isolated test");
+        InstalledSnapshot.Create(pack,P2PService.ExportState(sourceState,null,new[]{a.Id},true),new[]{a.Id},catalog,data,false,null,true);
+        var installer=new InstalledSnapshotInstaller(receiver,inbox,catalog,true);
+        string receipt=installer.Install(pack,Safe.Hash(pack),null);
+        var projects=new GeneralProjectStore(Path.Combine(parent,"r-"+Guid.NewGuid().ToString("N").Substring(0,3)));
+        var exportLibrary=new GeneralModLibrary(Path.Combine(data,"lista.json"));
+        string listExport=Path.Combine(root,"received.modloader.json");
+        exportLibrary.Export(listExport,sourceState.List,sourceState.SelectedPreset);
+        var imported=projects.Create("Imported list",exportLibrary.Import(listExport),"light","pt");
+        check(projects.Load(imported).SelectedPreset=="a"&&sourceState.List.Presets[0].Id=="b",
+            "A definition export also makes the sender's selected preset the initial choice without rearranging local presets.");
+        var received=projects.CreateReceived(new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),Destination=receiver,ReceiptId=receipt},inbox,catalog);
+        string receivedData=projects.DataPath(received);
+        TestForm(catalog,projects.Load(received),receivedData,root,async form=>{
+            form.ReadPresetPresentation();await form.Scan();form.AdoptReceivedPreset();
+            check(form.state.SelectedPreset=="a"&&form.state.AppliedPreset=="a"&&!form.NeedsPresetLoad&&
+                form.preset.SelectedItem.ToString()=="Preset A"&&File.Exists(Path.Combine(receiver,"mods/a.txt")),
+                "The receiver opens the sender's selected preset and can use mod actions immediately after installation.");
+            check(new GeneralPresetDeployment(receiver,receivedData).Read().Fingerprint==form.PresetFingerprint,
+                "Reopening a received project retains the initial applied preset.");
         });
         Safe.WriteJson(Path.Combine(root,"ui-result.json"),new{Passed=true,Checks=passed});
     }

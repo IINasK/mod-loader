@@ -1,1 +1,1 @@
-internal static class OnlineIdentity { internal const string CatalogHash="752a5308dc455e3e083d29066ce170b60b0b7128a1217d92f2db05f6c2e3f702"; }
+internal static class OnlineIdentity { internal const string CatalogHash="556d4a0d5d4ddfd250e9c61aa612f769e94d51ac0f2fdf519ea7dbefdb2dd244"; }

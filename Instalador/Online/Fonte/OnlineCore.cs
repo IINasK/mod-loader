@@ -82,7 +82,7 @@ public static class FixedData {
         Expand(c,c.Packages.Select(x=>x.Id));
         string[] basePaths={"bin/x64/winmm.dll","red4ext/RED4ext.dll","red4ext/LICENSE.txt","red4ext/THIRD_PARTY_LICENSES.txt","red4ext/plugins/NightCoop/NightCoop.dll"};
         var nightCoop=c.Packages.SingleOrDefault(m=>m.Id=="NightCoop");
-        if(nightCoop!=null&&nightCoop.Version==NightCoopRelease.Version)
+        if(nightCoop!=null&&(nightCoop.Version==NightCoopRelease.Version||nightCoop.Version=="0.2.0-beta"))
             basePaths=basePaths.Concat(NightCoopRelease.AddedPaths).ToArray();
         if(!immutable.SetEquals(basePaths)||c.Packages.Any(x=>x.Immutable&&x.Id!="NightCoop"))
             throw new IOException("A base imutável diverge dos arquivos esperados para esta versão.");

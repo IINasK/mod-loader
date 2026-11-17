@@ -80,12 +80,14 @@ internal static class GeneralP2PLifecycleTests {
         var relay=Source(root,"friend","forwarded.txt","from friend",left,leftData);
         string thirdTarget=Target(root,"third");
         File.WriteAllText(Safe.In(left,"mods/shared.txt"),"original");
-        source.Item1.List.Presets.Add(new GeneralModPreset{Id="no-pl",Name="Sem DLC Phantom Liberty",ModIds=source.Item1.List.Mods.Select(m=>m.Id).ToList()});
         source.Item1.List.Presets.Add(new GeneralModPreset{Id="all",Name="Com DLC Phantom Liberty",ModIds=source.Item1.List.Mods.Select(m=>m.Id).ToList()});
+        source.Item1.List.Presets.Add(new GeneralModPreset{Id="no-pl",Name="Sem DLC Phantom Liberty",ModIds=source.Item1.List.Mods.Select(m=>m.Id).ToList()});
         source.Item1.SelectedPreset="no-pl";
         var all=P2PService.ExportState(source.Item1,null,source.Item1.List.Mods.Select(item=>item.Id).ToArray(),true);
-        Check(checks,all.SelectedPreset==null&&all.List.Presets.Count==2&&source.Item1.SelectedPreset=="no-pl",
-            "Exporting all presets keeps both and clears the single-preset label without editing the source.");
+        var exported=InstalledSnapshot.Inspect(all,all.List.Mods.Select(mod=>mod.Id),Catalog,source.Item2,false,true);
+        Check(checks,all.List.Presets.Count==2&&source.Item1.List.Presets[0].Id=="all"&&
+            exported.List.Presets[0].Id=="no-pl"&&exported.Project.Presets[0].Id=="no-pl",
+            "Exporting every preset puts the sender's selected preset first in both lists without reordering the source.");
         var gate=new ManualResetEventSlim();
         var host=Service(root,"host-peer",source.Item2,helper);
         var first=Service(root,"first-peer",leftData,helper);

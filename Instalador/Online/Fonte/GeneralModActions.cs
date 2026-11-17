@@ -86,18 +86,20 @@ internal sealed partial class GeneralModWindow {
         if(SameVersion(MakeWork(choice.Entry),choice)&&(choice.Entry.AlternativeGroup==null||
             (ActivePreset!=null?PresetWorks().Any(w=>w.Entry.Id==choice.Entry.Id):IsActiveAlternative(choice.Entry))))return;
         var scope=PresetEditScope(choice.Entry);if(!scope.HasValue)return;
-        GeneralPresetProfiles.Capture(state);
-        foreach(var p in state.List.Presets.Where(p=>p.ModIds.Contains(choice.Entry.Id)&&(scope.Value||p.Id==state.SelectedPreset))){
-            if(!p.Configurations[choice.Entry.Id].Variants.Any(v=>v.Id==choice.Variant.Id))continue;
-            p.VariantChoices[choice.Entry.Id]=choice.Variant.Id;
-            if(choice.Entry.AlternativeGroup!=null)p.AlternativeChoices[choice.Entry.AlternativeGroup]=choice.Entry.Id;
-            if(choice.BodyChoice!=null)p.BodyChoice=choice.BodyChoice;
+        if(!UnappliedDefaultPreset){
+            GeneralPresetProfiles.Capture(state);
+            foreach(var p in state.List.Presets.Where(p=>p.ModIds.Contains(choice.Entry.Id)&&(scope.Value||p.Id==state.SelectedPreset))){
+                if(!p.Configurations[choice.Entry.Id].Variants.Any(v=>v.Id==choice.Variant.Id))continue;
+                p.VariantChoices[choice.Entry.Id]=choice.Variant.Id;
+                if(choice.Entry.AlternativeGroup!=null)p.AlternativeChoices[choice.Entry.AlternativeGroup]=choice.Entry.Id;
+                if(choice.BodyChoice!=null)p.BodyChoice=choice.BodyChoice;
+            }
+            if(ActivePreset!=null){
+                state.ChosenVariants[choice.Entry.Id]=choice.Variant.Id;
+                if(choice.BodyChoice!=null)state.BodyChoice=choice.BodyChoice;
+            }
+            Persist();
         }
-        if(ActivePreset!=null){
-            state.ChosenVariants[choice.Entry.Id]=choice.Variant.Id;
-            if(choice.BodyChoice!=null)state.BodyChoice=choice.BodyChoice;
-        }
-        Persist();
         pendingVersion=choice;
         choice.SwitchAlternatives=true;
         choice.SaveVariant=true;

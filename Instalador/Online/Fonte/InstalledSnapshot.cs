@@ -135,16 +135,18 @@ public static partial class InstalledSnapshot {
             string snapshotId;
             if(variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(work,out snapshotId)&&
                 MatchesBodyReceipt(receivedEngine,mod,variant,snapshotId)){
-                files=receivedEngine.ReadInstalledFiles(snapshotId,work,includeConfigs);
+                files=receivedEngine.ReadInstalledFiles(snapshotId,work,includeConfigs,checkpoint:checkpoint);
             }
             else if(variant.CyberpunkId!=null) {
                 if(!cyberpunk)throw new IOException(mod.Name+": o destino não é Cyberpunk 2077.");
                 var recipe=FixedRecipe(catalog,variant);
                 var paths=GeneralInstallRoutes.FixedPaths(catalog,recipe,variant.InstallRoutes);
-                var invalid=recipe.Files.Where(file=>!file.UserData).Where(file=>{
+                var checkedFiles=recipe.Files.Where(file=>!file.UserData).ToList();
+                var matches=SnapshotVerification.Map(checkedFiles,(file,poll)=>{
                     string path=GeneralInstallRoutes.Resolve(root,paths[file.Path]);
-                    return !File.Exists(path)||new FileInfo(path).Length!=file.Size||Safe.Hash(path)!=file.Sha256;
-                }).Select(file=>paths[file.Path]).ToList();
+                    return SnapshotVerification.Matches(path,file.Size,file.Sha256,poll);
+                },checkpoint);
+                var invalid=checkedFiles.Where((file,fileIndex)=>!matches[fileIndex]).Select(file=>paths[file.Path]).ToList();
                 if(invalid.Count>0)throw new IOException("Arquivos ausentes ou alterados ("+invalid.Count+"): "+String.Join("; ",invalid.Take(30)));
                 foreach(var file in recipe.Files) {
                     if(file.UserData)continue;
@@ -157,7 +159,7 @@ public static partial class InstalledSnapshot {
                     return P2PPack.TrySlot(state.CyberpunkImports,mod,variant,sourceIndex,out id);
                 }))) {
                 var knownBody=seed.Mods.FirstOrDefault(item=>item.Id==mod.Id);
-                variant=ReadManualHyst(root,mod,knownBody,state.SelectedPreset!="no-pl",files,bodyChoice:state.BodyChoice);
+                variant=ReadManualHyst(root,mod,knownBody,state.SelectedPreset!="no-pl",files,path=>SnapshotVerification.Hash(path,checkpoint),state.BodyChoice);
                 if(fixedChoice&&(variant.Id!=expectedRecipe.Id||!GeneralModLibrary.SamePayload(variant,expectedRecipe)))
                     throw new IOException("A versão instalada difere da escolha do preset.");
                 work=Owner(mod,variant);
@@ -172,11 +174,11 @@ public static partial class InstalledSnapshot {
                             id=mod.Id.StartsWith("file-",StringComparison.Ordinal)?mod.Id:null;
                             if(id==null)throw new IOException(mod.Name+": recibo instalado não encontrado.");
                         }
-                        files.AddRange(fixedEngine.ExportSnapshotImportedFiles(id));
+                        files.AddRange(fixedEngine.ExportSnapshotImportedFiles(id,checkpoint));
                     }else{
                         string legacy=P2PPack.LegacySlot(mod,variant,i);
                         if(legacy!=null&&!genericEngine.HasSnapshotRecord(key))key=legacy;
-                        files.AddRange(genericEngine.ExportSnapshotFiles(key,variant.InstallRoutes));
+                        files.AddRange(genericEngine.ExportSnapshotFiles(key,variant.InstallRoutes,checkpoint));
                     }
                 }
             }
@@ -284,8 +286,8 @@ public static partial class InstalledSnapshot {
                         if(report!=null)report("Preparando "+file.Path);
                         string source=GeneralInstallRoutes.Resolve(root,file.Path,true);
                         using(var input=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read))
-                        using(var sha=SHA256.Create())
-                        using(var target=archive.CreateEntry(Entry(file),CompressionLevel.Fastest).Open()) {
+                        using(var sha=SnapshotVerification.Algorithm())
+                        using(var target=archive.CreateEntry(Entry(file),SnapshotVerification.CompressionFor(input,checkpoint)).Open()) {
                             ValidateCustomData(manifest,file,input);input.Position=0;
                             byte[] buffer=new byte[1024*1024];long total=0;int count;
                             while((count=input.Read(buffer,0,buffer.Length))>0){if(checkpoint!=null)checkpoint();total+=count;if(total>file.Size)throw new IOException("Arquivo mudou durante a exportação: "+file.Path);sha.TransformBlock(buffer,0,count,null,0);target.Write(buffer,0,count);done+=count;if(progress!=null)progress(done,expected);}

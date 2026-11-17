@@ -15,6 +15,7 @@ internal sealed partial class GeneralModWindow {
         string target=Path.Combine(root,"game");Directory.CreateDirectory(target);
         var a=NewEntry("Mod instalado","https://example.com/a.zip");var b=NewEntry("Mod pendente","https://example.com/b.zip");var c=NewEntry("Mod com erro","https://example.com/c.zip");var d=NewEntry("Download em andamento","https://example.com/d.zip");
         var list=new GeneralModList{Mods=new List<GeneralModEntry>{a,b,c,d}};list.Presets.Add(new GeneralModPreset{Id="test",Name="Kit teste",ModIds=new List<string>{a.Id,b.Id,c.Id,d.Id}});
+        list.Presets.Add(new GeneralModPreset{Id="second",Name="Outro kit",ModIds=new List<string>{a.Id,b.Id,c.Id,d.Id}});
         var state=new GeneralModState{List=list,Destination=target,DownloadFolder=root};
         var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
         check(!GeneralAttention.NeedsSound(42,42,false)&&GeneralAttention.NeedsSound(43,42,false)&&
