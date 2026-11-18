@@ -7,11 +7,82 @@ using System.Reflection;
 using System.Windows.Forms;
 
 internal static class GeneralTableDialogTests {
+    static void AuditLayouts(string root,Action<bool,string> check){
+        var mods=new[]{new GeneralModEntry{Id="one",Name="Mod de teste",Variants=new List<GeneralModVariant>{
+            new GeneralModVariant{Id="main",Name="Principal",Sources=new List<string>{"https://example.test/example.zip"}}
+        },DefaultVariant="main"}};
+        var preset=new GeneralModPreset{Id="kit",Name="Com DLC Phantom Liberty",ModIds=new List<string>{"one"}};
+        Directory.CreateDirectory(Path.Combine(root,".CoopModsOnline","backups"));
+        var examples=new Dictionary<string,Func<GeneralDialog>>{
+            {"name",()=>new GeneralNameDialog("Preset",preset.Name)},
+            {"folder",()=>new GeneralNameDialog("Criar pasta",preset.Name,chooseSelectionMode:true)},
+            {"described-name",()=>new GeneralNameDialog("Projeto","Nome do projeto","A cópia usa a mesma pasta do jogo.")},
+            {"filter",()=>new GeneralColumnFilterDialog("Mods",new[]{"Principal","Opcional"},withSearch:true)},
+            {"install",()=>new GeneralInstallConfirmation(root,1,new[]{"Mod de teste"})},
+            {"variants",()=>new GeneralModAlternativeDialog(mods)},
+            {"version-conflict",()=>new GeneralVersionChoiceDialog(new ModVersionDifference{Name=mods[0].Name,Current="1.0",Incoming="2.0"})},
+            {"category",()=>new GeneralCategoryDetails("Jogabilidade","Descrição",canDelete:true)},
+            {"categories",()=>new GeneralCategoryEditor(new[]{"Jogabilidade","Núcleo"})},
+            {"preset",()=>new GeneralPresetEditor(preset,mods,preset.ModIds)},
+            {"switch",()=>new SwitchPerformanceDialog(new SwitchPerformance())},
+            {"options-home",()=>new GeneralOptionsDialog("dark","pt",root)},
+            {"options-project",()=>new GeneralOptionsDialog("dark","pt",root,()=>null,root,_=>null)},
+            {"nexus",()=>new GeneralNexusConnectionDialog(_=>{},_=>System.Threading.Tasks.Task.FromResult(NexusKeyCheck.Accepted))},
+            {"nexus-trust",()=>new NexusKeyTrustDialog()},
+            {"dependencies",()=>new GeneralDependencyReview("Auditoria",new GeneralDependencyIssue[0],0,_=>{})},
+            {"manual-capture",()=>new ManualInstallReview(new ManualInstallCapture.FileState[0])},
+            {"project-delete",()=>new GeneralProjectDeleteChoice("Projeto de teste")},
+            {"project-delete-review",()=>new GeneralProjectDeleteReview("Projeto de teste",null)},
+            {"sync-review",()=>new GeneralSyncDifferencesDialog(new P2PSyncDifference[0],true)}
+        };
+        foreach(string theme in new[]{"light","dark","black","light-red"})foreach(string language in new[]{"pt","en"}){
+            GeneralStyle.UseTheme(theme);GeneralStyle.Language=language;
+            foreach(var example in examples)using(var dialog=example.Value()){
+                Open(dialog);
+                var actions=Descendants(dialog).OfType<FlowLayoutPanel>().Single(panel=>panel.Name=="DialogActions");
+                var buttons=actions.Controls.OfType<Button>().Where(button=>button.Visible).OrderBy(button=>button.Left).ToArray();
+                string label=example.Key+"/"+theme+"/"+language;
+                check(buttons.Length!=0&&buttons.All(button=>actions.ClientRectangle.Contains(button.Bounds)&&button.Height>=44)&&
+                    buttons.Zip(buttons.Skip(1),(left,right)=>left.Right<=right.Left).All(fits=>fits),
+                    label+" keeps the full action targets inside the row. "+actions.ClientSize+" "+String.Join(" ",buttons.Select(button=>button.Bounds)));
+                var table=(TableLayoutPanel)actions.Parent;
+                int row=table.GetPositionFromControl(actions).Row;
+                var previous=row>0?table.GetControlFromPosition(0,row-1):null;
+                if(previous!=null&&previous.Visible)
+                    check(actions.Top-previous.Bottom>=12,label+" keeps a gap above the actions.");
+                if(example.Key=="options-project"){
+                    var tools=Descendants(dialog).OfType<FlowLayoutPanel>().Single(panel=>panel.Name=="OptionsMaintenance");
+                    var toolButtons=tools.Controls.OfType<Button>().ToArray();
+                    check(toolButtons.Length==3&&toolButtons.All(button=>tools.ClientRectangle.Contains(button.Bounds))&&
+                        toolButtons.Select(button=>button.Top).Distinct().Count()==1,label+" fits the three maintenance commands in one row.");
+                    var setting=Find<GeneralPicker>(dialog,"SwitchCpuLimit");
+                    var remember=Find<CheckBox>(dialog,"RememberSwitchPerformance");
+                    check(remember.Parent==setting.Parent&&remember.Left>=setting.Right,label+" keeps the preference inside the CPU field.");
+                }
+                if(example.Key=="name"){
+                    var field=Find<TextBox>(dialog,"NameInput").Parent;
+                    check(Math.Abs(field.Right-actions.Left-buttons.Last().Right)<=1&&field.Height>=44,
+                        label+" aligns the field and its primary action. "+field.Bounds+" "+actions.Bounds+" "+buttons.Last().Bounds);
+                    var corner=dialog.PointToScreen(new Point(dialog.ClientSize.Width-8,dialog.ClientSize.Height-8));
+                    var hit=Message.Create(dialog.Handle,0x84,IntPtr.Zero,new IntPtr((corner.X&0xffff)|((corner.Y&0xffff)<<16)));
+                    hit.Result=(IntPtr)1;GeneralPopupPlacement.ResizeHit(dialog,ref hit);
+                    check(hit.Result==(IntPtr)17,label+" exposes the diagonal resize area at the corner.");
+                }
+                if(theme=="dark"&&language=="pt")using(var capture=new Bitmap(dialog.Width,dialog.Height)){
+                    dialog.DrawToBitmap(capture,new Rectangle(Point.Empty,capture.Size));
+                    capture.Save(Path.Combine(root,"layout-"+example.Key+".png"));
+                }
+            }
+        }
+        GeneralStyle.UseTheme("light");GeneralStyle.Language="pt";
+    }
+
     internal static int Run(string parent) {
         string root = OnlineTests.NestedRoot(parent,"table-dialogs-"); Directory.CreateDirectory(root);
         var checks = new List<string>(); Action<bool, string> check = (ok, message) => { if (!ok) throw new IOException(message); checks.Add(message); };
         bool animations = GeneralStyle.AnimationsEnabled, originalDark = GeneralStyle.Dark, originalRed = GeneralStyle.RedTheme; string originalLanguage = GeneralStyle.Language; GeneralStyle.AnimationsEnabled = false;
         try {
+            AuditLayouts(root,check);
             using (var dialog = new GeneralNameDialog("Preset", "  Friends  ")) {
                 Open(dialog); var name = Find<TextBox>(dialog, "NameInput"); var save = Find<Button>(dialog, "SaveName");
                 name.Text = "   "; check(!save.Enabled, "An empty name disables confirmation.");
@@ -103,14 +174,16 @@ internal static class GeneralTableDialogTests {
                 GeneralStyle.UseTheme(theme);GeneralStyle.Language=language;
                 using(var menu=new GeneralActionsMenu()){
                     Open(menu);var buttons=Descendants(menu).OfType<Button>().Where(button=>button.Name!="").ToArray();
-                    check(buttons.Length==8&&buttons.Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"clone","export","import","manual","new","open","options","share"}),"List menu includes manual installation capture: "+theme+"/"+language);
-                    check(Find<Label>(menu,"ProjectSection").Text==(language=="pt"?"Projetos":"Projects"),"List section heading is translated: "+language);
-                    var create=Find<Button>(menu,"new");var open=Find<Button>(menu,"open");var sequence=new[]{"new","open","clone","manual","export","import","share","options"}.Select(id=>Find<Button>(menu,id)).ToArray();
+                    check(buttons.Length==8&&buttons.Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"details","export","import","new","open","options","save-menu","share"}),"List menu includes manual installation capture: "+theme+"/"+language);
+                    check(Find<Label>(menu,"NavigationSection").Text==(language=="pt"?"Navegação":"Navigation")&&
+                        Find<Label>(menu,"ProjectSection").Visible&&Find<Label>(menu,"ToolsSection").Visible,"List section heading is translated: "+language);
+                    var create=Find<Button>(menu,"new");var open=Find<Button>(menu,"open");var sequence=new[]{"new","open","save-menu","details","import","export","share","options"}.Select(id=>Find<Button>(menu,id)).ToArray();
                     check(((TableLayoutPanel)create.Parent).ColumnCount==1&&sequence.Select(button=>button.Left).Distinct().Count()==1&&sequence.Zip(sequence.Skip(1),(a,b)=>a.Bottom<=b.Top).All(value=>value),"List actions form one aligned vertical column: "+theme+"/"+language);
                     check(buttons.All(button=>button.Height==44&&button.Width==create.Width&&button.Bottom<=button.Parent.ClientSize.Height),"Buttons have matching sizes and remain inside the popup: "+theme+"/"+language+" "+String.Join(";",buttons.Select(button=>button.Name+"="+button.Bounds+" parent="+button.Parent.ClientSize)));
                     check(buttons.Cast<GeneralButton>().All(button=>!String.IsNullOrEmpty(button.IconKind)&&button.TextAlign==ContentAlignment.MiddleLeft&&!button.Destructive),"Every menu row has an icon and left aligned text: "+theme+"/"+language);
-                    var divider=Find<Panel>(menu,"MenuDivider");int lineY=divider.Top+divider.Height/2;
-                    check(lineY-Find<Button>(menu,"import").Bottom==Find<Button>(menu,"share").Top-lineY,"Section divider is centered between the painted action bounds: "+theme+"/"+language);
+                    var projectSection=Find<Label>(menu,"ProjectSection");var toolsSection=Find<Label>(menu,"ToolsSection");
+                    check(Find<Button>(menu,"save-menu").Bottom<=projectSection.Top&&Find<Button>(menu,"export").Bottom<=toolsSection.Top,
+                        "The sections separate navigation, project and tools: "+theme+"/"+language);
                     check(create.Text==(language=="pt"?"Novo projeto":"New project")&&open.Text==(language=="pt"?"Abrir projeto":"Open project"),"New/open labels match the selected language: "+language);
                     check(Descendants(menu).OfType<Button>().Single(button=>button.AccessibleName==(language=="pt"?"Fechar":"Close")).Visible==false,"The menu does not display an X close button: "+theme+"/"+language);
                     using(var bitmap=new Bitmap(menu.Width,menu.Height)){menu.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(root,"list-menu-"+language+"-"+theme+".png"),System.Drawing.Imaging.ImageFormat.Png);}
@@ -129,13 +202,13 @@ internal static class GeneralTableDialogTests {
                 check(review.Selected.Single().Path=="mods/emoji/init.lua","Manual capture returns only the explicitly checked files.");
                 review.Close();
             }
-            foreach(string id in new[]{"new","open","clone","manual","export","import","share","options"})using(var menu=new GeneralActionsMenu()){
+            foreach(string id in new[]{"new","open","save-menu","details","import","export","share","options"})using(var menu=new GeneralActionsMenu()){
                 Open(menu);Find<Button>(menu,id).PerformClick();check(menu.ActionId==id&&menu.DialogResult==DialogResult.OK,"List action returns its explicit identifier: "+id);
             }
             foreach(string theme in new[]{"light","dark","light-red"})foreach(string language in new[]{"pt","en"}){
                 GeneralStyle.UseTheme(theme);GeneralStyle.Language=language;using(var menu=new GeneralActionsMenu(true)){Open(menu);
                 var buttons=Descendants(menu).OfType<Button>().Where(button=>button.Name!="").ToArray();
-                check(buttons.Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"clone","manual","new","open","options","share"}),"Built-in menu offers manual capture and modpack sharing: "+theme+"/"+language);
+                check(buttons.Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"details","new","open","options","save-menu","share"}),"Built-in menu offers manual capture and modpack sharing: "+theme+"/"+language);
                 check(buttons.All(button=>button.Height==44&&button.Bottom<=button.Parent.Height),"Built-in menu actions fit without clipping: "+theme+"/"+language);
                 using(var bitmap=new Bitmap(menu.Width,menu.Height)){menu.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(root,"builtin-menu-"+language+"-"+theme+".png"));}
             }

@@ -35,7 +35,7 @@ internal sealed partial class GeneralModWindow {
         TestForm(catalog,state,Path.Combine(root,"app-data"),root,async form=>{
             form.launch=opened.Add;
             await form.VerifyProject();
-            if(form.detail.Text!="Selecione a pasta de instalação para verificar."||form.statuses.Count!=0)
+            if(form.statuses.Count!=0)
                 throw new IOException("Verificar sem pasta precisa informar o pré-requisito antes de varrer.");
             form.SetDestination(game);
 
@@ -88,7 +88,7 @@ internal sealed partial class GeneralModWindow {
                 await form.VerifyProject();
             }
             if(dialogFailure!=null)throw dialogFailure;
-            if(step!=3||form.working||form.detail.Text!="Instalação cancelada."||
+            if(step!=3||form.working||
                 File.Exists(dependencyPath)||File.ReadAllText(installedPath)!=owner.Id||File.ReadAllText(manualPath)!="manual")
                 throw new IOException("Cancelar na confirmação deve preservar os arquivos locais e deixar a fila vazia.");
 

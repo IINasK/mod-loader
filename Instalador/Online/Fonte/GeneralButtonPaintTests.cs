@@ -17,9 +17,13 @@ internal static class GeneralButtonPaintTests {
                 using(var nested=new Panel{BackColor=Color.Transparent,Size=surface.Size})
                 using(var button=new GeneralButton{Text="Teste",Primary=primary,Destructive=kind==2,Size=new Size(140,44)}){
                     surface.Controls.Add(nested);nested.Controls.Add(button);
+                    Color resting=Color.Empty;
                     foreach(string state in new[]{"normal","hover","pressed","disabled","resized","repaint"}){
                         button.Enabled=state!="disabled";
-                        if(state=="hover")typeof(Control).GetMethod("OnMouseEnter",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(button,new object[]{EventArgs.Empty});
+                        if(state=="hover"){
+                            typeof(Control).GetMethod("OnMouseEnter",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(button,new object[]{EventArgs.Empty});
+                            System.Threading.Thread.Sleep(155);
+                        }
                         if(state=="pressed")typeof(Control).GetMethod("OnMouseDown",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(button,new object[]{new MouseEventArgs(MouseButtons.Left,1,20,20,0)});
                         if(state=="resized")button.Size=new Size(230,52);
                         using(var bitmap=new Bitmap(button.Width,button.Height))
@@ -31,7 +35,10 @@ internal static class GeneralButtonPaintTests {
                                 if(bitmap.GetPixel(point.X,point.Y).ToArgb()!=expected)throw new InvalidOperationException("Restos de pintura no canto: "+state);
                             var center=bitmap.GetPixel(bitmap.Width/2,8);
                             if(center.ToArgb()==Color.Magenta.ToArgb())throw new InvalidOperationException("A face do botão não foi pintada.");
-                            if(kind==2&&button.Enabled&&center.ToArgb()!=GeneralStyle.DangerFill.ToArgb())throw new InvalidOperationException("A ação destrutiva preenchida precisa manter sua cor própria.");
+                            if(state=="normal")resting=center;
+                            if(state=="hover"&&center.ToArgb()==resting.ToArgb())throw new InvalidOperationException("O botão ativo não apresentou brilho.");
+                            if(state=="disabled"&&center.ToArgb()!=GeneralStyle.Selection.ToArgb())throw new InvalidOperationException("O botão desativado ainda apresenta brilho.");
+                            if(kind==2&&state=="normal"&&center.ToArgb()!=GeneralStyle.DangerFill.ToArgb())throw new InvalidOperationException("A ação destrutiva preenchida precisa manter sua cor própria.");
                             passed++;records.Add(new{Dark=dark,Primary=primary,Destructive=kind==2,State=state,OpaqueCorners=true});
                         }
                     }

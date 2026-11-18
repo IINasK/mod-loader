@@ -1,5 +1,4 @@
-﻿using System;
-using System.Diagnostics;
+using System;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -25,110 +24,84 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
         projectOptions=installationFolder!=null;
         bool showSaveCleanup=previewSaveBackups!=null&&!String.IsNullOrWhiteSpace(installationFolder)&&
             Directory.Exists(Path.Combine(installationFolder,".CoopModsOnline","backups"));
-        ClientSize = new Size(620, (previewCleanup == null ? 392 : 472)+(projectOptions?86:0)+(showSaveCleanup?60:0)+92);
-        Font = GeneralStyle.Font(12);
-        AutoScaleMode = AutoScaleMode.Dpi;
-
-        var layout = new TableLayoutPanel {
-            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 9,
-            Padding = new Padding(24, 16, 24, 20), Margin = Padding.Empty
-        };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        ClientSize=new Size(660,projectOptions?650:550);
+        Font=GeneralStyle.Font(12);
+        AutoScaleMode=AutoScaleMode.Dpi;
+        var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=9,
+            Padding=new Padding(24,12,24,20),Margin=Padding.Empty};
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        for(int row=0;row<9;row++)layout.RowStyles.Add(row==6?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.AutoSize));
         Content.Controls.Add(layout);
-
-        var choices = new TableLayoutPanel {
-            Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, RowCount = 2,
-            Margin = Padding.Empty
-        };
-        choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        layout.Controls.Add(SectionLabel(T("Aparência","Appearance"),0),0,0);
+        var choices=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,RowCount=2,Margin=Padding.Empty};
+        choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
+        choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
         choices.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        choices.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
-        choices.Controls.Add(FieldLabel(T("Tema", "Theme")), 0, 0);
-        choices.Controls.Add(FieldLabel(T("Idioma", "Language")), 1, 0);
-        Configure(this.theme, T("Tema", "Theme"), new Padding(0, 0, 10, 0));
-        this.theme.Items.AddRange(new object[] { T("Claro — violeta", "Light — violet"), T("Escuro", "Dark"), T("Claro — vermelho", "Light — red"), T("Preto e cinza", "Black and gray") });
-        this.theme.SelectedIndex = theme == "dark" ? 1 : theme == "light-red" ? 2 : theme == "black" ? 3 : 0;
-        Configure(this.language, T("Idioma", "Language"), new Padding(10, 0, 0, 0));
-        this.language.Items.AddRange(new object[] { "Português", "English" });
-        this.language.SelectedIndex = language == "en" ? 1 : 0;
-        choices.Controls.Add(this.theme, 0, 1);
-        choices.Controls.Add(this.language, 1, 1);
-        choices.GetControlFromPosition(1, 0).Margin = new Padding(10, 0, 0, 6);
-        layout.Controls.Add(choices, 0, 0);
+        choices.RowStyles.Add(new RowStyle(SizeType.Absolute,44));
+        choices.Controls.Add(FieldLabel(T("Tema","Theme")),0,0);
+        var languageLabel=FieldLabel(T("Idioma","Language"));languageLabel.Margin=new Padding(10,0,0,6);
+        choices.Controls.Add(languageLabel,1,0);
+        Configure(this.theme,T("Tema","Theme"),new Padding(0,0,10,0));
+        this.theme.Items.AddRange(new object[]{T("Claro — violeta","Light — violet"),T("Escuro","Dark"),
+            T("Claro — vermelho","Light — red"),T("Preto e cinza","Black and gray")});
+        this.theme.SelectedIndex=theme=="dark"?1:theme=="light-red"?2:theme=="black"?3:0;
+        Configure(this.language,T("Idioma","Language"),new Padding(10,0,0,0));
+        this.language.Items.AddRange(new object[]{"Português","English"});
+        this.language.SelectedIndex=language=="en"?1:0;
+        choices.Controls.Add(this.theme,0,1);choices.Controls.Add(this.language,1,1);layout.Controls.Add(choices,0,1);
 
+        layout.Controls.Add(SectionLabel(T("Destinos","Locations"),16),0,2);
+        var folders=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=1,Margin=Padding.Empty};
+        folders.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         this.folder.Text=folder??"";
         this.folder.ReadOnly=true;
         this.folder.AccessibleName=T("Pasta de downloads","Download folder");
-        layout.Controls.Add(FolderRow(T("Procurar downloads em","Look for downloads in"),this.folder,()=>Browse(this.folder,false)),0,1);
-        var browser = GeneralStyle.Button(T("Conectar navegador…", "Connect browser…"), ConnectBrowser);
-        browser.Margin = new Padding(0, 10, 0, 0);
-        var support = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true, Margin = Padding.Empty };
-        var report = GeneralStyle.Button(T("Reportar erro", "Report a problem"), ShowSessionReport);
-        report.Name = "ReportSessionError";
-        report.Margin = new Padding(10, 10, 0, 0);
-        support.Controls.Add(browser);
-        support.Controls.Add(report);
-        layout.Controls.Add(support, 0, 2);
+        var downloads=FolderRow(this.folder.AccessibleName,this.folder,()=>Browse(this.folder,false));
+        downloads.Margin=Padding.Empty;folders.Controls.Add(downloads);
         if(projectOptions){
-            destination.Text=installationFolder;
-            destination.Name="OptionsInstallationFolder";
+            destination.Text=installationFolder;destination.Name="OptionsInstallationFolder";
             destination.AccessibleName=T("Pasta de instalação","Installation folder");
-            layout.Controls.Add(FolderRow(destination.AccessibleName,destination,()=>Browse(destination,true)),0,3);
+            var game=FolderRow(destination.AccessibleName,destination,()=>Browse(destination,true));
+            game.Margin=new Padding(0,10,0,0);folders.Controls.Add(game);
         }
-        if(previewCleanup!=null){
-            var cachePanel=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=new Padding(0,12,0,0)};
-            cachePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));cachePanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            cachePanel.Controls.Add(new Label{Text=T("Cópias antigas do cache podem ser removidas. Os downloads originais e os mods instalados serão preservados.","Old cache copies can be removed. Original downloads and installed mods will be preserved."),Dock=DockStyle.Fill,AutoSize=true,MaximumSize=new Size(330,0)},0,0);
-            var clean=GeneralStyle.Button(T("Limpar cópias antigas","Clear old copies"),()=>ClearOldCopies(previewCleanup));
-            clean.Margin=Padding.Empty;cachePanel.Controls.Add(clean,1,0);layout.Controls.Add(cachePanel,0,4);
-        }
+        layout.Controls.Add(folders,0,3);
 
+        layout.Controls.Add(SectionLabel(T("Conferência","Verification"),16),0,4);
+        performance=new SwitchPerformanceField(switchSettings??new SwitchPerformance()){Margin=Padding.Empty};
+        layout.Controls.Add(performance,0,5);
+        error.Dock=DockStyle.Fill;error.Margin=new Padding(0,6,0,0);
+        error.AutoEllipsis=true;error.AccessibleName=T("Aviso","Notice");layout.Controls.Add(error,0,6);
+
+        var maintenance=GeneralTableDialogLayout.Commands();
+        maintenance.Name="OptionsMaintenance";
+        if(previewCleanup!=null){
+            var clean=GeneralStyle.Button(T("Limpar cópias antigas","Clear old copies"),()=>ClearOldCopies(previewCleanup));
+            clean.Name="CleanOldCopies";maintenance.Controls.Add(clean);
+        }
         if(showSaveCleanup){
             Button cleanSaves=null;
             cleanSaves=GeneralStyle.Button(T("Limpar backups de saves","Clear save backups"),
                 async()=>await ClearSaveBackups(cleanSaves,()=>previewSaveBackups(installationFolder)));
-            cleanSaves.Name="CleanOldSaveBackups";
-            cleanSaves.Margin=new Padding(0,10,0,0);
-            cleanSaves.Anchor=AnchorStyles.Right;
-            layout.Controls.Add(cleanSaves,0,5);
+            cleanSaves.Name="CleanOldSaveBackups";maintenance.Controls.Add(cleanSaves);
         }
+        var report=GeneralStyle.Button(T("Reportar erro","Report a problem"),ShowSessionReport);
+        report.Name="ReportSessionError";maintenance.Controls.Add(report);
+        layout.Controls.Add(maintenance,0,7);
 
-        performance=new SwitchPerformanceField(switchSettings??new SwitchPerformance());
-        performance.Margin=new Padding(0,8,0,0);
-        layout.Controls.Add(performance,0,6);
-        error.Dock = DockStyle.Fill;
-        error.Margin = new Padding(0, 6, 0, 0);
-        error.AutoEllipsis = true;
-        error.AccessibleName = T("Aviso", "Notice");
-        layout.Controls.Add(error, 0, 7);
-
-        var commands = new FlowLayoutPanel {
-            Dock = DockStyle.Fill, AutoSize = true, WrapContents = false,
-            FlowDirection = FlowDirection.RightToLeft, Margin = new Padding(0, 12, 0, 0)
-        };
-        var save = GeneralStyle.Button(T("Salvar", "Save"), Save, true);
-        save.Margin = Padding.Empty;
-        var cancel = GeneralStyle.Button(T("Cancelar", "Cancel"), () => DialogResult = DialogResult.Cancel);
-        cancel.Margin = new Padding(0, 0, 10, 0);
-        commands.Controls.Add(save);
-        commands.Controls.Add(cancel);
-        layout.Controls.Add(commands, 0, 8);
-        AcceptButton = save;
-        CancelButton = cancel;
-        GeneralStyle.Apply(this, GeneralStyle.Dark);
-        this.folder.BorderStyle = BorderStyle.None;
-        error.ForeColor = GeneralStyle.Danger;
+        var commands=GeneralTableDialogLayout.Commands();
+        var save=GeneralStyle.Button(T("Salvar","Save"),Save,true);
+        var cancel=GeneralStyle.Button(T("Cancelar","Cancel"),()=>DialogResult=DialogResult.Cancel);
+        commands.Controls.Add(save);commands.Controls.Add(cancel);layout.Controls.Add(commands,0,8);
+        AcceptButton=save;CancelButton=cancel;
+        GeneralStyle.Apply(this,GeneralStyle.Dark);
+        this.folder.BorderStyle=destination.BorderStyle=BorderStyle.None;
+        error.ForeColor=GeneralStyle.Danger;
     }
+
+    static Label SectionLabel(string text,int top){
+        return new Label{Text=text,AutoSize=true,Font=GeneralStyle.Font(13,true),Margin=new Padding(0,top,0,8)};
+    }
+
 
     static string T(string pt, string en) { return GeneralStyle.T(pt, en); }
 
@@ -169,17 +142,6 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
         dialog.Content.Controls.Add(layout);
         GeneralStyle.Apply(dialog, GeneralStyle.Dark);
         return dialog;
-    }
-
-    void ConnectBrowser() {
-        try {
-            string folder = BrowserDownloadBridge.Prepare(Application.ExecutablePath);
-            using (Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true })) { }
-            string steps = T(
-                "Abra brave://extensions, chrome://extensions ou edge://extensions no seu navegador. Ative o modo do desenvolvedor e escolha Carregar sem compactação. Selecione a pasta aberta no Explorador.",
-                "Open brave://extensions, chrome://extensions or edge://extensions in your browser. Turn on developer mode, choose Load unpacked and select the folder opened in File Explorer.");
-            GeneralDialog.Message(this, steps + "\n\n" + folder, T("Conectar navegador", "Connect browser"));
-        } catch (Exception ex) { ShowNotice(ex.Message, true); }
     }
 
     async Task ClearSaveBackups(Button button,Func<FixedInstaller.SaveBackupCleanup> preview){
@@ -258,11 +220,8 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
         var folderLabel=FieldLabel(label);
         row.Controls.Add(folderLabel, 0, 0);
         row.SetColumnSpan(folderLabel, 2);
-        var field = new GeneralSurface {
-            Dock = DockStyle.Fill, Padding = new Padding(14, 10, 14, 0),
-            Margin = new Padding(0, 0, 10, 0), MinimumSize = new Size(100, 44)
-        };
-        field.Controls.Add(text);
+        var field=GeneralTableDialogLayout.Input(text);
+        field.Margin=new Padding(0,0,10,0);
         row.Controls.Add(field,0,1);
         var browse = GeneralStyle.Button(T("Escolher pasta", "Choose folder"), browseFolder);
         browse.Margin = Padding.Empty;
@@ -311,24 +270,27 @@ internal sealed class SwitchPerformanceField : TableLayoutPanel {
     readonly CheckBox remember=new CheckBox();
 
     internal SwitchPerformanceField(SwitchPerformance settings) {
-        Dock=DockStyle.Fill;AutoSize=true;ColumnCount=1;RowCount=3;
+        Dock=DockStyle.Fill;AutoSize=true;ColumnCount=1;RowCount=2;
         ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        RowStyles.Add(new RowStyle(SizeType.Absolute,42));
-        RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        string label=GeneralStyle.T("CPU na conferência da troca","CPU for switch verification");
+        RowStyles.Add(new RowStyle(SizeType.Absolute,44));
+        string label=GeneralStyle.T("Núcleos para verificar arquivos","CPU cores for file checks");
         Controls.Add(new Label{Text=label,AutoSize=true,Margin=new Padding(0,0,0,5)},0,0);
         limit.Name="SwitchCpuLimit";limit.AccessibleName=label;
         limit.Dock=DockStyle.Fill;limit.Margin=Padding.Empty;
+        limit.Embedded=true;limit.MinimumSize=new Size(100,0);limit.MaximumSize=Size.Empty;
         limit.Items.AddRange(new object[]{"25%","50%","75%","100%"});
         settings.Normalize();
         limit.SelectedIndex=settings.CpuPercent/25-1;
-        Controls.Add(limit,0,1);
         remember.Name="RememberSwitchPerformance";
         remember.Text=GeneralStyle.T("Não perguntar novamente","Don't ask again");
         remember.Checked=!settings.AskBeforeSwitch;remember.AutoSize=true;
-        remember.Margin=new Padding(0,7,0,0);
-        Controls.Add(remember,0,2);
+        remember.Anchor=AnchorStyles.Right;remember.Margin=new Padding(8,0,0,0);
+        var field=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(14,6,14,6),Margin=Padding.Empty};
+        var row=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        row.Controls.Add(limit,0,0);row.Controls.Add(remember,1,0);
+        field.Controls.Add(row);Controls.Add(field,0,1);
     }
 
     internal SwitchPerformance Settings {
@@ -341,7 +303,7 @@ internal sealed class SwitchPerformanceDialog : GeneralDialog {
     internal SwitchPerformance Settings {get{return performance.Settings;}}
 
     internal SwitchPerformanceDialog(SwitchPerformance settings) : base(GeneralStyle.T("Desempenho da troca","Switch performance")) {
-        ClientSize=new Size(500,280);
+        ClientSize=new Size(500,310);
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(24,12,24,18)};
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -352,7 +314,7 @@ internal sealed class SwitchPerformanceDialog : GeneralDialog {
                 "This switch may take a while. Choose the share of logical processors that verification can use.")},0,0);
         performance=new SwitchPerformanceField(settings){Margin=Padding.Empty,Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right};
         layout.Controls.Add(performance,0,1);
-        var commands=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.RightToLeft,WrapContents=false};
+        var commands=GeneralTableDialogLayout.Commands();
         var apply=GeneralStyle.Button(GeneralStyle.T("Aplicar","Apply"),()=>Complete(DialogResult.OK),true);
         var cancel=GeneralStyle.Button(GeneralStyle.T("Cancelar","Cancel"),()=>Complete(DialogResult.Cancel));
         commands.Controls.Add(apply);commands.Controls.Add(cancel);

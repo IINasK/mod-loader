@@ -13,6 +13,13 @@ public sealed class GeneralModList {
     public List<GeneralModPreset> Presets = new List<GeneralModPreset>();
     public Dictionary<string,GeneralAlternativeGroup> AlternativeGroups = new Dictionary<string,GeneralAlternativeGroup>(StringComparer.Ordinal);
     public List<GeneralModEntry> Mods = new List<GeneralModEntry>();
+    public List<GeneralModFolder> Folders = new List<GeneralModFolder>();
+}
+
+public sealed class GeneralModFolder {
+    public string Id, Name;
+    public bool SingleSelection;
+    public List<string> ModIds = new List<string>();
 }
 
 public sealed class GeneralModPreset {
@@ -53,6 +60,8 @@ public sealed class GeneralModVariant {
     public List<string> CompatibilityGroups = new List<string>();
     public List<string> Sources = new List<string>();
     public Dictionary<string,GeneralSourceInfo> SourceInfo = new Dictionary<string,GeneralSourceInfo>();
+
+    internal List<string> PreviousCatalogSources;
 
     internal IEnumerable<GeneralModVariant> WithNaturalOption() {
         yield return this;
@@ -137,7 +146,7 @@ public sealed class GeneralModLibrary {
         if (String.Equals(fullPath, statePath, StringComparison.OrdinalIgnoreCase))
             throw new IOException("Escolha outro nome para a lista exportada.");
         Write(fullPath, new {
-            list.Schema, list.Categories, list.CategoryDescriptions, Presets=list.Presets.OrderByDescending(preset=>preset.Id==selectedPreset).Select(ExportPreset).ToList(), list.UncategorizedName, list.UncategorizedDescription, list.AlternativeGroups,
+            list.Schema, list.Categories, list.CategoryDescriptions, Presets=list.Presets.OrderByDescending(preset=>preset.Id==selectedPreset).Select(ExportPreset).ToList(), list.UncategorizedName, list.UncategorizedDescription, list.AlternativeGroups, list.Folders,
             Mods = list.Mods.Select(mod => new {
                 mod.Id, mod.Name, mod.Category, mod.DefaultVariant, mod.Description, mod.Tags, mod.CompatibilityGroups, mod.Nsfw, mod.NsfwOverride, mod.AlternativeGroup, mod.DependencySource, mod.DependencyFile,
                 Variants = mod.Variants.Select(ExportVariant).ToList()
@@ -286,6 +295,11 @@ public sealed class GeneralModLibrary {
                     original=trusted.Variants.SingleOrDefault(candidate=>candidate.Id==variant.Id&&candidate.Sources.SequenceEqual(new[]{NightCoopRelease.Url}));
                     if(original!=null){variant.Sources=original.Sources.ToList();variant.SourceInfo.Clear();}
                 }
+                if(original==null){
+                    original=trusted.Variants.SingleOrDefault(candidate=>candidate.Id==variant.Id&&candidate.PreviousCatalogSources!=null&&
+                        variant.Sources.SequenceEqual(candidate.PreviousCatalogSources,StringComparer.Ordinal));
+                    if(original!=null){variant.Sources=original.Sources.ToList();variant.SourceInfo.Clear();}
+                }
                 if(original==null&&entry.Id==NightCityDensity.ModId&&variant.Id=="legacy-low")original=trusted.Variants.FirstOrDefault(candidate=>candidate.CyberpunkVariant=="medium"&&candidate.Sources.SequenceEqual(variant.Sources,StringComparer.Ordinal));
                 if (original == null) continue;
                 variant.CyberpunkId = original.CyberpunkId;
@@ -315,7 +329,9 @@ public sealed class GeneralModLibrary {
                 continue;
             }
             if (mod.DensityProfiles == null) {
-                entry.Variants.Add(FromFixed(mod.Id, "default", "Principal", mod.Assets, null));
+                var variant=FromFixed(mod.Id, "default", "Principal", mod.Assets, null);
+                if(mod.PreviousRelease!=null)variant.PreviousCatalogSources=mod.PreviousRelease.Assets.Select(asset=>asset.Url).ToList();
+                entry.Variants.Add(variant);
             } else {
                 foreach (var profile in mod.DensityProfiles)
                     entry.Variants.Add(FromFixed(mod.Id, profile.Id, profile.Name, profile.Assets, profile.Id));
@@ -471,6 +487,7 @@ public sealed class GeneralModLibrary {
             else if (!ValidId(mod.AlternativeGroup)) throw new IOException("Associação de alternativas inválida.");
             if (!variantIds.Contains(mod.DefaultVariant)) throw new IOException("Escolha a versão principal de " + mod.Name + ".");
         }
+        ValidateFolders(list,ids);
         ValidateAlternativeGroups(list);
         if (list.Presets == null) list.Presets = new List<GeneralModPreset>();
         if (list.Presets.Count > 100) throw new IOException("Use no máximo 100 presets por lista.");
@@ -490,6 +507,21 @@ public sealed class GeneralModLibrary {
                 if (id == null || !ids.Contains(id) || !members.Add(id)) throw new IOException("O preset contém um mod desconhecido ou repetido.");
         }
         GeneralPresetProfiles.Validate(list,trustRecipes);
+    }
+
+    static void ValidateFolders(GeneralModList list,HashSet<string> mods){
+        if(list.Folders==null)list.Folders=new List<GeneralModFolder>();
+        if(list.Folders.Count>1000)throw new IOException("A lista contém pastas demais.");
+        var folderIds=new HashSet<string>(StringComparer.Ordinal);
+        var assigned=new HashSet<string>(StringComparer.Ordinal);
+        foreach(var folder in list.Folders){
+            if(folder==null||!ValidId(folder.Id)||!folderIds.Add(folder.Id)||folder.ModIds==null||folder.ModIds.Count>1000)
+                throw new IOException("Pasta de mods inválida ou repetida.");
+            folder.Name=RequiredText(folder.Name,120,"Nome da pasta");
+            folder.ModIds.RemoveAll(id=>!mods.Contains(id));
+            if(folder.ModIds.Any(id=>!assigned.Add(id)))throw new IOException("Um mod pertence a mais de uma pasta.");
+        }
+        list.Folders.RemoveAll(folder=>folder.ModIds.Count==0);
     }
 
     static void ValidateTags(List<string> tags) {

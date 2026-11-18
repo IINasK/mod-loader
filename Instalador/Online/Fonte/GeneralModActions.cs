@@ -7,8 +7,27 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
-    Button primaryAction;
+    GeneralButton primaryAction;
     Work pendingVersion;
+    string updateFocusedId;
+    const string UpdateAvailableStatus="Atualização disponível";
+
+    // A scan produces candidates for the active preset. Selection only limits this batch.
+    List<Work> InstallableUpdates(){
+        var candidates=ActivePreset==null?state.List.Mods.Select(MakeWork):PresetWorks();
+        return candidates.Where(work=>{
+            string status;
+            return !presetProtected.Contains(work.Entry.Id)&&statuses.TryGetValue(work.Key,out status)&&status==UpdateAvailableStatus;
+        }).ToList();
+    }
+
+    List<Work> SelectedUpdates(){
+        var updates=InstallableUpdates();
+        if(updates.Count==0||PresetRecoveryPending||state.AppliedPreset!=null&&state.AppliedPreset!=state.SelectedPreset)
+            return new List<Work>();
+        if(marked.Count!=0)return updates.Where(work=>marked.Contains(work.Entry.Id)).ToList();
+        return updates.Where(work=>updateFocusedId==null||work.Entry.Id==updateFocusedId).ToList();
+    }
     enum ModAction { None, Disable, ChooseDependency, Enable, Change, Update, Install, Download }
 
     static bool IsBigBody(GeneralModEntry mod) {
@@ -122,7 +141,8 @@ internal sealed partial class GeneralModWindow {
         if(choice!=null&&state.List.Mods.Contains(choice.Entry)&&
             grid.CurrentRow!=null&&grid.CurrentRow.Tag is Work&&SameVersion((Work)grid.CurrentRow.Tag,choice))
             return new List<Work>{choice};
-        if(jobs.Count==0&&focused!=null)jobs.Add(MakeWork(focused));
+        if(jobs.Count==0&&focused!=null&&focused.Id==updateFocusedId&&grid.CurrentRow.Visible)
+            jobs.Add(MakeWork(focused));
         int index=jobs.FindIndex(work=>IsBigBody(work.Entry));
         if(index>=0){
             var entry=jobs[index].Entry;
@@ -164,7 +184,8 @@ internal sealed partial class GeneralModWindow {
         if (alternative != null)
             return selectedIds.Contains(alternative.Id) ? ModAction.None : ModAction.Change;
         if (status == GeneralStatusPresentation.Disabled) return ModAction.Enable;
-        if (status == "Atualização disponível" || status == "Versão diferente"
+        if (status == UpdateAvailableStatus) return ModAction.None;
+        if (status == "Versão diferente"
             || (status != null && status.StartsWith("Instalado: ", StringComparison.Ordinal))) return ModAction.Change;
         if (status == "Pronto para instalar" || (status == null && work.Local && work.Variant.Sources.All(File.Exists))) return ModAction.Install;
         return ModAction.Download;
@@ -188,23 +209,32 @@ internal sealed partial class GeneralModWindow {
     }
 
     void RefreshPrimaryAction() {
-        if (primaryAction == null || grid == null || drawing || working || scanning || associationChoice != null) return;
-        if(String.IsNullOrWhiteSpace(state.Destination)){
-            primaryAction.Text=T("Selecionar pasta","Select folder");
-            primaryAction.Enabled=true;
-            return;
-        }
-        if(NeedsPresetLoad){primaryAction.Text=T("Carregar preset","Load preset");primaryAction.Enabled=ActivePreset!=null;return;}
+        if(primaryAction==null||primaryAction.IsDisposed||grid==null||drawing)return;
+        bool running=working||loadingPreset;
+        bool available=!running&&!scanning&&associationChoice==null;
+        string caption=running?primaryAction.Text:available?PrimaryActionCaption():"";
+        primaryAction.SetContextAction(caption,true,false,!testMode,available);
+    }
+
+    string PrimaryActionCaption(){
+        if(String.IsNullOrWhiteSpace(state.Destination))return T("Selecionar pasta","Select folder");
+        var updates=SelectedUpdates();
+        if(updates.Count!=0)return updateFocusedId==null&&marked.Count==0||updates.Count>1
+            ?T("Atualizar mods","Update mods"):T("Atualizar mod","Update mod");
+        var updateLinks=SelectedUpdateLinks();
+        if(updateLinks.Length>0)return updateLinks.Length==1?T("Abrir atualização","Open update"):T("Abrir atualizações","Open updates");
+        if(NeedsPresetLoad&&ActivePreset!=null)return T("Carregar preset","Load preset");
         List<Work> ignored;
-        var action = ClassifyJobs(SelectedJobs(), out ignored);
-        primaryAction.Text = action == ModAction.Disable ? T("Desabilitar", "Disable")
-            : action == ModAction.ChooseDependency ? GeneralStatusPresentation.Label(GeneralStatusPresentation.ChooseDependency)
-            : action == ModAction.Enable ? T("Reativar", "Enable")
-            : action == ModAction.Update ? T("Atualizar", "Update")
-            : action == ModAction.Change ? T("Mudar versão", "Change version")
-            : action == ModAction.Install ? T("Instalar", "Install")
-            : T("Baixar", "Download");
-        primaryAction.Enabled = action != ModAction.None;
+        switch(ClassifyJobs(SelectedJobs(),out ignored)){
+            case ModAction.Disable:return T("Desabilitar","Disable");
+            case ModAction.ChooseDependency:return GeneralStatusPresentation.Label(GeneralStatusPresentation.ChooseDependency);
+            case ModAction.Enable:return T("Reativar","Enable");
+            case ModAction.Update:return T("Atualizar","Update");
+            case ModAction.Change:return T("Mudar versão","Change version");
+            case ModAction.Install:return T("Instalar","Install");
+            case ModAction.Download:return T("Baixar","Download");
+            default:return "";
+        }
     }
 
     DisabledMods DisabledAt(string root) {
@@ -383,14 +413,14 @@ internal sealed partial class GeneralModWindow {
                     store.Enable(jobs.Select(work => PresetStoredKey(work,root)));
                 } else store.Disable(PlanDisable(jobs, root));
             });
-            detail.Text = enable ? T("Mods reativados.", "Mods enabled.") : T("Mods desabilitados.", "Mods disabled.");
-            OnlineDiagnostics.Record("general.toggle.complete",null,detail.Text,context);
+            OnlineDiagnostics.Record("general.toggle.complete",null,
+                enable?T("Mods reativados.","Mods enabled."):T("Mods desabilitados.","Mods disabled."),context);
         } finally { working = false; Busy(false); }
         await Scan();
     }
 
     string RemoveManagedWorks(List<Work> jobs, string root, HashSet<string> disabled,Action<string> progress=null) {
-        Action<string> report=progress??Report;
+        Action<string> report=progress??IgnoreInstallProgress;
         Action<Work> announce=work=>{
             if(progress!=null)progress(T("Desinstalando · ","Uninstalling · ")+work.Entry.Name);
         };

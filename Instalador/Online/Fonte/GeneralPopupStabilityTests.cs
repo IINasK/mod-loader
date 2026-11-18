@@ -129,14 +129,25 @@ internal static class GeneralPopupStabilityTests {
                                     graphics.IntersectClip(menu.Region);
                                     graphics.DrawImageUnscaled(bitmap,0,0);
                                     composed.Save(Path.Combine(root,"context-menu-selected.png"));
-                                    CheckPopupFrame(composed,"Selected one-item menu",check);
+                                    int middle=composed.Width/2,centerY=composed.Height/2;
+                                    check(new[]{composed.GetPixel(middle,0),composed.GetPixel(middle,composed.Height-1),
+                                        composed.GetPixel(0,centerY),composed.GetPixel(composed.Width-1,centerY)}
+                                        .All(pixel=>pixel.ToArgb()==GeneralStyle.Surface.ToArgb()),
+                                        "The smoothed stroke is inset on every side of the native mask.");
+                                    check(composed.GetPixel(middle,GeneralStyle.RoundedFaceInset+1).ToArgb()==GeneralStyle.Line.ToArgb(),
+                                        "The inset frame retains the palette border color.");
                                     check(composed.GetPixel(highlight.Left+highlight.Width-25,highlight.Top+highlight.Height/2)
                                         .ToArgb()==GeneralStyle.Selection.ToArgb(),"The selected item paints a centered inner highlight.");
                                 }
                                 int bottom=menu.ClientSize.Height-1;
                                 check(!menu.Region.IsVisible(1,bottom)&&!menu.Region.IsVisible(menu.ClientSize.Width-2,bottom),
                                     "Menu corners stay rounded when Opening hides all but one item.");
-                                menu.Close();
+                                Func<int,int,IntPtr> coordinates=(x,y)=>new IntPtr((x&0xffff)|((y&0xffff)<<16));
+                                var insideWheel=Message.Create(menu.Handle,0x020A,IntPtr.Zero,coordinates(menu.Left+20,menu.Top+20));
+                                check(!((IMessageFilter)menu).PreFilterMessage(ref insideWheel)&&menu.Visible,"Inside wheel keeps the menu open.");
+                                var outsideWheel=Message.Create(owner.Handle,0x020A,IntPtr.Zero,coordinates(menu.Right+1,menu.Top+20));
+                                check(!((IMessageFilter)menu).PreFilterMessage(ref outsideWheel)&&!menu.Visible,
+                                    "Outside wheel dismisses the menu and leaves the wheel message available.");
                             }
                             using(var picker=new GeneralPicker{Size=new Size(268,44),Location=new Point(320,126)}){
                                 owner.Controls.Add(picker);picker.Items.AddRange(new object[]{"Português","English"});picker.SelectedIndex=0;

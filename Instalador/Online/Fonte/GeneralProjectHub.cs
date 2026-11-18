@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -71,6 +71,8 @@ internal sealed partial class GeneralModWindow {
         foreach(DataGridViewRow row in grid.Rows){
             var work=row.Tag as Work;
             if(work!=null)row.Cells["Size"].Value=BodyOptionSpace(work);
+            var folder=row.Tag as FolderRow;
+            if(folder!=null){SetFolderSpace(row,folder);grid.InvalidateRow(row.Index);}
             var section=row.Tag as SectionRow;
             if(section!=null&&section.Kind=="heading"){
                 section.Size=CategorySize(section.ModIds);
@@ -79,6 +81,42 @@ internal sealed partial class GeneralModWindow {
         }
         UpdateCounts();
     }
+    long? ExpectedDownloadBytes(GeneralModEntry mod){
+        var work=MakeWork(mod);
+        if(work.Variant.CyberpunkId!=null){
+            var assets=ProfileRecipe(work).Assets;
+            return assets.Count>0&&assets.All(asset=>asset.Size>0)
+                ?(long?)assets.GroupBy(asset=>asset.Sha256,StringComparer.Ordinal).Sum(group=>group.First().Size):null;
+        }
+        long size=0;
+        foreach(string source in work.Variant.Sources.Distinct(StringComparer.Ordinal)){
+            GeneralSourceInfo info;
+            if(!work.Variant.SourceInfo.TryGetValue(source,out info)&&!sourceMetadata.TryGetValue(source,out info))return null;
+            if(info==null||info.Bytes<=0)return null;
+            size+=info.Bytes;
+        }
+        return size>0?(long?)size:null;
+    }
+
+    void SetFolderSpace(DataGridViewRow row,FolderRow folder){
+        var ids=new HashSet<string>(folder.Folder.ModIds,StringComparer.Ordinal);
+        long? installed=measuredStorage.CategoryBytes(ids);
+        long estimate=0;
+        int unknown=0;
+        foreach(var mod in state.List.Mods.Where(mod=>ids.Contains(mod.Id)&&!measuredMods.ContainsKey(mod.Id))){
+            long? bytes=ExpectedDownloadBytes(mod);
+            if(bytes.HasValue)estimate+=bytes.Value;else unknown++;
+        }
+        folder.Size=installed.HasValue||estimate>0
+            ?(estimate>0?"≈ ":unknown>0?"≥ ":"")+GeneralStorageSize.Format(installed.GetValueOrDefault()+estimate):"—";
+        string detail=T("Total da pasta · arquivos instalados e tamanho cadastrado dos downloads pendentes.",
+            "Folder total · installed files and registered sizes of pending downloads.");
+        if(unknown>0)detail+="\n"+String.Format(T("{0} mod(s) sem tamanho conhecido.","{0} mod(s) have unknown sizes."),unknown);
+        row.Cells["Size"].Value=folder.Size;
+        row.Cells["Size"].ToolTipText=detail;
+        row.Cells["Name"].ToolTipText=folder.Folder.Name+"\n"+detail;
+    }
+
     string CategorySize(string[] ids){
         if(ids.Length==0)return "";
         long? bytes=measuredStorage.CategoryBytes(ids);

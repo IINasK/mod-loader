@@ -59,6 +59,110 @@ internal sealed partial class GeneralModWindow {
         GeneralStyle.UseTheme("light");GeneralStyle.Language="pt";
         Safe.WriteJson(Path.Combine(root,"resultado-project-search.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});
     }
+    static void CheckTableSelection(GeneralModWindow form,string root,GeneralModEntry first,GeneralModEntry second,
+        GeneralModEntry third,Action<bool,string> check){
+        var grid=form.grid;
+        Func<GeneralModEntry,DataGridViewRow> row=entry=>form.ModRows().Single(item=>Equals(item.Tag,entry.Id));
+        Func<string,Type,MethodInfo> input=(method,type)=>typeof(DataGridView).GetMethod(method,
+            BindingFlags.Instance|BindingFlags.NonPublic,null,new[]{type},null);
+        var click=input("OnCellMouseClick",typeof(DataGridViewCellMouseEventArgs));
+        var down=input("OnCellMouseDown",typeof(DataGridViewCellMouseEventArgs));
+        var move=input("OnMouseMove",typeof(MouseEventArgs));
+        var up=input("OnMouseUp",typeof(MouseEventArgs));
+        int nameColumn=grid.Columns["Name"].Index,markColumn=grid.Columns["Mark"].Index;
+        Action<int,int,MethodInfo,MouseButtons> cell=(column,index,method,button)=>method.Invoke(grid,new object[]{
+            new DataGridViewCellMouseEventArgs(column,index,10,10,new MouseEventArgs(button,1,10,10,0))
+        });
+        cell(nameColumn,row(first).Index,click,MouseButtons.Left);
+        check(form.marked.SetEquals(new[]{first.Id}),"Clique no nome marca um mod.");
+        form.SelectTableRow(row(second),Keys.Control,false);
+        check(form.marked.SetEquals(new[]{first.Id,second.Id}),"Ctrl alterna a seleção sem perder o primeiro mod.");
+        form.SelectTableRow(row(third),Keys.Control|Keys.Shift,false);
+        check(form.marked.SetEquals(new[]{first.Id,second.Id,third.Id}),"Ctrl+Shift acrescenta o intervalo na ordem visual.");
+        cell(nameColumn,row(third).Index,click,MouseButtons.Left);
+        check(form.marked.SetEquals(new[]{third.Id}),"Clique solto substitui a seleção anterior.");
+        grid.FirstDisplayedScrollingRowIndex=row(first).Index;
+        Action<GeneralModEntry,GeneralModEntry> stroke=(from,to)=>{
+            cell(markColumn,row(from).Index,down,MouseButtons.Left);
+            var bounds=grid.GetCellDisplayRectangle(markColumn,row(to).Index,false);
+            var pointer=new MouseEventArgs(MouseButtons.Left,0,bounds.X+bounds.Width/2,bounds.Y+bounds.Height/2,0);
+            check(form.markStrokeRow==row(from)&&grid.HitTest(pointer.X,pointer.Y).RowIndex==row(to).Index,
+                "O gesto começa na caixa e alcança a linha de destino visível.");
+            move.Invoke(grid,new object[]{pointer});
+            check(form.markStrokeMoved,"Mover o ponteiro com o botão pressionado ativa o arraste.");
+            up.Invoke(grid,new object[]{pointer});
+        };
+        stroke(third,second);
+        check(form.marked.Count==0,"Arrastar a caixa marcada desmarca a origem e o intervalo.");
+        stroke(first,second);
+        check(form.marked.SetEquals(new[]{first.Id,third.Id,second.Id}),"Arrastar a caixa vazia marca a origem e o intervalo.");
+        stroke(second,first);
+        check(form.marked.Count==0,"Arrastar para cima a partir de uma caixa marcada desmarca todo o intervalo.");
+        form.SelectTableRow(row(first),Keys.None,false);
+        form.SelectTableRow(row(second),Keys.Shift,false);
+        check(form.marked.SetEquals(new[]{first.Id,third.Id,second.Id}),"Shift seleciona o intervalo completo entre a âncora e o clique.");
+        grid.CurrentCell=row(first).Cells["Name"];
+        var menu=grid.ContextMenuStrip;
+        menu.Show(grid,new Point(20,20));
+        var create=menu.Items.Find("CreateModFolder",false).Single();
+        bool offered=create.Available;
+        menu.Close();
+        check(offered,"O menu oferece criar pasta para vários mods.");
+        var firstVariant=form.state.List.Mods.Single(mod=>mod.Id==first.Id).Variants[0];
+        firstVariant.SourceInfo[firstVariant.Sources[0]]=new GeneralSourceInfo{Name="Tamanho cadastrado",Bytes=2400};
+        using(var chooser=new Timer{Interval=60}){
+            chooser.Tick+=(s,e)=>{
+                var dialog=Application.OpenForms.OfType<GeneralNameDialog>().FirstOrDefault();
+                if(dialog==null)return;
+                chooser.Stop();
+                AllControls(dialog).OfType<TextBox>().Single(box=>box.Name=="NameInput").Text="Pasta de teste";
+                AllControls(dialog).OfType<GeneralPicker>().Single(mode=>mode.Name=="FolderSelectionMode").SelectedIndex=1;
+                ((Button)dialog.AcceptButton).PerformClick();
+            };
+            chooser.Start();create.PerformClick();
+        }
+        var folder=form.state.List.Folders.Single();
+        check(folder.SingleSelection&&form.marked.Count==1,"O modo escolhido na criação limita a pasta a uma seleção.");
+        form.SelectTableRow(row(third),Keys.Control,false);
+        check(form.marked.SetEquals(new[]{third.Id}),"Selecionar outro mod substitui a escolha na pasta de seleção única.");
+        var heading=grid.Rows.Cast<DataGridViewRow>().Single(item=>item.Tag is FolderRow);
+        check(!grid.Columns["Variant"].Visible&&Equals(heading.Cells["Size"].Value,"≈ "+GeneralStorageSize.Format(2400))&&
+            heading.Cells["Size"].ToolTipText.Contains("2 mod(s)"),
+            "A coluna Variante fica fora da tabela e a pasta inclui o download pendente com tamanho cadastrado.");
+        check(folder.ModIds.Count==3&&form.folderBranches.Count==3&&
+            form.ModRows().Select(item=>(string)item.Tag).SequenceEqual(new[]{first.Id,third.Id,second.Id})&&
+            form.ModRows().All(item=>item.Cells["Name"].Style.Padding.Left>FolderTitleInset),
+            "A pasta preserva a ordem visual e recua mods de categorias diferentes sem duplicar linhas.");
+        form.ToggleModFolder((FolderRow)heading.Tag);
+        check(form.ModRows().All(item=>!item.Visible)&&form.TableSelectionIds().ToArray().Length==3,
+            "Recolher a pasta oculta filhos e preserva a seleção em lote.");
+        heading=grid.Rows.Cast<DataGridViewRow>().Single(item=>item.Tag is FolderRow);
+        form.ToggleModFolder((FolderRow)heading.Tag);
+        CaptureUi(form,Path.Combine(root,"mod-folder.png"));
+        form.SaveProjectEdits();
+        string exported=Path.Combine(root,"folder-list.json");
+        form.library.Export(exported,form.state.List);
+        check(form.library.Load().List.Folders.Single().ModIds.Count==3&&form.library.Import(exported).Folders.Single().SingleSelection,
+            "A pasta sobrevive ao salvamento e à exportação/importação da lista.");
+        form.DissolveModFolder(folder);form.SaveProjectEdits();
+        form.marked.Clear();form.tableSelectionAnchor=null;form.updateFocusedId=null;form.DrawRows();
+        check(form.state.List.Folders.Count==0&&form.ModRows().Count()==3,"Desagrupar mantém os mods cadastrados.");
+        Func<string,DataGridViewRow> group=category=>grid.Rows.Cast<DataGridViewRow>().Single(item=>{
+            var headingTag=item.Tag as SectionRow;
+            return headingTag!=null&&headingTag.Kind=="heading"&&headingTag.Category==category;
+        });
+        var principal=group("Principal");
+        int origin=grid.Columns["Origin"].Index;
+        check(form.GroupArrowAt(principal,origin,grid.Columns[origin].Width-8),
+            "O arraste de categorias começa na região da seta.");
+        form.BeginGroupStroke(principal);form.EndGroupStroke(group("Veículos").Index);
+        check(form.collapsedCategories.IsSupersetOf(new[]{"Principal","Veículos"})&&form.ModRows().All(item=>!item.Visible),
+            "Arrastar de uma categoria aberta recolhe as categorias atravessadas.");
+        form.BeginGroupStroke(group("Veículos"));form.EndGroupStroke(group("Principal").Index);
+        check(!form.collapsedCategories.Overlaps(new[]{"Principal","Veículos"})&&form.ModRows().All(item=>item.Visible),
+            "Arrastar para cima de uma categoria recolhida abre o intervalo.");
+    }
+
     internal static void RunRedesignTests(string parent){
         string root=OnlineTests.NestedRoot(parent,"redesign-");Directory.CreateDirectory(root);
         string archive=TestZip(root,"original.zip","mods/item.txt","unchanged");
@@ -70,6 +174,7 @@ internal sealed partial class GeneralModWindow {
         var state=new GeneralModState{List=list,SelectedPreset="kit",Destination=root,DownloadFolder=root};
         var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
         TestForm(FixedData.Load(),state,Path.Combine(root,"state"),root,async form=>{
+            CheckTableSelection(form,root,first,second,third,check);
             check(form.tableName.Text=="Kit original"&&!form.tableName.ReadOnly,"Título integrado usa o nome do preset ativo.");
             form.tableName.Text="Kit renomeado";form.SaveTableTitle();check(list.Presets[0].Name=="Kit renomeado"&&form.preset.SelectedItem.ToString()=="Kit renomeado","Renomear a tabela atualiza e persiste o preset.");
             first=form.state.List.Mods.Single(mod=>mod.Id==first.Id);
@@ -146,10 +251,10 @@ internal sealed partial class GeneralModWindow {
             var coverageView=(GeneralScrollView)form.grid.Parent.Parent;
             coverageView.ScrollTo(30);
             await Task.Delay(30);
-            check(!form.clearFilters.Visible,"Rolar para baixo recolhe as ferramentas antes do clique na barra.");
+            check(!form.tableTools.Visible&&form.clearFilters.Visible,"Rolar recolhe as ferramentas e mantém o comando de limpar no cabeçalho.");
             clickSegment.Invoke(coverageBar,new object[]{new MouseEventArgs(MouseButtons.Left,1,coverageBar.Width-7,24,0)});
             await Task.Delay(30);
-            check(form.clearFilters.Visible&&form.grid.FirstDisplayedScrollingRowIndex==0&&coverageView.Bar.Limit==0,
+            check(form.tableTools.Visible&&form.clearFilters.Visible&&form.grid.FirstDisplayedScrollingRowIndex==0&&coverageView.Bar.Limit==0,
                 "A barra volta ao topo, restaura a seta e oculta a rolagem quando o resultado cabe na tabela.");
             CaptureUi(form,Path.Combine(root,"coverage-filter.png"));
             form.categoryFilters=new HashSet<string>{"Principal"};
@@ -158,7 +263,9 @@ internal sealed partial class GeneralModWindow {
             form.statusFilters=new HashSet<string>{"Instalado"};
             form.nameFilter="Beta";
             form.SetAssociationSearch("Beta");
-            check(form.clearFilters.Enabled&&form.clearFilters.Left==form.deletePreset.Right,"A seta de limpar filtros fica ao lado da lixeira.");
+            check(form.clearFilters.Enabled&&form.clearFilters.Parent==form.grid&&
+                form.clearFilters.Right<=form.grid.GetCellDisplayRectangle(form.grid.Columns["Mark"].Index,-1,false).Left,
+                "A seta de limpar filtros fica à esquerda da caixa de seleção.");
             form.clearFilters.PerformClick();
             check(!form.HasListFilters&&!form.clearFilters.Enabled&&form.searchBox.Text==""&&
                 form.VisibleMods().Count==160&&form.marked.SetEquals(new[]{second.Id})&&form.state.SelectedPreset=="kit",
@@ -244,7 +351,8 @@ internal sealed partial class GeneralModWindow {
             CaptureUi(form,Path.Combine(root,"tabela-clara.png"));
             using(var menu=new GeneralActionsMenu()){
                 menu.StartPosition=FormStartPosition.Manual;menu.Location=new Point(-30000,-30000);menu.Show(form);Application.DoEvents();
-                check(menu.Width==350&&menu.Height==516&&AllControls(menu).OfType<Button>().Count(button=>button.Name!="")==8,"Menu em coluna inclui a captura manual.");
+                check(menu.Width==350&&AllControls(menu).OfType<Button>().Count(button=>button.Name!="")==8&&
+                    AllControls(menu).OfType<Button>().Any(button=>button.Name=="save-menu"),"Menu agrupa navegação e ferramentas.");
                 CaptureUi(menu,Path.Combine(root,"menu-unico.png"));menu.Close();
             }
             using(var editor=new GeneralCategoryDetails("Principal","",false,true)){

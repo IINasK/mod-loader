@@ -15,7 +15,7 @@ internal static class GeneralModUpdatesTests {
         var link=GeneralNexusLink.Parse("https://www.nexusmods.com/skyrimspecialedition/mods/42?tab=files&file_id=10");
         string files="{\"files\":[{\"file_id\":10,\"category_id\":4,\"version\":\"1.0\"},{\"file_id\":11,\"category_id\":4,\"version\":\"1.1\"},{\"file_id\":12,\"category_id\":1,\"version\":\"1.2\"}],\"file_updates\":[{\"old_file_id\":10,\"new_file_id\":11},{\"old_file_id\":11,\"new_file_id\":12}]}";
         var result=NexusUpdateSession.Parse(files,link);
-        check(result.State=="update"&&result.Version=="1.2"&&result.Url.Contains("skyrimspecialedition/mods/42"),"Follow author-declared update chain preserving game/mod identity");
+        check(result.State=="update"&&result.SourceVersion=="1.0"&&result.Version=="1.2"&&result.Url.Contains("skyrimspecialedition/mods/42"),"Follow author-declared update chain preserving game/mod identity");
         link.File=12;check(NexusUpdateSession.Parse(files,link).State=="current","Selected current variant has no reported successor");
         link.File=0;check(NexusUpdateSession.Parse(files,link).State=="choose-file","Mod page alone does not guess file variant");link.File=10;
         check(NexusUpdateSession.Parse(files.Replace("\"new_file_id\":12","\"new_file_id\":10"),link).State=="ambiguous","Update chain cycle is rejected");
@@ -52,6 +52,21 @@ internal static class GeneralModUpdatesTests {
         check(rejected.Check(link,()=>true).Result.State=="authentication","Invalid key never claims latest version");
         var offline=new NexusUpdateSession("fixture-key",(GeneralNexusLink source,string key,out HttpStatusCode status)=>{status=0;return null;});
         check(offline.Check(link,()=>true).Result.State=="unavailable","Offline is unknown rather than current");
+        int githubCalls=0;
+        var github=new GithubModUpdateSession(endpoint=>{
+            Interlocked.Increment(ref githubCalls);
+            if(endpoint.AbsoluteUri!="https://api.github.com/repos/example/any-game/releases/latest")
+                throw new IOException("The source must resolve to its official repository release endpoint.");
+            return "{\"tag_name\":\"v2.1\",\"draft\":false,\"prerelease\":false}";
+        });
+        var upstream=github.Check("https://github.com/example/any-game/releases/download/v2.0/asset.zip",()=>true).Result;
+        check(upstream.State=="update"&&upstream.SourceVersion=="v2.0"&&upstream.Version=="v2.1"&&githubCalls==1,
+            "GitHub mod releases use the repository independently of game or mod name.");
+        check(github.Check("https://github.com/example/any-game/releases/download/v2.1/other.zip",()=>true).Result.State=="current"&&githubCalls==1,
+            "Multiple assets in one GitHub repository reuse the release response.");
+        check(!GithubModUpdateSession.Supports("https://github.com.evil.example/example/any-game/releases/download/v2.0/asset.zip")&&
+            !GithubModUpdateSession.Supports("https://raw.githubusercontent.com/example/any-game/commit/mod.lua"),
+            "Unverified release identities are not guessed.");
         string credentialRoot=Path.Combine(root,"credentials");
         NexusCredentials.Save(credentialRoot,"fixture-private-key");
         check(!System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(credentialRoot,"nexus-key.dat"))).Contains("fixture-private-key"),"Credential protected by per-user DPAPI");
@@ -65,57 +80,278 @@ internal static class GeneralModUpdatesTests {
 }
 
 internal sealed partial class GeneralModWindow {
+    internal static void RunArchiveXLUpdateTest(string parent,string sources){
+        string root=OnlineTests.NestedRoot(parent,"archive-update-");
+        Directory.CreateDirectory(root);
+        string game=Safe.In(root,"g"),saves=Directory.CreateDirectory(Safe.In(root,"s")).FullName;
+        string executable=Safe.In(game,"bin/x64/Cyberpunk2077.exe");
+        Directory.CreateDirectory(Path.GetDirectoryName(executable));
+        File.Copy(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"..","FixtureGame.exe"),executable);
+        File.WriteAllText(Safe.In(game,".fixture-only"),"test");
+        Directory.CreateDirectory(Safe.In(game,"archive/pc/ep1"));
+        File.WriteAllText(Safe.In(game,"archive/pc/ep1/ep1.addcont_keystone"),"");
+        var current=FixedData.Load();
+        current.GameFileVersion="2.5.0.0";
+        var list=GeneralModLibrary.Seed(current,new ModImportItem[0]);
+        var after=current.Packages.Single(mod=>mod.Id=="ArchiveXL");
+        list.Mods.Single(mod=>mod.Id==after.Id).Variants.Single().Sources=after.PreviousRelease.Assets.Select(asset=>asset.Url).ToList();
+        var legacy=CatalogModVersions.ForReceipt(current,new InstalledSnapshotManifest{List=list});
+        var before=legacy.Packages.Single(mod=>mod.Id==after.Id);
+        var cache=new DownloadCache(Safe.In(root,"cache"));
+        foreach(var asset in before.Assets.Concat(after.Assets).Concat(current.Packages.Single(mod=>mod.Id=="NightCoop").Assets))
+            cache.Import(Safe.In(sources,asset.Name),asset);
+        new FixedInstaller(legacy,cache,game,saves,true).Install(new[]{before.Id},true,_=>{});
+        var scan=FixedData.Scan(after,game);
+        if(scan.State!=UpdateAvailableStatus||scan.Original!=4||scan.Different!=0||scan.Missing!=0)
+            throw new IOException("ArchiveXL 1.28.6 did not produce the update badge.");
+        var state=new GeneralModState{List=list,Destination=game,DownloadFolder=root,Language="pt"};
+        TestForm(current,state,Safe.In(root,"app"),root,async form=>{
+            form.testModUpdateSession=new NexusUpdateSession(null);
+            await form.Scan();
+            await WaitForVersionCheck(form);
+            var archive=form.state.List.Mods.Single(mod=>mod.Id==before.Id);
+            var basis=form.state.List.Mods.Single(mod=>mod.Id=="NightCoop");
+            var archiveRow=form.ModRows().Single(row=>Equals(row.Tag,archive.Id));
+            if(!Equals(archiveRow.Cells["Status"].Value,"Atualizar · 1.28.6")||form.primaryAction.Text!="Atualizar mods")
+                throw new IOException("The real scan did not display the update badge and batch action: "+archiveRow.Cells["Status"].Tag+" / "+form.primaryAction.Text);
+            string baseKey=form.MakeWork(basis).Key;
+            form.statuses[baseKey]=UpdateAvailableStatus;
+            if(form.SelectedUpdates().Count!=2)throw new IOException("No selection did not include both update candidates.");
+            form.updateFocusedId=archive.Id;
+            form.RefreshPrimaryAction();
+            if(form.primaryAction.Text!="Atualizar mod"||form.SelectedUpdates().Single().Entry.Id!=archive.Id)
+                throw new IOException("Selecting a row did not restrict the update.");
+            form.marked.Add(basis.Id);
+            if(form.SelectedUpdates().Single().Entry.Id!=basis.Id)throw new IOException("A mark did not restrict the batch.");
+            form.marked.Add(archive.Id);
+            if(form.SelectedUpdates().Count!=2)throw new IOException("Marking both updates did not select both.");
+            form.marked.Clear();
+            form.statuses[baseKey]="Instalado";
+            var selected=form.SelectedUpdates().Single();
+            int prompts=0;
+            form.testVersionChoice=difference=>{prompts++;return false;};
+            await form.RunWork(selected,game,false);
+            if(prompts!=1||!FixedData.Scan(before,game).IsCorrect||form.SelectedUpdates().Count!=1)
+                throw new IOException("Closing the version choice must leave the recognized update available.");
+            selected=form.SelectedUpdates().Single();
+            selected.UpdateRequested=true;
+            await form.RunWork(selected,game,false);
+            if(prompts!=1||!FixedData.Scan(after,game).IsCorrect||form.SelectedUpdates().Count!=0)
+                throw new IOException("An explicit update must install the known successor without a second confirmation.");
+        });
+        Safe.WriteJson(Safe.In(root,"result.json"),new{Passed=true,Previous=before.Version,Installed=after.Version,RealGameTouched=false});
+    }
+
+    static async Task WaitForVersionCheck(GeneralModWindow form){
+        for(int tries=0;form.checkingModUpdates&&tries<100;tries++)await Task.Delay(20);
+        if(form.checkingModUpdates)throw new IOException("The fixture version check did not finish.");
+    }
+
+    static void CheckInstalledVersionRows(string root){
+        string destination=Directory.CreateDirectory(Safe.In(root,"version-game")).FullName;
+        string source=Safe.In(root,"fixture-version.zip");
+        using(var zip=System.IO.Compression.ZipFile.Open(source,System.IO.Compression.ZipArchiveMode.Create))
+        using(var text=new StreamWriter(zip.CreateEntry("mods/sample.txt").Open()))text.Write("installed payload");
+        string nexus="https://www.nexusmods.com/skyrimspecialedition/mods/42?tab=files&file_id=10";
+        var entry=NewEntry("Installed fixture",nexus);
+        var missing=NewEntry("Not installed fixture","https://www.nexusmods.com/skyrimspecialedition/mods/44?tab=files&file_id=10");
+        var state=new GeneralModState{Destination=destination,DownloadFolder=root,Language="pt",Theme="dark",
+            List=new GeneralModList{Mods=new List<GeneralModEntry>{entry,missing}}};
+        TestForm(FixedData.Load(),state,Safe.In(root,"version-data"),root,async form=>{
+            var installed=form.state.List.Mods.Single(mod=>mod.Id==entry.Id);
+            var job=form.MakeWork(installed);
+            form.Generic(destination).Install(source,job.Receipt(0),_=>{});
+            int requests=0,startedBeforeLocal=0;
+            using(var lookupStarted=new ManualResetEventSlim()){
+                form.testStage=(key,phase)=>{
+                    if(phase=="scan.begin"&&startedBeforeLocal==0){
+                        if(!lookupStarted.Wait(3000))throw new IOException("Nexus lookup must start alongside the local scan.");
+                        startedBeforeLocal++;
+                    }
+                };
+                form.testModUpdateSession=new NexusUpdateSession("fixture-key",(GeneralNexusLink link,string key,out HttpStatusCode status)=>{
+                    Interlocked.Increment(ref requests);
+                    lookupStarted.Set();
+                    status=HttpStatusCode.OK;
+                    return "{\"files\":[{\"file_id\":10,\"category_id\":4,\"version\":\"1.0\"},{\"file_id\":11,\"category_id\":1,\"version\":\"1.1\"}],\"file_updates\":[{\"old_file_id\":10,\"new_file_id\":11}]}";
+                });
+                form.testGithubUpdateSession=new GithubModUpdateSession(_=>{throw new IOException("These fixtures only reference Nexus.");});
+                try{await form.Scan();}
+                finally{form.testStage=null;}
+            }
+            if(startedBeforeLocal!=1)throw new IOException("The fixture did not observe an overlapping lookup.");
+            form.updateFocusedId=installed.Id;
+            form.RefreshPrimaryAction();
+            if(form.primaryAction.Text!="Abrir atualização")throw new IOException("Selecting an online update must not fall back to Disable.");
+            var open=form.launch;
+            string openedLink=null;
+            form.launch=url=>openedLink=url;
+            try{form.StartSelected();}
+            finally{form.launch=open;}
+            if(openedLink!=nexus.Replace("file_id=10","file_id=11"))throw new IOException("The action must open the reported successor file.");
+            form.updateFocusedId=null;
+            Func<DataGridViewRow> installedRow=()=>form.ModRows().Single(row=>Equals(row.Tag,entry.Id));
+            var cell=installedRow().Cells["Status"];
+            if(requests!=2||!Equals(cell.Tag,UpdateAvailableStatus)||!Equals(cell.Value,"Atualizar · 1.0")||
+                !cell.ToolTipText.Contains("origem 1.1")||form.InstallableUpdates().Count!=0)
+                throw new IOException("Scan must show the installed API file version and the available successor as distinct values.");
+            if(StatusFilterKey(GeneralStatusPresentation.Label(UpdateAvailableStatus))!="update")
+                throw new IOException("The short update label must still use the update filter.");
+            var absent=form.ModRows().Single(row=>Equals(row.Tag,missing.Id)).Cells["Status"];
+            if(Convert.ToString(absent.Value).Contains("1.0")||form.modUpdates.Single(row=>row.Key==form.MakeWork(missing).Key).Online.State!="update"||
+                !form.ModVersionSummary().Contains("2/2 consultados"))
+                throw new IOException("An absent mod is checked at the source and has no installed-version badge.");
+            Action<VersionFilter> activate=filter=>{
+                var label=form.footerNumbers[(int)filter];
+                typeof(LinkLabel).GetMethod("OnLinkClicked",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)
+                    .Invoke(label,new object[]{new LinkLabelLinkClickedEventArgs(label.Links[0])});
+            };
+            activate(VersionFilter.Review);
+            if((form.ModRows().Select(row=>row.Tag).SingleOrDefault() as string)!=entry.Id||!form.clearFilters.Enabled)
+                throw new IOException("Review must filter the main table to the installed mod.");
+            activate(VersionFilter.Update);
+            if(form.ModRows().Any())throw new IOException("Update must include only actionable updates.");
+            activate(VersionFilter.Checked);
+            if(form.ModRows().Count()!=2)throw new IOException("Checked must show both consulted mods.");
+            activate(VersionFilter.Pending);
+            if(form.ModRows().Any())throw new IOException("Pending must exclude checked mods.");
+            form.clearFilters.PerformClick();
+            if(form.HasListFilters||form.ModRows().Count()!=2)throw new IOException("The header undo must clear a version filter.");
+            using(var image=new Bitmap(form.Width,form.Height)){
+                form.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));
+                image.Save(Safe.In(root,"installed-version-table.png"));
+            }
+            form.testModUpdateSession=new NexusUpdateSession(null,(GeneralNexusLink link,string key,out HttpStatusCode status)=>{
+                throw new IOException("Without authentication the fixture must not request Nexus.");
+            });
+            var other=form.state.List.Mods.Single(mod=>mod.Id==missing.Id);
+            var sources=form.MakeWork(other).Variant.Sources;
+            sources.Add("https://github.com/fixture/mod/releases/download/v1.0/mod.zip");
+            var finishLookup=new TaskCompletionSource<bool>();
+            form.testGithubUpdateSession=new GithubModUpdateSession(_=>{
+                if(!finishLookup.Task.Wait(8000))throw new IOException("The local scan waited for GitHub.");
+                return null;
+            });
+            try{
+                await form.Scan();
+                if(form.scanning||!form.checkingModUpdates||form.selectedFooterAction!=FooterAction.ConnectNexus||!form.footerAction.Enabled)
+                    throw new IOException("The connection action must be available even with a pending background lookup.");
+            }finally{finishLookup.TrySetResult(true);}
+            await WaitForVersionCheck(form);
+            sources.RemoveAt(sources.Count-1);
+            await form.Scan();
+            await WaitForVersionCheck(form);
+            if(!Equals(installedRow().Cells["Status"].Value,"Instalado")||!form.ModVersionSummary().Contains("2 sem consulta")||
+                form.selectedFooterAction!=FooterAction.ConnectNexus)
+                throw new IOException("The local installation remains visible while the unauthenticated lookup remains unresolved.");
+            form.ClientSize=new Size(1000,680);
+            form.PerformLayout();
+            if(!form.footerNumbers[0].Text.StartsWith("0/2")||!form.footerNumbers[3].Text.StartsWith("2\n")||
+                form.versionFooter.Height<38||form.footerNumbers.Any(label=>label.Width<72))
+                throw new IOException("The footer filters must fit the compact layout.");
+            var footerPosition=form.versionFooter.PointToScreen(Point.Empty);
+            form.marked.Add(entry.Id);form.DrawRows();
+            if(form.selectedFooterAction!=FooterAction.Uninstall||!form.footerAction.Enabled||
+                form.versionFooter.PointToScreen(Point.Empty)!=footerPosition)
+                throw new IOException("Uninstall must stay accessible without moving the version filters.");
+            form.marked.Clear();form.DrawRows();
+            using(var capture=new Bitmap(form.Width,form.Height)){
+                form.DrawToBitmap(capture,new Rectangle(Point.Empty,capture.Size));
+                capture.Save(Safe.In(root,"version-footer.png"));
+            }
+            CheckNexusConnectionDialog(form,root);
+            using(var review=new GeneralDependencyReview("Arquivos locais · 2 mods conferidos\r\n"+form.ModVersionSummary()+
+                "\r\nTags do Nexus · 11 consultas indisponíveis",new GeneralDependencyIssue[0],0,_=>{},
+                new[]{new P2PSyncDifference{Kind="found",Path="mods/unlinked.txt"}})){
+                review.StartPosition=FormStartPosition.Manual;review.Location=new Point(-30000,-30000);
+                review.Show(form);
+                Application.DoEvents();
+                var button=AllControls(review).OfType<Button>().Single(control=>control.Name=="ShowUnlistedInventory");
+                var visibleLabels=AllControls(review).OfType<Label>().Where(label=>label.Visible).ToArray();
+                if(!button.Text.Contains("arquivos não vinculados")||!visibleLabels.Any(label=>label.Text.Contains("11 consultas"))||
+                    !visibleLabels.Any(label=>label.Text.Contains("Nenhuma pendência local")))
+                    throw new IOException("Verification must explain the unlinked inventory and preserve pending query results.");
+                using(var image=new Bitmap(review.Width,review.Height)){
+                    review.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));
+                    image.Save(Safe.In(root,"verification-results.png"));
+                }
+                review.Close();
+            }
+        });
+    }
+
+    static void CheckNexusConnectionDialog(GeneralModWindow form,string root){
+        string opened=null;
+        int attempts=0,stage=0;
+        Exception failure=null;
+        using(var dialog=new GeneralNexusConnectionDialog(url=>opened=url,key=>{
+            attempts++;
+            return Task.FromResult(key=="fixture-key"?NexusKeyCheck.Accepted:NexusKeyCheck.Rejected);
+        }))
+        using(var timer=new System.Windows.Forms.Timer{Interval=65}){
+            dialog.StartPosition=FormStartPosition.Manual;dialog.Location=new Point(-30000,-30000);
+            timer.Tick+=(s,e)=>{
+                try{
+                    var warning=Application.OpenForms.OfType<NexusKeyTrustDialog>().FirstOrDefault();
+                    if(warning!=null){
+                        if(opened!=null||!AllControls(warning).OfType<GeneralSurface>().Any(surface=>surface.OutlineColor==Color.FromArgb(224,72,82)))
+                            throw new IOException("Confirm before opening Nexus, with a red-outline warning.");
+                        if(stage==2){
+                            stage++;
+                            warning.Controls.Find("TrustNexusNo",true).OfType<Button>().Single().PerformClick();
+                        }else{
+                            using(var capture=new Bitmap(warning.Width,warning.Height)){
+                                warning.DrawToBitmap(capture,new Rectangle(Point.Empty,capture.Size));
+                                capture.Save(Safe.In(root,"nexus-trust.png"));
+                            }
+                            warning.Controls.Find("TrustNexusYes",true).OfType<Button>().Single().PerformClick();
+                        }
+                        return;
+                    }
+                    var input=AllControls(dialog).OfType<TextBox>().Single(control=>control.Name=="NexusPersonalKey");
+                    var submit=AllControls(dialog).OfType<Button>().Single(control=>control.Name=="ValidateNexusKey");
+                    if(stage++==0){
+                        if(!input.UseSystemPasswordChar||submit.Enabled||opened!=null||
+                            !AllControls(dialog).OfType<Label>().Any(label=>label.Text.Contains("Personal API Key")&&label.Text.Contains("role até o fim"))||
+                            !AllControls(dialog).OfType<Button>().Any(button=>button.Name=="PasteNexusKey"&&button.Visible))
+                            throw new IOException("The dialog must explain which key to use before opening the browser.");
+                        var paste=AllControls(dialog).OfType<Button>().Single(button=>button.Name=="PasteNexusKey");
+                        if(paste.Height!=input.Parent.Height||paste.Bottom>paste.Parent.ClientSize.Height||
+                            paste.Top!=input.Parent.Top||paste.Left<=input.Parent.Right)
+                            throw new IOException("The paste button and masked field must fit on the same line.");
+                        using(var capture=new Bitmap(dialog.Width,dialog.Height)){
+                            dialog.DrawToBitmap(capture,new Rectangle(Point.Empty,capture.Size));
+                            capture.Save(Safe.In(root,"nexus-connection.png"));
+                        }
+                        var browse=AllControls(dialog).OfType<Button>().Single(control=>control.Name=="OpenNexusApiAccess");
+                        stage=2;browse.PerformClick();
+                        if(opened!=null)throw new IOException("Declining must not open the site.");
+                        browse.PerformClick();
+                        input.Text="invalid-fixture-key";submit.PerformClick();
+                    }else{
+                        if(!input.Enabled||dialog.PersonalKey!=null||
+                            opened!="https://next.nexusmods.com/settings/api-keys#:~:text=Personal%20API%20Key"||
+                            !AllControls(dialog).OfType<Label>().Single(label=>label.Name=="NexusConnectionFeedback").Text.Contains("recusou"))
+                            throw new IOException("A rejected personal key must stay editable and unsaved.");
+                        timer.Stop();input.Text="fixture-key";submit.PerformClick();
+                    }
+                }catch(Exception ex){
+                    failure=ex;timer.Stop();
+                    foreach(var warning in Application.OpenForms.OfType<NexusKeyTrustDialog>().ToArray())warning.Close();
+                    dialog.Close();
+                }
+            };
+            timer.Start();
+            var result=dialog.ShowDialog(form);
+            if(failure!=null)throw failure;
+            if(result!=DialogResult.OK||dialog.PersonalKey!="fixture-key"||attempts!=2)
+                throw new IOException("The connection dialog did not accept the validated test key.");
+        }
+    }
+
     internal static void RunModUpdateUiTests(string parent){
         string root=OnlineTests.NestedRoot(parent,"versions-ui-");Directory.CreateDirectory(root);
-        int checks=0;
-        foreach(string language in new[]{"pt","en"}){
-            var state=new GeneralModState{Language=language,Theme="dark",DownloadFolder=root};
-            TestForm(FixedData.Load(),state,Path.Combine(root,language),root,form=>{
-                form.modUpdates=new List<ModUpdateRow>{
-                    new ModUpdateRow{Name="Mod de exemplo",Key="example/main",Source="https://www.nexusmods.com/skyrimspecialedition/mods/42?tab=files&file_id=10",Expected="1.0",Local="2.0",LocalStatus=GeneralModInstaller.Modified,Online=new NexusUpdateResult{State="update",Version="2.1",Url="https://www.nexusmods.com/skyrimspecialedition/mods/42?tab=files&file_id=12"}},
-                    new ModUpdateRow{Name="Sem autenticação",Key="unknown/main",Online=NexusUpdateResult.Unknown("connect")}
-                };
-                form.ShowModUpdateNotice();
-                var manualNewer=new ModUpdateRow{Local="3.0",LocalStatus=GeneralModInstaller.Modified,Online=new NexusUpdateResult{State="update",Version="2.1"}};
-                if(!LocalAtLeastOnline(manualNewer)||!UpdateCaption(manualNewer).Contains(language=="pt"?"conferir":"verify"))throw new IOException("Newer manual version was called outdated");checks++;
-                if(!form.modUpdateNotice.Text.Contains(language=="pt"?"Conectar":"Connect"))throw new IOException("Missing connection notice");checks++;
-                Exception failed=null;int stage=0;var until=DateTime.UtcNow.AddSeconds(10);
-                using(var timer=new System.Windows.Forms.Timer{Interval=80}){
-                    timer.Tick+=(s,e)=>{
-                        var dialog=Application.OpenForms.Cast<Form>().FirstOrDefault(f=>f.Name=="ModVersions");
-                        try{
-                            if(DateTime.UtcNow>until)throw new IOException("Versions dialog timeout");
-                            if(dialog==null)return;
-                            var table=dialog.Controls.Find("ModVersionResults",true).OfType<DataGridView>().Single();
-                            if(stage==0){
-                                if(table.Rows.Count!=2||!Convert.ToString(table.Rows[0].Cells[2].Value).Contains(language=="pt"?"mais nova":"Newer"))throw new IOException("Manual newer version not shown");checks++;
-                                foreach(var button in AllControls(dialog).OfType<Button>()){
-                                    var bounds=dialog.RectangleToClient(button.RectangleToScreen(button.ClientRectangle));
-                                    if(bounds.Left<0||bounds.Top<0||bounds.Right>dialog.ClientSize.Width||bounds.Bottom>dialog.ClientSize.Height)throw new IOException("Versions button clipped: "+button.Text);
-                                }
-                                checks++;
-                                using(var capture=new Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(capture,new Rectangle(Point.Empty,capture.Size));capture.Save(Path.Combine(root,"versions-"+language+".png"));}
-                                stage++;
-                                AllControls(dialog).OfType<Button>().Single(b=>b.Text==(language=="pt"?"Revisar alteração":"Review change")).PerformClick();
-                            }else{
-                                var choice=Application.OpenForms.OfType<GeneralVersionChoiceDialog>().FirstOrDefault();
-                                if(choice==null)return;
-                                var replace=choice.Controls.Find("UseIncomingVersion",true).OfType<Button>().Single();
-                                if(replace.Enabled)throw new IOException("Advisory review permitted unverified replacement");checks++;
-                                choice.Controls.Find("KeepInstalledVersion",true).OfType<Button>().Single().PerformClick();
-                                timer.Stop();dialog.Close();
-                            }
-                        }catch(Exception ex){failed=ex;timer.Stop();foreach(var open in Application.OpenForms.Cast<Form>().Where(f=>f!=form).ToArray())open.Close();}
-                    };
-                    timer.Start();form.ShowModUpdates();timer.Stop();
-                }
-                if(failed!=null)throw failed;
-                if(stage!=1)throw new IOException("Review flow incomplete");
-                // Opening and going back again must not lose the observations.
-                if(form.modUpdates[0].Local!="2.0"||form.modUpdates[0].LocalStatus!=GeneralModInstaller.Modified)throw new IOException("Review altered evidence");checks++;
-                return Task.FromResult(0);
-            });
-        }
-        Safe.WriteJson(Path.Combine(root,"result.json"),new{Passed=true,Checks=checks,NativeWinForms=true});
+        CheckInstalledVersionRows(root);
+        Safe.WriteJson(Path.Combine(root,"result.json"),new{Passed=true,NativeWinForms=true});
     }
 }

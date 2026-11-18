@@ -20,7 +20,7 @@ internal sealed partial class GeneralModWindow {
         get {
             if(ActivePreset==null)return null;
             return InstalledSnapshot.Hash(Encoding.UTF8.GetBytes(Path.GetFullPath(state.Destination??".").ToUpperInvariant()+"\n"+Safe.Json.Serialize(PresetWorks().OrderBy(w=>w.Entry.Id).Select(w=>{
-                return new {w.Entry.Id,Recipe=PresetRecipeKey(w),Required=w.Variant.RequiredMods};
+                return new {w.Entry.Id,Recipe=PresetRecipeKey(w,forFingerprint:true),Required=w.Variant.RequiredMods};
             }).ToList())));
         }
     }
@@ -65,8 +65,11 @@ internal sealed partial class GeneralModWindow {
     bool IsPresetVersionSelected(Work choice) {
         return PresetWorks().Any(w=>SameVersion(w,choice));
     }
-    static string PresetRecipeKey(Work work) {
-        var identity=new {work.Variant.Id,work.Variant.Sources,work.Variant.InstallRoutes,work.Variant.CyberpunkId,work.Variant.CyberpunkVariant,work.BodyChoice};
+    string PresetRecipeKey(Work work,bool forFingerprint=false) {
+        // A pinned in-place update preserves the preset identity and keeps distinct package receipts.
+        var previous=forFingerprint?CatalogModVersions.Previous(catalog,work.Variant.CyberpunkId):null;
+        var sources=previous==null?work.Variant.Sources:previous.Assets.Select(asset=>asset.Url).ToList();
+        var identity=new {work.Variant.Id,Sources=sources,work.Variant.InstallRoutes,work.Variant.CyberpunkId,work.Variant.CyberpunkVariant,work.BodyChoice};
         return work.Entry.Id+"/r-"+InstalledSnapshot.Hash(Encoding.UTF8.GetBytes(Safe.Json.Serialize(identity))).Substring(0,40);
     }
     IEnumerable<Work> PresetUniverse() {
@@ -201,7 +204,7 @@ internal sealed partial class GeneralModWindow {
         presetCancellation=cancellation;
         loadingPreset=scanning=true;Busy(true);
         ShowPresetProgress(T("Conferindo preset","Checking preset"),0,0);
-        detail.Text=ActivePreset.Name;
+
         var updates=new Progress<Tuple<string,int,int>>(step=>{
             if(!IsDisposed&&presetCancellation==cancellation&&!cancellation.IsCancellationRequested)
                 ShowPresetProgress(step.Item1,step.Item2,step.Item3);
@@ -236,14 +239,13 @@ internal sealed partial class GeneralModWindow {
             UpdateOperationButton();
             applyMs=elapsed.ElapsedMilliseconds-discoveryMs;
             state.AppliedPreset=selected;state.AppliedPresetFingerprint=fingerprint;Persist();
-            presetIssues=result.Issues;presetProtected=new HashSet<string>(result.Protected.Keys,StringComparer.Ordinal);
-            detail.Text=result.Issues.Count==0?T("Preset carregado.","Preset loaded."):T("Carregado com exceções — clique para detalhes.","Loaded with exceptions — click for details.");
-            UpdatePresetIssueLink();
+            presetProtected=new HashSet<string>(result.Protected.Keys,StringComparer.Ordinal);
+
             scanning=false;
             ShowPresetProgress(T("Atualizando a lista do preset","Refreshing the preset list"),0,0);
             await Scan(workerLimit:workers);
             RefreshStorageSize();
-            RenderPresetResult();
+
             OnlineDiagnostics.Record("general.preset.complete",null,"Carregamento de preset concluído.",
                 new{Preset=selected,Workers=workers,DiscoveryMs=discoveryMs,ApplyMs=applyMs,
                     RefreshMs=elapsed.ElapsedMilliseconds-discoveryMs-applyMs,TotalMs=elapsed.ElapsedMilliseconds,
@@ -254,7 +256,7 @@ internal sealed partial class GeneralModWindow {
             if(!cancellation.IsCancellationRequested)throw;
             OnlineDiagnostics.Record("general.preset.cancelled",null,"Troca cancelada.",new{Preset=selected,TotalMs=elapsed.ElapsedMilliseconds});
             presetCancellation=null;
-            detail.Text=T("Troca cancelada. A combinação anterior foi mantida.","Switch cancelled. The previous selection was kept.");
+
             ShowPresetProgress(T("Troca cancelada","Switch cancelled"),0,0);
             currentProgress.Indeterminate=false;
             currentProgress.NotApplicable=true;
@@ -279,21 +281,18 @@ internal sealed partial class GeneralModWindow {
         currentProgress.Caption=total==0?stage+"…":done==total?stage:stage+" · "+done+" / "+total;
         currentProgress.Value=total>0?100*done/total:0;
     }
-    void RenderPresetResult() {
-        if(presetIssues.Count>0){detail.Text=T("Carregado com exceções — clique para detalhes.","Loaded with exceptions — click for details.");UpdatePresetIssueLink();}
-    }
-    List<string> presetIssues=new List<string>();
+
+
     HashSet<string> presetProtected=new HashSet<string>(StringComparer.Ordinal);
     void ReadPresetPresentation() {
-        presetIssues.Clear();presetProtected.Clear();
+        presetProtected.Clear();
         if(String.IsNullOrWhiteSpace(state.Destination)||!Directory.Exists(state.Destination))return;
         try {
             var deployed=new GeneralPresetDeployment(state.Destination,data).Read();
-            presetIssues=deployed.Issues.Select(issue=>issue
-                .Replace("alterado fora do Mod Loader; mantido sem alterações.","arquivos divergentes do registro; instalação local preservada.")
-                .Replace("changed outside Mod Loader; left unchanged.","files differ from the record; local installation preserved.")).ToList();
-            presetProtected.UnionWith(deployed.Protected.Keys);state.AppliedPreset=deployed.Preset;state.AppliedPresetFingerprint=deployed.Fingerprint;UpdatePresetIssueLink();
-        }catch(IOException ex){startupIssue=ex.Message;}catch(UnauthorizedAccessException ex){startupIssue=ex.Message;}
+
+            presetProtected.UnionWith(deployed.Protected.Keys);state.AppliedPreset=deployed.Preset;state.AppliedPresetFingerprint=deployed.Fingerprint;
+        }catch(IOException ex){OnlineDiagnostics.Failure("general.preset.read.failed",ex,"Ler o estado do preset.");}
+        catch(UnauthorizedAccessException ex){OnlineDiagnostics.Failure("general.preset.read.failed",ex,"Ler o estado do preset.");}
     }
     void AdoptReceivedPreset() {
         if(state.AppliedPreset!=null||state.SnapshotReceipts.Count==0||String.IsNullOrWhiteSpace(state.Destination)||!Directory.Exists(state.Destination))return;
@@ -309,7 +308,8 @@ internal sealed partial class GeneralModWindow {
             string fingerprint=PresetFingerprint;
             if(!new GeneralPresetDeployment(state.Destination,data).AdoptReceived(received,fingerprint))return;
             state.AppliedPreset=received;state.AppliedPresetFingerprint=fingerprint;RefreshPrimaryAction();
-        }catch(IOException ex){startupIssue=ex.Message;}catch(UnauthorizedAccessException ex){startupIssue=ex.Message;}
+        }catch(IOException ex){OnlineDiagnostics.Failure("general.preset.read.failed",ex,"Ler o estado do preset.");}
+        catch(UnauthorizedAccessException ex){OnlineDiagnostics.Failure("general.preset.read.failed",ex,"Ler o estado do preset.");}
     }
     async Task RecoverPresetOnOpen() {
         if(!PresetRecoveryPending)return;
@@ -320,52 +320,25 @@ internal sealed partial class GeneralModWindow {
                 using(Generic(root).ProjectDeletionLock())engine.Recover();
             });
             var restored=engine.Read();state.AppliedPreset=restored.Preset;state.AppliedPresetFingerprint=restored.Fingerprint;Persist();
-            detail.Text=T("Troca interrompida recuperada.","Interrupted preset change recovered.");
-        }catch(Exception ex){startupIssue=ex.Message;detail.Text=T("Recuperação pendente: ","Recovery pending: ")+ex.Message;}
+        }catch(Exception ex){OnlineDiagnostics.Failure("general.preset.recovery.failed",ex,"Recuperar a troca de preset.");}
         finally{scanning=false;Busy(false);}
     }
-    void UpdatePresetIssueLink() {
-        detail.Cursor=presetIssues.Count>0?Cursors.Hand:Cursors.Default;
-        tips.SetToolTip(detail,presetIssues.Count>0?T("Ver exceções do carregamento","View loading exceptions"):"");
+
+    void ResumePresetManagement(GeneralModEntry mod){
+        if(mod==null||working||scanning||associationChoice!=null||!presetProtected.Contains(mod.Id))return;
+        string title=T("Retomar gerenciamento","Resume management");
+        if(GeneralDialog.Message(this,mod.Name+"\n"+T(
+            "Adotar os arquivos atuais deste mod como referência? Os arquivos desconhecidos continuam preservados.",
+            "Adopt this mod's current files as the reference? Unknown files remain protected."),
+            title,MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
+        string root=Root();
+        new GeneralPresetDeployment(root,data,()=>EnsurePresetGameClosed(root)).ReleaseProtection(mod.Id);
+        presetProtected.Remove(mod.Id);
+        state.AppliedPresetFingerprint=null;
+        Persist();
+        DrawRows();
     }
-    void ShowPresetIssues() {
-        if(presetIssues.Count==0)return;
-        using(var dialog=CreatePresetIssuesDialog())dialog.ShowDialog(this);
-    }
-    GeneralDialog CreatePresetIssuesDialog() {
-        var dialog=new GeneralDialog(T("Exceções do preset","Preset exceptions")) {ClientSize=new System.Drawing.Size(720,460)};
-        var list=GeneralTableDialogLayout.SingleColumnTable("PresetIssues",
-            dialog.Text,T("Mod e motivo","Mod and reason"));
-        list.Columns[0].DefaultCellStyle.WrapMode=DataGridViewTriState.True;
-        list.DefaultCellStyle.Padding=new Padding(8,6,8,6);
-        Action sizeRows=()=>{
-            var style=list.DefaultCellStyle;
-            int width=Math.Max(1,list.Columns[0].Width-style.Padding.Horizontal-4);
-            foreach(DataGridViewRow row in list.Rows){
-                var size=TextRenderer.MeasureText(Convert.ToString(row.Cells[0].Value),style.Font,
-                    new System.Drawing.Size(width,0),TextFormatFlags.WordBreak|TextFormatFlags.NoPrefix);
-                row.Height=Math.Max(list.RowTemplate.Height,size.Height+style.Padding.Vertical);
-            }
-        };
-        list.ColumnWidthChanged+=(s,e)=>{if(list.IsHandleCreated)list.BeginInvoke(sizeRows);};
-        dialog.Shown+=(s,e)=>sizeRows();
-        var engine=new GeneralPresetDeployment(Root(),data,()=>EnsurePresetGameClosed(Root()));var deployment=engine.Read();
-        foreach(var issue in presetIssues) {
-            int row=list.Rows.Add(issue);
-            list.Rows[row].Tag=deployment.Protected.Keys.FirstOrDefault(id=>issue.StartsWith((deployment.Active.FirstOrDefault(p=>p.ModId==id)??new PresetPackage{Name=id}).Name+":",StringComparison.Ordinal));
-        }
-        var shell=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(16)};
-        shell.RowStyles.Add(new RowStyle(SizeType.Percent,100));shell.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        var resume=GeneralStyle.Button(T("Retomar gerenciamento","Resume management"),()=>{
-            string id=list.CurrentRow==null?null:list.CurrentRow.Tag as string;if(id==null)return;
-            if(GeneralDialog.Message(dialog,T("Adotar os arquivos atuais deste mod como referência? Os arquivos desconhecidos continuam preservados.","Adopt this mod's current files as the reference? Unknown files remain protected."),T("Retomar gerenciamento","Resume management"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-            Guard(()=>{engine.ReleaseProtection(id);presetProtected.Remove(id);state.AppliedPresetFingerprint=null;Persist();dialog.Complete(DialogResult.OK);RefreshPrimaryAction();});
-        });
-        resume.Anchor=AnchorStyles.Right;resume.Margin=new Padding(0,12,0,0);resume.Enabled=false;
-        list.SelectionChanged+=(s,e)=>resume.Enabled=list.CurrentRow!=null&&list.CurrentRow.Tag is string;
-        shell.Controls.Add(GeneralTableDialogLayout.TableSurface(list),0,0);shell.Controls.Add(resume,0,1);
-        dialog.Content.Controls.Add(shell);GeneralStyle.Apply(dialog,GeneralStyle.Dark);return dialog;
-    }
+
     // A single scope decision is made when applying an edit, never on every keystroke.
     bool? PresetEditScope(GeneralModEntry entry,bool removing=false) {
         if(state.List.Presets.Count(p=>p.ModIds.Contains(entry.Id))<2)return ActivePreset==null;
@@ -403,7 +376,7 @@ internal sealed partial class GeneralModEditor {
                 var checks=new FlowLayoutPanel{Dock=DockStyle.Top,AutoSize=true,FlowDirection=FlowDirection.TopDown,WrapContents=false,Margin=Padding.Empty};
                 foreach(var p in available)checks.Controls.Add(new CheckBox{Name="PresetMembership-"+p.Id,Text=p.Name,Tag=p.Id,Checked=presetIds.Contains(p.Id),AutoSize=true,Margin=new Padding(8,10,8,10),UseMnemonic=false});
                 body.Controls.Add(new GeneralScrollView(checks,panelContent:true,reserveBarSpace:true,fitPanelContent:true),0,0);
-                var commands=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.RightToLeft,WrapContents=false};
+                var commands=GeneralTableDialogLayout.Commands();
                 var apply=GeneralStyle.Button(T("Aplicar","Apply"),()=>dialog.Complete(DialogResult.OK),true);commands.Controls.Add(apply);dialog.AcceptButton=apply;
                 commands.Controls.Add(GeneralStyle.Button(T("Cancelar","Cancel"),()=>dialog.Complete(DialogResult.Cancel)));
                 body.Controls.Add(commands,0,1);dialog.Content.Controls.Add(body);GeneralStyle.Apply(dialog,GeneralStyle.Dark);

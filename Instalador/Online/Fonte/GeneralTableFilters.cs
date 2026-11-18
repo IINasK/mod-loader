@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -12,7 +12,7 @@ internal sealed partial class GeneralModWindow {
     string orderColumn;
     bool reverseOrder;
     Button clearFilters;
-    bool HasListFilters {get{return coverageFilter!=null||categoryFilters!=null||variantFilters!=null||
+    bool HasListFilters {get{return coverageFilter!=null||versionFilter.HasValue||categoryFilters!=null||variantFilters!=null||
         statusFilters!=null||groupFilters!=null||orderColumn!=null||nameFilter.Length!=0||searchQuery.Length!=0;}}
     string nameFilter="";
     TextBox searchBox;
@@ -25,10 +25,10 @@ internal sealed partial class GeneralModWindow {
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,28));layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));surface.Controls.Add(layout);
         var icon=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};icon.Paint+=(s,e)=>LucideIcons.Draw(e.Graphics,"search",new Rectangle(0,(icon.Height-18)/2,18,18),GeneralStyle.Muted);layout.Controls.Add(icon,0,0);
-        searchBox=new TextBox{Name="ModSearch",BorderStyle=BorderStyle.None,Dock=DockStyle.Fill,MaxLength=160,Font=GeneralStyle.Font(11),Margin=new Padding(0,10,0,0),BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground,Text=searchQuery,AccessibleName=T("Pesquisar por nome, tag, variante ou situação","Search by name, tag, variant or status")};
+        searchBox=new TextBox{Name="ModSearch",BorderStyle=BorderStyle.None,Anchor=AnchorStyles.Left|AnchorStyles.Right,MaxLength=160,Font=GeneralStyle.Font(11),Margin=Padding.Empty,BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground,Text=searchQuery,AccessibleName=T("Pesquisar por nome, tag, variante ou situação","Search by name, tag, variant or status")};
         tips.SetToolTip(searchBox,searchBox.AccessibleName+T(". Aceita partes do nome e pequenos erros de digitação.",". Accepts partial names and minor typos."));layout.Controls.Add(searchBox,1,0);
         searchBox.HandleCreated+=(s,e)=>SendMessage(((Control)s).Handle,0x1501,new IntPtr(1),T("Pesquisar nome, tag, variante ou situação…","Search name, tag, variant or status…"));
-        var clear=(GeneralButton)GeneralStyle.Button("",()=>{searchBox.Clear();searchBox.Focus();});clear.Name="ClearSearch";clear.Bare=true;clear.IconKind="close";clear.AutoSize=false;clear.MinimumSize=new Size(44,44);clear.Dock=DockStyle.Fill;clear.Margin=Padding.Empty;clear.AccessibleName=T("Limpar pesquisa","Clear search");clear.Enabled=searchQuery.Length>0;layout.Controls.Add(clear,2,0);
+        var clear=(GeneralButton)GeneralStyle.Button("",()=>{searchBox.Clear();searchBox.Focus();});clear.Name="ClearSearch";clear.Bare=true;clear.IconKind="close";clear.AutoSize=false;clear.MinimumSize=new Size(44,0);clear.Dock=DockStyle.Fill;clear.Margin=Padding.Empty;clear.AccessibleName=T("Limpar pesquisa","Clear search");clear.Enabled=searchQuery.Length>0;layout.Controls.Add(clear,2,0);
         var input=searchBox;var delay=new Timer{Interval=150};
         Action apply=()=>{delay.Stop();searchQuery=input.Text;searchTerms=GeneralModSearch.Terms(searchQuery);clear.Enabled=searchQuery.Length>0;DrawRows();};
         delay.Tick+=(s,e)=>apply();input.TextChanged+=(s,e)=>{delay.Stop();delay.Start();};input.KeyDown+=(s,e)=>{if(e.KeyCode==Keys.Enter){e.SuppressKeyPress=true;apply();}else if(e.KeyCode==Keys.Escape){e.SuppressKeyPress=true;input.Clear();apply();}};
@@ -51,6 +51,7 @@ internal sealed partial class GeneralModWindow {
     string DefaultCategory {get{return categoryFilters!=null&&categoryFilters.Count==1?categoryFilters.Single():null;}}
     void ResetColumnFilters(){
         categoryFilters=variantFilters=statusFilters=groupFilters=null;
+        versionFilter=null;
         orderColumn=null;reverseOrder=false;
         coverageFilter=null;
         nameFilter=searchQuery="";
@@ -74,6 +75,7 @@ internal sealed partial class GeneralModWindow {
         if(value=="Download concluído"||value=="Download complete")return "complete";
         if(value=="Instalando"||value=="Installing")return "installing";
         if(value=="Instalado"||value=="Installed")return "installed";
+        if(value=="Atualizar"||value=="Update"||value==UpdateAvailableStatus||value=="Update available")return "update";
         if(value=="Outra versão escolhida"||value=="Other version selected")return "other-choice";
 
         if(value=="Desabilitado"||value=="Disabled")return "disabled";
@@ -84,7 +86,7 @@ internal sealed partial class GeneralModWindow {
     }
     static string GameInventoryStatus {get{return T("Encontrado no jogo","Found in game");}}
     IEnumerable<P2PSyncDifference> VisibleGameInventory(){
-        if(associationChoice!=null||coverageFilter!=null||categoryFilters!=null||variantFilters!=null||groupFilters!=null||
+        if(associationChoice!=null||coverageFilter!=null||versionFilter.HasValue||categoryFilters!=null||variantFilters!=null||groupFilters!=null||
             statusFilters!=null&&!statusFilters.Any(value=>StatusFilterKey(value)=="game-inventory"))
             return Enumerable.Empty<P2PSyncDifference>();
         var included=new HashSet<string>(state.List.Mods.SelectMany(mod=>mod.DetectedPaths),StringComparer.OrdinalIgnoreCase);
@@ -188,6 +190,8 @@ internal sealed partial class GeneralModWindow {
                     GeneralStatusPresentation.Label(GeneralStatusPresentation.Disabled),
                     GeneralStatusPresentation.Label(GeneralStatusPresentation.ChooseDependency),
                     T("Falha","Failed")}.ToList();
+                if(statuses.Values.Contains(UpdateAvailableStatus)||modUpdates.Any(HasSourceUpdate))
+                    values.Add(GeneralStatusPresentation.Label(UpdateAvailableStatus));
                 if(gameInventory.Any(file=>file.Kind=="found"))values.Add(GameInventoryStatus);
                 foreach(var status in new[]{GeneralStatusPresentation.DetectedFiles,GeneralStatusPresentation.NexusManual,GeneralStatusPresentation.NexusAmbiguous})
                     if(statuses.Values.Contains(status))values.Add(GeneralStatusPresentation.Label(status));
@@ -219,7 +223,7 @@ internal sealed partial class GeneralModWindow {
     void UpdateTableTitle(){
         if(tableName==null)return;
         if(!hasPresetDraft||draftPresetId!=state.SelectedPreset)CapturePresetDraft();
-        var selected=ActivePreset;tableName.ReadOnly=selected==null;settingDraftName=true;
+        var selected=ActivePreset;settingDraftName=true;
         try{tableName.Text=selected==null?T("Todos os itens","All items"):draftName;}finally{settingDraftName=false;}
         tableName.AccessibleName=T("Nome do preset","Preset name");
         UpdatePresetCommands();

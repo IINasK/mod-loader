@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -519,8 +519,8 @@ public sealed partial class OnlineWindow {
             var intro=new Label { AutoSize=true, MaximumSize=new Size(760,0), Text=root+"\r\n\r\nRevise os arquivos que vão sair do jogo. A limpeza abrange archives, scripts, tweaks e pastas de mods do CET, RED4ext e REDmod." };
             var paths=new TextBox { Dock=DockStyle.Fill, ReadOnly=true, Multiline=true, WordWrap=false, ScrollBars=ScrollBars.Both, Text=String.Join("\r\n",plan.Select(f=>f.Path)), AccessibleName="Arquivos que serão guardados" };
             var buttons=new FlowLayoutPanel { AutoSize=true, Dock=DockStyle.Fill, FlowDirection=FlowDirection.RightToLeft };
-            var next=new Button { Text="Continuar", AutoSize=true, DialogResult=DialogResult.OK };
-            var cancel=new Button { Text="Cancelar", AutoSize=true, DialogResult=DialogResult.Cancel };
+            var next=new GeneralButton { Text="Continuar", AutoSize=true, DialogResult=DialogResult.OK };
+            var cancel=new GeneralButton { Text="Cancelar", AutoSize=true, DialogResult=DialogResult.Cancel };
             buttons.Controls.Add(next);
             buttons.Controls.Add(cancel);
             content.Controls.Add(intro,0,0);

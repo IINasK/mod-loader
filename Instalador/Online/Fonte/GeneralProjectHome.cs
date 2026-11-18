@@ -233,7 +233,7 @@ internal sealed partial class GeneralProjectHome : Form {
         if(IsDisposed||!File.Exists(Path.Combine(projectData,"P2P","sessions.json")))return;
         try{
             var service=SharingService(projectData);
-            if(!service.SnapshotSessions().Any(s=>!s.Completed&&!s.Discarded||Directory.Exists(service.Folder(s))||s.Lifecycle&&(s.Sender?s.Recipients.Any(peer=>!peer.ReceiptClosed):!s.ReceiptClosed)||!s.Sender&&s.Completed&&!s.ListImported))return;
+            if(!service.NeedsDiagnosticConnection()&&!service.SnapshotSessions().Any(s=>!s.Completed&&!s.Discarded||Directory.Exists(service.Folder(s))||s.Lifecycle&&(s.Sender?s.Recipients.Any(peer=>!peer.ReceiptClosed):!s.ReceiptClosed)||!s.Sender&&s.Completed&&!s.ListImported))return;
             if(project!=null)service.SetPreparationState(store.Load(project));
             await RecoverSharing(this,service);
             await Task.Run(()=>{
@@ -335,8 +335,8 @@ internal sealed partial class GeneralModWindow {
             float scale=96f/DeviceDpi;
             projectStore.SaveWindowSize(project,(int)Math.Round(Width*scale),(int)Math.Round(Height*scale));
             projectWindowSize=Size;
-        }catch(IOException ex){detail.Text=ex.Message;}
-        catch(UnauthorizedAccessException ex){detail.Text=ex.Message;}
+        }catch(IOException ex){OnlineDiagnostics.Failure("project.window-size.failed",ex,"Salvar o tamanho da janela.");}
+        catch(UnauthorizedAccessException ex){OnlineDiagnostics.Failure("project.window-size.failed",ex,"Salvar o tamanho da janela.");}
     }
     internal void AttachProject(GeneralProjectStore store,GeneralProject project){
         projectStore=store;this.project=project;state.TemplateId=project.TemplateId;state.ProjectName=project.Name;var preferences=store.Read();

@@ -12,6 +12,7 @@ internal sealed class P2PRecipient {
     public string Device, Phase;
     public bool ReceiptClosed;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile string SyncChoicePhase;
+    [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PSyncProgress ComparisonProgress;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PInstallProgress InstallProgress;
 }
 
@@ -119,7 +120,8 @@ internal sealed partial class P2PService {
     }
 
     string InstallProgressTag(P2PSession session,string recipient,InstallNotice notice) {
-        string context=session.Id+"\ninstall-progress\n"+recipient+"\n"+(notice.Writing?"write":"verify")+"\n"+notice.Done.ToString(CultureInfo.InvariantCulture);
+        string purpose=notice.Phase=="comparing"?"comparison-progress":"install-progress";
+        string context=session.Id+"\n"+purpose+"\n"+recipient+"\n"+(notice.Writing?"write":"verify")+"\n"+notice.Done.ToString(CultureInfo.InvariantCulture);
         return ReadyTag(session.Hash,context,notice.Hash,notice.Total);
     }
 
@@ -142,7 +144,7 @@ internal sealed partial class P2PService {
         if(phase==null)return;
         // Keep phase changes immediate and let the peer fetch a stable progress file between samples.
         DateTime now=DateTime.UtcNow;
-        if(phase=="installing"&&session.LastPublishedNoticePhase==phase&&now<session.NextProgressNoticeUtc)return;
+        if((phase=="installing"||phase=="comparing")&&session.LastPublishedNoticePhase==phase&&now<session.NextProgressNoticeUtc)return;
         var notice=new InstallNotice{Phase=phase,Hash=hash,Tag=NoticeTag(session,Engine.Device,phase,hash)};
         var progress=session.InstallProgress;
         if(session.Phase=="installing"&&progress!=null&&progress.Total>0){
@@ -150,13 +152,20 @@ internal sealed partial class P2PService {
             notice.Done=progress.Done;
             notice.Total=progress.Total;
             notice.ProgressTag=InstallProgressTag(session,Engine.Device,notice);
+        }else if(phase=="comparing"){
+            var comparison=session.SyncProgress;
+            if(comparison!=null&&ValidHostScan(comparison.Done,comparison.Total)){
+                notice.Done=comparison.Done;
+                notice.Total=comparison.Total;
+                notice.ProgressTag=InstallProgressTag(session,Engine.Device,notice);
+            }
         }
         string json=Safe.Json.Serialize(notice);
         if(File.Exists(path)&&new FileInfo(path).Length<=2048&&File.ReadAllText(path)==json)return;
         Safe.WriteJson(path,notice);
         Engine.Request("POST","db/scan?folder="+ReceiptFolderId(session,Engine.Device)+"&sub=status.json",null);
         session.LastPublishedNoticePhase=phase;
-        session.NextProgressNoticeUtc=now.AddSeconds(3);
+        session.NextProgressNoticeUtc=now.AddSeconds(phase=="comparing"?1:3);
     }
 
     InstallNotice ReadNotice(P2PSession session,P2PRecipient recipient) {
@@ -191,9 +200,14 @@ internal sealed partial class P2PService {
                 if(recipient.SyncChoicePhase!=notice.Phase)
                     OnlineDiagnostics.Record("p2p.choice.observed",null,"Estado da escolha recebido.",
                         new{Id=DiagnosticId(session.Id),Phase=notice.Phase});
+                recipient.ComparisonProgress=notice.Phase=="comparing"&&!notice.Writing&&
+                    ValidHostScan(notice.Done,notice.Total)&&SameNoticeTag(InstallProgressTag(session,recipient.Device,notice),notice.ProgressTag)
+                    ?new P2PSyncProgress{Done=notice.Done,Total=notice.Total}:null;
                 recipient.SyncChoicePhase=notice.Phase;
                 continue;
             }
+            recipient.ComparisonProgress=null;
+            recipient.SyncChoicePhase=null;
             recipient.InstallProgress=notice.Phase=="installing"&&notice.Total>0&&notice.Total<=InstalledSnapshot.MaxFiles&&
                 notice.Done>=0&&notice.Done<=notice.Total&&SameNoticeTag(InstallProgressTag(session,recipient.Device,notice),notice.ProgressTag)
                 ?new P2PInstallProgress(notice.Writing,notice.Done,notice.Total,null):null;
@@ -264,6 +278,7 @@ internal sealed partial class P2PService {
         var result=new P2PTransferStatus{Connected=connected};
         var lines=new List<P2PRecipientProgress>();
         int index=0,total=0,measured=0;
+        bool awaitingChoice=session.CompareBeforePack&&session.PayloadHash==null&&!HasSyncChoice(session);
         foreach(var recipient in session.Recipients){
             index++;
             string label=GeneralStyle.T("Amigo ","Friend ")+index;
@@ -299,7 +314,9 @@ internal sealed partial class P2PService {
                 : percent==100?GeneralStyle.T("Aguardando instalação","Waiting for installation")
                 : paused?GeneralStyle.T("Pausado","Paused")
                 : GeneralStyle.T("Enviando","Sending");
-            if(recipient.Phase=="installing"){
+            if(awaitingChoice&&recipient.SyncChoicePhase=="comparing"){
+                lines.Add(ComparisonBar(recipient.ComparisonProgress,false));
+            }else if(recipient.Phase=="installing"){
                 var progress=recipient.InstallProgress;
                 lines.Add(new P2PRecipientProgress{
                     Caption=label+" · "+(progress==null?detail:InstallCaption(progress)),
@@ -311,6 +328,17 @@ internal sealed partial class P2PService {
         result.Recipients=lines.ToArray();
         result.Percent=measured==0?0:total/measured;
         return result;
+    }
+
+    internal static P2PRecipientProgress ComparisonBar(P2PSyncProgress progress,bool local) {
+        bool measured=progress!=null&&progress.Total>0;
+        string label=local?GeneralStyle.T("Receptor (você)","Receiver (you)"):GeneralStyle.T("Receptor","Receiver");
+        return new P2PRecipientProgress{
+            Caption=label+" · "+GeneralStyle.T("Conferindo arquivos","Checking files")+
+                (measured?" · "+progress.Done+"/"+progress.Total:""),
+            Percent=measured?progress.Done*100/progress.Total:0,
+            Indeterminate=!measured,Finished=true
+        };
     }
 
     internal static string InstallCaption(P2PInstallProgress progress) {
@@ -403,6 +431,7 @@ internal sealed partial class P2PService {
                     ApplyApprovedSyncCleanup(session,manifest);
                 else session.SyncCleanup=null;
                 session.ModsOutsidePack=InstalledSnapshot.CountOutsidePack(manifest);
+                if(session.ModsOutsidePack>0)ReportDiagnosticFailure(session,"mods_outside_pack",null);
                 OnlineDiagnostics.Record("p2p.install.files",null,"Arquivos do pacote instalados.",
                     new{Id=DiagnosticId(session.Id),Milliseconds=elapsed.ElapsedMilliseconds});
                 var review=ReviewReceived;
@@ -428,6 +457,7 @@ internal sealed partial class P2PService {
             catch(Exception ex){
                 if(!disposed){
                     OnlineDiagnostics.Failure("p2p.install.failed",ex,"Instalar e verificar o pacote recebido.",stage:session.Phase);
+                    ReportDiagnosticFailure(session,"install_failed",ex);
                     session.Error=ex.Message;
                     SetPhase(session,"retry");
                     Notify();
@@ -446,6 +476,7 @@ internal sealed partial class P2PService {
                 session.ProjectError=null;
             }catch(Exception ex){
                 session.ProjectError=GeneralStyle.T("Mods instalados. Não foi possível salvar o projeto: ","Mods installed. Could not save the project: ")+ex.Message;
+                ReportDiagnosticFailure(session,"project_save_failed",ex);
             }
             Save();
         }

@@ -38,7 +38,7 @@ public sealed class FacialDownloadsWindow:Form {
     readonly DataGridView grid=new DataGridView{Name="FacialDownloadList"};
     readonly Label status=new Label{Name="FacialDownloadStatus"};
     readonly Label count=new Label{Name="FacialDownloadCount"};
-    readonly Button next=new Button{Name="NextFacialDownload",Text="Baixar próximo"};
+    readonly Button next=new GeneralButton{Name="NextFacialDownload",Text="Baixar próximo"};
     public FacialDownloadsWindow(string folder,Action<string> launch){
         if(launch==null)throw new ArgumentNullException("launch");openWeb=launch;
         Text="Conjunto facial · 14 downloads";Font=new Font("Segoe UI",10);BackColor=Color.White;
@@ -57,9 +57,9 @@ public sealed class FacialDownloadsWindow:Form {
         var guide=new Label{Text="1. Clique em Baixar próximo ou selecione uma linha e use Abrir selecionado.\n2. No navegador padrão, entre no Nexus se solicitado e clique em Manual / Slow download.\n3. Depois de iniciar o download, volte aqui para abrir o próximo. Deixe os arquivos originais em:\n"+folder+"\nEsta etapa só abre as páginas oficiais: não instala, extrai ou apaga arquivos. Página aberta não significa arquivo baixado. Os pacotes serão conferidos depois.",AutoSize=true,MaximumSize=new Size(940,0),Margin=new Padding(0,12,0,7),ForeColor=Color.DimGray};layout.Controls.Add(guide,0,4);
         status.AutoSize=true;status.MaximumSize=new Size(940,0);status.Margin=new Padding(0,0,0,8);status.Text="Comece pelo primeiro arquivo. Nenhum download foi aberto por esta janela.";layout.Controls.Add(status,0,5);
         var buttons=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.RightToLeft,WrapContents=false};
-        var close=new Button{Text="Fechar",AutoSize=true,MinimumSize=new Size(110,35),DialogResult=DialogResult.Cancel};buttons.Controls.Add(close);CancelButton=close;
+        var close=new GeneralButton{Text="Fechar",AutoSize=true,MinimumSize=new Size(110,35),DialogResult=DialogResult.Cancel};buttons.Controls.Add(close);CancelButton=close;
         next.AutoSize=true;next.MinimumSize=new Size(145,35);next.Click+=(s,e)=>OpenNext();buttons.Controls.Add(next);
-        var selected=new Button{Name="OpenSelectedFacialDownload",Text="Abrir selecionado",AutoSize=true,MinimumSize=new Size(145,35)};selected.Click+=(s,e)=>{if(grid.CurrentRow!=null)Open(grid.CurrentRow.Index);};buttons.Controls.Add(selected);
+        var selected=new GeneralButton{Name="OpenSelectedFacialDownload",Text="Abrir selecionado",AutoSize=true,MinimumSize=new Size(145,35)};selected.Click+=(s,e)=>{if(grid.CurrentRow!=null)Open(grid.CurrentRow.Index);};buttons.Controls.Add(selected);
         layout.Controls.Add(buttons,0,6);UpdateCount();
     }
     internal void OpenNext(){for(int i=0;i<items.Count;i++)if(!opened.Contains(i)){Open(i);return;}}

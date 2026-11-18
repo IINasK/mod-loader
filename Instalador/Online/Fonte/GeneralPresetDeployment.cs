@@ -168,6 +168,20 @@ internal sealed class GeneralPresetDeployment {
         }
         return results;
     }
+    internal static bool[] VerifyPackageFiles(IList<PresetPackage> packages,Func<DisabledModFile,bool> matches,
+        Action<int,int> progress,CancellationToken cancellation,int workers){
+        var results=Enumerable.Repeat(1,packages.Count).ToArray();
+        var files=packages.SelectMany((package,index)=>package.Files.Select(file=>new{Package=index,File=file}))
+            .OrderByDescending(work=>work.File.Size).ToArray();
+        CheckPackages(files,work=>{
+            if(Volatile.Read(ref results[work.Package])!=0&&!matches(work.File))
+                Interlocked.Exchange(ref results[work.Package],0);
+            return true;
+        },(done,total)=>{
+            if(progress!=null&&(done==0||done==total||done%Math.Max(1,total/80)==0))progress(done,total);
+        },cancellation,workers);
+        return results.Select(result=>result!=0).ToArray();
+    }
     internal PresetDeploymentState Apply(string preset,string fingerprint,IEnumerable<PresetPackage> wanted,IEnumerable<PresetPackage> discovered,Action<string,int,int> progress=null,ISet<string> sharedPaths=null,
         CancellationToken cancellation=default(CancellationToken),int workers=0) {
         cancellation.ThrowIfCancellationRequested();
@@ -205,11 +219,12 @@ internal sealed class GeneralPresetDeployment {
             var candidates=inventory.Where(p=>p.Files.Count>0&&!cached.ContainsKey(p.StorageKey)).ToList();
             var activeByKey=state.Active.ToDictionary(package=>package.Key,StringComparer.Ordinal);
             string validating=GeneralStyle.T("Validando instalações","Validating installations");
-            var verified=CheckPackages(candidates,package=>activeByKey.ContainsKey(package.Key)||package.Files.All(Matches),
+            var pending=candidates.Where(package=>!activeByKey.ContainsKey(package.Key)).ToList();
+            var verified=VerifyPackageFiles(pending,Matches,
                 (done,total)=>{if(progress!=null)progress(validating,done,total);},cancellation,workers);
-            for(int index=0;index<candidates.Count;index++) {
-                if(!verified[index])continue;
-                var package=candidates[index];
+            var rejected=new HashSet<string>(pending.Where((package,index)=>!verified[index]).Select(package=>package.Key),StringComparer.Ordinal);
+            foreach(var package in candidates) {
+                if(rejected.Contains(package.Key))continue;
                 PresetPackage previous;
                 if(activeByKey.TryGetValue(package.Key,out previous)){previous.Group=package.Group;previous.Name=package.Name;previous.RequiredMods=package.RequiredMods;continue;}
                 bool conflict=package.Files.Any(file=>{
@@ -220,11 +235,11 @@ internal sealed class GeneralPresetDeployment {
             }
             state.Issues.Clear();
             string checkingActive=GeneralStyle.T("Verificando arquivos ativos","Checking active files");
-            var changedFiles=CheckPackages(state.Active,package=>package.Files.Any(f=>!Matches(f)),
+            var intact=VerifyPackageFiles(state.Active,Matches,
                 (done,total)=>{if(progress!=null)progress(checkingActive,done,total);},cancellation,workers);
             for(int index=0;index<state.Active.Count;index++) {
                 var package=state.Active[index];
-                if(changedFiles[index])state.Protected[package.ModId]=GeneralStyle.T("arquivos divergentes do registro; instalação local preservada.","files differ from the record; local installation preserved.");
+                if(!intact[index])state.Protected[package.ModId]=GeneralStyle.T("arquivos divergentes do registro; instalação local preservada.","files differ from the record; local installation preserved.");
             }
             foreach(var package in inventory.Where(p=>p.Files.Count>0&&!state.Active.Any(a=>a.Key==p.Key)&&!cached.ContainsKey(p.StorageKey))) {
                 if(package.Files.Any(f=>File.Exists(Target(f)))&&package.Files.Any(f=>!Matches(f))&&

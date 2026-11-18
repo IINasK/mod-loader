@@ -28,8 +28,8 @@ public sealed class ArchiveLicensesWindow:Form {
         layout.Controls.Add(new Label{Text="Mod Loader · leitor 7-Zip "+ArchiveReaderIdentity.Version+" incorporado",AutoSize=true,Margin=new Padding(0,0,0,10)},0,0);
         layout.Controls.Add(new TextBox{Name="ReaderLicenses",Text=ArchiveLicenses.Text(),ReadOnly=true,Multiline=true,ScrollBars=ScrollBars.Vertical,Dock=DockStyle.Fill,BackColor=Color.White},0,1);
         var buttons=new FlowLayoutPanel{AutoSize=true,Dock=DockStyle.Fill,FlowDirection=FlowDirection.RightToLeft};
-        var close=new Button{Text="Fechar",AutoSize=true,MinimumSize=new Size(100,34),DialogResult=DialogResult.Cancel};buttons.Controls.Add(close);CancelButton=close;
-        var source=new Button{Name="SaveReaderSource",Text="Salvar código-fonte do leitor…",AutoSize=true,MinimumSize=new Size(220,34)};
+        var close=new GeneralButton{Text="Fechar",AutoSize=true,MinimumSize=new Size(100,34),DialogResult=DialogResult.Cancel};buttons.Controls.Add(close);CancelButton=close;
+        var source=new GeneralButton{Name="SaveReaderSource",Text="Salvar código-fonte do leitor…",AutoSize=true,MinimumSize=new Size(220,34)};
         source.Click+=(s,e)=>{using(var save=new SaveFileDialog{FileName="7z2605-src.tar.xz",Filter="Código-fonte original (*.tar.xz)|*.tar.xz",OverwritePrompt=true})if(save.ShowDialog(this)==DialogResult.OK){try{ArchiveLicenses.SaveSource(save.FileName);}catch(Exception ex){MessageBox.Show(this,ex.Message,"Não foi possível salvar",MessageBoxButtons.OK,MessageBoxIcon.Warning);}}};buttons.Controls.Add(source);layout.Controls.Add(buttons,0,2);
     }
 }

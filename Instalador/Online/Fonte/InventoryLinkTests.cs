@@ -50,7 +50,7 @@ internal sealed partial class GeneralModWindow {
                 return new DragEventArgs(argsData,0,p.X,p.Y,DragDropEffects.Move,DragDropEffects.None);
             };
             form.inventoryDragKey=InventoryLinkStore.Key(second);
-            check(form.InventoryDropEffect(form.grid,at(registeredRow))==DragDropEffects.None,"Manual drag cannot merge a catalog row.");
+            check(form.InventoryDropEffect(form.grid,at(registeredRow))==DragDropEffects.Move,"A registered mod accepts a manual inventory link.");
             var drop=at(target);
             check(form.InventoryDropEffect(form.grid,drop)==DragDropEffects.Move,"Two unidentified rows accept a move.");
             typeof(Control).GetMethod("OnDragDrop",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(form.grid,new object[]{drop});
@@ -104,6 +104,44 @@ internal sealed partial class GeneralModWindow {
             check(form.VisibleGameInventory().Any(file=>file.Path==catalogExtra)&&
                 form.VisibleGameInventory().Where(file=>file.Path==main||file.Path==input).Select(InventoryLinkStore.Key).Distinct().Count()==2,
                 "Undo restores the separate inventory rows.");
+            var remaining=form.VisibleGameInventory().Single(file=>file.Path==main);
+            string key=InventoryLinkStore.Key(remaining);
+            form.testManualInventoryLink=(source,owner)=>false;
+            form.LinkInventoryToMod(key,registered);
+            check(store.Load().Groups.Count==0,"Cancelling confirmation keeps the item outside the catalog.");
+            form.PickInventoryOwner(remaining);
+            check(form.associationChoice!=null,"The owner picker is active before Escape.");
+            form.associationChoice.TrySetResult(null);
+            for(int tries=0;tries<30&&form.associationChoice!=null;tries++)await System.Threading.Tasks.Task.Delay(15);
+            check(!form.pickingInventoryOwner&&form.associationChoice==null&&store.Load().Groups.Count==0,
+                "Cancel leaves the inventory unchanged and restores the table.");
+            int linksConfirmed=0;
+            form.testManualInventoryLink=(source,owner)=>{linksConfirmed++;return owner==registered.Name;};
+            form.PickInventoryOwner(remaining);
+            check(form.pickingInventoryOwner&&form.associationChoice!=null,"Menu opens the in-list owner picker.");
+            using(var image=new Bitmap(form.Width,form.Height)){
+                form.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));
+                image.Save(Safe.In(root,"inventory-owner-picker.png"),System.Drawing.Imaging.ImageFormat.Png);
+            }
+            registeredRow=form.ModRows().Single(row=>Equals(row.Tag,registered.Id));
+            var click=new DataGridViewCellMouseEventArgs(form.grid.Columns["Name"].Index,registeredRow.Index,10,10,
+                new MouseEventArgs(MouseButtons.Left,1,10,10,0));
+            typeof(DataGridView).GetMethod("OnCellMouseClick",BindingFlags.Instance|BindingFlags.NonPublic)
+                .Invoke(form.grid,new object[]{click});
+            for(int tries=0;tries<30&&linksConfirmed==0;tries++)await System.Threading.Tasks.Task.Delay(15);
+            check(linksConfirmed==1&&store.Load().Groups.Single().CatalogId==registered.Id&&
+                form.DisplayedInventory().Any(file=>file.Kind=="associated"&&file.ModId==registered.Id&&file.Path==main),
+                "Clicking a registered mod opens one confirmation and saves its associated files.");
+            form.UpdateInventoryLinks(links=>links.Groups.RemoveAll(group=>group.CatalogId==registered.Id));
+            registeredRow=form.ModRows().Single(row=>Equals(row.Tag,registered.Id));
+            form.inventoryDragKey=key;
+            var direct=at(registeredRow);
+            direct=new DragEventArgs(new DataObject(InventoryDragFormat,key),0,direct.X,direct.Y,DragDropEffects.Move,DragDropEffects.None);
+            typeof(Control).GetMethod("OnDragDrop",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(form.grid,new object[]{direct});
+            form.inventoryDragKey=null;
+            for(int tries=0;tries<30&&linksConfirmed<2;tries++)await System.Threading.Tasks.Task.Delay(15);
+            check(linksConfirmed==2&&store.Load().Groups.Single().Paths.SequenceEqual(new[]{main}),"Dropping on a registered mod uses the same confirmation and association.");
+            form.UpdateInventoryLinks(links=>links.Groups.RemoveAll(group=>group.CatalogId==registered.Id));
             check(state.SnapshotReceipts.Count==0&&state.CyberpunkImports.Count==0&&
                 paths.Select(path=>Safe.Hash(Safe.In(game,path))).SequenceEqual(hashes),"Grouping leaves installed content and all ownership records untouched.");
 

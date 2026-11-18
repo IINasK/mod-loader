@@ -341,7 +341,22 @@
     {
       "Id": "ArchiveXL",
       "Name": "ArchiveXL",
-      "Version": "v1.28.6",
+      "Version": "v1.28.8",
+      "PreviousRelease": {
+        "Version": "v1.28.6",
+        "Assets": [
+          {
+            "Id": "a0",
+            "Name": "ArchiveXL-1.28.6.zip",
+            "Size": 1072116,
+            "Sha256": "25d0493a1b3e8ec4c26b7144a4d8f1a1def4d6dc840fff94b4c91c908583da09",
+            "Format": "zip",
+            "Url": "https://github.com/psiberx/cp2077-archive-xl/releases/download/v1.28.6/ArchiveXL-1.28.6.zip",
+            "ModId": 0,
+            "FileId": 0
+          }
+        ]
+      },
       "Profile": "Kit inicial",
       "GameVersion": "2.5",
       "RequiresPL": false,
@@ -350,15 +365,15 @@
       "Dependencies": [
         "NightCoop"
       ],
-      "Warning": "ArchiveXL 1.28.6: correções de materiais para jogo 2.5. Mantém RED4ext 1.31.0.",
+      "Warning": "ArchiveXL 1.28.8 para o jogo 2.5, com correção de marcadores do mapa.",
       "Assets": [
         {
           "Id": "a0",
-          "Name": "ArchiveXL-1.28.6.zip",
-          "Size": 1072116,
-          "Sha256": "25d0493a1b3e8ec4c26b7144a4d8f1a1def4d6dc840fff94b4c91c908583da09",
+          "Name": "ArchiveXL-1.28.8.zip",
+          "Size": 1077330,
+          "Sha256": "b2a1c5777d3d0484475e1a1c034a1dc1dcada386595335e480c134fe7128a270",
           "Format": "zip",
-          "Url": "https://github.com/psiberx/cp2077-archive-xl/releases/download/v1.28.6/ArchiveXL-1.28.6.zip",
+          "Url": "https://github.com/psiberx/cp2077-archive-xl/releases/download/v1.28.8/ArchiveXL-1.28.8.zip",
           "ModId": 0,
           "FileId": 0
         }
@@ -375,8 +390,10 @@
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/ArchiveXL.dll",
           "Path": "red4ext/plugins/ArchiveXL/ArchiveXL.dll",
-          "Size": 1954816,
-          "Sha256": "97692f23b03fdb87354a3e1a4aaabba7dd604a9b8a16839afb8bcccd2bfe7674"
+          "Size": 1963008,
+          "Sha256": "2087a6a786a5ee2d6763574356bc8c8139a281872887d3e9efc720c74bfa8756",
+          "PreviousSha256": "97692f23b03fdb87354a3e1a4aaabba7dd604a9b8a16839afb8bcccd2bfe7674",
+          "PreviousSize": 1954816
         },
         {
           "Asset": "a0",
@@ -551,21 +568,27 @@
           "Entry": "red4ext/plugins/ArchiveXL/Scripts/ArchiveXL.DynamicAppearance.reds",
           "Path": "red4ext/plugins/ArchiveXL/Scripts/ArchiveXL.DynamicAppearance.reds",
           "Size": 1926,
-          "Sha256": "bdb9ad85e5d4e956932f829ff5dae6ab66dd155244c9a09f0f6177ed48b0ee56"
+          "Sha256": "3b7b9b58d7705dc066cb7173fd64f73947c58ddb14909e60d50ff85e28faa5b9",
+          "PreviousSha256": "bdb9ad85e5d4e956932f829ff5dae6ab66dd155244c9a09f0f6177ed48b0ee56",
+          "PreviousSize": 1926
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Scripts/ArchiveXL.Global.reds",
           "Path": "red4ext/plugins/ArchiveXL/Scripts/ArchiveXL.Global.reds",
           "Size": 369,
-          "Sha256": "118d95b378439f14b954e2287d667f779d005fff40fb2972e303bc255f3535a7"
+          "Sha256": "5f32a73485f410812a9713a7bf9bb65cad8cb9800dae9ca3690cb77161deee1d",
+          "PreviousSha256": "118d95b378439f14b954e2287d667f779d005fff40fb2972e303bc255f3535a7",
+          "PreviousSize": 369
         },
         {
           "Asset": "a0",
           "Entry": "red4ext/plugins/ArchiveXL/Scripts/ArchiveXL.reds",
           "Path": "red4ext/plugins/ArchiveXL/Scripts/ArchiveXL.reds",
           "Size": 39,
-          "Sha256": "8d933d4ba814fe8bc85a065f0c449e13b3bfe61159928a10879ffe7340443e60"
+          "Sha256": "e40079c15e1386b6882e0bf03771068df4282753ffbddef697df3557c4a441c2",
+          "PreviousSha256": "8d933d4ba814fe8bc85a065f0c449e13b3bfe61159928a10879ffe7340443e60",
+          "PreviousSize": 39
         }
       ],
       "BlockedReason": "",

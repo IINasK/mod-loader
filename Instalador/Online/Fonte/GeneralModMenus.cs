@@ -10,14 +10,46 @@ using System.Windows.Forms;
 internal sealed partial class GeneralModWindow {
     void ToggleListMenu(){
         if(working||scanning)return;
-        menus.Toggle(this,optionsButton,()=>new GeneralActionsMenu(BuiltInProject),dialog=>Guard(()=>{
+        menus.Toggle(this,optionsButton,()=>new GeneralActionsMenu(BuiltInProject,
+            savePresetItems:DraftSelectionChanged),dialog=>Guard(()=>{
             string action=((GeneralActionsMenu)dialog).ActionId;
             if(action=="new")ProjectCommand("new");else if(action=="open")BackToProjects();
             else if(!BuiltInProject&&action=="import")ProjectCommand("import");else if(!BuiltInProject&&action=="export")ProjectCommand("export");
-            else if(action=="clone")ProjectCommand("clone");else if(action=="share")ShowP2P();else if(action=="options")ShowOptions();
-            else if(action=="manual")CaptureManualInstall();
+            else if(action=="save-menu")OpenSaveProjectMenu();
+            else if(action=="details")ShowProjectDetails();
+            else if(action=="share")ShowP2P();else if(action=="options")ShowOptions();
+            else if(action=="save-preset-items")SavePresetSelection(false);
         }));
     }
+    void OpenSaveProjectMenu(){
+        menus.Toggle(this,optionsButton,()=>new GeneralActionsMenu(saveMenu:true),dialog=>Guard(()=>{
+            switch(((GeneralActionsMenu)dialog).ActionId){
+                case "save-project":
+                    if(DraftNameChanged)SavePresetName(false);else SaveProjectEdits();
+                    break;
+                case "save-increment":SaveProjectIncrement();break;
+                case "clone":ProjectCommand("clone");break;
+            }
+        }));
+    }
+
+    void SaveProjectIncrement(){
+        if(projectStore==null||project==null)return;
+        var revisionState=CopyProjectState();
+        if(DraftNameChanged){
+            string title=(draftName??"").Trim();
+            if(title.Length==0||title.Length>120||title.Any(Char.IsControl))
+                throw new IOException(T("Informe um nome válido para o preset.","Enter a valid preset name."));
+            revisionState.List.Presets.Single(preset=>preset.Id==revisionState.SelectedPreset).Name=title;
+        }
+        string prefix=project.Name.Substring(0,Math.Min(98,project.Name.Length))+" · ";
+        var names=new HashSet<string>(projectStore.Read().Projects.Select(item=>item.Name),StringComparer.CurrentCultureIgnoreCase);
+        int revision=1;string name;
+        do{name=prefix+(revision++).ToString("00");}while(names.Contains(name));
+        projectStore.Duplicate(project,name,catalog,revisionState);
+        GeneralDialog.Message(this,name,T("Incremento salvo","Revision saved"));
+    }
+
     async void Replace(GeneralModList list){await ReplaceList(list);}
     async Task<bool> ReplaceList(GeneralModList list,bool clearBindings=false,string snapshotReceipt=null,string newDestination=null){
         if(working||scanning||list==null||!ConfirmProjectNavigation())return false;
@@ -54,8 +86,9 @@ internal sealed partial class GeneralModWindow {
             }
         }catch(Exception ex){ShowError(ex);}
     }
-    void DeletePreset(){
-        if(working||scanning||state.List.Presets.Count<=1)return;var item=ActivePreset;if(item==null)return;
+    void DeletePreset(int index){
+        if(working||scanning||state.List.Presets.Count<=1||index<0||index>=state.List.Presets.Count)return;
+        var item=state.List.Presets[index];
         if(GeneralDialog.Message(this,T("Excluir este preset? Os mods permanecem na lista.","Delete this preset? Mods will remain in the list.")+"\n"+item.Name,T("Excluir preset","Delete preset"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
         BeginProjectEdit();state.List.Presets.Remove(item);GeneralPresetProfiles.Project(state);FinishProjectEdit();RebuildPresets();
     }
@@ -109,6 +142,7 @@ internal sealed partial class GeneralModWindow {
         if(String.Equals(state.Destination??"",destination,StringComparison.OrdinalIgnoreCase))return false;
         state.Destination=destination;state.ReceivedPreset=null;state.AppliedPreset=null;state.AppliedPresetFingerprint=null;ReadPresetPresentation();
         pendingVersion=null;
+        ClearModVersions();
         gameInventory=new P2PSyncDifference[0];
         nexusManual.Clear();
         statuses.Clear();statusDetails.Clear();progress.Clear();

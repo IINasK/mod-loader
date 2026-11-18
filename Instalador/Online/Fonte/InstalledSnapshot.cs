@@ -133,7 +133,7 @@ public static partial class InstalledSnapshot {
             var originalSources=variant.Sources.ToList();
             List<InstalledSnapshotFile> files=new List<InstalledSnapshotFile>();
             string snapshotId;
-            if(variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(work,out snapshotId)&&
+            if(variant.CyberpunkId!="NightCoop"&&CatalogModVersions.Previous(catalog,variant.CyberpunkId)==null&&state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(work,out snapshotId)&&
                 MatchesBodyReceipt(receivedEngine,mod,variant,snapshotId)){
                 files=receivedEngine.ReadInstalledFiles(snapshotId,work,includeConfigs,checkpoint:checkpoint);
             }
@@ -309,7 +309,7 @@ public static partial class InstalledSnapshot {
             string owner=Owner(mod,variant);
             string receipt;
             var configs=new List<InstalledSnapshotFile>();
-            if(variant.CyberpunkId!="NightCoop"&&state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(owner,out receipt)&&
+            if(variant.CyberpunkId!="NightCoop"&&CatalogModVersions.Previous(catalog,variant.CyberpunkId)==null&&state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(owner,out receipt)&&
                 MatchesBodyReceipt(receiver,mod,variant,receipt))
                 configs=receiver.ReadInstalledFiles(receipt,owner,configsOnly:true);
             else if(variant.CyberpunkId!=null){

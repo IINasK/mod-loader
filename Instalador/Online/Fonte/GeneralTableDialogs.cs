@@ -7,28 +7,47 @@ using System.Windows.Forms;
 internal sealed class GeneralNameDialog : GeneralDialog {
     readonly TextBox input = new TextBox { Name = "NameInput", MaxLength = 120, Dock = DockStyle.Fill };
     internal string ResultName { get; private set; }
+    internal bool SingleSelection { get; private set; }
 
-    internal GeneralNameDialog(string title, string initialName,string description=null,string fieldLabel=null,int maxLength=120) : base(title) {
-        ClientSize = new Size(500, description==null?220:300);
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(20, 8, 20, 20), ColumnCount = 1, RowCount = 3 };
+    internal GeneralNameDialog(string title, string initialName,string description=null,string fieldLabel=null,int maxLength=120,
+        bool chooseSelectionMode=false) : base(title) {
+        ClientSize = new Size(500,(description==null?230:300)+(chooseSelectionMode?82:0));
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(20, 8, 20, 20),
+            ColumnCount = 1, RowCount = 3+(description==null?0:1)+(chooseSelectionMode?2:0) };
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(description==null?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.Absolute,52));
-        if(description!=null)layout.RowStyles.Add(new RowStyle(SizeType.Absolute,52));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         input.MaxLength=maxLength;
         layout.Controls.Add(GeneralModEditor.LabelFor(fieldLabel??GeneralStyle.T("Nome *", "Name *")), 0, 0);
         input.AccessibleName = fieldLabel??GeneralStyle.T("Nome", "Name");
         layout.Controls.Add(GeneralTableDialogLayout.Input(input), 0, 1);
+        int row=2;
+        GeneralPicker mode=null;
+        if(chooseSelectionMode){
+            string selection=GeneralStyle.T("Seleção na pasta","Selection in folder");
+            var label=GeneralModEditor.LabelFor(selection);
+            label.Margin=new Padding(0,10,0,6);
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));layout.Controls.Add(label,0,row++);
+            mode=new GeneralPicker{Name="FolderSelectionMode",Dock=DockStyle.Fill,Margin=Padding.Empty,AccessibleName=selection};
+            mode.Items.AddRange(new object[]{GeneralStyle.T("Vários itens","Multiple items"),GeneralStyle.T("Um item por vez","One item at a time")});
+            mode.SelectedIndex=0;
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute,44));layout.Controls.Add(mode,0,row++);
+        }
+        if(description!=null){
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            layout.Controls.Add(new Label{Name="NameDescription",Text=description,Dock=DockStyle.Fill,
+                Font=GeneralStyle.Font(10.5f),Margin=new Padding(0,8,0,0)},0,row++);
+        }
         var commands = GeneralTableDialogLayout.Commands();
         var save = GeneralStyle.Button(GeneralStyle.T("Salvar", "Save"), () => {
-            ResultName = input.Text.Trim(); Complete(DialogResult.OK);
+            ResultName=input.Text.Trim();SingleSelection=mode!=null&&mode.SelectedIndex==1;
+            Complete(DialogResult.OK);
         }, true);
         save.Name = "SaveName";
         var cancel = GeneralStyle.Button(GeneralStyle.T("Cancelar", "Cancel"), () => Complete(DialogResult.Cancel));
         cancel.Name = "CancelName";
         commands.Controls.Add(save); commands.Controls.Add(cancel);
-        if(description!=null){layout.RowCount=4;layout.Controls.Add(new Label{Name="NameDescription",Text=description,Dock=DockStyle.Fill,Font=GeneralStyle.Font(10.5f),Margin=new Padding(0,4,0,0)},0,2);}
-        layout.Controls.Add(commands, 0, description==null?2:3); Content.Controls.Add(layout);
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.Controls.Add(commands,0,row);Content.Controls.Add(layout);
         Action validate = () => save.Enabled = !String.IsNullOrWhiteSpace(input.Text) && !input.Text.Any(Char.IsControl);
         input.TextChanged += (s, e) => validate();
         input.Text = initialName ?? ""; validate();
@@ -187,11 +206,22 @@ internal static class GeneralTableDialogLayout {
         return surface;
     }
     internal static GeneralSurface Input(TextBox text) {
-        var field = new GeneralSurface { Dock = DockStyle.Top, Height = 44, MinimumSize = new Size(120, 44), MaximumSize = new Size(0, 44), Padding = new Padding(14, 10, 14, 0), Margin = Padding.Empty };
-        field.Controls.Add(text); return field;
+        var field = new GeneralSurface { Dock = DockStyle.Top, Height = 44, MinimumSize = new Size(120,44),
+            MaximumSize = new Size(0,44), Padding = new Padding(14,4,14,4), Margin = Padding.Empty };
+        text.Dock=DockStyle.None;
+        field.Controls.Add(text);
+        field.Layout+=(s,e)=>{
+            var body=field.DisplayRectangle;
+            text.SetBounds(body.Left,Math.Max(body.Top,(field.ClientSize.Height-text.PreferredHeight)/2),
+                body.Width,text.PreferredHeight);
+        };
+        return field;
     }
     internal static FlowLayoutPanel Commands() {
-        return new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.RightToLeft, Margin = new Padding(0, 14, 0, 0) };
+        var actions=new FlowLayoutPanel{Name="DialogActions",Dock=DockStyle.Fill,AutoSize=true,WrapContents=false,
+            FlowDirection=FlowDirection.RightToLeft,Margin=new Padding(0,14,0,0)};
+        actions.ControlAdded+=(s,e)=>e.Control.Margin=new Padding(6,0,0,0);
+        return actions;
     }
 }
 

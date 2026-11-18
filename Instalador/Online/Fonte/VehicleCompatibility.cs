@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
 
-// Exact identities approved for the 2.5 vehicle repair. No arbitrary old-file acceptance.
+// Exact file identities for the existing vehicle compatibility repair.
 internal static class VehicleCompatibility {
     sealed class Upgrade {internal string Path,Before,After;internal long BeforeSize;}
     static readonly Upgrade[] upgrades=new Upgrade[]{

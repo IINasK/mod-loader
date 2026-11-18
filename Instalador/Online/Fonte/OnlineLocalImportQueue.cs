@@ -25,8 +25,8 @@ internal sealed class LocalImportWindow : Form {
             "O arquivo entra antes dos próximos itens da lista assim que a operação em andamento terminar.":
             "O Mod Loader confere as pastas do pacote e faz backup dos saves antes de instalar. Use um arquivo de uma fonte em que você confia."},0,2);
         var buttons=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.RightToLeft,WrapContents=false};
-        var install=new Button{Name="InstallImported",Text="Instalar",DialogResult=DialogResult.OK,AutoSize=true,MinimumSize=new Size(110,34),Enabled=!String.IsNullOrWhiteSpace(root)};
-        var close=new Button{Text="Cancelar",DialogResult=DialogResult.Cancel,AutoSize=true,MinimumSize=new Size(110,34)};
+        var install=new GeneralButton{Name="InstallImported",Text="Instalar",DialogResult=DialogResult.OK,AutoSize=true,MinimumSize=new Size(110,34),Enabled=!String.IsNullOrWhiteSpace(root)};
+        var close=new GeneralButton{Text="Cancelar",DialogResult=DialogResult.Cancel,AutoSize=true,MinimumSize=new Size(110,34)};
         buttons.Controls.Add(install);
         buttons.Controls.Add(close);
         layout.Controls.Add(buttons,0,3);

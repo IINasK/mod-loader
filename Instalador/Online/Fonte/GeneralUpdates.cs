@@ -28,9 +28,10 @@ internal sealed class GeneralUpdateChecker {
         try{return Parse(await fetch().ConfigureAwait(false),CurrentVersion);}
         catch(WebException){return null;}catch(IOException){return null;}catch(ArgumentException){return null;}catch(InvalidOperationException){return null;}
     }
-    static string ReadLatest(){
+    static string ReadLatest(){return ReadGithubRelease(new Uri(Endpoint));}
+    internal static string ReadGithubRelease(Uri endpoint){
         ServicePointManager.SecurityProtocol|=SecurityProtocolType.Tls12;
-        var request=(HttpWebRequest)WebRequest.Create(Endpoint);
+        var request=(HttpWebRequest)WebRequest.Create(endpoint);
         request.Method="GET";request.UserAgent="ModLoader/"+CurrentVersion;
         request.Accept="application/vnd.github+json";request.Headers["X-GitHub-Api-Version"]="2026-03-10";
         request.Timeout=3000;request.ReadWriteTimeout=3000;request.AllowAutoRedirect=false;

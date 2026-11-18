@@ -13,14 +13,14 @@ public sealed class SkipModFailureWindow:Form {
         layout.Controls.Add(new TextBox{Name="FailureDetails",Text=failure.Message,ReadOnly=true,Multiline=true,ScrollBars=ScrollBars.Both,WordWrap=true,Dock=DockStyle.Fill,BackColor=Color.White,AccessibleName="Mod, arquivo e motivo da falha"},0,0);
         layout.Controls.Add(new Label{Text=canSkip?"Pular deixa este mod fora desta tentativa e continua os demais. Itens que dependem dele também ficam de fora:\r\n"+affectedNames:"Esta operação não tem uma fila autorizada para continuar.",AutoSize=true,MaximumSize=new Size(660,0),Margin=new Padding(0,12,0,12)},0,1);
         var buttons=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.RightToLeft,WrapContents=false};
-        var stop=new Button{Name="StopQueue",Text="Parar",AutoSize=true,MinimumSize=new Size(100,36),DialogResult=DialogResult.Cancel};buttons.Controls.Add(stop);
-        var skip=new Button{Name="SkipMod",Text="Pular e continuar",AccessibleName="Pular este mod e continuar a fila",AutoSize=true,MinimumSize=new Size(170,36),Enabled=canSkip,DialogResult=DialogResult.Ignore};buttons.Controls.Add(skip);
+        var stop=new GeneralButton{Name="StopQueue",Text="Parar",AutoSize=true,MinimumSize=new Size(100,36),DialogResult=DialogResult.Cancel};buttons.Controls.Add(stop);
+        var skip=new GeneralButton{Name="SkipMod",Text="Pular e continuar",AccessibleName="Pular este mod e continuar a fila",AutoSize=true,MinimumSize=new Size(170,36),Enabled=canSkip,DialogResult=DialogResult.Ignore};buttons.Controls.Add(skip);
         layout.Controls.Add(buttons,0,2);CancelButton=stop;AcceptButton=stop;
     }
 }
 
 public sealed partial class OnlineWindow {
-    readonly Button skipCurrentModButton=new Button{Name="SkipCurrentMod",Text="Pular mod atual",AccessibleName="Pular o mod aguardado e continuar para o próximo",AutoSize=true,MinimumSize=new Size(138,35),Enabled=false};
+    readonly Button skipCurrentModButton=new GeneralButton{Name="SkipCurrentMod",Text="Pular mod atual",AccessibleName="Pular o mod aguardado e continuar para o próximo",AutoSize=true,MinimumSize=new Size(138,35),Enabled=false};
     readonly HashSet<string> skippedThisQueue=new HashSet<string>(StringComparer.Ordinal);
     bool preparationWasSkipped;
     Func<ModPreparationException,bool> confirmSkipFailure=null;

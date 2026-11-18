@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -43,12 +43,33 @@ internal sealed partial class GeneralModWindow {
         check(editable.TemplateId==null&&store.Load(editable).List.Presets.Count==store.Load(builtIn).List.Presets.Count&&Safe.Hash(Path.Combine(store.DataPath(builtIn),"lista.json"))==builtInHash,"Built-in projects clone as personal editable versions while the source remains protected and unchanged.");
         var missing=store.Create("Sem jogo",new GeneralModList(),"light","pt",Path.Combine(root,"missing"));check(store.Load(store.Duplicate(missing,"Cópia sem jogo",catalog)).Destination==store.Load(missing).Destination,"A definitions-only project can be duplicated before its game folder exists.");
         int count=store.Read().Projects.Count;bool rejected=false;try{store.Duplicate(builtIn," ",catalog);}catch(IOException){rejected=true;}check(rejected&&store.Read().Projects.Count==count,"Invalid clone name does not register a partial project.");
-        TestForm(catalog,store.Load(editable),Path.Combine(root,"ui-copy"),root,async form=>{form.AttachProject(store,editable);check(!form.tableName.ReadOnly&&form.deletePreset.Enabled,"Presets in the personal duplicate are editable and deletable in the real UI.");await Task.CompletedTask;});
+        TestForm(catalog,store.Load(editable),Path.Combine(root,"ui-copy"),root,async form=>{form.AttachProject(store,editable);check(!form.tableName.ReadOnly&&form.preset.DeleteChoice!=null,"Presets in the personal duplicate are editable and deletable in the real UI.");await Task.CompletedTask;});
         TestForm(catalog,store.Load(builtIn),Path.Combine(root,"ui-base"),root,async form=>{
             form.AttachProject(store,builtIn);check(!form.tableName.ReadOnly,"Built-in preset is editable before creating a personal copy.");
             int before=store.Read().Projects.Count;using(var timer=new Timer{Interval=60}){timer.Tick+=(s,e)=>{var dialog=Application.OpenForms.OfType<GeneralNameDialog>().FirstOrDefault();if(dialog==null)return;timer.Stop();var field=AllControls(dialog).OfType<TextBox>().Single(box=>box.Name=="NameInput").Parent;var note=AllControls(dialog).OfType<Label>().Single(label=>label.Name=="NameDescription");var fieldBounds=dialog.RectangleToClient(field.RectangleToScreen(field.ClientRectangle));var noteBounds=dialog.RectangleToClient(note.RectangleToScreen(note.ClientRectangle));check(fieldBounds.Height>=44&&noteBounds.Top>=fieldBounds.Bottom,"Clone name field keeps its full rounded frame and the description stays outside it.");CaptureUi(dialog,Path.Combine(root,"clone-name.png"));check(AllControls(dialog).OfType<Label>().Any(label=>label.Name=="NameDescription"&&label.Text.Contains("mesma pasta")),"Clone dialog explains shared game files before creating a project.");((Button)dialog.CancelButton).PerformClick();};timer.Start();form.ProjectCommand("clone");}
             check(store.Read().Projects.Count==before&&form.ProjectAction==null&&form.Visible,"Canceling duplicate leaves the project library and current window unchanged.");
-            form.optionsButton.PerformClick();var menu=(GeneralActionsMenu)form.menus.Current;var button=AllControls(menu).OfType<Button>().Single(item=>item.Name=="clone");
+            form.optionsButton.PerformClick();var menu=(GeneralActionsMenu)form.menus.Current;
+            AllControls(menu).OfType<Button>().Single(item=>item.Name=="save-menu").PerformClick();
+            menu=(GeneralActionsMenu)form.menus.Current;
+            var revision=AllControls(menu).OfType<Button>().Single(item=>item.Name=="save-increment");
+            string originalPreset=form.ActivePreset.Name;
+            form.tableName.Text="Preset da revisão";
+            using(var timer=new Timer{Interval=55}){
+                timer.Tick+=(s,e)=>{
+                    var dialog=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(item=>item.Text=="Incremento salvo");
+                    if(dialog==null)return;
+                    timer.Stop();dialog.Close();
+                };
+                timer.Start();revision.PerformClick();
+            }
+            var increment=store.Read().Projects.Single(item=>item.Name==builtIn.Name+" · 01");
+            var incrementState=store.Load(increment);
+            check(form.project.Id==builtIn.Id&&incrementState.List.Presets.Single(preset=>preset.Id==incrementState.SelectedPreset).Name=="Preset da revisão"&&
+                form.ActivePreset.Name==originalPreset,"Incremento guarda a edição na cópia numerada e mantém o projeto original aberto.");
+            form.tableName.Text=originalPreset;
+            form.OpenSaveProjectMenu();
+            menu=(GeneralActionsMenu)form.menus.Current;
+            var button=AllControls(menu).OfType<Button>().Single(item=>item.Name=="clone");
             CompleteProjectName("Cópia pelo menu",()=>button.PerformClick());
             var created=store.Read().Projects.Single(item=>item.Name=="Cópia pelo menu");check(created.TemplateId==null&&form.ProjectAction=="project/"+created.Id,"Duplicate menu action creates an editable project and navigates directly to it.");await Task.CompletedTask;
         });

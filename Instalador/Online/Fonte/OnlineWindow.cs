@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -167,7 +167,7 @@ public sealed partial class OnlineWindow:Form {
         await Run(()=>RefreshAll());
     }
 
-    Button Button(string title,Action action){var b=new Button{Text=title,AutoSize=true,MinimumSize=new Size(138,35),Margin=new Padding(0,3,8,3)};b.Click+=(s,e)=>{if(!automaticFlow)action();};actions.Add(b);return b;}
+    Button Button(string title,Action action){var b=new GeneralButton{Text=title,AutoSize=true,MinimumSize=new Size(138,35),Margin=new Padding(0,3,8,3)};b.Click+=(s,e)=>{if(!automaticFlow)action();};actions.Add(b);return b;}
     string DownloadFolderSettings(){return Path.Combine(Path.GetDirectoryName(cache.Root),"pasta-downloads.json");}
     string LoadDownloadFolder(){
         try{string file=DownloadFolderSettings();Safe.NoLinks(file);if(File.Exists(file)&&new FileInfo(file).Length<=8192){string folder=Safe.Json.Deserialize<string>(File.ReadAllText(file));return new OnlineDownloadWatch(folder).Folder;}}
@@ -280,8 +280,8 @@ public sealed partial class OnlineWindow:Form {
                 string[] ids={"low","medium","high"};string preferred=pendingDensityId??current.Id;
                 int index=Array.IndexOf(ids,preferred);choice.SelectedIndex=index<0?0:index;
                 var explanation=new Label{Text="Baixa é a densidade recomendada.\nEste controle ajusta apenas o Night City Alive; Cyberpsycho e Dark Future ficam preservados.\nUse a mesma densidade nos dois computadores.",Location=new Point(18,180),Size=new Size(704,63)};
-                var close=new Button{Text="Fechar",Location=new Point(380,267),Size=new Size(148,35),DialogResult=DialogResult.Cancel};
-                var apply=new Button{Text="Aplicar e instalar",Location=new Point(540,267),Size=new Size(182,35),DialogResult=DialogResult.OK,Enabled=current.CanApply};
+                var close=new GeneralButton{Text="Fechar",Location=new Point(380,267),Size=new Size(148,35),DialogResult=DialogResult.Cancel};
+                var apply=new GeneralButton{Text="Aplicar e instalar",Location=new Point(540,267),Size=new Size(182,35),DialogResult=DialogResult.OK,Enabled=current.CanApply};
                 f.Controls.AddRange(new Control[]{actual,detail,label,choice,explanation,close,apply});f.AcceptButton=apply;f.CancelButton=close;
                 if(f.ShowDialog(this)==DialogResult.OK)selected=ids[choice.SelectedIndex];
             }
@@ -707,6 +707,7 @@ static class OnlineProgram {
         if(args.Length==3&&args[0]=="--verify-local-sources"){OnlineTests.VerifySources(c,args[1],args[2]);return 0;}
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
         if(args.Length==2&&args[0]=="--self-test-mod-updates-ui"){GeneralModWindow.RunModUpdateUiTests(args[1]);return 0;}
+        if(args.Length==3&&args[0]=="--self-test-archivexl-update"){GeneralModWindow.RunArchiveXLUpdateTest(args[1],args[2]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-human-ui"){GeneralModWindow.RunHumanCloseTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-diagnostics"){OnlineDiagnosticsTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-inventory-links"){GeneralModWindow.RunInventoryLinkTests(args[1]);return 0;}
@@ -727,7 +728,7 @@ static class OnlineProgram {
         if(args.Length==3&&args[0]=="--self-test-p2p-engine-owner"){GeneralP2PLifecycleTests.RunEngineOwner(args[1],args[2]);return 0;}
         if(args.Length==3&&args[0]=="--self-test-p2p-lifecycle"){GeneralP2PLifecycleTests.Run(args[1],args[2]);return 0;}
         if(args.Length==3&&args[0]=="--self-test-p2p-automatic"){GeneralP2PAutomaticTests.Run(args[1],args[2]);return 0;}
-        if(args.Length==3&&args[0]=="--self-test-p2p-diagnostics"){GeneralP2PDiagnosticTests.Run(args[1],args[2]);return 0;}
+        if(args.Length==2&&args[0]=="--self-test-p2p-diagnostics"){GeneralP2PDiagnosticTests.Run(args[1]);return 0;}
         if(args.Length==3&&args[0]=="--self-test-p2p-deferred"){GeneralP2PDeferredTests.Run(args[1],args[2]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-versions"){ModVersionChoiceTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-updates"){GeneralUpdatesTests.Run(args[1]);GeneralAutomaticUpdateTests.Run(args[1]);return 0;}

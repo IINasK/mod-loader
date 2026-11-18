@@ -122,14 +122,14 @@ internal sealed partial class GeneralModWindow {
             bool saved=false;
             try{
                 EnsureGameClosed(root);
-                detail.Text=T("Conferindo arquivos antes da instalação…","Scanning files before installation…");
+
                 bool cyberpunk=IsCyberpunk(root);
                 var capture=await Task.Run(()=>new ManualInstallCapture(root,cyberpunk));
                 if(IsDisposed||exitApproved)return;
                 if(GeneralDialog.Message(this,T("Instale o mod manualmente. Quando terminar, clique em OK para revisar os arquivos.",
                     "Install the mod manually. When finished, click OK to review the files."),title,MessageBoxButtons.OKCancel,MessageBoxIcon.Information)!=DialogResult.OK)return;
                 EnsureGameClosed(root);
-                detail.Text=T("Conferindo alterações…","Checking for changes…");
+
                 var changes=await Task.Run(()=>capture.Changes());
                 if(IsDisposed||exitApproved)return;
                 if(changes.Count==0){
@@ -165,10 +165,7 @@ internal sealed partial class GeneralModWindow {
             }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
             finally{
                 working=false;
-                if(!IsDisposed&&!exitApproved){
-                    Busy(false);
-                    detail.Text=saved?T("Instalação manual registrada.","Manual installation recorded."):"";
-                }
+                if(!IsDisposed&&!exitApproved)Busy(false);
             }
             if(saved&&!IsDisposed&&!exitApproved)await Scan();
         }

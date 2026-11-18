@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -1277,7 +1277,7 @@ internal sealed class GeneralCategoryDetails : GeneralDialog {
         layout.Controls.Add(GeneralModEditor.FieldFor(description, true));
         var feedback = new Label { AutoSize = true, Dock = DockStyle.Fill, UseMnemonic = false, Font = GeneralStyle.Font(10, false), Margin = new Padding(3, 6, 3, 6) };
         layout.Controls.Add(feedback);
-        var commands = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.RightToLeft };
+        var commands = GeneralTableDialogLayout.Commands();
         var save = GeneralStyle.Button(GeneralStyle.T("Salvar", "Save"), () => {
             ResultName = name.Text.Trim();
             ResultDescription = description.Text.Trim();
@@ -1336,7 +1336,7 @@ internal sealed class GeneralPresetEditor : GeneralDialog {
         layout.Controls.Add(GeneralModEditor.FieldFor(name, false));
         layout.Controls.Add(GeneralModEditor.LabelFor(GeneralStyle.T("Mods incluídos", "Included mods")));
         layout.Controls.Add(GeneralModEditor.FieldFor(choices, true));
-        var commands = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.RightToLeft };
+        var commands = GeneralTableDialogLayout.Commands();
         var save = GeneralStyle.Button(GeneralStyle.T("Salvar", "Save"), () => {
             Result = new GeneralModPreset {
                 Id = preset == null ? Guid.NewGuid().ToString("N") : preset.Id,
@@ -1379,12 +1379,12 @@ internal sealed class GeneralCategoryEditor : GeneralDialog {
         for (int i = 0; i < 4; i++) layout.RowStyles.Add(new RowStyle(i == 0 ? SizeType.Percent : SizeType.AutoSize, i == 0 ? 100 : 0));
         layout.Controls.Add(GeneralModEditor.FieldFor(list, true), 0, 0);
         layout.Controls.Add(GeneralModEditor.FieldFor(name, false), 0, 1);
-        var edit = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
+        var edit = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, Margin=new Padding(0,8,0,0) };
         edit.Controls.Add(GeneralStyle.Button(GeneralStyle.T("Adicionar", "Add"), () => Change(false, false), false));
         edit.Controls.Add(GeneralStyle.Button(GeneralStyle.T("Renomear", "Rename"), () => Change(true, false), false));
         edit.Controls.Add(GeneralStyle.Button(GeneralStyle.T("Excluir", "Delete"), () => Change(true, true), false));
         layout.Controls.Add(edit, 0, 2);
-        var commands = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.RightToLeft };
+        var commands = GeneralTableDialogLayout.Commands();
         var save = GeneralStyle.Button(GeneralStyle.T("Salvar", "Save"), () => { DialogResult = DialogResult.OK; }, true);
         var cancel = GeneralStyle.Button(GeneralStyle.T("Cancelar", "Cancel"), () => { DialogResult = DialogResult.Cancel; }, false);
         commands.Controls.Add(save);

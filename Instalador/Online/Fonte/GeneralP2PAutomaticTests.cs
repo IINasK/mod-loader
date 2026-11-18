@@ -55,9 +55,11 @@ internal static class GeneralP2PAutomaticTests {
                     using(var diagnostics=new GeneralP2PDiagnosticDialog(sender)){
                         diagnostics.Show(host);
                         var copyReport=(Button)diagnostics.Content.Controls.Find("p2p-diagnostic-copy",true).Single();
-                        var saveDiagnostics=(Button)diagnostics.Content.Controls.Find("p2p-diagnostic-save",true).Single();
-                        check(new[]{copyReport,saveDiagnostics}.All(button=>button.Parent.ClientRectangle.Contains(button.Bounds)),
+                        var sendDiagnostics=(Button)diagnostics.Content.Controls.Find("p2p-diagnostic-send",true).Single();
+                        check(new[]{copyReport,sendDiagnostics}.All(button=>button.Parent.ClientRectangle.Contains(button.Bounds)),
                             "Diagnostic actions fit their footer.");
+                        check(!sendDiagnostics.Enabled&&diagnostics.Content.Controls.Find("p2p-diagnostic-endpoint",true).Length==0,
+                            "A host with no received invitation cannot send a report and there is no web endpoint.");
                         copyReport.PerformClick();
                         check(Clipboard.GetText()==Safe.Json.Serialize(hostReport),"Copy diagnostics copies the sanitized report.");
                         diagnostics.Close();

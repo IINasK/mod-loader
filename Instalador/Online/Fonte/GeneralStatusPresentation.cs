@@ -12,6 +12,7 @@ internal static class GeneralStatusPresentation {
     internal const string NexusAmbiguous="Versão indeterminada";
     internal const string Disabled="Desabilitado";
     internal const string ChooseDependency="Escolher versão";
+    const string UpdateStatus="atualização disponível";
     internal static string Label(string raw) {
         if(raw==OtherChoice)return GeneralStyle.T(OtherChoice,"Other version selected");
         if(raw==DetectedFiles)return GeneralStyle.T(DetectedFiles,"Files detected");
@@ -21,7 +22,7 @@ internal static class GeneralStatusPresentation {
         if(raw==Disabled)return GeneralStyle.T(Disabled,"Disabled");
         if(raw==ChooseDependency)return GeneralStyle.T(ChooseDependency,"Choose version");
         string value=(raw??"").Trim().ToLowerInvariant();
-        if(value=="atualização disponível")return GeneralStyle.T("Atualização disponível","Update available");
+        if(value==UpdateStatus)return GeneralStyle.T("Atualizar","Update");
         if(value=="versão diferente")return GeneralStyle.T("Versão diferente","Different version");
         if(value=="versão mantida")return GeneralStyle.T("Versão mantida","Version kept");
         string kind=Kind(raw);
@@ -44,10 +45,15 @@ internal static class GeneralStatusPresentation {
         string kind=Kind(raw);
         if(kind=="installed")return ColorTranslator.FromHtml("#137B45");
         if(kind=="error")return ColorTranslator.FromHtml("#B51F37");
-        if(value=="baixando"||value=="instalando"||value=="versão diferente"||value=="atualização disponível")
+        if(value==UpdateStatus)return ColorTranslator.FromHtml("#F9DF80");
+        if(value=="baixando"||value=="instalando"||value=="versão diferente")
             return ColorTranslator.FromHtml("#A14C00");
         if(DownloadComplete(raw))return ColorTranslator.FromHtml("#105337");
         return ColorTranslator.FromHtml("#185ABD");
+    }
+    internal static Color TextColorFor(string raw) {
+        return String.Equals((raw??"").Trim(),UpdateStatus,StringComparison.OrdinalIgnoreCase)
+            ? ColorTranslator.FromHtml("#35270A") : Color.White;
     }
     internal static bool DownloadComplete(string raw) {
         string value=(raw??"").Trim().ToLowerInvariant();
@@ -69,7 +75,7 @@ internal static class GeneralStatusPresentation {
             case "instalação parcial":
             case "parcial/pulado":
                 return "error";
-            case "atualização disponível":
+            case UpdateStatus:
             case "versão diferente":
             case "na fila":
             case "verificando":

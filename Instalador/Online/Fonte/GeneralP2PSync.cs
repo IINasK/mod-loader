@@ -299,6 +299,7 @@ internal sealed partial class P2PService {
         }catch(Exception ex){
             if(!disposed&&!session.Discarded){
                 session.Error=ex.Message;
+                ReportDiagnosticFailure(session,"choice_failed",ex);
                 OnlineDiagnostics.Failure("p2p.choice.failed",ex,"Comparar os mods e enviar a escolha ao anfitrião.",
                     stage:full?"full":"update");
                 Save();

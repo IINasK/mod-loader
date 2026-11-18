@@ -1,78 +1,44 @@
 using System;
-using System.Globalization;
 using System.IO;
-using System.Net;
-using System.Net.Security;
-using System.Net.Sockets;
-using System.Security.Authentication;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Threading.Tasks;
+using System.Linq;
 
 internal static class GeneralP2PDiagnosticTests {
-    internal static void Run(string root,string certificateFile){
+    internal static void Run(string parent){
+        string root=OnlineTests.NestedRoot(parent,"diagnostics-");
         Directory.CreateDirectory(root);
-        string settings=Safe.In(root,"diagnostic-preferences.json");
-        var report=new P2PDiagnosticReport{Schema=1,Id="0123456789abcdef",Side="receiver",Phase="peer_unreachable"};
-        var listener=new TcpListener(IPAddress.Loopback,0);
-        var original=ServicePointManager.ServerCertificateValidationCallback;
-        using(var certificate=new X509Certificate2(certificateFile)){
-            listener.Start();
-            try{
-                int port=((IPEndPoint)listener.LocalEndpoint).Port;
-                string endpoint="https://127.0.0.1:"+port+"/report";
-                Check(P2PDiagnosticPreferences.HttpsEndpoint("http://127.0.0.1/report")==null&&
-                    P2PDiagnosticPreferences.HttpsEndpoint("https://user:password@example.test/report")==null,
-                    "Only HTTPS without embedded credentials is allowed.");
-                Check(!P2PDiagnosticPreferences.Load(settings).Enabled,"Reports default to local only.");
-                Safe.WriteJson(settings,new P2PDiagnosticPreferences{Endpoint=endpoint,Enabled=false});
-                P2PDiagnosticPreferences.SendIfEnabled(settings,report);
-                Check(!listener.Pending(),"A saved endpoint without opt-in never connects.");
+        string data=Safe.In(root,"p2p"),store=Safe.In(root,"packages");
+        string device=String.Join("-",Enumerable.Repeat("AAAAAAA",8));
+        string other=String.Join("-",Enumerable.Repeat("BBBBBBB",8));
+        var session=new P2PSession{
+            Id="ml-"+new string('a',32),Name="Receiver fixture",Hash=new string('a',64),
+            Lifecycle=true,Deferred=true,Mode="installed-zip",Peer=device,CreatedUtc=DateTime.UtcNow.ToString("o")
+        };
+        var unrelated=new P2PSession{
+            Id="ml-"+new string('b',32),Name="Unrelated fixture",Hash=new string('b',64),
+            Lifecycle=true,Deferred=true,Mode="installed-zip",Peer=other,CreatedUtc=DateTime.UtcNow.ToString("o")
+        };
+        Directory.CreateDirectory(data);
+        Safe.WriteJson(Safe.In(data,"sessions.json"),new[]{session,unrelated});
+        using(var service=new P2PService(data,store,true)){
+            var received=service.SnapshotSessions().First();
+            service.ArmConnectionDiagnostic(received.Id,false);
+            service.ConnectionDiagnosticPhase(received.Id,"local_failure",new IOException(@"C:\Users\fixture\secret.txt"));
+            Check(service.NeedsDiagnosticConnection()&&!service.Engine.Running,"Offline report survives while the helper is unavailable.");
+            service.ReportDiagnosticFailure(received,"local_failure",new IOException("repeat"));
+            Check(service.LocalDiagnostics(received).Length==1,"Repeated identical failure within one poll is coalesced.");
+            for(int i=0;i<12;i++)service.SendDiagnostic(received);
+            var pending=service.LocalDiagnostics(received);
+            Check(pending.Length==8&&pending.All(report=>report.Phase=="manual"),"The local report history is bounded.");
+            Check(service.LocalDiagnostics(service.SnapshotSessions()[1]).Length==0,"A report is never assigned to an unrelated invitation.");
+        }
+        using(var reopened=new P2PService(data,store,true)){
+            Check(reopened.LocalDiagnostics(reopened.SnapshotSessions()[0]).Length==8,
+                "Reports queued offline survive reopening.");
+        }
+        Safe.WriteJson(Safe.In(root,"resultado-p2p-diagnostics.json"),new{Passed=true,Tests=5,LoopbackOnly=true});
+    }
 
-                // Trust the fixture's leaf only inside this self-test process.
-                ServicePointManager.ServerCertificateValidationCallback=(source,peer,chain,errors)=>
-                    peer!=null&&peer.GetCertHashString()==certificate.Thumbprint;
-                Safe.WriteJson(settings,new P2PDiagnosticPreferences{Endpoint=endpoint,Enabled=true});
-                var received=Task.Run(()=>Receive(listener,certificate));
-                P2PDiagnosticPreferences.SendIfEnabled(settings,report);
-                Check(received.Wait(10000)&&received.Result==Safe.Json.Serialize(report),"The HTTPS receiver got the exact opt-in report.");
-                Safe.WriteJson(settings,new P2PDiagnosticPreferences{Endpoint=endpoint,Enabled=false});
-                P2PDiagnosticPreferences.SendIfEnabled(settings,report);
-                Check(!listener.Pending(),"Disabling the preference stops further connections.");
-                Safe.WriteJson(Safe.In(root,"resultado-p2p-diagnostics.json"),new{Passed=true,LoopbackOnly=true,Tests=5});
-            }finally{
-                ServicePointManager.ServerCertificateValidationCallback=original;
-                listener.Stop();
-            }
-        }
+    static void Check(bool ok,string message){
+        if(!ok)throw new IOException(message);
     }
-    static string Receive(TcpListener listener,X509Certificate2 certificate){
-        using(var client=listener.AcceptTcpClient())
-        using(var transport=new SslStream(client.GetStream())){
-            client.ReceiveTimeout=8000;client.SendTimeout=8000;
-            transport.AuthenticateAsServer(certificate,false,SslProtocols.Tls12,false);
-            using(var reader=new StreamReader(transport,Encoding.UTF8,false,1024,true)){
-                Check(reader.ReadLine()=="POST /report HTTP/1.1","The receiver gets a POST.");
-                int length=0;bool json=false,expect=false;
-                string line;
-                while(!String.IsNullOrEmpty(line=reader.ReadLine())){
-                    if(line.StartsWith("Content-Length:",StringComparison.OrdinalIgnoreCase))
-                        length=Int32.Parse(line.Substring(15),CultureInfo.InvariantCulture);
-                    if(line.Equals("Content-Type: application/json",StringComparison.OrdinalIgnoreCase))json=true;
-                    if(line.Equals("Expect: 100-continue",StringComparison.OrdinalIgnoreCase))expect=true;
-                }
-                Check(json&&length>0&&length<4096,"The request carries bounded JSON.");
-                if(expect)Write(transport,"HTTP/1.1 100 Continue\r\n\r\n");
-                var content=new char[length];
-                Check(reader.ReadBlock(content,0,length)==length,"The full report was received.");
-                Write(transport,"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
-                return new string(content);
-            }
-        }
-    }
-    static void Write(Stream stream,string value){
-        var bytes=Encoding.ASCII.GetBytes(value);
-        stream.Write(bytes,0,bytes.Length);stream.Flush();
-    }
-    static void Check(bool passed,string message){if(!passed)throw new IOException(message);}
 }

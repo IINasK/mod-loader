@@ -85,7 +85,7 @@ internal sealed partial class P2PService : IDisposable {
     readonly object manifestsLock=new object();
     readonly Dictionary<string,P2PManifest> allowedManifests=new Dictionary<string,P2PManifest>();
     internal P2PService(string root,string store,bool localOnly=false,bool offerRecovery=false){
-        diagnosticFixture=localOnly;Root=Path.GetFullPath(root);Store=Path.GetFullPath(store);Safe.NoLinks(Root);Safe.NoLinks(Store);
+        Root=Path.GetFullPath(root);Store=Path.GetFullPath(store);Safe.NoLinks(Root);Safe.NoLinks(Store);
         if(Root.TrimEnd('\\').Equals(Store.TrimEnd('\\'),StringComparison.OrdinalIgnoreCase))throw new IOException("Separe os arquivos privados da pasta de transferência.");
         statePath=Safe.In(Root,"sessions.json");Engine=new SyncthingEngine(Safe.In(Root,"syncthing"),localOnly);
         if(!localOnly){
@@ -206,8 +206,9 @@ internal sealed partial class P2PService : IDisposable {
                 if(disposed)break;
                 try{ProcessInstalled(session);}
                 catch(System.Net.WebException){/* The transport can reconnect without changing the installation state. */}
-                catch(Exception ex){if(session.Stage==null){session.Error=ex.Message;Save();}}
+                catch(Exception ex){if(session.Stage==null){ReportDiagnosticFailure(session,"transfer_failed",ex);session.Error=ex.Message;Save();}}
             }
+            TryDiagnosticIo(()=>ProcessDiagnosticTransfers(transfers));
             foreach(var s in receivers){if(disposed)break;if(s.Paused||s.Mode=="installed-zip")continue;try{if(File.Exists(Safe.In(Folder(s),"pack.json")))AllowFiles(s);}catch(Exception ex){OnlineDiagnostics.Record("p2p.waiting",null,"Aguardando manifesto conferido.",new{ErrorType=ex.GetType().Name});}}
         }
         finally{Interlocked.Exchange(ref pumping,0);}

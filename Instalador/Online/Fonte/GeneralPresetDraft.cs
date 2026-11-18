@@ -5,7 +5,7 @@ using System.Linq;
 using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
-    Button deletePreset;
+
     GeneralModState projectDraft;
     Func<DialogResult> testProjectSaveChoice;
 
@@ -62,7 +62,7 @@ internal sealed partial class GeneralModWindow {
             if(register!=null)register(data,state);
             library.Save(state);
         }
-        startupIssue=null;
+
         EndProjectEdit();
         UpdatePresetCommands();
     }
@@ -109,9 +109,23 @@ internal sealed partial class GeneralModWindow {
     void UpdatePresetCommands(){
         if(presetSettings==null)return;bool available=!working&&!scanning&&(p2p==null||!p2p.Installing);
         bool valid=ActivePreset==null||!String.IsNullOrWhiteSpace(draftName)&&draftName.Length<=120&&!draftName.Any(Char.IsControl);
-        presetSettings.Enabled=available&&valid&&(projectDraft!=null||(ActivePreset==null?marked.Any():DraftNameChanged||DraftSelectionChanged));
-        if(deletePreset!=null)deletePreset.Enabled=available&&state.List.Presets.Count>1;
+        tableName.ReadOnly=!available||ActivePreset==null;
+        tableName.ForeColor=tableName.ReadOnly?GeneralStyle.Muted:GeneralStyle.Foreground;
+        tableName.TabStop=!tableName.ReadOnly;
+        tableName.Cursor=tableName.ReadOnly?Cursors.Default:Cursors.IBeam;
+        presetSettings.Visible=DraftNameChanged;
+        presetSettings.Enabled=available&&valid&&DraftNameChanged;
+        LayoutPresetTitle();
         if(clearFilters!=null)clearFilters.Enabled=available&&associationChoice==null&&HasListFilters;
+    }
+    void LayoutPresetTitle(){
+        if(tableName==null||tableName.Parent==null)return;
+        var area=tableName.Parent.ClientSize;
+        int width=TextRenderer.MeasureText(tableName.Text+"  ",tableName.Font).Width;
+        int available=Math.Max(1,area.Width-(DraftNameChanged?44:0));
+        tableName.SetBounds(0,Math.Max(0,(area.Height-tableName.PreferredHeight)/2),
+            Math.Min(available,Math.Max(72,width)),tableName.PreferredHeight);
+        presetSettings.SetBounds(Math.Max(0,area.Width-44),0,44,area.Height);
     }
     bool ConfirmPresetNavigation(){
         return ConfirmProjectNavigation();
@@ -121,7 +135,7 @@ internal sealed partial class GeneralModWindow {
         var selected=ActivePreset;
         if(projectDraft!=null&&!DraftNameChanged){
             SaveProjectEdits();
-            detail.Text=T("Projeto salvo.","Project saved.");
+
             return;
         }
         if(selected==null){if(marked.Any())SavePresetSelection(true);return;}
@@ -135,6 +149,6 @@ internal sealed partial class GeneralModWindow {
         string previous=selected.Name;var members=selected.ModIds;
         selected.Name=name;if(saveSelection&&DraftSelectionChanged)selected.ModIds=PresetCheckedIds();
         try{SaveProjectEdits();}catch{selected.Name=previous;selected.ModIds=members;throw;}
-        CapturePresetDraft();RebuildPresets();detail.Text=T("Preset salvo.","Preset saved.");
+        CapturePresetDraft();RebuildPresets();
     }
 }

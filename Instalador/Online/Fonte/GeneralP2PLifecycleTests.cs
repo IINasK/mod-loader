@@ -231,8 +231,19 @@ internal static class GeneralP2PLifecycleTests {
                 var sent=host.BeginDeferred(source.Item1,ids,true,compareBeforePack:true);
                 var invitation=host.Invitation(sent);
                 var received=friend.Accept(invitation,target,true);
+                if(!full){
+                    friend.ReportDiagnosticFailure(received,"install_failed",new IOException("private C:\\Users\\fixture\\secret.txt"));
+                    Check(checks,friend.LocalDiagnostics(received).Length==1&&host.ReceivedDiagnostics(sent).Length==0,
+                        "A receiver failure is queued locally while the host is unreachable.");
+                }
                 ConnectTo(friend,host);
                 Wait(()=>friend.HasSyncPreview(received),"The signed comparison preview did not reach the receiver. "+sent.Error);
+                if(!full){
+                    Wait(()=>host.ReceivedDiagnostics(sent).Any(report=>report.Phase=="install_failed"&&report.FailureType=="IOException"),
+                        "The automatic report did not reach the approved host over P2P.");
+                    Check(checks,!Safe.Json.Serialize(host.ReceivedDiagnostics(sent)).Contains("secret.txt"),
+                        "The host receives the failure stage and type without the private exception message.");
+                }
                 string zip=Safe.In(host.Folder(sent),"pack.zip");
                 Check(checks,P2PInvite.Decode(invitation).Schema==3&&!File.Exists(zip)&&sent.PayloadHash==null,
                     "The sender builds no ZIP until the receiver makes a choice.");
@@ -246,6 +257,18 @@ internal static class GeneralP2PLifecycleTests {
                     friend.CompareIncoming(received,report:(done,total,item)=>{throw new IOException("Full pack should not hash local files.");},full:true);
                 var offerSource=sent.OfferSource;
                 sent.OfferSource=null;host.SetPreparationState(null);
+                if(!full){
+                    received.SyncMode=1;
+                    try{
+                        Wait(()=>host.TransferStatus(sent).Recipients.Any(bar=>bar.Indeterminate&&bar.Finished&&bar.Caption.StartsWith(GeneralStyle.T("Receptor","Receiver"))),
+                            "The host did not show indeterminate comparison progress.");
+                        received.SyncProgress=new P2PSyncProgress{Done=1,Total=3,Item="mods/local-only.txt"};
+                        Wait(()=>host.TransferStatus(sent).Recipients.Any(bar=>!bar.Indeterminate&&bar.Percent==33&&
+                            bar.Caption.Contains("1/3")&&!bar.Caption.Contains("local-only")),
+                            "The host did not receive the receiver's authenticated counts.");
+                        checks.Add("The host displays the signed receiver comparison without a local file path.");
+                    }finally{received.SyncProgress=null;received.SyncMode=0;}
+                }
                 friend.ChooseIncoming(received,full).GetAwaiter().GetResult();
                 Wait(()=>sent.Recipients.Single().SyncChoicePhase=="choice_sent",
                     "The host did not receive the fast receiver choice.");
@@ -269,6 +292,14 @@ internal static class GeneralP2PLifecycleTests {
                 Check(checks,File.ReadAllText(different)=="host version"&&File.Exists(Safe.In(target,"mods/missing.txt"))&&File.GetLastWriteTimeUtc(same)==stamp&&File.ReadAllText(Safe.In(target,"mods/local-only.txt"))=="keep local",
                     "The receiver installs changes and preserves the existing identical file.");
                 Check(checks,friend.InstalledManifest(received).List.Mods.Count==3,"The installed receipt retains the complete mod list.");
+                if(!full){
+                    Wait(()=>received.ReceiptClosed&&sent.Recipients.All(item=>item.ReceiptClosed),
+                        "The package receipt did not close before the manual diagnostic.");
+                    friend.SendDiagnostic(received);
+                    Wait(()=>host.ReceivedDiagnostics(sent).Any(report=>report.Phase=="manual"),
+                        "The manual report did not arrive after the package receipt closed.");
+                    checks.Add("A manual report reaches the same host after completed transport is unshared.");
+                }
             }
         }
     }

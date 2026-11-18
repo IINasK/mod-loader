@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 
 internal sealed class P2PDiagnosticReport {
     public int Schema {get;set;}
@@ -20,46 +20,8 @@ internal sealed class P2PDiagnosticReport {
     public bool? LocalApiResponded {get;set;}
     public bool? PeerConnected {get;set;}
     public string FailureType {get;set;}
-}
-
-internal sealed class P2PDiagnosticPreferences {
-    public bool Enabled {get;set;}
-    public string Endpoint {get;set;}
-    internal static Uri HttpsEndpoint(string address){
-        Uri url;
-        return address!=null&&address.Length<=2048&&Uri.TryCreate(address,UriKind.Absolute,out url)&&
-            url.Scheme==Uri.UriSchemeHttps&&url.Host.Length!=0&&url.UserInfo.Length==0&&url.Fragment.Length==0?url:null;
-    }
-    internal static P2PDiagnosticPreferences Load(string path){
-        try{
-            Safe.NoLinks(path);
-            if(File.Exists(path)&&new FileInfo(path).Length<8192)
-                return Safe.Json.Deserialize<P2PDiagnosticPreferences>(File.ReadAllText(path))??new P2PDiagnosticPreferences();
-        }catch(Exception ex){OnlineDiagnostics.Record("p2p.diagnostic.preferences",null,ex.GetType().Name);}
-        return new P2PDiagnosticPreferences();
-    }
-    internal static void Post(Uri endpoint,byte[] body){
-        var request=(HttpWebRequest)WebRequest.Create(endpoint);
-        request.Method="POST";request.ContentType="application/json";request.ContentLength=body.Length;
-        request.AllowAutoRedirect=false;request.UseDefaultCredentials=false;
-        request.Timeout=8000;request.ReadWriteTimeout=8000;
-        using(var stream=request.GetRequestStream())stream.Write(body,0,body.Length);
-        using(var response=(HttpWebResponse)request.GetResponse()){
-            int status=(int)response.StatusCode;
-            if(status<200||status>=300)throw new IOException("Unexpected HTTP status.");
-        }
-    }
-    internal static void SendIfEnabled(string path,P2PDiagnosticReport report){
-        var settings=Load(path);
-        var endpoint=HttpsEndpoint(settings.Endpoint);
-        if(!settings.Enabled||endpoint==null)return;
-        try{
-            Post(endpoint,Encoding.UTF8.GetBytes(Safe.Json.Serialize(report)));
-            OnlineDiagnostics.Record("p2p.diagnostic.delivered",null,report.Id);
-        }catch(Exception ex){
-            OnlineDiagnostics.Record("p2p.diagnostic.delivery_failed",null,report.Id,new{ErrorType=ex.GetType().Name});
-        }
-    }
+    public int? ErrorCode {get;set;}
+    public int? ModsOutsidePack {get;set;}
 }
 
 internal sealed partial class P2PService {
@@ -71,15 +33,204 @@ internal sealed partial class P2PService {
     }
     readonly object diagnosticGate=new object();
     readonly Dictionary<string,ConnectionAttempt> connectionAttempts=new Dictionary<string,ConnectionAttempt>();
-    readonly bool diagnosticFixture;
-    string DiagnosticPreferencesPath {get{
-        return Safe.In(diagnosticFixture?Root:GeneralAppPaths.Current().Data,"p2p-diagnostic-preferences.json");
-    }}
-    internal P2PDiagnosticPreferences DiagnosticPreferences(){return P2PDiagnosticPreferences.Load(DiagnosticPreferencesPath);}
-    internal void SaveDiagnosticPreferences(P2PDiagnosticPreferences preferences){
-        string path=DiagnosticPreferencesPath;
-        Directory.CreateDirectory(Path.GetDirectoryName(path));
-        Safe.NoLinks(path);Safe.WriteJson(path,preferences);
+    const string DiagnosticName="report.json";
+    const int DiagnosticLimit=8;
+    const int MaxDiagnosticMessage=12288;
+    readonly HashSet<string> configuredDiagnostics=new HashSet<string>(StringComparer.Ordinal);
+    bool diagnosticFoldersRecovered;
+    readonly HashSet<string> staleDiagnosticFolders=new HashSet<string>(StringComparer.Ordinal);
+
+    static bool SupportsDiagnostics(P2PSession session){
+        return session.Lifecycle&&!session.Discarded&&!session.HistoryDismissed&&session.Mode=="installed-zip"&&
+            (session.Sender?session.Recipients.Length!=0:session.Peer!=null);
+    }
+
+    internal bool CanSendDiagnostic(P2PSession session){
+        return session!=null&&!session.Sender&&SupportsDiagnostics(session)&&SnapshotSessions().Contains(session);
+    }
+
+    internal bool NeedsDiagnosticConnection(){
+        return SnapshotSessions().Any(session=>SupportsDiagnostics(session)&&
+            (session.Sender||File.Exists(DiagnosticQueue(session))));
+    }
+
+    string DiagnosticQueue(P2PSession session){
+        return Safe.In(Root,"dq/"+session.Id+".json");
+    }
+
+    string DiagnosticFolderId(P2PSession session,string receiver){
+        return "ml-"+InstalledSnapshot.Hash(Encoding.UTF8.GetBytes("diagnostics\n"+session.Id+"\n"+receiver)).Substring(0,32);
+    }
+
+    string DiagnosticFolder(string id){
+        return Safe.In(Root,"dr/"+id);
+    }
+
+    // Keep the wire report structured. No exception messages, paths, or raw logs cross the connection.
+    static bool ValidDiagnostic(P2PDiagnosticReport report,P2PSession session){
+        DateTimeOffset started,updated;
+        return report!=null&&report.Schema==1&&report.Side=="receiver"&&report.Id==DiagnosticId(session.Id)&&
+            Regex.IsMatch(report.AppVersion??"", @"\A[0-9]+(?:\.[0-9]+){1,3}\z")&&report.AppVersion.Length<=24&&
+            Regex.IsMatch(report.Phase??"", @"\A[a-z_]{1,60}\z")&&
+            (report.FailureType==null||Regex.IsMatch(report.FailureType,@"\A[A-Za-z][A-Za-z0-9]{0,79}\z"))&&
+            DiagnosticTime(report.StartedUtc,out started)&&DiagnosticTime(report.UpdatedUtc,out updated)&&
+            updated>=started&&report.ElapsedSeconds>=0&&
+            (!report.ModsOutsidePack.HasValue||report.ModsOutsidePack>=0&&report.ModsOutsidePack<=1000);
+    }
+
+    static bool DiagnosticTime(string value,out DateTimeOffset parsed){
+        parsed=default(DateTimeOffset);
+        return value!=null&&value.Length<=36&&DateTimeOffset.TryParseExact(value,"o",CultureInfo.InvariantCulture,
+            DateTimeStyles.None,out parsed);
+    }
+
+    static P2PDiagnosticReport[] ParseDiagnostics(string json,P2PSession session){
+        var reports=Safe.Json.Deserialize<P2PDiagnosticReport[]>(json);
+        if(reports==null||reports.Length==0||reports.Length>DiagnosticLimit||reports.Any(report=>!ValidDiagnostic(report,session)))
+            throw new IOException("Relatório P2P inválido.");
+        return reports;
+    }
+
+    P2PDiagnosticReport[] ReadDiagnosticQueue(P2PSession session){
+        string path=DiagnosticQueue(session);
+        Safe.NoLinks(path);
+        if(!File.Exists(path))return new P2PDiagnosticReport[0];
+        using(var input=File.OpenRead(path))
+            return ParseDiagnostics(Encoding.UTF8.GetString(InstalledSnapshot.ReadBytes(input,MaxDiagnosticMessage)),session);
+    }
+
+    P2PDiagnosticReport DiagnosticFor(P2PSession session,string phase,Exception error=null){
+        var now=DateTime.UtcNow;
+        DateTime started;
+        if(!DateTime.TryParse(session.CreatedUtc,out started)||started.ToUniversalTime()>now)started=now;
+        started=started.ToUniversalTime();
+        return new P2PDiagnosticReport{
+            Schema=1,Id=DiagnosticId(session.Id),Side="receiver",AppVersion=GeneralUpdateChecker.CurrentVersion,
+            Phase=phase,FailureType=error==null?null:error.GetType().Name,
+            ErrorCode=error==null?(int?)null:error.HResult,ModsOutsidePack=session.ModsOutsidePack,
+            StartedUtc=new DateTimeOffset(started).ToString("o"),UpdatedUtc=new DateTimeOffset(now).ToString("o"),
+            ElapsedSeconds=(int)Math.Min(Int32.MaxValue,(now-started).TotalSeconds),HelperRunning=Engine.Running
+        };
+    }
+
+    void QueueDiagnostic(P2PSession session,P2PDiagnosticReport report,bool automatic){
+        if(!CanSendDiagnostic(session)||!ValidDiagnostic(report,session))return;
+        lock(diagnosticGate){
+            var queue=ReadDiagnosticQueue(session);
+            var previous=queue.LastOrDefault();
+            if(automatic&&previous!=null&&previous.Phase==report.Phase&&previous.FailureType==report.FailureType&&
+                DateTimeOffset.UtcNow-DateTimeOffset.Parse(previous.UpdatedUtc)<TimeSpan.FromSeconds(10))return;
+            string path=DiagnosticQueue(session);
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            Safe.NoLinks(path);
+            Safe.WriteJson(path,queue.Skip(Math.Max(0,queue.Length-DiagnosticLimit+1)).Concat(new[]{report}).ToArray());
+        }
+    }
+
+    internal void SendDiagnostic(P2PSession session){
+        if(!CanSendDiagnostic(session))throw new IOException(GeneralStyle.T("Escolha um recebimento P2P.","Choose a P2P download."));
+        QueueDiagnostic(session,DiagnosticFor(session,"manual"),false);
+    }
+
+    internal void ReportDiagnosticFailure(P2PSession session,string phase,Exception error){
+        if(!CanSendDiagnostic(session))return;
+        TryDiagnosticIo(()=>QueueDiagnostic(session,DiagnosticFor(session,phase,error),true));
+    }
+
+    void ConfigureDiagnostics(string id,string peer,bool host){
+        if(configuredDiagnostics.Contains(id))return;
+        string folder=DiagnosticFolder(id);
+        Safe.NoLinks(folder);
+        Directory.CreateDirectory(folder);
+        string ignore=Safe.In(folder,".stignore"),rules="!"+DiagnosticName+"\n*\n";
+        Safe.NoLinks(ignore);
+        if(!File.Exists(ignore))File.WriteAllText(ignore,rules);
+        else if(new FileInfo(ignore).Length>128||File.ReadAllText(ignore)!=rules)
+            throw new IOException("As regras da pasta de diagnóstico P2P foram alteradas.");
+        Engine.EnsurePeer(peer);
+        Engine.ConfigureFolder(id,folder,"Mod Loader diagnostics",!host,peer);
+        configuredDiagnostics.Add(id);
+    }
+
+    void RestoreDiagnosticFolders(){
+        string root=Safe.In(Root,"dr");
+        Safe.NoLinks(root);
+        if(!Directory.Exists(root))return;
+        foreach(string folder in Directory.GetDirectories(root)){
+            string id=Path.GetFileName(folder);
+            if(Regex.IsMatch(id,@"\Aml-[a-f0-9]{32}\z"))staleDiagnosticFolders.Add(id);
+        }
+    }
+
+    void ProcessDiagnosticTransfers(P2PSession[] sessions){
+        if(!Engine.Running)return;
+        if(!diagnosticFoldersRecovered){
+            RestoreDiagnosticFolders();
+            diagnosticFoldersRecovered=true;
+        }
+        var active=new HashSet<string>(StringComparer.Ordinal);
+        foreach(var session in sessions.Where(SupportsDiagnostics)){
+            if(session.Sender){
+                foreach(var recipient in session.Recipients){
+                    string id=DiagnosticFolderId(session,recipient.Device);
+                    active.Add(id);
+                    TryDiagnosticIo(()=>ConfigureDiagnostics(id,recipient.Device,true));
+                }
+            }else if(Engine.Device!=null&&File.Exists(DiagnosticQueue(session))){
+                string id=DiagnosticFolderId(session,Engine.Device);
+                active.Add(id);
+                TryDiagnosticIo(()=>PublishDiagnostics(session,id));
+            }
+        }
+        foreach(string id in staleDiagnosticFolders.Concat(configuredDiagnostics).Distinct().Where(id=>!active.Contains(id)).ToArray())
+            TryDiagnosticIo(()=>{Engine.RemoveFolder(id);configuredDiagnostics.Remove(id);staleDiagnosticFolders.Remove(id);});
+        staleDiagnosticFolders.ExceptWith(active);
+    }
+
+    void PublishDiagnostics(P2PSession session,string id){
+        // The invitation pins the host's TLS device. Only that device is offered this folder.
+        ConfigureDiagnostics(id,session.Peer,false);
+        var reports=ReadDiagnosticQueue(session);
+        if(reports.Length==0)return;
+        string path=Safe.In(DiagnosticFolder(id),DiagnosticName);
+        Safe.NoLinks(path);
+        if(File.Exists(path)){
+            string ignored;
+            try{
+                if(ReadSyncMessage(session,Engine.Device,path,DiagnosticName,out ignored,MaxDiagnosticMessage)==Safe.Json.Serialize(reports))
+                    return;
+            }catch(IOException){/* Rebuild the envelope from the validated queue. */}
+            catch(ArgumentException){/* Rebuild invalid local JSON. */}
+            catch(InvalidOperationException){/* Rebuild invalid local JSON. */}
+        }
+        WriteSyncMessage(session,Engine.Device,path,DiagnosticName,reports);
+        ScanSyncFolder(id,DiagnosticName);
+    }
+
+    internal P2PDiagnosticReport[] LocalDiagnostics(P2PSession session){
+        P2PDiagnosticReport[] reports=new P2PDiagnosticReport[0];
+        if(session!=null&&!session.Sender)TryDiagnosticIo(()=>reports=ReadDiagnosticQueue(session));
+        return reports;
+    }
+
+    internal P2PDiagnosticReport[] ReceivedDiagnostics(P2PSession session){
+        var reports=new List<P2PDiagnosticReport>();
+        if(session==null||!session.Sender)return reports.ToArray();
+        foreach(var recipient in session.Recipients){
+            TryDiagnosticIo(()=>{
+                string path=Safe.In(DiagnosticFolder(DiagnosticFolderId(session,recipient.Device)),DiagnosticName);
+                Safe.NoLinks(path);
+                if(!File.Exists(path))return;
+                string ignored;
+                reports.AddRange(ParseDiagnostics(ReadSyncMessage(session,recipient.Device,path,DiagnosticName,out ignored,MaxDiagnosticMessage),session));
+            });
+        }
+        return reports.OrderBy(report=>report.UpdatedUtc,StringComparer.Ordinal).ToArray();
+    }
+
+    static void TryDiagnosticIo(Action action){
+        try{action();}
+        catch(Exception ex){OnlineDiagnostics.Record("p2p.diagnostic.delivery_failed",null,ex.GetType().Name);}
     }
     internal static string DiagnosticId(string folder){
         using(var hash=SHA256.Create())return Safe.Hex(hash.ComputeHash(Encoding.UTF8.GetBytes(folder))).Substring(0,16);
@@ -105,14 +256,14 @@ internal sealed partial class P2PService {
         if(attempt.Report!=null&&attempt.Report.Phase==phase)return;
         var now=DateTime.UtcNow;
         var report=new P2PDiagnosticReport{Schema=1,Id=DiagnosticId(attempt.Folder),Side=attempt.Sender?"host":"receiver",
-            AppVersion=GeneralUpdateChecker.CurrentVersion,StartedUtc=attempt.Started.ToString("o"),UpdatedUtc=now.ToString("o"),
+            AppVersion=GeneralUpdateChecker.CurrentVersion,StartedUtc=new DateTimeOffset(attempt.Started).ToString("o"),UpdatedUtc=new DateTimeOffset(now).ToString("o"),
             ElapsedSeconds=(int)Math.Max(0,(now-attempt.Started).TotalSeconds),Phase=phase,HelperRunning=Engine.Running,
             LocalApiResponded=api,PeerConnected=connected,FailureType=failure};
         attempt.Report=report;
         OnlineDiagnostics.Record("p2p.diagnostic",null,phase,report);
-        if(send&&!attempt.Sender&&!diagnosticFixture){
-            string path=DiagnosticPreferencesPath;
-            Task.Run(()=>P2PDiagnosticPreferences.SendIfEnabled(path,report));
+        if(send&&!attempt.Sender){
+            var session=SnapshotSessions().FirstOrDefault(item=>item.Id==attempt.Folder&&!item.Sender);
+            if(session!=null)TryDiagnosticIo(()=>QueueDiagnostic(session,report,true));
         }
     }
     internal P2PDiagnosticReport GetConnectionDiagnostic(string folder=null){

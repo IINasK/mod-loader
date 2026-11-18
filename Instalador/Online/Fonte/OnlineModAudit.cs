@@ -98,7 +98,7 @@ public sealed class ModAuditWindow:Form {
         foreach(var finding in report.Findings.OrderBy(f=>f.Level=="Problema"?0:f.Level=="Atenção"?1:2)){int row=grid.Rows.Add(finding.Level,finding.Mod,finding.Message);grid.Rows[row].Tag=finding;grid.Rows[row].DefaultCellStyle.ForeColor=finding.Level=="Problema"?Color.Firebrick:finding.Level=="Atenção"?Color.FromArgb(140,86,0):Color.Black;}
         Action explain=()=>{var finding=grid.CurrentRow==null?null:grid.CurrentRow.Tag as ModAuditFinding;details.Text=finding==null?"":finding.Message+"\r\n\r\nRecomendação: "+finding.Advice+"\r\n\r\nEvidência: "+finding.Evidence;};grid.CurrentCellChanged+=(s,e)=>explain();
         layout.Controls.Add(grid,0,2);layout.Controls.Add(details,0,3);
-        var footer=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.RightToLeft};var close=new Button{Text="Fechar",AutoSize=true,MinimumSize=new Size(120,34),DialogResult=DialogResult.Cancel};footer.Controls.Add(close);CancelButton=close;layout.Controls.Add(footer,0,4);
+        var footer=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.RightToLeft};var close=new GeneralButton{Text="Fechar",AutoSize=true,MinimumSize=new Size(120,34),DialogResult=DialogResult.Cancel};footer.Controls.Add(close);CancelButton=close;layout.Controls.Add(footer,0,4);
         Shown+=(s,e)=>{if(grid.Rows.Count>0)grid.CurrentCell=grid.Rows[0].Cells[0];explain();};
     }
 }

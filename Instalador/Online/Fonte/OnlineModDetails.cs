@@ -65,8 +65,8 @@ public sealed class ModDetailsWindow:Form {
         layout.Controls.Add(files,0,3);
         layout.Controls.Add(new TextBox{Text=info.Notes,ReadOnly=true,Multiline=true,ScrollBars=ScrollBars.Vertical,Dock=DockStyle.Fill,Height=62,BackColor=Color.White,AccessibleName="Informações adicionais",Margin=new Padding(0,10,0,7)},0,4);
         var buttons=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.RightToLeft,WrapContents=false};
-        var close=new Button{Text="Fechar",AutoSize=true,MinimumSize=new Size(110,34),DialogResult=DialogResult.Cancel};buttons.Controls.Add(close);CancelButton=close;
-        var web=new Button{Name="OpenWeb",Text="Abrir na web",AutoSize=true,MinimumSize=new Size(140,34)};web.Click+=(s,e)=>{try{OnlineWindow.BrowserRequest(info.OfficialUrl);var page=new Uri(info.OfficialUrl);OnlineDiagnostics.Record("browser.details.request",null,"Abrir na web acionado nos detalhes.",new{Name=info.Name,Host=page.DnsSafeHost,Path=page.AbsolutePath});openWeb(info.OfficialUrl);}catch(Exception ex){MessageBox.Show(this,ex.Message,"Não foi possível abrir a página",MessageBoxButtons.OK,MessageBoxIcon.Error);}};buttons.Controls.Add(web);
+        var close=new GeneralButton{Text="Fechar",AutoSize=true,MinimumSize=new Size(110,34),DialogResult=DialogResult.Cancel};buttons.Controls.Add(close);CancelButton=close;
+        var web=new GeneralButton{Name="OpenWeb",Text="Abrir na web",AutoSize=true,MinimumSize=new Size(140,34)};web.Click+=(s,e)=>{try{OnlineWindow.BrowserRequest(info.OfficialUrl);var page=new Uri(info.OfficialUrl);OnlineDiagnostics.Record("browser.details.request",null,"Abrir na web acionado nos detalhes.",new{Name=info.Name,Host=page.DnsSafeHost,Path=page.AbsolutePath});openWeb(info.OfficialUrl);}catch(Exception ex){MessageBox.Show(this,ex.Message,"Não foi possível abrir a página",MessageBoxButtons.OK,MessageBoxIcon.Error);}};buttons.Controls.Add(web);
         layout.Controls.Add(buttons,0,5);
     }
 }

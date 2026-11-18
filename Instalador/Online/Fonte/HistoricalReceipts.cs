@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -17,6 +17,7 @@ internal static class HistoricalReceipts {
     });
     internal static FixedCatalog CatalogForSnapshot(FixedCatalog catalog,InstalledSnapshotManifest manifest){
         catalog=NightCoopRelease.CatalogForReceipt(catalog,manifest);
+        catalog=CatalogModVersions.ForReceipt(catalog,manifest);
         if(catalog==null||catalog.Id!=CatalogId||manifest==null||manifest.Game!="cyberpunk2077"||manifest.List==null||manifest.List.Mods==null)
             return catalog;
         var variants=manifest.List.Mods.Where(mod=>mod!=null&&mod.Variants!=null)

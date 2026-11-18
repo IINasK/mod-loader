@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 // Metadata is advisory. It never authorizes installation, ownership or a hash change.
 internal sealed class NexusUpdateResult {
-    internal string State,Version,Url;
+    internal string State,Version,Url,SourceVersion;
     internal static NexusUpdateResult Unknown(string state){return new NexusUpdateResult{State=state};}
 }
 
@@ -37,7 +37,17 @@ internal static class NexusCredentials {
     }
 }
 
+internal enum NexusKeyCheck { Accepted, Rejected, Unavailable }
+
 internal static partial class GeneralNexusInfo {
+    internal static Task<NexusKeyCheck> CheckPersonalKey(string key){
+        return Task.Run(()=>{
+            HttpStatusCode status;
+            string json=ReadJsonUrl(new Uri(ApiHost+"/v1/users/validate.json"),key,out status,3500);
+            if(status==HttpStatusCode.Unauthorized||status==HttpStatusCode.Forbidden)return NexusKeyCheck.Rejected;
+            return status==HttpStatusCode.OK&&json!=null?NexusKeyCheck.Accepted:NexusKeyCheck.Unavailable;
+        });
+    }
     internal static string ReadUpdateFiles(GeneralNexusLink link,string key,out HttpStatusCode status){
         return ReadJsonUrl(new Uri(ApiHost+"/v1/games/"+link.Game+"/mods/"+link.Mod+"/files.json"),key,out status,3500);
     }
@@ -49,6 +59,7 @@ internal sealed class NexusUpdateSession {
     internal static NexusUpdateSession Session {
         get{lock(sessionGate){string key=NexusCredentials.Read();if(shared==null||shared.credential!=key)shared=new NexusUpdateSession(key);return shared;}}
     }
+    internal static NexusUpdateSession Fresh(){return new NexusUpdateSession(NexusCredentials.Read());}
     internal delegate string Fetch(GeneralNexusLink link,string key,out HttpStatusCode status);
     sealed class Response {internal FilesResponse Files;internal string Failure;}
     readonly Dictionary<string,Task<Response>> pages=new Dictionary<string,Task<Response>>(StringComparer.Ordinal);
@@ -59,10 +70,12 @@ internal sealed class NexusUpdateSession {
     int retainedEntries;
     string stopped;
     internal NexusUpdateSession(string key,Fetch fetch=null){credential=key;this.fetch=fetch??GeneralNexusInfo.ReadUpdateFiles;}
+    internal bool HasCredential {get{return NexusCredentials.Valid(credential);}}
     internal async Task<NexusUpdateResult> Check(GeneralNexusLink link,Func<bool> active){
         if(link==null)return NexusUpdateResult.Unknown("no-source");
         if(!active())return NexusUpdateResult.Unknown("cancelled");
-        if(!NexusCredentials.Valid(credential))return NexusUpdateResult.Unknown("connect");
+        if(!HasCredential)return NexusUpdateResult.Unknown("connect");
+        if(link.File<=0)return NexusUpdateResult.Unknown("choose-file");
         Task<Response> page;
         string id=link.Game+"/"+link.Mod;
         lock(pages){
@@ -117,6 +130,8 @@ internal sealed class NexusUpdateSession {
             if(response==null||link==null)return NexusUpdateResult.Unknown("unavailable");
             if(link.File<=0)return NexusUpdateResult.Unknown("choose-file");
             var files=response.files.ToDictionary(f=>f.file_id);
+            FileInfoItem source;
+            files.TryGetValue(link.File,out source);
             var updates=response.file_updates??new FileUpdate[0];
             if(updates.Length>10000||updates.Any(x=>x==null||x.old_file_id<=0||x.new_file_id<=0))return NexusUpdateResult.Unknown("unavailable");
             int current=link.File;var seen=new HashSet<int>();
@@ -127,7 +142,7 @@ internal sealed class NexusUpdateSession {
                     FileInfoItem file;
                     if(!files.TryGetValue(current,out file)||!new[]{1,2,3}.Contains(file.category_id))return NexusUpdateResult.Unknown("unavailable");
                     if(file.version!=null&&(file.version.Length>120||file.version.Any(Char.IsControl)))return NexusUpdateResult.Unknown("unavailable");
-                    return new NexusUpdateResult{State=current==link.File?"current":"update",Version=file.version,
+                    return new NexusUpdateResult{State=current==link.File?"current":"update",Version=file.version,SourceVersion=source==null?null:source.version,
                         Url=new GeneralNexusLink{Game=link.Game,Mod=link.Mod,File=current}.Url};
                 }
                 current=next[0];
@@ -138,6 +153,67 @@ internal sealed class NexusUpdateSession {
     public sealed class FilesResponse {public FileInfoItem[] files {get;set;}public FileUpdate[] file_updates {get;set;}}
     public sealed class FileInfoItem {public int file_id {get;set;}public int category_id {get;set;}public string version {get;set;}}
     public sealed class FileUpdate {public int old_file_id {get;set;}public int new_file_id {get;set;}}
+}
+
+internal sealed class GithubModUpdateSession {
+    internal static readonly GithubModUpdateSession Session=new GithubModUpdateSession();
+    sealed class Lookup {internal DateTime Expires;internal Task<GeneralUpdateChecker.Release> Result;}
+    readonly Dictionary<string,Lookup> releases=new Dictionary<string,Lookup>(StringComparer.OrdinalIgnoreCase);
+    readonly SemaphoreSlim workers=new SemaphoreSlim(2);
+    readonly Func<Uri,string> fetch;
+
+    internal GithubModUpdateSession(Func<Uri,string> fetch=null){
+        this.fetch=fetch??GeneralUpdateChecker.ReadGithubRelease;
+    }
+
+    static Match Download(string source){
+        Uri link;
+        if(!Uri.TryCreate(source,UriKind.Absolute,out link)||link.Scheme!="https"||link.Host!="github.com"||
+            !link.IsDefaultPort||!String.IsNullOrEmpty(link.UserInfo)||link.Query.Length!=0||link.Fragment.Length!=0)return null;
+        var match=Regex.Match(link.AbsolutePath,@"\A/(?<repo>[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100})/releases/download/(?<tag>[A-Za-z0-9][A-Za-z0-9_.-]{0,119})/[^/]+\z");
+        return match.Success?match:null;
+    }
+
+    internal static bool Supports(string source){return Download(source)!=null;}
+
+    internal async Task<NexusUpdateResult> Check(string source,Func<bool> active){
+        var match=Download(source);
+        if(match==null)return NexusUpdateResult.Unknown("no-source");
+        if(!active())return NexusUpdateResult.Unknown("cancelled");
+        string repository=match.Groups["repo"].Value;
+        string tag=match.Groups["tag"].Value;
+        if(ModVersionNumbers.Compare(tag,tag)==null)return NexusUpdateResult.Unknown("ambiguous");
+        Lookup lookup;
+        lock(releases){
+            var now=DateTime.UtcNow;
+            if(!releases.TryGetValue(repository,out lookup)||now>=lookup.Expires){
+                foreach(string expired in releases.Where(pair=>now>=pair.Value.Expires).Select(pair=>pair.Key).ToArray())
+                    releases.Remove(expired);
+                if(releases.Count>=48)return NexusUpdateResult.Unknown("budget");
+                releases[repository]=lookup=new Lookup{Expires=now.AddMinutes(10),Result=Read(repository)};
+            }
+        }
+        var release=await lookup.Result.ConfigureAwait(false);
+        if(!active())return NexusUpdateResult.Unknown("cancelled");
+        if(release==null)return NexusUpdateResult.Unknown("unavailable");
+        int? newer=ModVersionNumbers.Compare(release.tag_name,tag);
+        if(!newer.HasValue||newer.Value<0)return NexusUpdateResult.Unknown("ambiguous");
+        return new NexusUpdateResult{State=newer.Value>0?"update":"current",Version=release.tag_name,
+            SourceVersion=tag,Url="https://github.com/"+repository+"/releases/tag/"+Uri.EscapeDataString(release.tag_name)};
+    }
+
+    async Task<GeneralUpdateChecker.Release> Read(string repository){
+        await workers.WaitAsync().ConfigureAwait(false);
+        try{
+            var endpoint=new Uri("https://api.github.com/repos/"+repository+"/releases/latest");
+            string json=await Task.Run(()=>fetch(endpoint)).ConfigureAwait(false);
+            if(String.IsNullOrEmpty(json))return null;
+            var release=Safe.Json.Deserialize<GeneralUpdateChecker.Release>(json);
+            return release!=null&&!release.draft&&!release.prerelease&&release.tag_name!=null&&release.tag_name.Length<=120?release:null;
+        }catch(WebException){return null;}catch(IOException){return null;}
+        catch(ArgumentException){return null;}catch(InvalidOperationException){return null;}
+        finally{workers.Release();}
+    }
 }
 
 internal static class ModVersionNumbers {

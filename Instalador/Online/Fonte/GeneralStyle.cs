@@ -56,7 +56,7 @@ internal static class GeneralStyle {
         if(selected)using(var path=Round(new RectangleF(bounds.X+2,bounds.Y+2,Math.Max(1,bounds.Width-4),Math.Max(1,bounds.Height-4)),12))
             using(var brush=new SolidBrush(Selection))graphics.FillPath(brush,path);
     }
-    const int PopupRadius=18;
+    internal const int PopupRadius=18;
     internal static GraphicsPath PopupShape(Size size){
         return Round(new RectangleF(0,0,Math.Max(1,size.Width),Math.Max(1,size.Height)),PopupRadius);
     }
@@ -161,6 +161,7 @@ internal static class GeneralNativeTheme {
 }
 
 internal sealed class GeneralSurface : Panel {
+    internal Color? OutlineColor {get;set;}
     internal GeneralSurface(){SetStyle(ControlStyles.UserPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.SupportsTransparentBackColor,true);BackColor=Color.Transparent;}
     public override Rectangle DisplayRectangle {
         get {
@@ -175,7 +176,7 @@ internal sealed class GeneralSurface : Panel {
     }
     protected override void OnPaint(PaintEventArgs e){
         e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
-        GeneralStyle.PaintRoundedFace(e.Graphics,new RectangleF(0,0,Width,Height),18,GeneralStyle.Line,GeneralStyle.Surface);
+        GeneralStyle.PaintRoundedFace(e.Graphics,new RectangleF(0,0,Width,Height),18,OutlineColor??GeneralStyle.Line,GeneralStyle.Surface);
         base.OnPaint(e);
     }
 }
@@ -184,7 +185,118 @@ internal sealed class GeneralButton : Button {
     internal bool Primary,Destructive,Bare;
     internal string IconKind;
     internal Color? BareInk;
-    Timer activityTimer;
+    Timer activityTimer,contextTimer,hoverTimer;
+    readonly System.Diagnostics.Stopwatch hoverClock=new System.Diagnostics.Stopwatch();
+    Point hoverOrigin;
+    float hoverStart,hoverTarget;
+    float HoverAmount {get{
+        float progress=Math.Min(1f,hoverClock.ElapsedMilliseconds/145f);
+        return hoverClock.IsRunning?hoverStart+(hoverTarget-hoverStart)*progress:hoverTarget;
+    }}
+    protected override void OnMouseEnter(EventArgs e){
+        base.OnMouseEnter(e);
+        if(!Enabled)return;
+        if(HoverAmount<=0){
+            var point=PointToClient(Cursor.Position);
+            hoverOrigin=new Point(Math.Min(Math.Max(0,point.X),ClientSize.Width),Math.Min(Math.Max(0,point.Y),ClientSize.Height));
+        }
+        ChangeHover(1);
+    }
+    protected override void OnMouseLeave(EventArgs e){
+        base.OnMouseLeave(e);
+        ChangeHover(0);
+    }
+    protected override void OnEnabledChanged(EventArgs e){
+        base.OnEnabledChanged(e);
+        if(!Enabled){hoverTarget=0;hoverClock.Reset();if(hoverTimer!=null)hoverTimer.Stop();Invalidate();}
+    }
+    void ChangeHover(float target){
+        if(target==hoverTarget)return;
+        hoverStart=HoverAmount;hoverTarget=target;
+        if(Visible&&IsHandleCreated&&SystemInformation.IsMenuAnimationEnabled&&!SystemInformation.HighContrast){
+            if(hoverTimer==null){
+                hoverTimer=new Timer{Interval=16};
+                hoverTimer.Tick+=(s,e)=>{
+                    if(!Visible||hoverClock.ElapsedMilliseconds>=145){hoverClock.Reset();hoverTimer.Stop();}
+                    Invalidate();
+                };
+            }
+            hoverClock.Restart();hoverTimer.Start();
+        }else hoverClock.Reset();
+        Invalidate();
+    }
+    void PaintHover(Graphics graphics){
+        if(!Enabled)return;
+        float light=HoverAmount;
+        if(light<=0)return;
+        var inner=new RectangleF(0,0,Width,Height);
+        inner.Inflate(-GeneralStyle.RoundedFaceClearance,-GeneralStyle.RoundedFaceClearance);
+        if(inner.Width<=0||inner.Height<=0)return;
+        float radius=Math.Max(Width,Height)*(.22f+light*.86f);
+        var saved=graphics.Save();
+        try{
+            using(var clip=GeneralStyle.Round(inner,Math.Max(0,Math.Min(22,Height/2)-GeneralStyle.RoundedFaceClearance)))
+            using(var glow=new GraphicsPath()){
+                graphics.SetClip(clip,CombineMode.Intersect);
+                glow.AddEllipse(hoverOrigin.X-radius,hoverOrigin.Y-radius,2*radius,2*radius);
+                using(var brush=new PathGradientBrush(glow)){
+                    var tint=Primary||GeneralStyle.Dark?Color.White:GeneralStyle.Accent;
+                    brush.CenterColor=Color.FromArgb((int)(49*light),tint);
+                    brush.SurroundColors=new[]{Color.FromArgb(0,tint)};
+                    graphics.FillPath(brush,glow);
+                }
+            }
+        }finally{graphics.Restore(saved);}
+    }
+    readonly System.Diagnostics.Stopwatch contextClock=new System.Diagnostics.Stopwatch();
+    string contextText;
+    float contextStart,contextTarget;
+    float ContextOpacity {get{
+        var progress=Math.Min(1f,contextClock.ElapsedMilliseconds/150f);
+        return contextClock.IsRunning?contextStart+(contextTarget-contextStart)*progress:contextTarget;
+    }}
+
+    internal void SetContextAction(string caption,bool primary,bool destructive,bool animate,bool enabled=true){
+        bool available=caption.Length>0&&enabled;
+        if(contextText!=null&&Text==caption){
+            Enabled=TabStop=available;
+            Cursor=available?Cursors.Hand:Cursors.Default;
+            return;
+        }
+        float before=contextText==null?0:ContextOpacity;
+        bool hasCaption=caption.Length>0;
+        if(hasCaption&&contextText!=caption){before=0;contextText=caption;}
+        if(contextText==null)contextText="";
+        Text=caption;
+        if(hasCaption){Primary=primary;Destructive=destructive;}
+        Enabled=TabStop=available;
+        AccessibleName=hasCaption?caption:null;
+        Cursor=available?Cursors.Hand:Cursors.Default;
+        contextTarget=hasCaption?1:0;
+        if(animate&&Visible&&IsHandleCreated&&!SystemInformation.HighContrast&&SystemInformation.IsMenuAnimationEnabled&&before!=contextTarget){
+            contextStart=before;
+            if(contextTimer==null){
+                contextTimer=new Timer{Interval=16};
+                contextTimer.Tick+=(s,e)=>{
+                    if(!Visible||contextClock.ElapsedMilliseconds>=150)FinishContextFade();
+                    Invalidate();
+                };
+            }
+            contextClock.Restart();
+            contextTimer.Start();
+        }else FinishContextFade();
+        Invalidate();
+    }
+
+    void FinishContextFade(){
+        contextClock.Reset();
+        if(contextTimer!=null)contextTimer.Stop();
+    }
+
+    static Color Blend(Color from,Color to,float amount){
+        return Color.FromArgb((int)(from.R+(to.R-from.R)*amount),
+            (int)(from.G+(to.G-from.G)*amount),(int)(from.B+(to.B-from.B)*amount));
+    }
     readonly System.Diagnostics.Stopwatch activityClock=new System.Diagnostics.Stopwatch();
     internal bool ShowActivity {
         get{return activityClock.IsRunning;}
@@ -205,7 +317,11 @@ internal sealed class GeneralButton : Button {
         }
     }
     protected override void Dispose(bool disposing) {
-        if(disposing&&activityTimer!=null)activityTimer.Dispose();
+        if(disposing){
+            if(activityTimer!=null)activityTimer.Dispose();
+            if(contextTimer!=null)contextTimer.Dispose();
+            if(hoverTimer!=null)hoverTimer.Dispose();
+        }
         base.Dispose(disposing);
     }
     internal GeneralButton(){SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.Opaque,true);BackColor=GeneralStyle.Background;Cursor=Cursors.Hand;FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;UseVisualStyleBackColor=false;}
@@ -219,23 +335,35 @@ internal sealed class GeneralButton : Button {
         var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;
         // ButtonBase can leave stale themed pixels outside the rounded face.
         Control surface=Parent;while(surface!=null&&surface.BackColor.A<255)surface=surface.Parent;
-        g.Clear(surface==null?GeneralStyle.Background:surface.BackColor);
+        Color background=surface==null?GeneralStyle.Background:surface.BackColor;
+        g.Clear(background);
         Color fill=Primary?(Destructive?GeneralStyle.DangerFill:GeneralStyle.Primary):GeneralStyle.Surface;
         Color ink=Primary?Color.White:Destructive?GeneralStyle.Danger:GeneralStyle.Foreground;
+        string caption=Text;
         if(Bare&&BareInk.HasValue)ink=BareInk.Value;
-        if(!Enabled){fill=GeneralStyle.Selection;ink=GeneralStyle.Muted;}
-        if(!Bare)GeneralStyle.PaintRoundedFace(g,new RectangleF(0,0,Width,Height),Math.Min(22,Height/2),Focused?GeneralStyle.Accent:Primary?fill:GeneralStyle.Line,fill);
+        if(!Enabled&&contextText==null){fill=GeneralStyle.Selection;ink=GeneralStyle.Muted;}
+        Color border=Focused?GeneralStyle.Accent:Primary?fill:GeneralStyle.Line;
+        if(contextText!=null){
+            float opacity=ContextOpacity;
+            if(opacity<=0)return;
+            fill=Blend(background,fill,opacity);
+            border=Blend(background,border,opacity);
+            ink=Blend(fill,ink,opacity);
+            caption=contextText;
+        }
+        if(!Bare)GeneralStyle.PaintRoundedFace(g,new RectangleF(0,0,Width,Height),Math.Min(22,Height/2),border,fill);
         else if(Focused&&ShowFocusCues){using(var pen=new Pen(GeneralStyle.Accent,2))g.DrawLine(pen,Width/2-10,Height-6,Width/2+10,Height-6);}
 
+        PaintHover(g);
         var textRect=new Rectangle(12,0,Width-24,Height);
         if(!String.IsNullOrEmpty(IconKind)){
-            int x=String.IsNullOrEmpty(Text)?Width/2-9:14,y=Height/2-9;
+            int x=String.IsNullOrEmpty(Text)?(Width-20)/2:14,y=(Height-20)/2;
             LucideIcons.Draw(g,IconKind,new Rectangle(x,y,20,20),ink);
             if(!String.IsNullOrEmpty(Text))textRect=new Rectangle(42,0,Width-52,Height);
         }
         var flags=TextFormatFlags.VerticalCenter|(TextAlign==ContentAlignment.MiddleLeft?TextFormatFlags.Left:TextFormatFlags.HorizontalCenter)|
             TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine;
-        TextRenderer.DrawText(g,Text,Font,textRect,ink,flags);
+        TextRenderer.DrawText(g,caption,Font,textRect,ink,flags);
         if(ShowActivity&&!String.IsNullOrEmpty(Text)&&textRect.Width>0) {
             int x=textRect.Left-24+(int)((textRect.Width+48)*(activityClock.ElapsedMilliseconds%1900)/1900);
             var highlight=GeneralStyle.Dark?Color.White:GeneralStyle.Primary;
@@ -341,7 +469,12 @@ internal sealed class GeneralMenuRenderer : ToolStripProfessionalRenderer {
         try{
             using(var shape=GeneralStyle.PopupShape(e.ToolStrip.ClientSize))
             using(var mask=new Region(shape))e.Graphics.IntersectClip(mask);
-            GeneralStyle.PaintCard(e.Graphics,e.ToolStrip.ClientSize);
+            if(e.ToolStrip is GeneralPopupMenu){
+                using(var surface=new SolidBrush(GeneralStyle.Surface))e.Graphics.FillRectangle(surface,e.ToolStrip.ClientRectangle);
+                e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
+                GeneralStyle.PaintRoundedFace(e.Graphics,e.ToolStrip.ClientRectangle,GeneralStyle.PopupRadius,
+                    GeneralStyle.Line,GeneralStyle.Surface);
+            }else GeneralStyle.PaintCard(e.Graphics,e.ToolStrip.ClientSize);
         }finally{e.Graphics.Restore(state);}
     }
     protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e){}
@@ -365,8 +498,8 @@ internal sealed class GeneralMenuRenderer : ToolStripProfessionalRenderer {
     }
     protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e){
         e.TextColor=e.Item.Enabled?GeneralStyle.Foreground:GeneralStyle.Muted;
-        var label=e.TextRectangle;
-        e.TextRectangle=new Rectangle(label.X,0,label.Width,e.Item.Height);
+        const int textInset=20;
+        e.TextRectangle=new Rectangle(textInset,0,Math.Max(1,e.Item.Width-textInset*2),e.Item.Height);
         e.TextFormat=(e.TextFormat&~TextFormatFlags.Bottom)|TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine;
         base.OnRenderItemText(e);
     }
@@ -378,6 +511,6 @@ internal sealed class GeneralMenuRenderer : ToolStripProfessionalRenderer {
         return menu;
     }
     internal static ToolStripItem Add(ContextMenuStrip menu,string text,Action action){
-        var item=menu.Items.Add(text);item.AutoSize=false;item.Size=new Size(280,44);item.Padding=new Padding(12,0,12,0);item.Click+=(s,e)=>action();return item;
+        var item=menu.Items.Add(text);item.AutoSize=false;item.Size=new Size(Math.Max(280,TextRenderer.MeasureText(text,menu.Font).Width+40),44);item.Padding=new Padding(20,0,20,0);item.Click+=(s,e)=>action();return item;
     }
 }

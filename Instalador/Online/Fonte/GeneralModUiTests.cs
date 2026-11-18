@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -136,7 +136,7 @@ internal sealed partial class GeneralModWindow {
             form.ClientSize=new Size(1440,900);form.PerformLayout();Application.DoEvents();CaptureUi(form,Path.Combine(root,"claro-1440.png"));
             using(var menu=new GeneralActionsMenu()){
                 menu.StartPosition=FormStartPosition.Manual;menu.Location=new Point(-30000,-30000);menu.Show(form);Application.DoEvents();
-                check(AllControls(menu).OfType<Button>().Where(button=>button.Name!="").Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"clone","export","import","manual","new","open","options","share"}),"Menu reúne listas, captura manual, compartilhar e opções em uma coluna.");
+                check(AllControls(menu).OfType<Button>().Where(button=>button.Name!="").Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"details","export","import","new","open","options","save-menu","share"}),"Menu reúne listas, captura manual, compartilhar e opções em uma coluna.");
                 CaptureUi(menu,Path.Combine(root,"menu-principal.png"));menu.Close();
                 check(!menu.Visible,"Menu fecha sem alterar a lista.");
             }

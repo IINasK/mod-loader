@@ -278,7 +278,7 @@ internal sealed partial class GeneralModWindow {
             try{
                 using(var form=new GeneralModWindow(catalog,new DownloadCache(Path.Combine(root,"cache")),data,state)){
                     form.ShowInTaskbar=false;form.StartPosition=FormStartPosition.Manual;form.Location=new Point(-30000,-30000);
-                    form.Shown+=async(s,e)=>{try{await test(form);completed=true;}catch(Exception ex){failure=new IOException(form.detail.Text,ex);}finally{Application.ExitThread();}};
+                    form.Shown+=async(s,e)=>{try{await test(form);completed=true;}catch(Exception ex){failure=ex;}finally{Application.ExitThread();}};
                     Application.Run(form);
                 }
             }catch(Exception ex){failure=ex;}

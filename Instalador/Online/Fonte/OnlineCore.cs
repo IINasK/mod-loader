@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -20,9 +20,69 @@ public sealed class FixedMod {
     public List<FixedAsset> Assets;
     public List<FixedFile> Files;
     public List<FixedDensityProfile> DensityProfiles;
+    public FixedPreviousRelease PreviousRelease;
 }
+public sealed class FixedPreviousRelease { public string Version; public List<FixedAsset> Assets; }
 public sealed class FixedAsset { public string Id,Name,Sha256,Format,Url; public long Size; public int ModId,FileId; }
-public sealed class FixedFile { public string Asset,Entry,Path,Sha256; public long Size; public bool UserData; public FixedTextPatch Patch; public string CanonicalSha256; public long CanonicalSize; public string[] PriorApprovedHashes; }
+public sealed class FixedFile { public string Asset,Entry,Path,Sha256; public long Size; public bool UserData; public FixedTextPatch Patch; public string CanonicalSha256; public long CanonicalSize; public string[] PriorApprovedHashes; public string PreviousSha256; public long PreviousSize; }
+internal static class CatalogModVersions {
+    internal static void Validate(FixedMod mod,HashSet<string> currentAssets){
+        var previous=mod.PreviousRelease;
+        bool previousFiles=mod.Files.Any(file=>file!=null&&file.PreviousSha256!=null);
+        if(previous==null&&!previousFiles)return;
+        if(previous==null||mod.Immutable||mod.DensityProfiles!=null||String.IsNullOrWhiteSpace(previous.Version)||
+            previous.Version==mod.Version||previous.Version.Length>120||!previousFiles||previous.Assets==null||
+            previous.Assets.Count!=currentAssets.Count||previous.Assets.Any(asset=>asset==null||String.IsNullOrWhiteSpace(asset.Id))||
+            !currentAssets.SetEquals(previous.Assets.Select(asset=>asset.Id))||
+            previous.Assets.Select(asset=>asset.Url).SequenceEqual(mod.Assets.Select(asset=>asset.Url),StringComparer.Ordinal))
+            throw new IOException("Versão anterior inválida no catálogo.");
+        foreach(var asset in previous.Assets){
+            Uri url;
+            var current=mod.Assets.Single(item=>item.Id==asset.Id);
+            if(!Uri.TryCreate(asset.Url,UriKind.Absolute,out url)||!NexusClient.Allowed(url,false)||
+                !FixedData.HashValid(asset.Sha256)||asset.Size<=0||asset.Size>8L*1024*1024*1024||asset.Format!=current.Format||
+                asset.ModId!=current.ModId||asset.ModId<0||asset.FileId<0||asset.ModId>0&&asset.FileId==0)
+                throw new IOException("Fonte anterior inválida no catálogo.");
+        }
+        foreach(var file in mod.Files.Where(item=>item!=null&&item.PreviousSha256!=null))
+            if(file.UserData||file.Patch!=null||!FixedData.HashValid(file.PreviousSha256)||file.PreviousSha256==file.Sha256||
+                file.PreviousSize<0||file.PreviousSize>8L*1024*1024*1024)
+                throw new IOException("Arquivo anterior inválido no catálogo.");
+    }
+
+    internal static FixedPreviousRelease Previous(FixedCatalog catalog,string id){
+        if(id==null)return null;
+        var mod=catalog.Packages.FirstOrDefault(item=>item.Id==id);
+        return mod==null?null:mod.PreviousRelease;
+    }
+
+    internal static FixedCatalog ForReceipt(FixedCatalog catalog,InstalledSnapshotManifest manifest){
+        if(catalog==null||manifest==null||manifest.List==null||manifest.List.Mods==null)return catalog;
+        var versions=catalog.Packages.Where(mod=>mod.PreviousRelease!=null)
+            .Where(mod=>manifest.List.Mods.Any(entry=>entry!=null&&entry.Variants!=null&&entry.Variants.Count==1&&
+                entry.Variants[0]!=null&&entry.Variants[0].CyberpunkId==mod.Id&&entry.Variants[0].Sources!=null&&
+                entry.Variants[0].Sources.SequenceEqual(mod.PreviousRelease.Assets.Select(asset=>asset.Url))))
+            .ToDictionary(mod=>mod.Id,StringComparer.Ordinal);
+        if(versions.Count==0)return catalog;
+        return new FixedCatalog{
+            Schema=catalog.Schema,Id=catalog.Id,GameVersion=catalog.GameVersion,GameFileVersion=catalog.GameFileVersion,
+            Defaults=catalog.Defaults,Excluded=catalog.Excluded,
+            Packages=catalog.Packages.Select(mod=>versions.ContainsKey(mod.Id)?PreviousRecipe(mod):mod).ToList()
+        };
+    }
+
+    static FixedMod PreviousRecipe(FixedMod current){
+        var previous=GeneralPresetProfiles.Copy(current);
+        previous.Version=previous.PreviousRelease.Version;
+        previous.Assets=previous.PreviousRelease.Assets;
+        previous.PreviousRelease=null;
+        foreach(var file in previous.Files.Where(item=>item.PreviousSha256!=null)){
+            file.Sha256=file.PreviousSha256;file.Size=file.PreviousSize;
+            file.PreviousSha256=null;file.PreviousSize=0;
+        }
+        return previous;
+    }
+}
 public sealed class ModScan {
     public string Id,State,Detail; public int Correct,Missing,Different,Original;
     public bool IsCorrect { get { return State=="Instalado correto"; } }
@@ -68,6 +128,7 @@ public static class FixedData {
                 if(a==null||!assets.Add(a.Id)||!HashValid(a.Sha256)||a.Size<0||a.Size>8L*1024*1024*1024||!new[]{"zip","tar","raw"}.Contains(a.Format)||!NexusClient.Allowed(new Uri(a.Url),false)) throw new IOException("Fonte inválida no catálogo.");
                 if(a.ModId<0||a.FileId<0||(a.ModId>0&&a.FileId==0)) throw new IOException("Identificador Nexus inválido ou não fixado.");
             }
+            CatalogModVersions.Validate(m,assets);
             foreach(var f in m.Files) {
                 if(f==null||!assets.Contains(f.Asset)||!HashValid(f.Sha256)||f.Size<0||f.Size>8L*1024*1024*1024||!Safe.Allowed(f.Path)||!paths.Add(f.Path)) throw new IOException("Colisão ou receita inválida no catálogo.");
                 if(f.UserData&&(m.Immutable||!f.Path.StartsWith("bin/x64/plugins/cyber_engine_tweaks/mods/",StringComparison.Ordinal)||!f.Path.EndsWith(".json",StringComparison.OrdinalIgnoreCase)))throw new IOException("Perfil personalizável inválido.");
@@ -109,10 +170,10 @@ public static class FixedData {
             foreach(var f in mod.Files.Where(f=>!f.UserData)) {
                 string p=Safe.In(game,f.Path);
                 if(!File.Exists(p)) { if(Directory.Exists(p)) s.Different++; else s.Missing++;if(logFiles)OnlineDiagnostics.Record("scan.file",mod.Id,"Arquivo não encontrado.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,Present=false}); }
-                else {var info=new FileInfo(p);string hash=(info.Length==f.Size||FpvCustomization.IsWeaveUpgrade(f)||VehicleCompatibility.HasUpgrade(f)||NightCoopRelease.IsUpgradeTarget(f)||f.CanonicalSha256!=null||(f.Patch!=null&&info.Length==f.Patch.SourceSize))?(readHash==null?Safe.Hash(p):readHash(p)):null;bool correct=FpvCustomization.MatchesFile(f,info.Length,hash)&&!FpvCustomization.IsOriginal(f,info.Length,hash);bool original=FpvCustomization.IsOriginal(f,info.Length,hash);if(correct)s.Correct++;else if(original)s.Original++;else s.Different++;if(logFiles||!correct)OnlineDiagnostics.Record("scan.file",mod.Id,correct?"Arquivo conferido.":original?"Versão anterior reconhecida; correção disponível.":"Arquivo divergente.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,ActualSize=info.Length,ActualSha256=hash,WrittenUtc=info.LastWriteTimeUtc.ToString("o"),Present=true,Correct=correct,OfficialOriginal=original});}
+                else {var info=new FileInfo(p);string hash=(info.Length==f.Size||FpvCustomization.IsWeaveUpgrade(f)||VehicleCompatibility.HasUpgrade(f)||f.PreviousSha256!=null||NightCoopRelease.IsUpgradeTarget(f)||f.CanonicalSha256!=null||(f.Patch!=null&&info.Length==f.Patch.SourceSize))?(readHash==null?Safe.Hash(p):readHash(p)):null;bool correct=FpvCustomization.MatchesFile(f,info.Length,hash)&&!FpvCustomization.IsOriginal(f,info.Length,hash);bool original=FpvCustomization.IsOriginal(f,info.Length,hash);if(correct)s.Correct++;else if(original)s.Original++;else s.Different++;if(logFiles||!correct)OnlineDiagnostics.Record("scan.file",mod.Id,correct?"Arquivo conferido.":original?"Versão anterior reconhecida; correção disponível.":"Arquivo divergente.",new{Game=game,Path=f.Path,ExpectedSha256=f.Sha256,ExpectedSize=f.Size,ActualSize=info.Length,ActualSha256=hash,WrittenUtc=info.LastWriteTimeUtc.ToString("o"),Present=true,Correct=correct,OfficialOriginal=original});}
             }
-            bool migrateNightCoop=mod.Id=="NightCoop"&&s.Original>0;
-            s.State=migrateNightCoop&&s.Different==0?"Atualização disponível":s.Different>0?"Diferente/alterado":s.Missing==0?(s.Original>0?"Setup NASK disponível":"Instalado correto"):s.Correct+s.Original==0?"Não instalado":"Parcial";
+            bool update=mod.Id=="NightCoop"||mod.PreviousRelease!=null&&s.Missing==0;
+            s.State=update&&s.Original>0&&s.Different==0?"Atualização disponível":s.Different>0?"Diferente/alterado":s.Missing==0?(s.Original>0?"Setup NASK disponível":"Instalado correto"):s.Correct+s.Original==0?"Não instalado":"Parcial";
             s.Detail=s.Correct+" corretos; "+s.Original+" originais oficiais; "+s.Missing+" ausentes; "+s.Different+" diferentes";
             if(mod.Files.Any(f=>f.UserData))s.Detail+="; arquivos de perfil preservados, fora da verificação de versão";
         }catch(IOException){s.State="Não verificável";s.Detail="Não foi possível ler o caminho com segurança.";}

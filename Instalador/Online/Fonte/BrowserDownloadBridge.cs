@@ -26,6 +26,22 @@ internal static class BrowserDownloadBridge {
         }
     }
 
+    internal static bool IsPrepared(string executable){
+        try{
+            string root=Safe.In(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"ModLoader/BrowserIntegration");
+            string manifest=Safe.In(root,Host+".json");
+            Safe.NoLinks(manifest);
+            if(!File.Exists(manifest))return false;
+            var registration=Safe.Json.Deserialize<Dictionary<string,object>>(GeneralProjectStorage.ReadText(manifest,16000));
+            return registration!=null&&registration.ContainsKey("path")&&
+                String.Equals(registration["path"] as string,executable,StringComparison.OrdinalIgnoreCase)&&
+                File.Exists(Safe.In(root,"Extension/manifest.json"))&&File.Exists(Safe.In(root,"Extension/downloads.js"));
+        }catch(IOException){return false;}
+        catch(UnauthorizedAccessException){return false;}
+        catch(ArgumentException){return false;}
+        catch(InvalidOperationException){return false;}
+    }
+
     internal static string Prepare(string executable) {
         string root = Safe.In(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ModLoader/BrowserIntegration");
         string extension = Safe.In(root, "Extension");

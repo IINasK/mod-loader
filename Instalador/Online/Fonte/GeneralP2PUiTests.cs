@@ -114,8 +114,9 @@ internal static class GeneralP2PUiTests {
                         update();
                         var cards=Children(dialog.Content).Where(control=>control.Name=="p2p-card").ToArray();
                         check(cards.Length==2&&cards[0] is GeneralSurface&&cards[1] is GeneralSurface,"Envio e recebimento aparecem juntos em molduras separadas: "+theme+locale);
-                        var outgoingBars=Children(cards[0]).OfType<GeneralProgress>().Where(bar=>bar.Name=="p2p-progress").ToArray();
-                        check(outgoingBars.Length==2&&outgoingBars[0].Value==100&&outgoingBars[1].Value==55,"Cada destinatário tem uma barra própria: "+theme+locale);
+                        var outgoingBar=Find<GeneralProgress>(cards[0],"p2p-progress");
+                        check(Children(cards[0]).OfType<GeneralProgress>().Count()==1&&outgoingBar.Value==55&&outgoingBar.Caption=="Friend 2",
+                            "O cartão usa uma barra e prioriza o destinatário ainda recebendo: "+theme+locale);
                         var pause=Find<Button>(cards[1],"p2p-pause");
                         check(pause.AccessibleName==(locale=="pt"?"Pausado pelo amigo":"Paused by friend")&&!pause.Enabled,"Pausa remota não oferece destravar o amigo: "+theme+locale);
                         incoming.Paused=true;update();
@@ -123,12 +124,12 @@ internal static class GeneralP2PUiTests {
                         incoming.Paused=false;incoming.Stage="install";incoming.Phase="installing";
                         incoming.InstallProgress=new P2PInstallProgress(true,2,5,"mods/example");
                         update();
-                        var prep=Find<GeneralProgress>(cards[1],"p2p-preparation");
                         var active=Find<GeneralProgress>(cards[1],"p2p-progress");
-                        check(!prep.Visible&&!pause.Visible&&active.Value==40&&Find<Label>(cards[1],"p2p-transfer-status").Text=="mods/example","Instalação troca as barras pela etapa, progresso e arquivo: "+theme+locale);
+                        check(active.Visible&&!pause.Visible&&active.Value==40&&Find<Label>(cards[1],"p2p-transfer-status").Text=="mods/example",
+                            "Instalação mantém a barra com a etapa, o progresso e o arquivo: "+theme+locale);
                         incoming.Completed=true;incoming.Stage=null;incoming.Phase="installed";
                         update();
-                        check(!prep.Visible&&!pause.Visible&&active.Width==active.Parent.ClientSize.Width&&active.Value==100,
+                        check(!pause.Visible&&active.Width==active.Parent.ClientSize.Width&&active.Value==100,
                             "Conclusão usa uma única barra na largura disponível: "+theme+locale);
                         incoming.ListImported=true;incoming.ModsOutsidePack=2;
                         update();
@@ -187,12 +188,38 @@ internal static class GeneralP2PUiTests {
                             update();
                             var activeCard=Children(viewport.Content).Single(c=>c.Name=="p2p-card"&&c.AccessibleName==activeSend.ToString());
                             activeSend.CompareBeforePack=true;activeSend.Deferred=true;activeSend.Automatic=true;activeSend.Size=0;
+                            activeSend.SyncProgress=new P2PSyncProgress{Done=3,Total=10};
+                            var remoteCheck=new P2PSyncProgress{Done=2,Total=5};
+                            views[activeSend]=new P2PTransferStatus{Connected=true,Accepted=true,
+                                Recipients=new[]{P2PService.ComparisonBar(remoteCheck,false)}};
                             activeSend.Recipients[0].SyncChoicePhase="comparing";update();
+                            var friendCheck=Find<GeneralProgress>(activeCard,"p2p-progress");
+                            check(Children(activeCard).OfType<GeneralProgress>().Count()==1&&
+                                friendCheck.Visible&&friendCheck.Value==40&&friendCheck.Caption.StartsWith("Receiver")&&
+                                !Find<Button>(activeCard,"p2p-pause").Visible,
+                                "The host sees the active receiver check on one bar with no transfer controls before the pack exists.");
                             check(Find<Label>(activeCard,"p2p-transfer-status").Text.Contains(locale=="pt"?"já escolheu":"friend chose"),
                                 "The sender card acknowledges a quick choice while the receiver compares files.");
+                            activeSend.SyncProgress=null;
                             activeSend.Recipients[0].SyncChoicePhase="choice_sent";update();
+                            check(friendCheck.Visible&&friendCheck.Caption.StartsWith("Host (you)")&&friendCheck.Indeterminate,
+                                "The same bar returns to the host when the receiver submits the choice.");
                             check(Find<Label>(activeCard,"p2p-transfer-status").Text.Contains(locale=="pt"?"confirmou":"confirmed"),
                                 "The sender card distinguishes submitted choice from waiting for input.");
+                            activeSend.PayloadHash=offered.ManifestHash;
+                            activeSend.Recipients[0].Phase="installing";
+                            views[activeSend].Recipients=new[]{
+                                new P2PRecipientProgress{Caption="Friend 1 · Verifying pack · 0/7",Percent=0,Finished=true}
+                            };
+                            update();
+                            check(friendCheck.Visible&&friendCheck.Value==100&&friendCheck.Caption=="Pack prepared",
+                                "The sender sees preparation complete on the single bar.");
+                            update();
+                            check(friendCheck.Visible&&friendCheck.Value==0&&friendCheck.Caption=="Friend 1 · Verifying pack · 0/7"&&
+                                Children(activeCard).OfType<GeneralProgress>().Count()==1,
+                                "The sender's bar restarts as the friend begins verifying the received pack.");
+                            activeSend.PayloadHash=null;
+                            activeSend.Recipients[0].Phase=null;
                             activeSend.CompareBeforePack=false;activeSend.Deferred=false;activeSend.Automatic=false;activeSend.Size=1024;
                             Find<Button>(activeCard,"p2p-dismiss").PerformClick();
                             deadline=DateTime.UtcNow.AddSeconds(4);
@@ -248,22 +275,51 @@ internal static class GeneralP2PUiTests {
                         incoming.SyncMode=2;
                         views[incoming].HostScan=new P2PSyncProgress{Done=3,Total=10};
                         update();
-                        check(prep.Visible&&!active.Visible&&!prep.Indeterminate&&prep.Value==30&&prep.Caption.Contains("3/10"),
+                        check(active.Visible&&!active.Indeterminate&&active.Value==30&&active.Caption.Contains("3/10"),
                             "The receiver displays the sender's scan with one determinate bar: "+theme+locale);
                         views[incoming].HostScan=new P2PSyncProgress{Done=62,Total=100,Packing=true};
                         views[incoming].HostDecision=P2PService.HostPreparing;
                         update();
-                        check(prep.Visible&&!active.Visible&&prep.Value==62&&!prep.Caption.Contains("62/100"),
+                        check(active.Visible&&active.Value==62&&!active.Caption.Contains("62/100"),
                             "The same receiver bar shows actual package preparation: "+theme+locale);
-                        views[incoming].Percent=17;
+                        views[incoming].Percent=17;incoming.PayloadHash=offered.ManifestHash;
                         update();
-                        check(!prep.Visible&&active.Visible&&active.Value==17,
-                            "Once download progresses, only the download bar is visible: "+theme+locale);
+                        check(active.Value==100&&active.Caption==(locale=="pt"?"Pacote preparado":"Pack prepared"),
+                            "Preparation has a visible finish even when the first download sample has arrived: "+theme+locale);
+                        update();
+                        check(active.Visible&&active.Value==17&&active.Caption==(locale=="pt"?"Recebimento do pacote":"Pack download"),
+                            "The same bar switches to the actual download progress: "+theme+locale);
+                        incoming.PayloadHash=null;
                         views[incoming].Percent=0;views[incoming].HostScan=null;
                         incoming.SyncMode=1;incoming.SyncProgress=new P2PSyncProgress{Done=2,Total=5,Item="mods/different.txt"};
                         update();
-                        check(!updateMods.Enabled&&!fullPack.Enabled&&prep.Visible&&prep.Value==40&&
-                            Find<Label>(cards[1],"p2p-transfer-status").Text=="mods/different.txt","The receiver shows the current local file and comparison progress: "+theme+locale);
+                        check(!updateMods.Enabled&&!fullPack.Enabled&&active.Visible&&active.Value==40&&
+                            active.Caption.StartsWith(locale=="pt"?"Receptor (você)":"Receiver (you)")&&
+                            Find<Label>(cards[1],"p2p-transfer-status").Text=="mods/different.txt","The receiver shows its own labeled comparison and local file: "+theme+locale);
+                        views[incoming].HostScan=new P2PSyncProgress{Done=3,Total=10};
+                        update();
+                        check(Children(cards[1]).OfType<GeneralProgress>().Count()==1&&active.Visible&&active.Value==40&&
+                            active.Caption.StartsWith(locale=="pt"?"Receptor (você)":"Receiver (you)"),
+                            "An overlapping host sample does not replace the active receiver check: "+theme+locale);
+                        using(var image=new Bitmap(dialog.Width,dialog.Height)){
+                            dialog.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));
+                            image.Save(Path.Combine(root,"p2p-comparison-"+theme+"-"+locale+".png"),System.Drawing.Imaging.ImageFormat.Png);
+                        }
+                        incoming.Lifecycle=true;
+                        using(var diagnostics=new GeneralP2PDiagnosticDialog(service,incoming)){
+                            diagnostics.Show(dialog);
+                            Application.DoEvents();
+                            var sendReport=Find<Button>(diagnostics,"p2p-diagnostic-send");
+                            var copyReport=Find<Button>(diagnostics,"p2p-diagnostic-copy");
+                            using(var diagnosticImage=new Bitmap(diagnostics.Width,diagnostics.Height)){
+                                diagnostics.DrawToBitmap(diagnosticImage,new Rectangle(Point.Empty,diagnosticImage.Size));
+                                diagnosticImage.Save(Path.Combine(root,"p2p-diagnostics-"+theme+"-"+locale+".png"),System.Drawing.Imaging.ImageFormat.Png);
+                            }
+                            check(sendReport.Enabled,"The receiver can send a diagnostic without a web endpoint: "+theme+locale);
+                            check(Inside(sendReport,diagnostics.Content)&&Inside(copyReport,diagnostics.Content),
+                                "Diagnostic actions fit the dialog: "+theme+locale+" "+sendReport.Bounds+" / "+copyReport.Bounds+" in "+sendReport.Parent.ClientRectangle);
+                            diagnostics.Close();
+                        }
                         service.Sessions.Clear();
                         using(var image=new Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(root,"p2p-"+theme+"-"+locale+".png"),System.Drawing.Imaging.ImageFormat.Png);}dialog.Close();
                     }

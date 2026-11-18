@@ -225,35 +225,6 @@ internal sealed partial class GeneralModWindow {
         int passed=0;Action<bool,string> check=(ok,message)=>{if(!ok)throw new IOException(message);passed++;};
         TestForm(FixedData.Load(),state,data,root,async form=>{
             form.testPresetEditScope=()=>false;
-            string longIssue="Mod de teste: "+String.Join(" ",Enumerable.Repeat("Arquivos existentes não correspondem ao registro e foram preservados.",4));
-            form.presetIssues=Enumerable.Repeat(longIssue,20).ToList();
-            string initialTheme=form.state.Theme;
-            try{
-                foreach(string theme in new[]{"dark","black","light"}){
-                    GeneralStyle.UseTheme(theme);
-                    using(var exceptions=form.CreatePresetIssuesDialog()){
-                        exceptions.StartPosition=FormStartPosition.Manual;exceptions.Location=new System.Drawing.Point(-30000,-30000);
-                        exceptions.Show();Application.DoEvents();
-                        var table=AllControls(exceptions).OfType<DataGridView>().Single(control=>control.Name=="PresetIssues");
-                        var scroll=AllControls(exceptions).OfType<GeneralScrollView>().Single();
-                        table.CurrentCell=table.Rows[0].Cells[0];
-                        var selected=table.Rows[0].Cells[0].InheritedStyle;
-                        check(table.Rows[0].Selected&&selected.BackColor==GeneralStyle.Surface&&
-                            selected.SelectionBackColor==GeneralStyle.Selection&&selected.SelectionForeColor==GeneralStyle.Foreground&&
-                            table.ColumnHeadersDefaultCellStyle.BackColor==GeneralStyle.Surface&&!table.EnableHeadersVisualStyles,
-                            "Preset exceptions apply the theme to the header, rows and selection: "+theme);
-                        scroll.RefreshScroll();
-                        check(selected.WrapMode==DataGridViewTriState.True&&table.Rows[0].Height>table.RowTemplate.Height&&scroll.Bar.Visible&&table.ScrollBars==ScrollBars.None,
-                            "Long exception text wraps and uses the custom scrollbar: "+theme+"; row="+table.Rows[0].Height+"; width="+table.Width+"; bar="+scroll.Bar.Visible+"; size="+table.Size);
-                        using(var image=new System.Drawing.Bitmap(exceptions.Width,exceptions.Height)){
-                            exceptions.DrawToBitmap(image,new System.Drawing.Rectangle(System.Drawing.Point.Empty,image.Size));
-                            image.Save(Path.Combine(root,"preset-exceptions-"+theme+".png"));
-                        }
-                        scroll.ScrollTo(19);
-                        check(table.Rows[19].Displayed,"Preset exception scrolling reaches the last reason: "+theme);
-                    }
-                }
-            }finally{GeneralStyle.UseTheme(initialTheme);form.presetIssues.Clear();}
             var settingsStore=new GeneralProjectStore(Path.Combine(root,"preferences"));
             var defaults=settingsStore.Read().SwitchSettings;
             check(defaults.CpuPercent==50&&defaults.AskBeforeSwitch,"Existing projects default to asking at 50 percent.");
@@ -302,15 +273,16 @@ internal sealed partial class GeneralModWindow {
             }
             check(sawInstallPrompt&&form.NeedsPresetLoad&&File.Exists(Path.Combine(game,"mods/b.txt")),
                 "An install request offers to load the preset and cancelling leaves the previous files active.");
-            check(form.preset.PopupAnchor==form.tableName,"The popup is anchored to the full preset name field.");
+            check(form.preset.PopupAnchor==null,"The compact popup uses the preset button as its anchor.");
             var screen=Screen.PrimaryScreen.WorkingArea;
             var placements=new List<object>();
             foreach(int width in new[]{1080,1240}) {
                 form.SetBounds(screen.Left+32,screen.Top+32,Math.Min(width,screen.Width-64),Math.Min(800,screen.Height-64));
                 Application.DoEvents();form.preset.Toggle();Application.DoEvents();
-                var field=form.tableName.RectangleToScreen(form.tableName.ClientRectangle);var popup=form.preset.OpenPopup.Bounds;
+                var field=form.preset.RectangleToScreen(form.preset.ClientRectangle);var popup=form.preset.OpenPopup.Bounds;
                 placements.Add(new{Window=form.Bounds,Field=field,Popup=popup});
-                check(popup.Top>=field.Bottom&&Math.Abs(popup.Left-field.Left)<=2&&popup.Width>=field.Width,"The popup follows the full preset field. Field: "+field+"; popup: "+popup);
+                check(popup.Location==GeneralPopupPlacement.Location(form.preset,form.preset.ClientRectangle,popup.Size,false),
+                    "The popup follows the preset button at both widths. Field: "+field+"; popup: "+popup);
                 form.preset.Toggle();
             }
             Safe.WriteJson(Path.Combine(root,"preset-popup.json"),placements);

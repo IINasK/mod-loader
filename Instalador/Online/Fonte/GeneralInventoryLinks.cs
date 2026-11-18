@@ -13,6 +13,7 @@ internal sealed partial class GeneralModWindow {
     InventoryLinkData inventoryLinks;
     string inventoryLoadError;
     Func<InventoryLinkSuggestion,DialogResult> testInventoryLinkChoice;
+    Func<string,string,bool> testManualInventoryLink;
 
     InventoryLinkData InventoryLinks {
         get {
@@ -70,10 +71,16 @@ internal sealed partial class GeneralModWindow {
     }
 
     bool CanEditInventory {get{return !working&&!scanning&&associationChoice==null&&!String.IsNullOrWhiteSpace(state.Destination);}}
-    P2PSyncDifference InventoryRowAt(int screenX,int screenY){
+    static bool CanLinkInventoryFile(P2PSyncDifference file){
+        return file!=null&&file.Kind=="found"&&file.VerifiedZip==null&&file.ProvenOwner==null&&!file.LocalInModFolder;
+    }
+    object InventoryTargetAt(int screenX,int screenY){
         var point=grid.PointToClient(new Point(screenX,screenY));
         int index=grid.HitTest(point.X,point.Y).RowIndex;
-        return index<0?null:grid.Rows[index].Tag as P2PSyncDifference;
+        return index<0?null:grid.Rows[index].Tag;
+    }
+    P2PSyncDifference InventoryRowAt(int screenX,int screenY){
+        return InventoryTargetAt(screenX,screenY) as P2PSyncDifference;
     }
 
     void EnableInventoryDrag(DataGridView table){
@@ -84,7 +91,7 @@ internal sealed partial class GeneralModWindow {
             int index=table.HitTest(e.X,e.Y).RowIndex;
             if(e.Button!=MouseButtons.Left||!CanEditInventory||index<0)return;
             var item=table.Rows[index].Tag as P2PSyncDifference;
-            if(item==null||item.Kind!="found"||item.VerifiedZip!=null||item.ProvenOwner!=null||item.LocalInModFolder)return;
+            if(!CanLinkInventoryFile(item))return;
             key=InventoryLinkStore.Key(item);down=e.Location;
         };
         table.MouseUp+=(s,e)=>key=null;
@@ -93,17 +100,75 @@ internal sealed partial class GeneralModWindow {
             var size=SystemInformation.DragSize;
             if(new Rectangle(down.X-size.Width/2,down.Y-size.Height/2,size.Width,size.Height).Contains(e.Location))return;
             inventoryDragKey=key;key=null;
-            try{table.DoDragDrop(new DataObject(InventoryDragFormat,inventoryDragKey),DragDropEffects.Move);}
-            finally{inventoryDragKey=null;}
+            try{
+                using(var scroll=new Timer{Interval=90}){
+                    scroll.Tick+=(sender,args)=>ScrollInventoryDrag(table);
+                    scroll.Start();
+                    table.DoDragDrop(new DataObject(InventoryDragFormat,inventoryDragKey),DragDropEffects.Move);
+                }
+            }finally{inventoryDragKey=null;}
         };
     }
 
     DragDropEffects InventoryDropEffect(Control target,DragEventArgs e) {
         if(target!=grid||!CanEditInventory||inventoryDragKey==null||
             !InventoryPaths.Equals(e.Data.GetData(InventoryDragFormat) as string,inventoryDragKey))return DragDropEffects.None;
-        var item=InventoryRowAt(e.X,e.Y);
-        return item!=null&&item.Kind=="found"&&item.VerifiedZip==null&&item.ProvenOwner==null&&!item.LocalInModFolder&&!InventoryPaths.Equals(InventoryLinkStore.Key(item),inventoryDragKey)
+        var destination=InventoryTargetAt(e.X,e.Y);
+        if(destination is string)return DragDropEffects.Move;
+        var item=destination as P2PSyncDifference;
+        return CanLinkInventoryFile(item)&&!InventoryPaths.Equals(InventoryLinkStore.Key(item),inventoryDragKey)
             ?DragDropEffects.Move:DragDropEffects.None;
+    }
+
+    static void ScrollInventoryDrag(DataGridView table){
+        if(table.IsDisposed)return;
+        var point=table.PointToClient(Cursor.Position);
+        if(!table.ClientRectangle.Contains(point))return;
+        int start=table.ColumnHeadersVisible?table.ColumnHeadersHeight:0;
+        int direction=point.Y<start+36?-1:point.Y>=table.ClientSize.Height-40?1:0;
+        int first=table.FirstDisplayedScrollingRowIndex;
+        if(direction==0||first<0)return;
+        int index=direction<0?table.Rows.GetPreviousRow(first,DataGridViewElementStates.Visible)
+            :table.Rows.GetNextRow(first,DataGridViewElementStates.Visible);
+        if(index>=0)table.FirstDisplayedScrollingRowIndex=index;
+    }
+
+    void DropInventoryGroup(DragEventArgs args){
+        string source=inventoryDragKey;
+        object target=InventoryTargetAt(args.X,args.Y);
+        var file=target as P2PSyncDifference;
+        if(file!=null){MergeInventoryRows(source,InventoryLinkStore.Key(file));return;}
+        var mod=state.List.Mods.FirstOrDefault(item=>item.Id==target as string);
+        if(mod==null)return;
+        BeginInvoke((Action)(()=>Guard(()=>LinkInventoryToMod(source,mod))));
+    }
+
+    async void PickInventoryOwner(P2PSyncDifference item){
+        if(!CanEditInventory||!CanLinkInventoryFile(item))return;
+        string key=InventoryLinkStore.Key(item),root=state.Destination;
+        try{
+            var owner=await PickAlternative(null,null,inventoryOwner:true);
+            if(owner!=null&&!IsDisposed&&InventoryPaths.Equals(root,state.Destination))LinkInventoryToMod(key,owner);
+        }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
+    }
+
+    void LinkInventoryToMod(string key,GeneralModEntry mod){
+        if(!CanEditInventory||!state.List.Mods.Contains(mod))return;
+        var files=InventoryRow(key);
+        if(files.Length==0||files.Any(file=>!CanLinkInventoryFile(file)))return;
+        string name=files[0].Mod??files[0].Path;
+        bool confirmed=testManualInventoryLink!=null?testManualInventoryLink(name,mod.Name):
+            GeneralDialog.Message(this,String.Format(T("Vincular {0} a {1}? Esta ação associa os caminhos na lista do projeto.",
+                "Link {0} to {1}? This associates their paths in the project list."),name,mod.Name),
+                T("Vincular ao mod","Link to mod"),MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)==DialogResult.Yes;
+        if(!confirmed)return;
+        UpdateInventoryLinks(links=>{
+            var previous=links.Groups.FirstOrDefault(group=>group.Id==key);
+            var paths=files.Select(file=>file.Path);
+            if(previous!=null)paths=paths.Concat(previous.Paths);
+            InventoryLinkStore.Combine(links,null,mod.Name,mod.Id,paths);
+        });
+
     }
 
     void MergeInventoryRows(string from,string into) {
@@ -118,7 +183,7 @@ internal sealed partial class GeneralModWindow {
                 source.Concat(target).Select(file=>file.Path).Concat(previous==null?Enumerable.Empty<string>():previous.Paths),
                 primary==null||primary.Source==null?(previous==null?null:previous.Source):primary.Source);
         });
-        detail.Text=T("Arquivos agrupados na lista.","Files grouped in the list.");
+
     }
 
     InventoryLinkGroup SelectedInventoryLink(){
@@ -157,11 +222,7 @@ internal sealed partial class GeneralModWindow {
             var group=InventoryLinkStore.Combine(links,key,files[0].Mod??files[0].Path,null,files.Select(file=>file.Path),link.Url);
             id=group.Id;
         });
-        if(!NexusPreviewsAvailable){
-            detail.Text=T("Link salvo. A consulta precisa da API do Nexus no Dev.","Link saved. Looking it up requires the Nexus API in Dev.");
-            return;
-        }
-        await ReviewInventoryLinks(id);
+        if(NexusPreviewsAvailable)await ReviewInventoryLinks(id);
     }
 
     async void VerifyInventoryZip() {
@@ -173,9 +234,7 @@ internal sealed partial class GeneralModWindow {
                 fieldLabel:T("Nome do mod","Mod name"),maxLength:300)){
                 if(name.ShowDialog(this)!=DialogResult.OK)return;
                 try{
-                    int count=await VerifyInventoryZip(dialog.FileName,name.ResultName);
-                    detail.Text=count==0?T("Nenhum arquivo instalado bate com o ZIP.","No installed files match the ZIP."):
-                        T("Arquivos com origem confirmada: ","Files with verified origin: ")+count;
+                    await VerifyInventoryZip(dialog.FileName,name.ResultName);
                 }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
             }
         }
@@ -185,7 +244,7 @@ internal sealed partial class GeneralModWindow {
         string root=state.Destination;
         var candidates=gameInventory.Where(file=>file.Kind=="found"||file.LocalInModFolder).Select(file=>file.Path).ToArray();
         scanning=true;Busy(true);
-        detail.Text=T("Conferindo conteúdo do ZIP…","Verifying ZIP contents…");
+
         Dictionary<string,InventoryZipLabel> matches;
         try{matches=await Task.Run(()=>InventoryLinkStore.MatchZip(root,zip,name,IsCyberpunk(root),candidates));}
         finally{scanning=false;if(!IsDisposed)Busy(false);}
@@ -232,12 +291,12 @@ internal sealed partial class GeneralModWindow {
         if(owners.Length==0)return;
         string root=state.Destination;
         bool cyberpunk=IsCyberpunk(root);
-        string previous=detail.Text;
+
         var read=nexusScan.PreviewSession(testNexusPreviews??GeneralNexusInfo.ReadFilePreviews);
         InventoryLinkSuggestion[] proposals;
-        scanning=true;Busy(true);detail.Text=T("Comparando caminhos de mods com o Nexus…","Comparing mod paths with Nexus…");
+        scanning=true;Busy(true);
         try{proposals=await Task.Run(()=>InventoryLinkSuggestions.Find(root,cyberpunk,owners,inventory,read));}
-        finally{scanning=false;Busy(false);detail.Text=previous;}
+        finally{scanning=false;if(!IsDisposed)Busy(false);}
         if(IsDisposed||!InventoryPaths.Equals(root,state.Destination))return;
         foreach(var proposal in proposals){
             if(InventoryLinks.Ignored.Contains(proposal.Target.IgnoreKey,StringComparer.Ordinal)||InventoryRow(proposal.RowId).Length==0||
@@ -249,8 +308,7 @@ internal sealed partial class GeneralModWindow {
             UpdateInventoryLinks(links=>InventoryLinkStore.Combine(links,null,proposal.Target.Name,
                 proposal.Target.CatalogId,proposal.Paths));
         }
-        if(onlyGroup!=null&&proposals.Length==0)
-            detail.Text=T("Link salvo. Nenhum outro item da lista coincidiu.","Link saved. No other listed item matched.");
+
     }
 
     DialogResult AskInventoryLink(InventoryLinkSuggestion proposal){

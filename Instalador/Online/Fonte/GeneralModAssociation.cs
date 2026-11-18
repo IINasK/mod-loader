@@ -7,6 +7,8 @@ using System.Windows.Forms;
 internal sealed partial class GeneralModWindow {
     TaskCompletionSource<GeneralModEntry> associationChoice;
     string associationSourceId;
+    bool pickingInventoryOwner;
+    double inventoryOwnerPulse;
 
     void ConfirmAlternative() {
         var entry = FocusedEntry();
@@ -14,7 +16,7 @@ internal sealed partial class GeneralModWindow {
             associationChoice.TrySetResult(entry);
     }
 
-    async Task<GeneralModEntry> PickAlternative(string sourceId, GeneralModEntry previous, bool dependency = false) {
+    async Task<GeneralModEntry> PickAlternative(string sourceId, GeneralModEntry previous, bool dependency = false, bool inventoryOwner = false) {
         var oldEntry = FocusedEntry();
         int oldScroll = grid.FirstDisplayedScrollingRowIndex;
         bool oldExpanded = listExpanded;
@@ -29,12 +31,16 @@ internal sealed partial class GeneralModWindow {
         var task = new TaskCompletionSource<GeneralModEntry>(TaskCreationOptions.RunContinuationsAsynchronously);
         associationChoice = task;
         associationSourceId = sourceId;
+        pickingInventoryOwner = inventoryOwner;
+        using (var pulse = new Timer { Interval = 32 })
         using (var bar = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, Padding = new Padding(14, 4, 14, 4) }) {
             bar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             bar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             bar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             bar.Controls.Add(new Label {
-                Text = dependency?T("Selecione a dependência","Select the required mod"):T("Selecione o mod alternativo", "Select the alternative mod"), Dock = DockStyle.Fill,
+                Text = inventoryOwner?T("Selecione o mod para vincular os arquivos","Select the mod to link the files"):
+                    dependency?T("Selecione a dependência","Select the required mod"):T("Selecione o mod alternativo", "Select the alternative mod"),
+                Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft, Font = GeneralStyle.Font(13, true), AutoEllipsis = true
             }, 0, 0);
             var cancel = GeneralStyle.Button(T("Cancelar", "Cancel"), () => task.TrySetResult(null));
@@ -73,10 +79,22 @@ internal sealed partial class GeneralModWindow {
                 }
                 selection(this, EventArgs.Empty);
                 grid.Focus();
+                if(inventoryOwner&&GeneralStyle.AnimationsEnabled){
+                    var elapsed=System.Diagnostics.Stopwatch.StartNew();
+                    pulse.Tick+=(s,e)=>{
+                        double progress=Math.Min(1,elapsed.Elapsed.TotalMilliseconds/820);
+                        inventoryOwnerPulse=Math.Sin(Math.PI*progress);
+                        grid.InvalidateColumn(grid.Columns["Name"].Index);
+                        if(progress>=1)pulse.Stop();
+                    };
+                    pulse.Start();
+                }
                 return await task.Task;
             } finally {
                 associationChoice = null;
                 associationSourceId = null;
+                pickingInventoryOwner = false;
+                inventoryOwnerPulse = 0;
                 if (!IsDisposed) {
                     grid.SelectionChanged -= selection;
                     grid.CurrentCellChanged -= selection;

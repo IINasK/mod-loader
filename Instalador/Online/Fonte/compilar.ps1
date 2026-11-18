@@ -1,4 +1,4 @@
-﻿param([string]$VelopackBuildDirectory,[string]$NuGetPackages,[string]$DevelopmentBuildDirectory,[switch]$Dev)
+param([string]$VelopackBuildDirectory,[string]$NuGetPackages,[string]$DevelopmentBuildDirectory,[switch]$Dev)
 $ErrorActionPreference='Stop'
 if($VelopackBuildDirectory -and $DevelopmentBuildDirectory){throw 'Escolha uma edição para compilar.'}
 & (Join-Path $PSScriptRoot 'preparar-leitor.ps1')
@@ -95,6 +95,7 @@ $extensions += @('GeneralP2PSync.cs','NightCoopRelease.cs','NightCoopReleaseTest
 $extensions += @('SnapshotVerification.cs','SnapshotVerificationTests.cs','GeneralModInstallerRecovery.cs','GeneralModHumanFlowTests.cs','GeneralModInstallerMaintenance.cs','GeneratedFileProvenance.cs','ProvenanceMaintenanceTests.cs','GeneralModUpdates.cs','GeneralModUpdateWindow.cs','GeneralModUpdatesTests.cs')|ForEach-Object {Join-Path $PSScriptRoot $_}
 $extensions += Join-Path $PSScriptRoot 'GeneralHomeModUpdates.cs'
 $extensions += Join-Path $PSScriptRoot 'GeneralModHumanUiTests.cs'
+$extensions += Join-Path $PSScriptRoot 'GeneralModTableSelection.cs'
 $extensions += '/reference:System.Xml.dll'
 $extensions += '/win32icon:'+(Join-Path $PSScriptRoot 'Assets\ModLoader.ico')
 $extensions += '/resource:'+(Join-Path $PSScriptRoot 'Assets\ModLoader.svg')+',ModLoader.Logo.svg'

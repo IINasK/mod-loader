@@ -84,13 +84,25 @@ internal sealed partial class GeneralModWindow {
         }
     }
 
+    void ShowProjectDetails(){
+        var issues=new List<GeneralDependencyIssue>();
+        if(!String.IsNullOrWhiteSpace(state.Destination)&&Directory.Exists(state.Destination)){
+            var deployed=new GeneralPresetDeployment(Root(),data).Read();
+            foreach(string issue in deployed.Issues){
+                int separator=issue.IndexOf(':');
+                issues.Add(new GeneralDependencyIssue{Mod=separator>0?issue.Substring(0,separator):ActivePreset==null?"":ActivePreset.Name,
+                    Requirement=T("Preset","Preset"),Status=separator>0?issue.Substring(separator+1).TrimStart():issue});
+            }
+        }
+        using(var dialog=new GeneralDependencyReview(ModVersionSummary(),issues,0,launch,
+            DisplayedInventory().Where(file=>file.Kind=="found").ToArray(),title:T("Detalhes do projeto","Project details")))
+            dialog.ShowDialog(this);
+    }
+
     async Task VerifyProject() {
         if(projectDraft!=null&&!ConfirmProjectNavigation())return;
         if(working||scanning)return;
-        if(String.IsNullOrWhiteSpace(state.Destination)||!Directory.Exists(state.Destination)){
-            detail.Text=T("Selecione a pasta de instalação para verificar.","Select the installation folder to verify.");
-            return;
-        }
+        if(String.IsNullOrWhiteSpace(state.Destination)||!Directory.Exists(state.Destination))return;
         try {
             var audit=new ProjectVerification(!testMode);
             await Scan(audit);
@@ -99,16 +111,17 @@ internal sealed partial class GeneralModWindow {
             if(IsDisposed)return;
             var install=new Dictionary<string,Work>(StringComparer.Ordinal);
             var issues=ReviewDependencies(audit,install);
-            var summary=String.Format(T("{0} mods verificados · {1} com tags atualizadas","{0} mods checked · {1} with updated tags"),
-                audit.Checked.Count,audit.MetadataChanged);
-            if(audit.UnavailableMetadata>0)
-                summary+="\r\n"+String.Format(T("Tags do Nexus indisponíveis em {0} fonte(s).","Nexus tags unavailable for {0} source(s)."),audit.UnavailableMetadata);
+            var summary=String.Format(T("Arquivos locais · {0} mods conferidos","Local files · {0} mods checked"),audit.Checked.Count)+
+                "\r\n"+ModVersionSummary();
+            if(audit.MetadataChanged>0||audit.UnavailableMetadata>0)
+                summary+="\r\n"+String.Format(T("Tags do Nexus · {0} mods atualizados · {1} consultas indisponíveis",
+                    "Nexus tags · {0} mods updated · {1} queries unavailable"),audit.MetadataChanged,audit.UnavailableMetadata);
             if(audit.UnavailableRequirements>0)
                 summary+="\r\n"+(GeneralNexusInfo.HasTestKey
-                    ?String.Format(T("Dependências do Nexus não verificadas em {0} fonte(s).","Nexus dependencies unverified for {0} source(s)."),audit.UnavailableRequirements)
-                    :T("Dependências online do Nexus exigem autenticação.","Online Nexus dependencies require authentication."));
+                    ?String.Format(T("Dependências do Nexus · {0} consultas sem resposta","Nexus dependencies · {0} unanswered queries"),audit.UnavailableRequirements)
+                    :T("Dependências do Nexus · conecte sua conta para consultar","Nexus dependencies · connect your account to check"));
             if(audit.InventoryUnavailable)
-                summary+="\r\n"+T("Não foi possível ler os arquivos fora da lista.","Could not read files outside the list.");
+                summary+="\r\n"+T("Não foi possível ler os arquivos não vinculados.","Could not read unlinked files.");
             string verifyRoot=Root();
             var repairs=new Dictionary<GeneralDependencyIssue,Work>();
             foreach(var work in audit.Divergent.Where(CanReviewReplacement)){
@@ -121,7 +134,7 @@ internal sealed partial class GeneralModWindow {
                 issues.Add(issue);repairs.Add(issue,work);
             }
             if(IsDisposed)return;
-            detail.Text=issues.Count==0?T("Verificação concluída.","Verification complete."):T("Verificação concluída com pendências para revisar.","Verification complete with issues to review.");
+
             Work repair=null;
             using(var dialog=new GeneralDependencyReview(summary,issues,install.Count,launch,DisplayedInventory().Where(file=>file.Kind=="found").ToArray(),
                 AddReviewedDependency,repairs.Count==0?null:(Action<GeneralDependencyIssue>)(issue=>repair=repairs[issue]))){
@@ -487,10 +500,16 @@ internal sealed class GeneralDependencyIssue {
 
 internal sealed class GeneralDependencyReview : GeneralDialog {
     internal GeneralDependencyReview(string summary,IReadOnlyList<GeneralDependencyIssue> issues,int installable,Action<string> open,
-        IReadOnlyList<P2PSyncDifference> inventory=null,Action<GeneralNexusRequirement> add=null,Action<GeneralDependencyIssue> repair=null)
-        :base(GeneralStyle.T("Resultado da verificação","Verification results")) {
+        IReadOnlyList<P2PSyncDifference> inventory=null,Action<GeneralNexusRequirement> add=null,Action<GeneralDependencyIssue> repair=null,string title=null)
+        :base(title??GeneralStyle.T("Resultado da verificação","Verification results")) {
         RequiresDecision=installable>0||add!=null;
-        ClientSize=new Size(860,Math.Min(550,290+issues.Count*35));
+        int lines=summary.Count(character=>character=='\n')+1;
+        if(inventory!=null&&inventory.Count>0){
+            summary+="\r\n"+GeneralStyle.T("Arquivos não vinculados são itens encontrados no jogo sem um mod cadastrado associado.",
+                "Unlinked files are items found in the game without an associated mod in the project.");
+            lines++;
+        }
+        ClientSize=new Size(900,Math.Min(600,250+lines*23+issues.Count*35));
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(20,8,20,20)};
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
@@ -514,7 +533,7 @@ internal sealed class GeneralDependencyReview : GeneralDialog {
         }
         var view=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(10),Margin=Padding.Empty};
         if(issues.Count>0)view.Controls.Add(new GeneralScrollView(table));
-        else view.Controls.Add(new Label{Text=GeneralStyle.T("Nenhuma pendência no catálogo local.","No missing dependencies in the local catalog."),Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleCenter});
+        else view.Controls.Add(new Label{Text=GeneralStyle.T("Nenhuma pendência local apontada pela verificação.","No local issues reported by the check."),Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleCenter});
         layout.Controls.Add(view,0,1);
         var commands=GeneralTableDialogLayout.Commands();
         var done=GeneralStyle.Button(GeneralStyle.T("Fechar","Close"),()=>Complete(DialogResult.Cancel));
@@ -543,11 +562,13 @@ internal sealed class GeneralDependencyReview : GeneralDialog {
             addChoice.Enabled=issue!=null&&issue.Candidate!=null;
             if(repair!=null)repairButton.Enabled=issue!=null&&issue.CanRepair;
         };
-        commands.Controls.Add(done);commands.Controls.Add(browser);
+        commands.Controls.Add(done);
+        browser.Visible=issues.Any(issue=>GeneralModDownload.IsWebSource(issue.Url));
+        commands.Controls.Add(browser);
         if(repair!=null)commands.Controls.Add(repairButton);else repairButton.Dispose();
         if(add!=null&&issues.Any(issue=>issue.Candidate!=null))commands.Controls.Add(addChoice);
         if(inventory!=null&&inventory.Count>0){
-            var outside=GeneralStyle.Button(GeneralStyle.T("Fora da lista","Outside the list")+" ("+inventory.Count+")",()=>{
+            var outside=GeneralStyle.Button(GeneralStyle.T("Ver arquivos não vinculados","View unlinked files")+" ("+inventory.Count+")",()=>{
                 using(var dialog=new GeneralSyncDifferencesDialog(inventory,true))dialog.ShowDialog(this);
             });
             outside.Name="ShowUnlistedInventory";
