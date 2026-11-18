@@ -51,10 +51,12 @@ internal sealed partial class GeneralModWindow {
             int expandedLimit=view.Bar.Limit;
             var toggle=new Point(form.CategoryContentRight-28,form.grid.GetRowDisplayRectangle(heading.Index,false).Top+22);
             ClickModCell(form.grid,toggle);
-            check(primaryRows.All(row=>!row.Visible)&&heading.Visible&&form.ModRows().Count()==3&&view.Bar.Limit<expandedLimit,
+            primaryRows=form.ModRows().Where(row=>Equals(row.Tag,two.Id)||Equals(row.Tag,three.Id)).ToArray();
+            check(primaryRows.All(row=>!row.Visible)&&form.ModRows().Count()==3&&view.Bar.Limit<expandedLimit,
                 "Recolher esconde os itens e reduz a rolagem, preservando a categoria e o contador.");
             CaptureUi(form,Path.Combine(root,"category-collapsed.png"));
             ClickModCell(form.grid,toggle);
+            primaryRows=form.ModRows().Where(row=>Equals(row.Tag,two.Id)||Equals(row.Tag,three.Id)).ToArray();
             check(primaryRows.All(row=>row.Visible)&&view.Bar.Limit==expandedLimit,
                 "A mesma seta abre a categoria e recupera seu espaço de rolagem.");
             form.grid.ClearSelection();
@@ -85,10 +87,11 @@ internal sealed partial class GeneralModWindow {
             }
             check(form.currentProgress.Top==form.totalProgress.Top&&Math.Abs(form.currentProgress.Width-form.totalProgress.Width)<=1,"As barras do rodapé dividem a mesma linha em partes iguais.");
             var verifyButton=AllControls(form).OfType<Button>().Single(button=>button.Name=="VerifyProject");
-            check(verifyButton.Right<form.primaryAction.Left&&verifyButton.Top==form.primaryAction.Top&&
+            var brandTitle=AllControls(form).Single(control=>control.Name=="ProjectBrandTitle");
+            check(verifyButton.Parent==brandTitle.Parent&&verifyButton.Left>brandTitle.Right&&verifyButton.Height==44&&
                 verifyButton.Text==""&&((GeneralButton)verifyButton).Bare&&((GeneralButton)verifyButton).IconKind=="refresh"&&
                 !AllControls(form).OfType<GeneralButton>().Any(button=>button!=verifyButton&&button.IconKind=="refresh"),
-                "Verificar fica ao lado da ação principal no rodapé.");
+                "Verificar fica à direita do título Mod Loader, mantendo um único botão de recarga.");
             check(form.grid.Columns["Group"].Visible&&form.grid.AllowUserToResizeColumns,
                 "Grupos ocupam a linha do nome e as divisórias do cabeçalho permitem ajustar a largura.");
             int initialStatusWidth=form.grid.Columns["Status"].Width;
@@ -106,7 +109,8 @@ internal sealed partial class GeneralModWindow {
             var glyph=markCell.ContentBounds;
             var markPoint=new Point(markBounds.Left+glyph.Left+glyph.Width/2,markBounds.Top+glyph.Top+glyph.Height/2);
             ClickModCell(form.grid,statusPoint);
-            check(form.marked.Count==0,"Um clique em Situação não marca a linha.");
+            check(form.marked.SetEquals(new[]{one.Id}),"Um clique em Situação seleciona somente aquele mod.");
+            form.marked.Clear();form.RefreshTableMarks();
             ClickModCell(form.grid,markMargin);
             check(form.marked.SetEquals(new[]{one.Id}),"A margem da célula de marcação responde ao clique.");
             ClickModCell(form.grid,markPoint);
@@ -186,6 +190,7 @@ internal sealed partial class GeneralModWindow {
             check(form.VisibleMods().Single()==dependency,"O filtro de situação encontra dependências sem versão.");
             form.statusFilters=null;
             form.grid.CurrentCell=dependencyRow.Cells["Name"];
+            form.SelectTableRow(dependencyRow,Keys.None,false);
             form.RefreshPrimaryAction();
             check(form.primaryAction.Text=="Escolher versão","A dependência indefinida abre o editor em vez de baixar.");
             dependency.Variants[0].Sources[0]="https://www.nexusmods.com/cyberpunk2077/mods/9000?tab=files&file_id=123";
@@ -229,8 +234,8 @@ internal sealed partial class GeneralModWindow {
             form.categoryFilters=null;
             await TestPrimaryActions(form,one,two,archive,root,check);
             form.state.Theme="dark";form.state.Language="en";form.Persist();form.BuildInterface();form.ClientSize=new Size(1100,760);form.PerformLayout();Application.DoEvents();
-            check(form.grid.Columns["Status"].HeaderText=="Status"&&form.preset.Items.Count==3&&form.preset.Items[0].ToString()=="Preset padrão"&&
-                form.preset.Items[2].ToString()=="New preset…","Idioma inglês alcança a tabela e preserva os nomes dos presets.");
+            check(form.grid.Columns["Status"].HeaderText=="Status"&&form.preset.Items.Count==2&&form.preset.Items[0].ToString()=="Preset padrão"&&
+                form.preset.AddChoiceLabel=="New preset…","Idioma inglês alcança a tabela e preserva os nomes dos presets.");
             check(form.BackColor==GeneralStyle.Background&&GeneralStyle.Dark,"Tema escuro atualiza toda a janela.");
             check(GeneralStyle.Status("Instalado")=="Installed"&&GeneralStyle.Status("Pulado")=="Skipped","Estados têm rótulos em inglês.");
             check(!form.next.Visible,"Pular fica oculto em repouso após trocar tema e idioma.");
@@ -255,10 +260,13 @@ internal sealed partial class GeneralModWindow {
         GeneralModEditor opened=null;
         DateTime selectionStarted=DateTime.MaxValue;
         bool previousAnimation=GeneralStyle.AnimationsEnabled;
+        bool driving=false;
         GeneralStyle.AnimationsEnabled=true;
         try {
             using(var timer=new Timer{Interval=280}){
                 timer.Tick+=(s,e)=>{
+                    if(driving)return;
+                    driving=true;
                     try {
                         var editor=Application.OpenForms.OfType<GeneralModEditor>().FirstOrDefault(item=>item.Visible);
                         if(failure!=null){
@@ -355,7 +363,7 @@ internal sealed partial class GeneralModWindow {
                         failure=new IOException("Dependency picking stage "+stage,ex);
                         if(form.associationChoice!=null)form.associationChoice.TrySetResult(null);
                         else if(opened!=null&&opened.Visible){timer.Stop();opened.Complete(DialogResult.Cancel);}
-                    }
+                    }finally{driving=false;}
                 };
                 timer.Start();
                 await form.EditMod(source);
@@ -471,6 +479,7 @@ internal sealed partial class GeneralModWindow {
             var start=form.grid.GetCellDisplayRectangle(indent,parent.Index,false);
             var child=form.grid.GetCellDisplayRectangle(indent,expanded[0].Index,false);
             var end=form.grid.GetCellDisplayRectangle(indent,following.Index,false);
+            CaptureUi(form,Path.Combine(root,"variant-drawer-"+theme+".png"));
             using(var rendered=new Bitmap(form.grid.Width,form.grid.Height)){
                 form.grid.DrawToBitmap(rendered,new Rectangle(Point.Empty,rendered.Size));
                 check(rendered.GetPixel(child.X+4,child.Y+4).ToArgb()==GeneralStyle.DrawerSurface.ToArgb()&&
@@ -481,7 +490,6 @@ internal sealed partial class GeneralModWindow {
                     rendered.GetPixel(start.X+10,y)!=rendered.GetPixel(start.X+4,y)),
                     "O traço pintado atravessa as emendas até o próximo item: "+theme);
             }
-            CaptureUi(form,Path.Combine(root,"variant-drawer-"+theme+".png"));
         }
         form.state.Theme=originalTheme;
         form.BuildInterface();

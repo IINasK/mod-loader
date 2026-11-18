@@ -57,6 +57,7 @@ public sealed class GeneralModVariant {
     public GeneralModVariant NaturalOption;
     public List<string> RequiredMods = new List<string>();
     public List<GeneralInstallRoute> InstallRoutes = new List<GeneralInstallRoute>();
+    public List<string> OutputFolders = new List<string>();
     public List<string> CompatibilityGroups = new List<string>();
     public List<string> Sources = new List<string>();
     public Dictionary<string,GeneralSourceInfo> SourceInfo = new Dictionary<string,GeneralSourceInfo>();
@@ -81,6 +82,8 @@ public sealed class GeneralModState {
     public Dictionary<string, string> ResolvedDownloads = new Dictionary<string, string>();
     public Dictionary<string, string> CyberpunkImports = new Dictionary<string, string>();
     public Dictionary<string, string> SnapshotReceipts = new Dictionary<string, string>();
+    public List<string> SuppressedModRecovery = new List<string>();
+    public List<string> RecoveredModIds = new List<string>();
 }
 
 public sealed class GeneralModLibrary {
@@ -453,7 +456,7 @@ public sealed class GeneralModLibrary {
             mod.Name = RequiredText(mod.Name, 300, "Nome do mod");
             mod.Description = OptionalDescription(mod.Description);
             if(!trustRecipes||mod.DetectedPaths==null)mod.DetectedPaths=new List<string>();
-            if(mod.DetectedPaths.Count>2000||mod.DetectedPaths.Any(path=>!FixedInstaller.SyncModPath(path)))
+            if(mod.DetectedPaths.Count>2000||mod.DetectedPaths.Any(path=>!FixedInstaller.InventoryRegistrationPath(path)))
                 throw new IOException("Caminhos detectados inválidos em "+mod.Name+".");
             mod.DetectedPaths=mod.DetectedPaths.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if(mod.DependencyFile<0||mod.DependencyFile>0&&mod.DependencySource==null)
@@ -548,6 +551,7 @@ public sealed class GeneralModLibrary {
             else if (categories.TryGetValue(category, out category)) variant.Category = category;
             else throw new IOException("Categoria desconhecida em " + mod.Name + ".");
         }
+        variant.OutputFolders=ModOutputIndex.NormalizeFolders(variant.OutputFolders);
         variant.CompatibilityGroups = ValidateCompatibilityGroups(variant.CompatibilityGroups);
         if(variant.RequiredMods==null)variant.RequiredMods=new List<string>();
         if(variant.RequiredMods.Count>32||variant.RequiredMods.Any(id=>!ValidId(id)||id==mod.Id)||

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -24,6 +24,7 @@ internal sealed class P2PSyncComparison {
 
 internal sealed class P2PSyncDifference {
     internal string InventoryGroupId, ProvenOwner, VerifiedZip;
+    internal bool GeneratedOutput,PreexistingOutput;
     internal bool LocalInModFolder, RecordedFile, RecordedChange;
     internal long? VerifiedBytes;
     public string Kind, Mod, Path, ModId, VariantId;

@@ -18,6 +18,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         Margin = new Padding(3, 0, 3, 3)
     };
     readonly List<string> selectedTags = new List<string>();
+    readonly TextBox outputFolders=new TextBox{Name="DeclaredOutputFolders",MaxLength=4000};
     readonly TextBox description = new TextBox { Dock = DockStyle.Fill, Multiline = true, ScrollBars = ScrollBars.Vertical, MaxLength = 4000 };
     readonly GeneralButton nsfw;
     bool adult;
@@ -103,7 +104,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         model = entry.Variants.Select(v => new GeneralModVariant {
             DisplayName=v.DisplayName,Category=v.Category,Description=v.Description,Tags=v.Tags==null?null:v.Tags.ToList(),
             Nsfw=v.Nsfw,NsfwOverride=v.NsfwOverride,NaturalOption=v.NaturalOption,
-            Id = v.Id, Name = v.Name, CompatibilityGroups = v.CompatibilityGroups.ToList(), RequiredMods = v.RequiredMods.ToList(), InstallRoutes = v.InstallRoutes.ToList(), Sources = v.Sources.ToList(), SourceInfo=v.SourceInfo==null?new Dictionary<string,GeneralSourceInfo>():v.SourceInfo.ToDictionary(pair=>pair.Key,pair=>pair.Value.SavedCopy()), CyberpunkId = v.CyberpunkId, CyberpunkVariant = v.CyberpunkVariant
+            Id = v.Id, Name = v.Name, CompatibilityGroups = v.CompatibilityGroups.ToList(), RequiredMods = v.RequiredMods.ToList(), InstallRoutes = v.InstallRoutes.ToList(), OutputFolders=(v.OutputFolders??new List<string>()).ToList(), Sources = v.Sources.ToList(), SourceInfo=v.SourceInfo==null?new Dictionary<string,GeneralSourceInfo>():v.SourceInfo.ToDictionary(pair=>pair.Key,pair=>pair.Value.SavedCopy()), CyberpunkId = v.CyberpunkId, CyberpunkVariant = v.CyberpunkVariant
         }).ToList();
         if (model.Count == 0) model.Add(new GeneralModVariant { Id = Guid.NewGuid().ToString("N"), Name = T("Principal", "Default") });
         originalSources = new HashSet<string>(model.SelectMany(variant => variant.Sources), StringComparer.Ordinal);
@@ -285,6 +286,10 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         archiveDestinations.Applied+=routes=>{current.InstallRoutes=routes;ValidateInputs();};
         archiveDestinations.DraftChanged+=ValidateInputs;
         AddEditorRow(layout,archiveDestinations);
+        AddEditorRow(layout,EditorField(T("Pastas de saída declaradas","Declared output folders"),outputFolders));
+        editorTips.SetToolTip(outputFolders,T("Caminhos dentro do jogo, separados por |. Use apenas pastas de saída deste mod.",
+            "Paths inside the game, separated by |. Only enter output folders for this mod."));
+        outputFolders.TextChanged+=(s,e)=>{if(!changing)ValidateInputs();};
 
         if (alternatives != null) {
             AddEditorRow(layout, EditorSection(T("Vínculos entre mods", "Mod links"), true));
@@ -548,6 +553,10 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         }
     }
 
+    internal void ShowLocalFiles(IEnumerable<string> paths,IEnumerable<string> unread,Action<string> markSeen){
+        archiveDestinations.SetLocalFiles(paths,unread,markSeen);
+    }
+
     void ScheduleArchive(){
         if(changing||attachment||current==null)return;
         archiveGeneration++;
@@ -720,6 +729,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
             .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         current.Nsfw=adult;
         current.NsfwOverride=adultOverride;
+        current.OutputFolders=outputFolders.Text.Split('|').Select(path=>path.Trim()).Where(path=>path.Length>0).ToList();
 
 
         if (String.IsNullOrEmpty(current.CyberpunkId)&&current.Sources.Count>0){
@@ -755,6 +765,7 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
         category.Text=current.Category??initialEntry.Category??"";
         categoryFrom=category.Text;
         description.Text=current.Description??initialEntry.Description??"";
+        outputFolders.Text=String.Join(" | ",current.OutputFolders??new List<string>());
         lastAutoName=null;
         ClearTags();
         MergeSourceTags(current.Tags??initialEntry.Tags);
@@ -834,6 +845,8 @@ internal sealed partial class GeneralModEditor : GeneralDialog {
                 return T("Informe o nome de cada variante.", "Enter a name for each variant.");
             if (variant.Sources.Count == 0 || variant.Sources.Count > 32)
                 return T("Informe de 1 a 32 links ou arquivos para cada versão.", "Enter 1 to 32 links or files for each version.");
+            try{ModOutputIndex.NormalizeFolders(variant.OutputFolders);}
+            catch(IOException){return T("Informe pastas de saída relativas e separadas por |.","Enter relative output folders separated by |.");}
             try { foreach (string source in variant.Sources) GeneralModLibrary.ValidateSource(source); }
             catch (Exception) {
                 return T("Fonte inválida. Use um link HTTPS público ou o caminho de um ZIP, RAR ou 7z.", "Invalid source. Use a public HTTPS link or a ZIP, RAR or 7z file path.");
@@ -912,13 +925,17 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
     readonly TextBox destination=new TextBox { Name="ArchiveCurrentDestination",MaxLength=4096 };
     readonly Label feedback=GeneralModEditor.LabelFor("");
     readonly GeneralScrollView scroll;
-    readonly Button reset, cancel, apply;
+    readonly Button reset, cancel, apply, chooseFolder;
     readonly TreeNode root=new TreeNode(T("Raiz do pacote","Archive root")){Tag=""};
+    readonly TreeNode localRoot=new TreeNode(T("Arquivos locais","Local files")){Tag=""};
     readonly HashSet<TreeNode> folded=new HashSet<TreeNode>();
+    readonly HashSet<string> newLocalFiles=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    Action<string> markLocalFileSeen;
     readonly Dictionary<string,TreeNode> nodes=new Dictionary<string,TreeNode>(StringComparer.OrdinalIgnoreCase);
     List<GeneralInstallRoute> accepted=new List<GeneralInstallRoute>();
     Dictionary<string,string> drafts=RouteDraft(new GeneralInstallRoute[0]);
     GeneralArchivePreview preview;
+    string archiveFeedback="";
     bool updating;
     internal event Action<List<GeneralInstallRoute>> Applied;
     internal event Action DraftChanged;
@@ -933,7 +950,7 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
         Dock=DockStyle.Fill;AutoSize=true;AutoSizeMode=AutoSizeMode.GrowAndShrink;
         ColumnCount=1;RowCount=4;Margin=new Padding(3,0,3,6);
         ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-        tree.AccessibleName=T("Árvore de arquivos do pacote","Archive file tree");
+        tree.AccessibleName=T("Árvore de destinos dos arquivos","File destinations tree");
         scroll=new GeneralScrollView(tree);
         var frame=new GeneralSurface{Dock=DockStyle.Fill,Height=242,Padding=new Padding(9),Margin=new Padding(0,0,0,5)};
         frame.Controls.Add(scroll);
@@ -951,16 +968,27 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
             var node=(TreeNode)tree.Items[index];
             if(node.Nodes.Count>0&&e.X>=Indent(node)&&e.X<Indent(node)+20)Toggle(node);
         };
+        tree.MouseClick+=(s,e)=>{
+            if(e.Button!=MouseButtons.Left)return;
+            int index=tree.IndexFromPoint(e.Location);
+            if(index>=0)MarkSeen((TreeNode)tree.Items[index]);
+        };
         tree.MouseMove+=(s,e)=>{
             if(e.Button!=MouseButtons.Left)return;
             Size distance=SystemInformation.DragSize;
             var threshold=new Rectangle(dragStart.X-distance.Width/2,dragStart.Y-distance.Height/2,distance.Width,distance.Height);
             int index=tree.IndexFromPoint(dragStart);
-            if(index>=0&&!threshold.Contains(e.Location))tree.DoDragDrop(tree.Items[index],DragDropEffects.Move);
+            if(index<0||threshold.Contains(e.Location))return;
+            var node=(TreeNode)tree.Items[index];
+            if(!IsLocalNode(node))tree.DoDragDrop(node,DragDropEffects.Move);
         };
         tree.KeyDown+=(s,e)=>{
             var node=Selected;
-            if(node==null||node.Nodes.Count==0)return;
+            if(node==null)return;
+            if(IsLocalNode(node)&&node.Nodes.Count==0&&(e.KeyCode==Keys.Enter||e.KeyCode==Keys.Space)){
+                MarkSeen(node);e.SuppressKeyPress=true;return;
+            }
+            if(node.Nodes.Count==0)return;
             if(e.KeyCode==Keys.Left&&!folded.Contains(node)||e.KeyCode==Keys.Right&&folded.Contains(node)){
                 Toggle(node);e.Handled=true;
             }
@@ -969,21 +997,25 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
         string location=T("Localização atual","Current location");
         destination.AccessibleName=location;
         destination.AllowDrop=true;
-        destination.DragEnter+=(s,e)=>e.Effect=e.Data.GetDataPresent(typeof(TreeNode))?DragDropEffects.Move:DragDropEffects.None;
+        destination.DragEnter+=(s,e)=>{
+            var node=e.Data.GetData(typeof(TreeNode)) as TreeNode;
+            e.Effect=node!=null&&!IsLocalNode(node)?DragDropEffects.Move:DragDropEffects.None;
+        };
         destination.DragDrop+=(s,e)=>{
             var node=e.Data.GetData(typeof(TreeNode)) as TreeNode;
-            if(node==null||!tree.Items.Contains(node))return;
+            if(node==null||IsLocalNode(node)||!tree.Items.Contains(node))return;
             string folder=String.IsNullOrWhiteSpace(destination.Text)?"%GAME%":destination.Text;
             tree.SelectedItem=node;
             destination.Text=folder;
         };
         destination.TextChanged+=(s,e)=>{
-            if(updating||Selected==null)return;
+            if(updating||Selected==null||IsLocalNode(Selected))return;
             drafts[SelectedPath]=destination.Text;
             UpdateButtons();
             NotifyDraftChanged();
         };
         var locationRow=GeneralOptionsDialog.FolderRow(location,destination,Choose);
+        chooseFolder=(Button)locationRow.GetControlFromPosition(1,1);
         locationRow.Margin=new Padding(0,4,0,0);
         Controls.Add(locationRow,0,1);
         feedback.ForeColor=GeneralStyle.Muted;
@@ -1007,6 +1039,15 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
         if(backupFile!=null){
             openFolder=GeneralStyle.Button(T("Abrir pasta da instalação","Open installation folder"),()=>{
                 try{
+                    if(Selected!=null&&IsLocalNode(Selected)){
+                        string path=LocalDestination(Selected);
+                        Safe.NoLinks(path);
+                        if(Selected.Nodes.Count==0&&File.Exists(path))
+                            System.Diagnostics.Process.Start("explorer.exe","/select,\""+path+"\"");
+                        else if(Directory.Exists(path))
+                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path){UseShellExecute=true});
+                        return;
+                    }
                     string backup=backupFile();
                     if(backup!=null){
                         Safe.NoLinks(backup);
@@ -1040,6 +1081,11 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
     internal void RefreshFolderButton(){
         if(openFolder==null)return;
+        if(Selected!=null&&IsLocalNode(Selected)){
+            openFolder.Text=T("Abrir pasta do arquivo","Open file location");
+            openFolder.Enabled=Directory.Exists(game);
+            return;
+        }
         string backup=null;
         try{backup=backupFile();}catch(IOException){}catch(UnauthorizedAccessException){}
         openFolder.Text=backup==null?T("Abrir pasta da instalação","Open installation folder"):T("Abrir pasta de backup","Open backup folder");
@@ -1047,6 +1093,39 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
     }
     TreeNode Selected {get{return tree.SelectedItem as TreeNode;}}
     string SelectedPath {get{return Selected==null?"":(string)Selected.Tag;}}
+
+    bool IsLocalNode(TreeNode node){
+        while(node.Parent!=null)node=node.Parent;
+        return ReferenceEquals(node,localRoot);
+    }
+
+    string LocalDestination(TreeNode node){
+        string path=(string)node.Tag;
+        return path.Length==0?game:Safe.In(game,path);
+    }
+
+    internal void SetLocalFiles(IEnumerable<string> paths,IEnumerable<string> unread,Action<string> markSeen){
+        markLocalFileSeen=markSeen;
+        folded.RemoveWhere(IsLocalNode);
+        localRoot.Nodes.Clear();
+        newLocalFiles.Clear();
+        newLocalFiles.UnionWith(unread);
+        BuildBranch(localRoot,new Dictionary<string,TreeNode>(StringComparer.OrdinalIgnoreCase),paths);
+        folded.Add(localRoot);
+        RefreshTree(root);
+    }
+
+    void MarkSeen(TreeNode node){
+        string path=(string)node.Tag;
+        if(!IsLocalNode(node)||!newLocalFiles.Contains(path))return;
+        try{
+            markLocalFileSeen(path);
+            newLocalFiles.Remove(path);
+            tree.AccessibleDescription=null;
+            tree.Invalidate();
+        }catch(IOException ex){feedback.Text=ex.Message;}
+         catch(UnauthorizedAccessException ex){feedback.Text=ex.Message;}
+    }
 
     internal static Dictionary<string,string> RouteDraft(IEnumerable<GeneralInstallRoute> routes){
         return routes.ToDictionary(route=>route.Folder,route=>route.Destination,StringComparer.OrdinalIgnoreCase);
@@ -1072,7 +1151,7 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
 
     internal void ShowPreview(GeneralArchivePreview value){
         preview=value;
-        feedback.Text=value==null?T("Lendo a estrutura do pacote…","Reading the archive layout…"):
+        archiveFeedback=value==null?T("Lendo a estrutura do pacote…","Reading the archive layout…"):
             value.NeedsFileSelection?T("Escolha um arquivo no Nexus e cole o link com file_id.","Choose a file on Nexus and paste its link with file_id."):
             value.Paths.Length==0?T("Prévia indisponível. Você ainda pode escolher a raiz.","Preview unavailable. You can still choose the root."):
             value.Origin==GeneralArchivePreviewOrigin.Local?
@@ -1083,15 +1162,28 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
 
     internal void ShowError(string message){
         ShowPreview(null);
-        feedback.Text=message;
+        archiveFeedback=message;
+        if(Selected==null||!IsLocalNode(Selected))feedback.Text=message;
     }
 
     void RebuildTree(){
-        string selected=SelectedPath;
-        root.Nodes.Clear();folded.Clear();nodes.Clear();nodes.Add("",root);
+        var selected=Selected;
+        root.Nodes.Clear();
+        folded.RemoveWhere(node=>!IsLocalNode(node));
+        nodes.Clear();nodes.Add("",root);
         var paths=preview==null||preview.Paths.Length==0?drafts.Keys.AsEnumerable():preview.Paths;
+        BuildBranch(root,nodes,paths);
+        if(selected!=null&&!IsLocalNode(selected)){
+            TreeNode replacement;
+            nodes.TryGetValue((string)selected.Tag,out replacement);
+            selected=replacement;
+        }
+        RefreshTree(selected??root);
+    }
+
+    static void BuildBranch(TreeNode branch,Dictionary<string,TreeNode> nodes,IEnumerable<string> paths){
         foreach(string path in paths.Where(path=>!String.IsNullOrEmpty(path)).OrderBy(path=>path,StringComparer.OrdinalIgnoreCase)){
-            TreeNode parent=root;
+            TreeNode parent=branch;
             string relative="";
             foreach(string part in path.Split('/')){
                 relative=relative.Length==0?part:relative+"/"+part;
@@ -1102,8 +1194,6 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
                 parent=node;
             }
         }
-        TreeNode next;
-        RefreshTree(nodes.TryGetValue(selected,out next)?next:root);
     }
 
     void Toggle(TreeNode node){
@@ -1117,6 +1207,7 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
         tree.BeginUpdate();
         try{
             tree.Items.Clear();
+            if(localRoot.Nodes.Count>0)AddBranch(localRoot);
             AddBranch(root);
             tree.SelectedItem=selected;
             tree.TopIndex=Math.Min(top,tree.SelectedIndex);
@@ -1146,9 +1237,19 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
             }
         }
         if(node.Nodes.Count>0)LucideIcons.Draw(args.Graphics,folded.Contains(node)?"right":"down",new Rectangle(x,y,16,16),GeneralStyle.Muted);
-        TextRenderer.DrawText(args.Graphics,node.Text,tree.Font,
-            new Rectangle(x+23,args.Bounds.Top,Math.Max(0,args.Bounds.Right-x-29),args.Bounds.Height),
-            GeneralStyle.Foreground,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix);
+        var flags=TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix;
+        var label=new Rectangle(x+23,args.Bounds.Top,Math.Max(0,args.Bounds.Right-x-29),args.Bounds.Height);
+        if(IsLocalNode(node)&&newLocalFiles.Contains((string)node.Tag)){
+            string badge=T("Novo","New");
+            var badgeFlags=TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.NoPadding;
+            int width=TextRenderer.MeasureText(args.Graphics,badge,tree.Font,Size.Empty,badgeFlags).Width+4;
+            if(label.Width>width+12){
+                label.Width-=width+8;
+                TextRenderer.DrawText(args.Graphics,badge,tree.Font,
+                    new Rectangle(label.Right+8,label.Y,width,label.Height),GeneralStyle.Accent,badgeFlags);
+            }
+        }
+        TextRenderer.DrawText(args.Graphics,node.Text,tree.Font,label,GeneralStyle.Foreground,flags);
     }
 
     string SuggestedFolder(TreeNode node){
@@ -1194,10 +1295,17 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
     void ShowDestination(){
         var node=Selected;
         if(node==null)return;
+        bool local=IsLocalNode(node),refreshFolder=destination.ReadOnly!=local;
         updating=true;
         try{
+            destination.ReadOnly=local;
+            feedback.Text=local?T("Localização no jogo.","Location in the game."):archiveFeedback;
+            chooseFolder.Enabled=!local;
+            tree.AccessibleDescription=local&&newLocalFiles.Contains(SelectedPath)
+                ?T("Novo arquivo local detectado","New local file detected"):null;
             string text;
-            if(!drafts.TryGetValue(SelectedPath,out text)||String.IsNullOrWhiteSpace(text))text=SuggestedFolder(node);
+            if(local)text=LocalDestination(node);
+            else if(!drafts.TryGetValue(SelectedPath,out text)||String.IsNullOrWhiteSpace(text))text=SuggestedFolder(node);
             if(text.StartsWith("%",StringComparison.Ordinal)){
                 try{text=GeneralInstallRoutes.DirectoryFor(game,text,false);}
                 catch(IOException){}
@@ -1211,11 +1319,12 @@ internal sealed class GeneralArchiveDestinations : TableLayoutPanel {
         catch(NotSupportedException){destination.Text="";}
         finally{updating=false;}
         UpdateButtons();
+        if(refreshFolder)RefreshFolderButton();
     }
 
     void UpdateButtons(){
         string draft;
-        reset.Enabled=drafts.TryGetValue(SelectedPath,out draft)&&!String.IsNullOrWhiteSpace(draft);
+        reset.Enabled=Selected!=null&&!IsLocalNode(Selected)&&drafts.TryGetValue(SelectedPath,out draft)&&!String.IsNullOrWhiteSpace(draft);
         bool dirty;
         try{dirty=!GeneralInstallRoutes.Same(accepted,ReadRoutes(game,drafts));}
         catch(IOException){dirty=true;}

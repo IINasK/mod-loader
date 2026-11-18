@@ -101,8 +101,7 @@ internal sealed partial class GeneralModWindow {
             using(var dialog=new GeneralCategoryDetails(name,description,!create&&category==null,!create&&category!=null)){
                 if(dialog.ShowDialog(this)!=DialogResult.OK)return;
                 if(dialog.DeleteRequested){
-                    if(GeneralDialog.Message(this,T("Excluir a categoria? Os mods vão para Sem categoria; os arquivos instalados serão preservados.","Delete this category? Mods will move to Uncategorized; installed files will stay in place."),T("Excluir categoria","Delete category"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-                    BeginProjectEdit();GeneralModLibrary.DeleteCategory(state.List,category);ResetColumnFilters();FinishProjectEdit();DrawRows();return;
+                    RequestDeleteCategory(category);return;
                 }
                 string renamed=dialog.ResultName;
                 string existing=state.List.Categories.FirstOrDefault(c=>String.Equals(c,renamed,StringComparison.OrdinalIgnoreCase));

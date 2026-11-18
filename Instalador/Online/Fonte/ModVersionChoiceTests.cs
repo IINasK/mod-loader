@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -106,8 +106,8 @@ internal static class ModVersionChoiceTests {
                     if(scale>1f)dialog.Scale(new System.Drawing.SizeF(scale/(scale==1.25f?1f:1.25f),scale/(scale==1.25f?1f:1.25f)));
                     dialog.PerformLayout();
                     foreach(var action in new[]{keep,replace}){
-                        var painted=action.Bounds;
-                        painted.Inflate(action.Margin.Left,action.Margin.Bottom);
+                        var painted=System.Drawing.Rectangle.FromLTRB(action.Left-action.Margin.Left,action.Top-action.Margin.Top,
+                            action.Right+action.Margin.Right,action.Bottom+action.Margin.Bottom);
                         check(action.Parent.ClientRectangle.Contains(painted),"Complete action and margins at scale "+scale+" in "+language+"/"+theme);
                     }
                 }

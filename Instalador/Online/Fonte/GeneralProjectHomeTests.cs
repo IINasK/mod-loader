@@ -9,7 +9,9 @@ using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
     internal static void RunProjectHomeTests(string parent){
-        string root=Path.Combine(parent,"h");Directory.CreateDirectory(root);
+        RunProjectCreationTests(parent);
+        RunProjectCardInteractionTests(parent);
+        string root=Path.GetFullPath(Path.Combine(parent,"h"));Directory.CreateDirectory(root);
         var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
         var catalog=FixedData.Load();
         var expected=new HashSet<string>(GeneralModLibrary.Seed(catalog,new ModImportItem[0]).Mods.Select(mod=>mod.Id),StringComparer.Ordinal);
@@ -18,12 +20,19 @@ internal sealed partial class GeneralModWindow {
         var thread=new System.Threading.Thread(()=>{
             try{
                 var store=new GeneralProjectStore(Path.Combine(root,"p"));
+                string covers=Path.Combine(store.Root,"CoverCache","GameCovers");
+                Directory.CreateDirectory(covers);
+                using(var image=new Bitmap(120,180))using(var graphics=Graphics.FromImage(image)){
+                    graphics.Clear(Color.CadetBlue);image.Save(Path.Combine(covers,"cyberpunk2077.jpg"),System.Drawing.Imaging.ImageFormat.Jpeg);
+                }
                 using(var home=new GeneralProjectHome(catalog,new DownloadCache(Path.Combine(root,"cache")),store.Root,true)){
                     home.ShowInTaskbar=false;home.StartPosition=FormStartPosition.Manual;home.Location=new Point(-30000,-30000);
                     home.Shown+=async(s,e)=>{
                         try{
                             check(home.Controls.Find("NewProject",true).Length==1&&home.Controls.Find("ImportProject",true).Length==1,"Tela inicial oferece criar e importar projeto.");
-                            check(home.Controls.Find("EmptyProjects",true).Length==1&&store.Read().Projects.Count==0,"Primeira abertura mostra biblioteca vazia sem criar o pacote Cyberpunk automaticamente.");
+                            check(home.Controls.Find("NewProjectCard",true).Length==1&&!home.Controls.Find("SavedProjectsHeading",true).Single().Visible&&store.Read().Projects.Count==0,"Primeira abertura oferece o card vazio ao lado do jogo pronto, sem criar projeto automaticamente.");
+                            check(home.Controls.Find("HomeStorage",true).Length==0&&home.Controls.Find("HomeModVersions",true).Length==0,"Cabeçalho fica livre de medidas e versões de mods.");
+                            CaptureHomeGallery(home,Path.Combine(root,"home-empty.png"));
                             var homeMenu=(Button)home.Controls.Find("HomeMenu",true).Single();
                             using(var closeSharing=new Timer{Interval=60}){
                                 bool openedSharing=false;
@@ -42,37 +51,28 @@ internal sealed partial class GeneralModWindow {
                                 check(openedSharing&&store.Read().Projects.Count==0,"Home abre o mesmo compartilhamento para receber antes de existir um projeto.");
                             }
                             var create=(Button)home.Controls.Find("NewProject",true).Single();var import=(Button)home.Controls.Find("ImportProject",true).Single();
-                            check(create.Top==import.Top&&create.Height==import.Height&&create.Right<=import.Left,"Criar e importar ficam lado a lado e alinhados.");
+                            var plus=(GeneralProjectHome.HomeProjectCard)home.Controls.Find("NewProjectCard",true).Single();plus.PerformClick();
+                            check(create.Parent==import.Parent&&create.Parent.Parent==plus&&create.Top<import.Top&&create.Bottom<=import.Top,
+                                "Criar e importar aparecem um abaixo do outro dentro do card vazio.");
                             check(create.Height==44&&import.Height==44,"Ações principais da Home têm a altura compacta de 44px.");
                             check(store.Read().Theme=="light-red"&&GeneralStyle.RedTheme&&!GeneralStyle.Dark,"Nova biblioteca usa tema claro vermelho por padrão.");
-                            var actualOpen=home.OpenRequested;GeneralProject opened=null;int openCalls=0;home.OpenRequested=project=>{opened=project;openCalls++;};
-                            CompleteProjectName("Meu jogo",()=>create.PerformClick());
+                            var actualOpen=home.OpenRequested;GeneralProject opened=null;string openedPreset=null;int openCalls=0;home.OpenRequested=(project,preset)=>{opened=project;openedPreset=preset;openCalls++;};
+                            CompleteProjectCreation("Meu jogo",root,Path.Combine(covers,"cyberpunk2077.jpg"),()=>create.PerformClick());
                             check(opened!=null&&opened.Name=="Meu jogo"&&store.Load(opened).List.Mods.Count==0&&store.Load(opened).List.Categories.Count==0,"Criar pela Home salva e abre projeto vazio sem sugestões de Cyberpunk.");
-                            var blank=opened;check(home.Controls.Find("SavedProjects",true).Length==1&&home.Controls.Find("EmptyProjects",true).Length==0,"Projeto criado passa para a lista de salvos.");
-                            var choices=(ListBox)home.Controls.Find("SavedProjects",true).Single();choices.SelectedIndex=0;opened=null;
-                            typeof(ListBox).GetMethod("OnKeyDown",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(choices,new object[]{new KeyEventArgs(Keys.Enter)});
-                            check(opened!=null&&opened.Id==blank.Id,"Projeto salvo abre pelo teclado sem recriar a lista.");
-                            choices=(ListBox)home.Controls.Find("SavedProjects",true).Single();choices.SelectedIndex=0;
-                            int beforeHover=openCalls;
-                            typeof(ListBox).GetMethod("OnMouseMove",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(choices,new object[]{new MouseEventArgs(MouseButtons.None,0,12,20,0)});
-                            check(home.HoveredSavedProject==0&&openCalls==beforeHover&&choices.SelectedIndex==0,"Hover destaca o projeto salvo sem abrir nem alterar a seleção por teclado.");
-                            foreach(string theme in new[]{"light-red","light","dark"}){
-                                GeneralStyle.UseTheme(theme);
-                                choices.Items.Add(choices.Items[0]);choices.Items.Add(choices.Items[0]);
-                                foreach(int at in new[]{0,1,choices.Items.Count-1})using(var image=new Bitmap(240,56))using(var graphics=Graphics.FromImage(image)){
-                                    var bounds=new Rectangle(0,0,image.Width,image.Height);
-                                    typeof(ListBox).GetMethod("OnMouseLeave",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(choices,new object[]{EventArgs.Empty});
-                                    typeof(ListBox).GetMethod("OnDrawItem",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(choices,new object[]{new DrawItemEventArgs(graphics,choices.Font,bounds,at,DrawItemState.Selected)});
-                                    check(image.GetPixel(3,3).ToArgb()==GeneralStyle.Surface.ToArgb()&&image.GetPixel(235,3).ToArgb()==GeneralStyle.Surface.ToArgb(),"Seleção nativa deixa cantos livres na linha "+at+"/"+theme);
-                                    check(image.GetPixel(120,3).ToArgb()==GeneralStyle.Selection.ToArgb()&&image.GetPixel(120,1).ToArgb()==GeneralStyle.Surface.ToArgb(),"Seleção nativa tem recuo e preenchimento arredondado: "+at+"/"+theme);
-                                    image.Save(Path.Combine(root,"home-selection-"+theme+"-"+at+".png"));
-                                }
-                                choices.Items.RemoveAt(choices.Items.Count-1);choices.Items.RemoveAt(choices.Items.Count-1);
-                            }
-                            GeneralStyle.UseTheme("light-red");
-                            CaptureUi(home,Path.Combine(root,"home-hover.png"));
-                            typeof(ListBox).GetMethod("OnMouseLeave",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(choices,new object[]{EventArgs.Empty});
-                            check(home.HoveredSavedProject==-1,"Sair da lista remove o highlight de hover.");
+                            var blank=opened;
+                            check(File.Exists(store.CoverPath(blank))&&store.Load(blank).Destination==root,"Criar salva a capa local e a pasta escolhida antes de abrir o projeto.");
+                            check(HomeCards(home,"SavedProjects").Length==1&&home.Controls.Find("SavedProjectsHeading",true).Single().Visible,"Projeto criado ganha um cartão em Projetos salvos.");
+                            var blankCard=HomeCards(home,"SavedProjects").Single();opened=null;
+                            blankCard.PerformClick();
+                            check(opened!=null&&opened.Id==blank.Id&&openedPreset==null,"Cartão salvo abre o projeto preservando a seleção interna do preset.");
+                            blankCard=HomeCards(home,"SavedProjects").Single();int beforeHover=openCalls;
+                            typeof(Button).GetMethod("OnMouseEnter",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(blankCard,new object[]{EventArgs.Empty});
+                            check(openCalls==beforeHover,"Hover do cartão não abre o projeto.");
+                            check(blankCard.AccessibleName.Contains("0 mods")&&blankCard.AccessibleName.Contains("0 B"),"Cartão vazio mostra a contagem e o tamanho de zero arquivos.");
+                            var offlineLimit=DateTime.UtcNow.AddSeconds(5);
+                            while(HomeCards(home,"ReadyProjects").Any(card=>!card.HasCover)&&DateTime.UtcNow<offlineLimit)await Task.Delay(30);
+                            check(HomeCards(home,"ReadyProjects").All(card=>card.HasCover),"O cartão único do jogo usa a capa do cache com rede desativada.");
+                            CaptureHomeGallery(home,Path.Combine(root,"home-gallery.png"));
                             ClickReadyWithoutRename(home,check);
                             check(opened!=null&&opened.Id!=blank.Id&&opened.TemplateId=="cyberpunk-2077"&&opened.Name=="Cyberpunk 2077"&&catalogMatches(store.Load(opened).List)&&store.Load(blank).List.Mods.Count==0,"Pacote pronto abre com identidade fixa e preserva os projetos personalizados.");
                             check(store.Load(opened).Destination==null,"Fixture do pacote pronto não descobre nem altera o jogo real.");
@@ -81,16 +81,17 @@ internal sealed partial class GeneralModWindow {
                             string configuredHash=Safe.Hash(Path.Combine(store.DataPath(builtIn),"lista.json"));
                             ClickReadyWithoutRename(home,check);
                             check(opened.Id==builtIn.Id&&store.Read().Projects.Count==2&&configuredHash==Safe.Hash(Path.Combine(store.DataPath(builtIn),"lista.json")),"Reabrir projeto pronto reutiliza estado e preferências sem duplicar ou sobrescrever.");
-                            check(((ListBox)home.Controls.Find("SavedProjects",true).Single()).Items.Count==1,"Projeto padrão não é duplicado na lista de projetos personalizados.");
-                            foreach(string theme in new[]{"light-red","light","dark"})foreach(string language in new[]{"pt","en"}){
+                            check(HomeCards(home,"SavedProjects").Length==1,"Projeto padrão não é duplicado na lista de projetos personalizados.");
+                            foreach(string theme in new[]{"light-red","light","dark","black"})foreach(string language in new[]{"pt","en"}){
                                 store.SavePreferences(theme,language,root);home.Build();home.ClientSize=new Size(900,680);home.PerformLayout();await Task.Delay(40);
-                                var newButton=home.Controls.Find("NewProject",true).Single();var importButton=home.Controls.Find("ImportProject",true).Single();var ready=home.Controls.Find("ReadyCyberpunk",true).Single();var saved=home.Controls.Find("SavedProjects",true).Single();
-                                check(newButton.Height==importButton.Height&&newButton.Width>200&&importButton.Right<=importButton.Parent.ClientSize.Width,"Ações cabem na Home: "+theme+"/"+language);
+                                var newButton=home.Controls.Find("NewProject",true).Single();var importButton=home.Controls.Find("ImportProject",true).Single();var grid=home.Controls.Find("ProjectCards",true).Single();
+                                ((Button)home.Controls.Find("NewProjectCard",true).Single()).PerformClick();
+                                check(newButton.Height==importButton.Height&&newButton.Width>=140&&importButton.Right<=importButton.Parent.ClientSize.Width,"Ações cabem dentro do card: "+theme+"/"+language);
                                 check(HomeInside(newButton,home)&&HomeInside(importButton,home)&&HomeInside(home.Controls.Find("HomeMenu",true).Single(),home),"Ações e menu ficam dentro da janela após reduzir largura: "+theme+"/"+language);
-                                check(ready.PointToScreen(Point.Empty).Y>=saved.PointToScreen(Point.Empty).Y+saved.Height&&ready.Bottom<=ready.Parent.ClientSize.Height,"Projetos prontos ficam abaixo dos salvos sem recorte: "+theme+"/"+language);
+                                check(HomeCards(home,"ReadyProjects").Concat(HomeCards(home,"SavedProjects")).All(card=>card.Parent.Right<=grid.Width&&card.Parent.Bottom<=grid.Height),"Cartões ficam alinhados e dentro da área rolável: "+theme+"/"+language);
                                 check(((GeneralButton)home.Controls.Find("HomeMenu",true).Single()).IconKind=="menu","Home usa o mesmo ícone de menu do editor: "+theme+"/"+language);
                                 check(home.Controls.Find("HomeIntro",true).Single().Text==(language=="pt"?"Criado por Nask e Codex. Se achou ruim, faz você.":"Made by Nask and Codex. If you don't like it, make your own."),"Home usa o crédito combinado nos dois idiomas: "+theme+"/"+language);
-                                CaptureUi(home,Path.Combine(root,"home-"+theme+"-"+language+".png"));
+                                CaptureHomeGallery(home,Path.Combine(root,"home-"+theme+"-"+language+".png"));
                             }
                             store.SavePreferences("light-red","pt",root);home.Build();
                             using(var timer=new Timer{Interval=60}){
@@ -104,40 +105,44 @@ internal sealed partial class GeneralModWindow {
                             var neighbor=store.Create("Vizinho preservado",new GeneralModList(),"light-red","pt");home.Build();
                             string disposableFile=Path.Combine(store.DataPath(disposable),"lista.json"),disposableHash=Safe.Hash(disposableFile);
                             string blankFile=Path.Combine(store.DataPath(blank),"lista.json"),blankHash=Safe.Hash(blankFile);
-                            choices=(ListBox)home.Controls.Find("SavedProjects",true).Single();
-                            int target=choices.Items.Cast<object>().Select(item=>item.ToString()).ToList().IndexOf(disposable.Name);
-                            var trash=GeneralProjectHome.DeleteProjectBounds(choices.GetItemRectangle(target));
-                            check(target==1&&trash.Width==44&&trash.Height==44&&trash.Right==choices.GetItemRectangle(target).Right,"A lixeira reserva alvo de44px na própria linha, inclusive entre vizinhos.");
-                            int beforeClick=openCalls;ClickSavedProject(choices,new Point(12,choices.GetItemRectangle(target).Top+28));
-                            check(openCalls==beforeClick+1&&opened.Id==disposable.Id&&store.Read().Projects.Count==4,"Clicar no nome continua abrindo o projeto, sem excluir.");
-                            choices=(ListBox)home.Controls.Find("SavedProjects",true).Single();target=choices.Items.Cast<object>().Select(item=>item.ToString()).ToList().IndexOf(disposable.Name);
-                            trash=GeneralProjectHome.DeleteProjectBounds(choices.GetItemRectangle(target));var trashPoint=new Point(trash.Left+22,trash.Top+22);
+                            var cards=HomeCards(home,"SavedProjects");
+                            check(cards.Length==3&&cards.All(card=>card.Parent.Top==cards[0].Parent.Top)&&cards.Select(card=>card.Parent.Left).Distinct().Count()==3,"Três cartões diferentes ocupam a mesma linha.");
+                            var savedHeading=home.Controls.Find("SavedProjectsHeading",true).Single();
+                            var readyHeading=home.Controls.Find("ReadyProjectsHeading",true).Single();
+                            var divider=home.Controls.Find("ProjectGalleryDivider",true).Single();
+                            var readyCard=HomeCards(home,"ReadyProjects").Single();
+                            check(savedHeading.Visible&&divider.Visible&&cards.All(card=>card.Parent.Bottom<divider.Top)&&
+                                divider.Bottom<readyHeading.Top&&readyHeading.Bottom<readyCard.Parent.Top,
+                                "Os projetos salvos aparecem antes de uma divisão e do título dos projetos prontos.");
+                            check(cards.Select(card=>card.Project.Id).Distinct().Count()==cards.Length,
+                                "Cada projeto salvo aparece uma única vez na Home.");
+                            var target=cards.Single(card=>card.Project.Id==disposable.Id);
+                            check(target.RemoveButton.Width>=44&&target.RemoveButton.Height>=44&&target.RemoveButton.Width==target.RemoveButton.Height,"Excluir tem alvo de 44 px no próprio cartão: "+target.RemoveButton.Size+" cartão "+target.Size+" contêiner "+target.Parent.Size);
+                            int beforeClick=openCalls;target.PerformClick();
+                            check(openCalls==beforeClick+1&&opened.Id==disposable.Id&&store.Read().Projects.Count==4,"Clicar no cartão abre o projeto sem excluir.");
+                            target=HomeCards(home,"SavedProjects").Single(card=>card.Project.Id==disposable.Id);
                             beforeClick=openCalls;
-                            int prompts=await ConfirmHomeDelete(home,new[]{DialogResult.No},()=>ClickSavedProject(choices,trashPoint),check,root);
-                            check(prompts==1&&store.Read().Projects.Count==4&&Object.ReferenceEquals(choices,home.Controls.Find("SavedProjects",true).Single()),"Cancelar a primeira confirmação não exclui nem reconstrói a Home.");
-                            prompts=await ConfirmHomeDelete(home,new[]{DialogResult.Yes,DialogResult.No},()=>ClickSavedProject(choices,trashPoint),check,root);
+                            int prompts=await ConfirmHomeDelete(home,new[]{DialogResult.No},()=>target.RemoveButton.PerformClick(),check,root);
+                            check(prompts==1&&store.Read().Projects.Count==4&&Object.ReferenceEquals(target,HomeCards(home,"SavedProjects").Single(card=>card.Project.Id==disposable.Id)),"Cancelar a primeira confirmação preserva o cartão e o projeto.");
+                            prompts=await ConfirmHomeDelete(home,new[]{DialogResult.Yes,DialogResult.No},()=>target.RemoveButton.PerformClick(),check,root);
                             check(prompts==2&&store.Read().Projects.Count==4&&File.Exists(disposableFile)&&Safe.Hash(disposableFile)==disposableHash,"Cancelar a segunda confirmação preserva o projeto e seu arquivo.");
-                            choices.SelectedIndex=target;
-                            prompts=await ConfirmHomeDelete(home,new[]{DialogResult.Cancel},()=>typeof(ListBox).GetMethod("OnKeyDown",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(choices,new object[]{new KeyEventArgs(Keys.Delete)}),check,root);
-                            check(prompts==1&&store.Read().Projects.Count==4,"Delete no teclado usa a mesma confirmação e fechar o diálogo cancela.");
-                            ClickSavedProject(choices,new Point(choices.ClientSize.Width-22,choices.GetItemRectangle(choices.Items.Count-1).Bottom+12));
-                            check(store.Read().Projects.Count==4&&openCalls==beforeClick,"Clicar no vazio da lista ou na lixeira não abre projeto.");
-                            prompts=await ConfirmHomeDelete(home,new[]{DialogResult.Yes,DialogResult.Yes},()=>ClickSavedProject(choices,trashPoint),check,root);
+                            prompts=await ConfirmHomeDelete(home,new[]{DialogResult.Cancel},()=>typeof(Button).GetMethod("OnKeyDown",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(target,new object[]{new KeyEventArgs(Keys.Delete)}),check,root);
+                            check(prompts==1&&store.Read().Projects.Count==4&&openCalls==beforeClick,"Delete no teclado usa a mesma confirmação e fechar o diálogo cancela.");
+                            prompts=await ConfirmHomeDelete(home,new[]{DialogResult.Yes,DialogResult.Yes},()=>target.RemoveButton.PerformClick(),check,root);
                             var afterDelete=store.Read();
                             check(prompts==2&&afterDelete.Projects.Count==3&&!afterDelete.Projects.Any(item=>item.Id==disposable.Id),"Somente duas confirmações positivas removem o projeto certo do índice persistido.");
                             check(afterDelete.Projects.Any(item=>item.Id==neighbor.Id)&&afterDelete.Projects.Any(item=>item.Id==blank.Id)&&afterDelete.Projects.Any(item=>item.Id==builtIn.Id),"Excluir um projeto conserva vizinhos e o projeto padrão.");
                             check(File.Exists(disposableFile)&&Safe.Hash(disposableFile)==disposableHash&&Safe.Hash(blankFile)==blankHash,"A exclusão preserva dados, registros e arquivos dos projetos.");
-                            check(openCalls==beforeClick&&((ListBox)home.Controls.Find("SavedProjects",true).Single()).Items.Count==2,"A lixeira atualiza a Home sem abrir o projeto excluído.");
-                            home.Build();check(((ListBox)home.Controls.Find("SavedProjects",true).Single()).Items.Count==2,"O projeto excluído continua ausente depois de reconstruir a tela.");
+                            check(openCalls==beforeClick&&HomeCards(home,"SavedProjects").Length==2,"A lixeira atualiza a Home sem abrir o projeto excluído.");
+                            home.Build();check(HomeCards(home,"SavedProjects").Length==2,"O projeto excluído continua ausente depois de reconstruir a tela.");
                             string removeGame=Path.Combine(root,"online-testes-"+Guid.NewGuid().ToString("N"),"game");Directory.CreateDirectory(removeGame);File.WriteAllText(Safe.In(removeGame,".fixture-only"),"fixture");
                             string removeZip=TestZip(root,"home-remove.zip","mods/home.txt","home payload");
                             var removeProject=store.Create("Projeto descartável",new GeneralModList(),"light-red","pt",removeGame);
                             new GeneralModInstaller(removeGame,Path.Combine(store.DataPath(removeProject),"Instalacoes")).Install(removeZip,"home-owned",null);home.Build();
-                            choices=(ListBox)home.Controls.Find("SavedProjects",true).Single();int removeAt=choices.Items.Cast<object>().Select(item=>item.ToString()).ToList().IndexOf(removeProject.Name);
-                            var removeBounds=GeneralProjectHome.DeleteProjectBounds(choices.GetItemRectangle(removeAt));
-                            prompts=await ConfirmHomeDelete(home,new[]{DialogResult.Yes,DialogResult.No},()=>ClickSavedProject(choices,new Point(removeBounds.Left+22,removeBounds.Top+22)),check,root,true);
+                            var removeCard=HomeCards(home,"SavedProjects").Single(card=>card.Project.Id==removeProject.Id);
+                            prompts=await ConfirmHomeDelete(home,new[]{DialogResult.Yes,DialogResult.No},()=>removeCard.RemoveButton.PerformClick(),check,root,true);
                             check(prompts==2&&File.Exists(Safe.In(removeGame,"mods/home.txt"))&&store.Read().Projects.Any(item=>item.Id==removeProject.Id),"Cancelar a revisão da opção apagar mods não remove arquivo algum.");
-                            prompts=await ConfirmHomeDelete(home,new[]{DialogResult.Yes,DialogResult.Yes},()=>ClickSavedProject(choices,new Point(removeBounds.Left+22,removeBounds.Top+22)),check,root,true);
+                            prompts=await ConfirmHomeDelete(home,new[]{DialogResult.Yes,DialogResult.Yes},()=>removeCard.RemoveButton.PerformClick(),check,root,true);
                             check(prompts==2&&!File.Exists(Safe.In(removeGame,"mods/home.txt"))&&!store.Read().Projects.Any(item=>item.Id==removeProject.Id),"O fluxo real da Home apaga o arquivo e remove o projeto após as duas etapas.");
                             check(File.Exists(removeZip),"A opção apagar mods mantém o download original fora do destino.");
                             store.Delete(neighbor);home.Build();
@@ -145,10 +150,21 @@ internal sealed partial class GeneralModWindow {
                             var remaining=store.Read().Projects.Single();string before=Safe.Hash(Path.Combine(store.DataPath(remaining),"lista.json"));home.OpenRequested=actualOpen;
                             using(var timer=new Timer{Interval=60}){
                                 timer.Tick+=(ss,ee)=>{var window=Application.OpenForms.OfType<GeneralModWindow>().FirstOrDefault();if(window==null)return;timer.Stop();try{check(catalogMatches(window.state.List)&&window.data==store.DataPath(remaining),"Abrir projeto usa a lista e a pasta próprias na janela real.");window.homeButton.PerformClick();}catch(Exception ex){failure=ex;window.Close();}};
-                                timer.Start();home.OpenRequested(remaining);
+                                timer.Start();home.OpenRequested(remaining,null);
                             }
                             if(failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
-                            check(home.Visible&&home.Controls.Find("EmptyProjects",true).Length==1&&before==Safe.Hash(Path.Combine(store.DataPath(remaining),"lista.json")),"Voltar pelo menu do editor restaura a Home e preserva os dados do projeto padrão.");
+                            check(home.Visible&&home.Controls.Find("ProjectGallery",true).Length==1&&before==Safe.Hash(Path.Combine(store.DataPath(remaining),"lista.json")),"Voltar pelo menu do editor restaura a Home e preserva os dados do projeto padrão.");
+                            var readyCards=HomeCards(home,"ReadyProjects");
+                            check(readyCards.Length==1&&readyCards[0].Text=="Cyberpunk 2077"&&readyCards[0].PresetId==null,
+                                "O jogo tem um cartão único com seu nome, mesmo quando possui vários presets.");
+                            string chosen=store.Load(remaining).SelectedPreset;
+                            using(var timer=new Timer{Interval=60}){
+                                timer.Tick+=(ss,ee)=>{var window=Application.OpenForms.OfType<GeneralModWindow>().FirstOrDefault();if(window==null)return;timer.Stop();try{check(window.state.SelectedPreset==chosen,"Abrir a capa preserva o preset escolhido dentro do projeto.");window.homeButton.PerformClick();}catch(Exception ex){failure=ex;window.Close();}};
+                                timer.Start();readyCards.Single().PerformClick();
+                            }
+                            if(failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+                            check(store.Load(remaining).SelectedPreset==chosen,"A navegação preserva o preset selecionado e a identidade única do projeto.");
+                            before=Safe.Hash(Path.Combine(store.DataPath(remaining),"lista.json"));
                             var transfer=home.SharingService(Path.Combine(root,"exit-share"));
                             var send=new P2PSession{Sender=true};
                             transfer.Sessions.Add(send);
@@ -186,7 +202,7 @@ internal sealed partial class GeneralModWindow {
                                     }
                                 };
                                 closeProject.Start();
-                                home.OpenRequested(remaining);
+                                home.OpenRequested(remaining,null);
                                 answerTransfer.Stop();
                                 if(failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
                                 var edited=store.Read().Projects.Single(item=>item.TemplateId==null);
@@ -401,7 +417,17 @@ internal sealed partial class GeneralModWindow {
             "A quarta opção é persistida e reaparece na mesma gaveta.");
     }
 
-    static void ClickSavedProject(ListBox list,Point point){typeof(ListBox).GetMethod("OnMouseClick",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(list,new object[]{new MouseEventArgs(MouseButtons.Left,1,point.X,point.Y,0)});}
+    static void CaptureHomeGallery(GeneralProjectHome home,string path){
+        using(var bitmap=new Bitmap(home.Width,home.Height))
+        using(var output=File.Create(path)){
+            home.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));
+            bitmap.Save(output,System.Drawing.Imaging.ImageFormat.Png);
+        }
+    }
+    static GeneralProjectHome.HomeProjectCard[] HomeCards(GeneralProjectHome home,string grid){
+        return AllControls(home.Controls.Find("ProjectCards",true).Single()).OfType<GeneralProjectHome.HomeProjectCard>()
+            .Where(card=>!card.IsNew&&card.Official==(grid=="ReadyProjects")).ToArray();
+    }
     static async Task<int> ConfirmHomeDelete(GeneralProjectHome home,DialogResult[] responses,Action click,Action<bool,string> check,string root,bool removeMods=false){
         int prompts=0;GeneralDialog previous=null;Exception failure=null;
         using(var timer=new Timer{Interval=50}){
@@ -417,9 +443,22 @@ internal sealed partial class GeneralModWindow {
                     if(answer==DialogResult.Cancel)dialog.Close();else AllControls(dialog).OfType<Button>().Single(button=>button.Name==(dialog is GeneralProjectDeleteChoice?(answer==DialogResult.Yes?"ContinueDelete":"CancelDelete"):(answer==DialogResult.Yes?"ConfirmProjectDelete":"CancelProjectDelete"))).PerformClick();
                 }catch(Exception ex){failure=ex;timer.Stop();dialog.DialogResult=DialogResult.Cancel;}
             };
+            foreach(var card in HomeCards(home,"SavedProjects"))card.SetPointerOver(true);
             timer.Start();click();var limit=DateTime.UtcNow.AddSeconds(20);while(home.DeletingProject&&DateTime.UtcNow<limit)await Task.Delay(25);if(home.DeletingProject)throw new IOException("Exclusão excedeu o tempo do teste.");
         }
         if(failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();return prompts;
+    }
+    static void CompleteProjectCreation(string value,string destination,string cover,Action show){
+        using(var timer=new Timer{Interval=60}){
+            timer.Tick+=(s,e)=>{
+                var dialog=Application.OpenForms.OfType<GeneralProjectCreationDialog>().FirstOrDefault();if(dialog==null)return;
+                timer.Stop();AllControls(dialog).OfType<TextBox>().Single(box=>box.Name=="ProjectNameInput").Text=value;
+                AllControls(dialog).OfType<TextBox>().Single(box=>box.Name=="ProjectDestinationInput").Text=destination;
+                if(cover!=null)dialog.SetCover(cover);
+                ((Button)dialog.AcceptButton).PerformClick();
+            };
+            timer.Start();show();
+        }
     }
     static void CompleteProjectName(string value,Action show){
         using(var timer=new Timer{Interval=60}){timer.Tick+=(s,e)=>{var dialog=Application.OpenForms.OfType<GeneralNameDialog>().FirstOrDefault();if(dialog==null)return;timer.Stop();AllControls(dialog).OfType<TextBox>().Single(box=>box.Name=="NameInput").Text=value;((Button)dialog.AcceptButton).PerformClick();};timer.Start();show();}

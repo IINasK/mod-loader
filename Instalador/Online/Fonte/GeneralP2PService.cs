@@ -20,6 +20,7 @@ internal sealed class P2PSession {
     [System.Web.Script.Serialization.ScriptIgnore] public DateTime NextChoiceScanUtc;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile GeneralModState OfferSource;
     public int? ModsOutsidePack;
+    public string[] ReceivedGeneratedConfigs;
     public List<OwnedChange> SyncCleanup;
     public int SyncLocalExtrasKept, SyncHostFilesDifferent;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PInstallProgress InstallProgress;
@@ -32,6 +33,7 @@ internal sealed class P2PSession {
     public long PreparationBytes,PreparationTotal;
     public string PayloadHash;
     public string[] SelectedMods, SkippedVerificationMods;
+    public P2POutputSelection[] GeneratedConfigSelection;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PVerificationIssue VerificationIssue;
     [System.Web.Script.Serialization.ScriptIgnore] public GeneralModList ReviewedProject;
     [System.Web.Script.Serialization.ScriptIgnore] public int ChoiceNotified;
@@ -76,6 +78,7 @@ internal sealed partial class P2PService : IDisposable {
         if(Interlocked.Exchange(ref session.ChoiceNotified,1)==0)Notify();
     }
     internal string ApplicationData {get{return installedData;}}
+    internal void SaveGeneratedConfigChoice(){Save();}
     internal bool Installing {get{return installedSessions.Any(s=>s.Stage!=null&&!s.Completed&&String.IsNullOrEmpty(s.Error));}}
     internal bool HasActiveTransfers {get{
         return Installing||SnapshotSessions().Any(session=>!session.Completed&&!session.Discarded&&

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,7 +10,7 @@ public static partial class InstalledSnapshot {
     }
 
     internal static List<string> SkipMissingDestinations(InstalledSnapshotManifest manifest,FixedCatalog catalog,string game,Func<string[],bool> approveUserFolders) {
-        if(manifest.Schema!=2)return new List<string>();
+        if(manifest.Schema<2)return new List<string>();
         var unavailable=new HashSet<string>(StringComparer.Ordinal);
         var personal=new Dictionary<string,string[]>(StringComparer.Ordinal);
         foreach(var mod in manifest.List.Mods){

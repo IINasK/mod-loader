@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -176,7 +176,7 @@ public sealed partial class InstalledSnapshotInstaller {
         foreach(var receipt in AllReceipts(inspection,skipUnreadable)){
             if(receipt.Status!="installed")continue;
             var codePaths=new HashSet<string>(receipt.Manifest.Files.Where(file=>file.Kind=="file").Select(file=>file.Path),StringComparer.OrdinalIgnoreCase);
-            var owners=receipt.Manifest.Files.GroupBy(payload=>payload.Path,StringComparer.OrdinalIgnoreCase).ToDictionary(group=>group.Key,group=>group.SelectMany(payload=>payload.Owners).Where(receipt.ActiveOwners.Contains).Distinct().ToList(),StringComparer.OrdinalIgnoreCase);
+            var owners=receipt.Manifest.Files.Where(payload=>!payload.Generated).GroupBy(payload=>payload.Path,StringComparer.OrdinalIgnoreCase).ToDictionary(group=>group.Key,group=>group.SelectMany(payload=>payload.Owners).Where(receipt.ActiveOwners.Contains).Distinct().ToList(),StringComparer.OrdinalIgnoreCase);
             var recipes=receipt.Manifest.List.Mods.ToDictionary(m=>InstalledSnapshot.Owner(m,m.Variants.Single()),m=>m.Variants.Single());
             foreach(var file in receipt.Files.Where(file=>file.Applied&&!file.Reverted)){
                 List<string> keys;if(!owners.TryGetValue(file.Path,out keys)||keys.Count==0)continue;

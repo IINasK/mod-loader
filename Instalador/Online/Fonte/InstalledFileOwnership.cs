@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -32,7 +32,7 @@ internal static class InstalledFileOwnership {
     }
 
     internal static Dictionary<string,string> FindAssociated(string root,IEnumerable<ModFileAnchor> registered,
-        Func<string,string> scope,IEnumerable<string> candidates=null) {
+        Func<string,string> scope,IEnumerable<string> candidates=null,Func<string,string> readHash=null,bool includeAll=false) {
         var anchors=registered.Where(file=>!String.IsNullOrEmpty(file.Owner)&&!GeneralInstallRoutes.External(file.Path)).ToList();
         var known=new HashSet<string>(anchors.Select(file=>file.Path),Paths);
         var scopes=anchors.GroupBy(file=>scope(file.Path),Paths).Where(group=>group.Key!=null)
@@ -41,12 +41,12 @@ internal static class InstalledFileOwnership {
         foreach(var group in scopes) {
             var owners=group.Value.Select(file=>file.Owner).Distinct(StringComparer.Ordinal).ToArray();
             if(owners.Length!=1)continue;
-            if(group.Value.Any(file=>!Companion(file.Path)&&Matches(root,file)))verified.Add(group.Key,owners[0]);
+            if(group.Value.Any(file=>!Companion(file.Path)&&Matches(root,file,readHash)))verified.Add(group.Key,owners[0]);
         }
         if(candidates==null)candidates=Walk(root,verified.Keys);
         var result=new Dictionary<string,string>(Paths);
         foreach(string path in candidates) {
-            if(known.Contains(path)||!Companion(path))continue;
+            if(known.Contains(path)||!includeAll&&!Companion(path))continue;
             var owners=new HashSet<string>(StringComparer.Ordinal);
             bool verifiedScope=false;
             for(int slash=path.LastIndexOf('/');slash>=0;slash=path.LastIndexOf('/',slash-1)) {
@@ -61,11 +61,31 @@ internal static class InstalledFileOwnership {
         return result;
     }
 
-    static bool Matches(string root,ModFileAnchor anchor) {
+    internal static IEnumerable<KeyValuePair<string,string>> FindDeclared(string root,
+        IEnumerable<KeyValuePair<string,string>> declarations,IEnumerable<ModFileAnchor> registered,Func<string,string> readHash){
+        var claims=declarations.Distinct().ToArray();
+        if(claims.Length==0)yield break;
+        var anchors=registered.Where(file=>!GeneralInstallRoutes.External(file.Path)).ToArray();
+        var byOwner=anchors.ToLookup(file=>file.Owner,StringComparer.Ordinal);
+        var known=new HashSet<string>(anchors.Select(file=>file.Path),Paths);
+        foreach(var claim in claims){
+            if(claims.Any(other=>other.Value!=claim.Value&&(Within(other.Key,claim.Key)||Within(claim.Key,other.Key)))||
+                anchors.Any(file=>file.Owner!=claim.Value&&Within(file.Path,claim.Key))||
+                !byOwner[claim.Value].Any(file=>!Companion(file.Path)&&Matches(root,file,readHash)))continue;
+            foreach(string path in Walk(root,new[]{claim.Key}).Where(path=>!known.Contains(path)))
+                yield return new KeyValuePair<string,string>(path,claim.Value);
+        }
+    }
+
+    static bool Within(string path,string folder){
+        return Paths.Equals(path,folder)||path.StartsWith(folder+"/",StringComparison.OrdinalIgnoreCase);
+    }
+
+    static bool Matches(string root,ModFileAnchor anchor,Func<string,string> readHash) {
         if(!FixedData.HashValid(anchor.Hash))return false;
         try {
             string path=Safe.In(root,anchor.Path);Safe.NoLinks(path);
-            return File.Exists(path)&&Safe.Hash(path)==anchor.Hash;
+            return File.Exists(path)&&(readHash??Safe.Hash)(path)==anchor.Hash;
         }catch(IOException){return false;}catch(UnauthorizedAccessException){return false;}
     }
 

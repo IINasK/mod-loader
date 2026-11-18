@@ -172,9 +172,76 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
     static Label Heading(string text){return new Label{Text=text,Dock=DockStyle.Fill,Font=GeneralStyle.Font(11),Margin=Padding.Empty};}
     static GeneralSurface Field(Control control){var field=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(14,9,14,9),Margin=new Padding(0,0,0,Gap)};field.Controls.Add(control);return field;}
     void CopyInvitation(){
-        if(CopyOpenInvitation())return;
-        Run(async()=>{await PrepareLink();CopyOpenInvitation();});
+        Run(async()=>{
+            if(service.OpenInvitation(offer)==null)await PrepareLink();
+            var current=offer;
+            if(current==null||!await ChooseGeneratedConfigFiles(current))return;
+            CopyOpenInvitation();
+        });
     }
+
+    async Task<bool> ChooseGeneratedConfigFiles(P2PSession current){
+        if(current.GeneratedConfigSelection!=null||current.PayloadHash!=null||current.Recipients.Length!=0||
+            service.ApplicationData==null||String.IsNullOrEmpty(current.Destination))return true;
+        var candidates=await Task.Run(()=>{
+            try{
+                var chosen=new HashSet<string>(current.SelectedMods,StringComparer.Ordinal);
+                return new ModOutputIndex(service.ApplicationData,current.Destination).Load().Files
+                    .Where(item=>item.Added&&chosen.Contains(item.Owner)&&ModOutputIndex.CanSend(item.Path)).Take(200)
+                    .Select(item=>{
+                        try{
+                            string json=InstalledSnapshot.ReadGeneratedConfig(current.Destination,item.Path);
+                            return new P2POutputSelection{Owner=item.Owner,Path=item.Path,
+                                Hash=InstalledSnapshot.Hash(System.Text.Encoding.UTF8.GetBytes(json))};
+                        }catch(IOException){return null;}catch(UnauthorizedAccessException){return null;}
+                    }).Where(item=>item!=null).ToArray();
+            }catch(IOException){return new P2POutputSelection[0];}
+             catch(UnauthorizedAccessException){return new P2POutputSelection[0];}
+        });
+        if(IsDisposed||offer!=current)return false;
+        if(candidates.Length==0)return true;
+        var selected=ReviewGeneratedConfigFiles(candidates);
+        if(selected==null)return false;
+        if(current.PayloadHash!=null||current.Recipients.Length!=0)return true;
+        current.GeneratedConfigSelection=selected;
+        service.SaveGeneratedConfigChoice();
+        return true;
+    }
+    P2POutputSelection[] ReviewGeneratedConfigFiles(P2POutputSelection[] candidates){
+        using(var dialog=new GeneralDialog(T("Arquivos gerados pelo mod","Generated mod files")){ClientSize=new Size(790,475)}){
+            var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(20,8,20,20)};
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var warning=new Label{AutoSize=true,MaximumSize=new Size(715,0),Margin=new Padding(0,0,0,10),Text=T(
+                "Estes arquivos surgiram depois da instalação e podem conter ajustes específicos deste computador. Enviá-los pode causar erros no computador de quem recebe.",
+                "These files appeared after installation and may contain computer-specific settings. Sending them may cause errors on the recipient's computer.")};
+            layout.Controls.Add(warning,0,0);
+            var list=new CheckedListBox{Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,
+                CheckOnClick=true,AccessibleName=T("Configurações geradas","Generated settings"),Name="GeneratedConfigChoices"};
+            var names=state.List.Mods.ToDictionary(mod=>mod.Id,mod=>mod.Name,StringComparer.Ordinal);
+            foreach(var item in candidates)list.Items.Add((names.ContainsKey(item.Owner)?names[item.Owner]:item.Owner)+" · "+item.Path);
+            var surface=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(10)};
+            surface.Controls.Add(new GeneralScrollView(list));layout.Controls.Add(surface,0,1);
+            var commands=GeneralTableDialogLayout.Commands();
+            var standard=GeneralStyle.Button(T("Enviar sem arquivos gerados (recomendado)","Send without generated files (recommended)"),
+                ()=>dialog.Complete(DialogResult.No),true);
+            standard.Name="SendWithoutGeneratedConfigs";
+            var include=GeneralStyle.Button(T("Enviar configurações marcadas","Send selected settings"),
+                ()=>dialog.Complete(DialogResult.Yes));
+            include.Name="SendSelectedGeneratedConfigs";
+            include.Enabled=false;
+            list.ItemCheck+=(s,e)=>include.Enabled=list.CheckedItems.Count+(e.NewValue==CheckState.Checked?1:-1)>0;
+            commands.Controls.AddRange(new Control[]{standard,include});
+            layout.Controls.Add(commands,0,2);dialog.Content.Controls.Add(layout);
+            GeneralStyle.Apply(dialog,GeneralStyle.Dark);
+            var response=dialog.ShowDialog(this);
+            if(response==DialogResult.No)return new P2POutputSelection[0];
+            if(response!=DialogResult.Yes)return null;
+            return list.CheckedIndices.Cast<int>().Select(index=>candidates[index]).ToArray();
+        }
+    }
+
     bool CopyOpenInvitation(){
         string code=service.OpenInvitation(offer);
         if(code==null)return false;
@@ -735,6 +802,8 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             else if(message.Length==0&&!session.CompareBeforePack&&!prepared)message=T("Convite antigo. Gere um novo convite para escolher como receber.","Older invitation. Create a new invitation to choose how to receive.");
             else if(message.Length==0&&view.RemotePaused)message=T("Pausado pelo amigo","Paused by friend");
             else if(message.Length==0&&!view.Connected&&view.Recipients.Length==0)message=T("Aguardando conexão","Waiting for connection");
+            var receivedConfigs=session.ReceivedGeneratedConfigs??new string[0];
+            if(receivedConfigs.Length>0)message+=" · "+String.Format(T("{0} configurações geradas no pacote","{0} generated settings in the pack"),receivedConfigs.Length);
             if(detail.Text!=message){
                 detail.Text=message;
                 int linkStart=message.LastIndexOf(differencesLink,StringComparison.Ordinal);
@@ -742,7 +811,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
             }
             detail.ForeColor=session.Error!=null||session.ProjectError!=null||view.Unavailable?GeneralStyle.Danger
                 :ready?(GeneralStyle.Dark?Color.PaleGreen:Color.DarkGreen):GeneralStyle.Foreground;
-            owner.tips.SetToolTip(detail,message);
+            owner.tips.SetToolTip(detail,receivedConfigs.Length==0?message:message+"\n"+String.Join("\n",receivedConfigs.Take(10)));
             var installing=!session.Sender&&session.Stage!=null&&session.Phase=="installing";
             var installProgress=session.InstallProgress;
             var entries=view.Recipients;

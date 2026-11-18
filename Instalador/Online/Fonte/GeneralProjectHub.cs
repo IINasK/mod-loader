@@ -160,6 +160,10 @@ internal sealed partial class GeneralModWindow {
             if(keys==Keys.Enter&&grid.ContainsFocus){ConfirmAlternative();return true;}
             return base.ProcessCmdKey(ref message,keys);
         }
+        if(keys==Keys.F5){
+            RequestProjectVerification();
+            return true;
+        }
         if(keys==(Keys.Control|Keys.V)&&!(ActiveControl is TextBoxBase)&&!(ActiveControl is GeneralPicker)){
             if(Clipboard.ContainsText()){string text=Clipboard.GetText();if(GeneralModDownload.IsWebSource(text.Trim())){ImportWebSources(text);return true;}}
         }

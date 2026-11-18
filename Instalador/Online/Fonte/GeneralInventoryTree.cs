@@ -181,6 +181,8 @@ internal sealed class GeneralInventoryTree : GeneralDialog {
         else if(file.RecordedFile)origin.Text=(file.RecordedChange?T("Alterado desde o registro","Changed since recording"):
             T("Registrado pelo Mod Loader","Recorded by Mod Loader"))+" · "+file.Mod;
         else if(Proof(file))origin.Text=T("Origem confirmada","Verified origin")+" · "+file.Mod;
+        else if(file.GeneratedOutput)origin.Text=T("Detectado depois da instalação","Detected after installation")+" · "+file.Mod;
+        else if(file.PreexistingOutput)origin.Text=T("Já presente na instalação","Already present at installation")+" · "+file.Mod;
         else origin.Text=GeneratedFileProvenance.Describe(file);
     }
 

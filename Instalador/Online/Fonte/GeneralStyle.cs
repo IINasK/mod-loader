@@ -183,6 +183,7 @@ internal sealed class GeneralSurface : Panel {
 
 internal sealed class GeneralButton : Button {
     internal bool Primary,Destructive,Bare;
+    internal bool CompositeParentSurface;
     internal string IconKind;
     internal Color? BareInk;
     Timer activityTimer,contextTimer,hoverTimer;
@@ -336,7 +337,14 @@ internal sealed class GeneralButton : Button {
         // ButtonBase can leave stale themed pixels outside the rounded face.
         Control surface=Parent;while(surface!=null&&surface.BackColor.A<255)surface=surface.Parent;
         Color background=surface==null?GeneralStyle.Background:surface.BackColor;
-        g.Clear(background);
+        if(CompositeParentSurface&&Parent!=null){
+            var saved=g.Save();
+            try{
+                g.TranslateTransform(-Left,-Top);
+                var args=new PaintEventArgs(g,new Rectangle(Left,Top,Width,Height));
+                InvokePaintBackground(Parent,args);InvokePaint(Parent,args);
+            }finally{g.Restore(saved);}
+        }else g.Clear(background);
         Color fill=Primary?(Destructive?GeneralStyle.DangerFill:GeneralStyle.Primary):GeneralStyle.Surface;
         Color ink=Primary?Color.White:Destructive?GeneralStyle.Danger:GeneralStyle.Foreground;
         string caption=Text;

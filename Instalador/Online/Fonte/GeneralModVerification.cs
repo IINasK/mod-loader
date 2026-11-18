@@ -99,11 +99,15 @@ internal sealed partial class GeneralModWindow {
             dialog.ShowDialog(this);
     }
 
+    bool verifyingProject;
+
     async Task VerifyProject() {
-        if(projectDraft!=null&&!ConfirmProjectNavigation())return;
-        if(working||scanning)return;
-        if(String.IsNullOrWhiteSpace(state.Destination)||!Directory.Exists(state.Destination))return;
+        if(working||scanning||verifyingProject||associationChoice!=null||exitApproved)return;
+        verifyingProject=true;
         try {
+            UpdateVerificationAction();
+            if(projectDraft!=null&&!ConfirmProjectNavigation())return;
+            if(String.IsNullOrWhiteSpace(state.Destination)||!Directory.Exists(state.Destination))return;
             var audit=new ProjectVerification(!testMode);
             await Scan(audit);
             if(IsDisposed||audit.Reads==null)return;
@@ -163,6 +167,10 @@ internal sealed partial class GeneralModWindow {
                 ConfirmAndEnqueue(pending,root,downloads,false);
             }
         }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
+        finally{
+            verifyingProject=false;
+            if(!IsDisposed)UpdateVerificationAction();
+        }
     }
 
     bool CanReviewReplacement(Work work){
@@ -203,7 +211,9 @@ internal sealed partial class GeneralModWindow {
             add(file,lookup);
             record(file,file.OwnerKeys.SelectMany(receiptName));
         }
-        var exact=new HashSet<string>(state.List.Mods.SelectMany(mod=>mod.DetectedPaths),StringComparer.OrdinalIgnoreCase);
+        var detectedOwners=state.List.Mods.SelectMany(mod=>mod.DetectedPaths.Select(path=>new{Path=path,mod.Id}))
+            .ToLookup(file=>file.Path,file=>file.Id,InventoryPaths);
+        var exact=new HashSet<string>(detectedOwners.Select(group=>group.Key),InventoryPaths);
         var extras=new List<P2PSyncDifference>();
         var registeredNames=new Dictionary<string,string>(names,StringComparer.Ordinal);
         if(cyberpunk){
@@ -234,7 +244,21 @@ internal sealed partial class GeneralModWindow {
                     VariantId=installed.Id,VerifiedBytes=files.Sum(file=>file.Size)});
             }
             exact.UnionWith(registered.Where(file=>names.ContainsKey(file.Owner)).Select(file=>file.Path));
-            extras.AddRange(engine.ReadUnlistedModFiles(exact,data,reads==null?null:(Func<string,string>)reads.Hash,true));
+            foreach(var file in engine.ReadUnlistedModFiles(exact.Where(path=>!detectedOwners.Contains(path)),data,
+                reads==null?null:(Func<string,string>)reads.Hash,true)){
+                if(file.ProvenOwner!=null){
+                    string owner=file.ProvenOwner;
+                    var candidates=fixedOwners[owner].Concat(imports[owner].SelectMany(lookup)).Concat(detectedOwners[file.Path])
+                        .Concat(names.ContainsKey(owner)?new[]{owner}:Enumerable.Empty<string>())
+                        .Distinct(StringComparer.Ordinal).Take(2).ToArray();
+                    if(candidates.Length==1){
+                        file.Kind="associated";
+                        file.ModId=candidates[0];
+                        file.Mod=names[file.ModId];
+                    }
+                }
+                if(!exact.Contains(file.Path)||file.Kind=="associated"||file.Kind=="found"&&detectedOwners.Contains(file.Path))extras.Add(file);
+            }
             foreach(var owner in engine.OwnershipNames())
                 if(!registeredNames.ContainsKey(owner.Key))registeredNames.Add(owner.Key,owner.Value);
         }
@@ -242,9 +266,19 @@ internal sealed partial class GeneralModWindow {
             add(file,key=>lookup(WorkKeyFromReceipt(key)));
             record(file,file.OwnerKeys.SelectMany(receiptName));
         }
-        Func<string,string> scope=cyberpunk?(Func<string,string>)FixedInstaller.ModFolder:InstalledFileOwnership.GenericScope;
+        var portable=Snapshot(destination).ReadOutputScopes()
+            .Where(item=>item.Anchor.StartsWith(item.Path+"/",StringComparison.OrdinalIgnoreCase))
+            .GroupBy(item=>item.Anchor,InventoryPaths)
+            .Where(group=>group.Select(item=>item.Path).Distinct(InventoryPaths).Count()==1)
+            .ToDictionary(group=>group.Key,group=>group.First().Path,InventoryPaths);
+        Func<string,string> scope=path=>{
+            string folder;
+            return portable.TryGetValue(path,out folder)?folder:
+                cyberpunk?FixedInstaller.ModFolder(path):InstalledFileOwnership.GenericScope(path);
+        };
         var associated=InstalledFileOwnership.FindAssociated(destination,registered,scope,
-            cyberpunk?extras.Where(file=>file.Kind=="found").Select(file=>file.Path):null);
+            cyberpunk?extras.Where(file=>file.Kind=="found").Select(file=>file.Path):null,
+            reads==null?null:(Func<string,string>)reads.Hash,includeAll:!cyberpunk);
         var labels=zipLabels??new Dictionary<string,InventoryZipLabel>(InventoryPaths);
         Func<string,string> readHash=reads==null?(Func<string,string>)Safe.Hash:reads.Hash;
         var ambiguous=cyberpunk&&reads!=null?InventoryLinkStore.DiscoverZips(destination,
@@ -261,8 +295,15 @@ internal sealed partial class GeneralModWindow {
                 file.Mod=label.Name;
                 file.VerifiedZip=label.Archive;
                 file.InventoryGroupId="zip:"+label.Name;
+                var owners=detectedOwners[file.Path].Take(2).ToArray();
+                if(owners.Length==1){
+                    file.Kind="associated";
+                    file.ModId=owners[0];
+                    file.Mod=names[file.ModId];
+                }
             }catch(IOException){}catch(UnauthorizedAccessException){}
         }
+        extras.RemoveAll(file=>file.Kind=="found"&&detectedOwners.Contains(file.Path));
         var observedScopes=cyberpunk
             ? GroupModFolders(destination,extras,registered,registeredNames,names,exact,labels,readHash,ambiguous)
             : new HashSet<string>(InventoryPaths);
@@ -272,6 +313,13 @@ internal sealed partial class GeneralModWindow {
         foreach(var pair in associated.Where(item=>names.ContainsKey(item.Value)&&!labels.ContainsKey(item.Key)&&!ambiguous.Contains(item.Key)&&
             !observedScopes.Contains(scope(item.Key))))
             extras.Add(new P2PSyncDifference{Kind="associated",Mod=names[pair.Value],ModId=pair.Value,Path=pair.Key,LocalInModFolder=true});
+        var declarations=state.List.Mods.SelectMany(mod=>(Selected(mod).OutputFolders??new List<string>())
+            .Select(folder=>new KeyValuePair<string,string>(folder,mod.Id)));
+        var declaredOutputs=InstalledFileOwnership.FindDeclared(destination,declarations,registered,readHash)
+            .GroupBy(pair=>pair.Key,InventoryPaths).ToDictionary(group=>group.Key,group=>group.First().Value,InventoryPaths);
+        AssociateDeclaredOutputs(extras,declaredOutputs,names);
+        var associatedPaths=new HashSet<string>(extras.Where(file=>file.Kind=="associated").Select(file=>file.Path),InventoryPaths);
+        extras.RemoveAll(file=>file.Kind=="inventory-local"&&associatedPaths.Contains(file.Path));
         var recordedFiles=RecordedInventory(destination,recorded,readHash).ToArray();
         extras.AddRange(recordedFiles);
         if(!cyberpunk){
@@ -281,7 +329,24 @@ internal sealed partial class GeneralModWindow {
             foreach(string path in InstalledFileOwnership.Walk(destination,folders).Where(known.Add))
                 extras.Add(new P2PSyncDifference{Kind="inventory-local",Path=path});
         }
+        foreach(var file in extras.Where(item=>item.Kind=="inventory-local"||
+            item.Kind=="found"&&item.LocalInModFolder))
+            file.Kind="unlinked";
         return extras;
+    }
+
+    static void AssociateDeclaredOutputs(List<P2PSyncDifference> inventory,Dictionary<string,string> outputs,
+        Dictionary<string,string> names){
+        var identified=new HashSet<string>(inventory.Where(file=>file.Path!=null&&
+            (file.ProvenOwner!=null||file.VerifiedZip!=null)).Select(file=>file.Path),InventoryPaths);
+        foreach(var file in inventory.Where(file=>file.Path!=null&&file.Kind=="associated")){
+            string declaredOwner;
+            if(outputs.TryGetValue(file.Path,out declaredOwner)&&declaredOwner!=file.ModId)identified.Add(file.Path);
+        }
+        foreach(string path in identified)outputs.Remove(path);
+        inventory.RemoveAll(file=>file.Path!=null&&outputs.ContainsKey(file.Path));
+        inventory.AddRange(outputs.Select(item=>new P2PSyncDifference{Kind="associated",Mod=names[item.Value],
+            ModId=item.Value,Path=item.Key,LocalInModFolder=true}));
     }
 
     static IEnumerable<P2PSyncDifference> RecordedInventory(string root,IEnumerable<ModFileAnchor> records,
@@ -306,11 +371,12 @@ internal sealed partial class GeneralModWindow {
     static HashSet<string> GroupModFolders(string root,List<P2PSyncDifference> inventory,IEnumerable<ModFileAnchor> registered,
         Dictionary<string,string> names,Dictionary<string,string> projectNames,HashSet<string> listed,
         Dictionary<string,InventoryZipLabel> labels,Func<string,string> readHash,HashSet<string> ambiguous) {
-        var files=inventory.Where(file=>file.Kind=="found").ToDictionary(file=>file.Path,InventoryPaths);
+        var files=inventory.Where(file=>file.Kind=="found"||file.ProvenOwner!=null||file.VerifiedZip!=null).ToDictionary(file=>file.Path,InventoryPaths);
         var confirmed=new Dictionary<string,string>(InventoryPaths);
         foreach(string path in ambiguous)confirmed[path]=String.Empty;
         foreach(var file in files.Values){
-            string owner=file.VerifiedZip!=null?file.InventoryGroupId:file.ProvenOwner;
+            string owner=file.ModId??(file.VerifiedZip!=null?file.InventoryGroupId:file.ProvenOwner);
+            if(file.Kind=="found"&&owner!=null&&projectNames.ContainsKey(owner))owner=String.Empty;
             if(owner!=null){
                 confirmed[file.Path]=owner;
                 if(!names.ContainsKey(owner))names[owner]=file.Mod;
@@ -340,7 +406,7 @@ internal sealed partial class GeneralModWindow {
             }
         }
         var byFolder=files.Values.ToLookup(file=>FixedInstaller.ModFolder(file.Path),InventoryPaths);
-        var knownZipOwners=labels.Where(pair=>FixedInstaller.ModFolder(pair.Key)!=null)
+        var knownZipOwners=labels.Where(pair=>FixedInstaller.ModFolder(pair.Key)!=null&&!confirmed.ContainsKey(pair.Key))
             .ToLookup(pair=>FixedInstaller.ModFolder(pair.Key),pair=>"zip:"+pair.Value.Name,InventoryPaths);
         foreach(var group in scopes){
             var owners=group.Select(pair=>pair.Value).Distinct(StringComparer.Ordinal).ToArray();

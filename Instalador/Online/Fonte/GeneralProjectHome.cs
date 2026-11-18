@@ -1,5 +1,7 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Threading;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -11,30 +13,31 @@ internal sealed partial class GeneralProjectHome : Form {
     readonly DownloadCache cache;
     readonly GeneralProjectStore store;
     readonly bool fixture;
+    readonly GeneralGameCoverCache coverCache;
     readonly Dictionary<string,P2PService> sharing=new Dictionary<string,P2PService>(StringComparer.OrdinalIgnoreCase);
     readonly GeneralMenuHost menus=new GeneralMenuHost();
     GeneralModWindow sharingWindow;
     GeneralP2PDialog sharingDialog;
     bool exitApproved,waitingForInstallation;
     string ReceiveData {get{return Path.Combine(store.Root,"P2P-Inbox");}}
-    ListBox saved;
+    CancellationTokenSource coverRequests;
     LinkLabel update;
-    GeneralStorageLabel storageSize;
     GeneralUpdateRelease available=null;
-    int buildVersion,hoverSaved=-1;
+    int buildVersion;
     internal bool DeletingProject {get;private set;}
     readonly ToolTip savedTips=new ToolTip{UseAnimation=false,UseFading=false};
-    internal int HoveredSavedProject {get{return hoverSaved;}}
-    internal Action<GeneralProject> OpenRequested;
+
+    internal Action<GeneralProject,string> OpenRequested;
     internal GeneralProjectHome(FixedCatalog catalog,DownloadCache cache,string root,bool fixture=false){
         this.catalog=catalog;this.cache=cache;this.fixture=fixture;store=new GeneralProjectStore(root);OpenRequested=OpenProject;
+        string coverRoot=fixture?Path.Combine(store.Root,"CoverCache"):GeneralAppPaths.Current().Cache;
+        coverCache=new GeneralGameCoverCache(coverRoot,allowNetwork:!fixture);
         Text=GeneralAppPaths.WindowTitle;Icon=ModLoaderBrand.AppIcon;ClientSize=new Size(1020,740);MinimumSize=new Size(900,680);
         StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;Build();Disposed+=(s,e)=>{
-            savedTips.Dispose();menus.Dispose();
+            StopCoverRequests();savedTips.Dispose();menus.Dispose();
             foreach(var service in sharing.Values)try{service.Dispose();}catch(Exception){}
         };
         FormClosing+=CloseHome;
-        Shown+=(s,e)=>RefreshStorageSize();
         if(!fixture)Shown+=async(s,e)=>await RestoreSharing();
         if(!fixture)Shown+=async(s,e)=>await CheckHomeModVersions();
 #if !VELOPACK
@@ -44,50 +47,316 @@ internal sealed partial class GeneralProjectHome : Form {
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
     internal void Build(){
         var index=store.Read();GeneralStyle.UseTheme(index.Theme);GeneralStyle.Language=index.Language;
-        menus.Close();buildVersion++;hoverSaved=-1;saved=null;
+        menus.Close();buildVersion++;StopCoverRequests();coverRequests=new CancellationTokenSource();
         SuspendLayout();while(Controls.Count>0){var old=Controls[0];Controls.Remove(old);old.Dispose();}
         Font=GeneralStyle.Font(12);BackColor=GeneralStyle.Background;ForeColor=GeneralStyle.Foreground;
-        var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=8,Padding=new Padding(32,28,32,24)};
+        var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Padding=new Padding(32,28,32,24)};
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-        for(int i=0;i<8;i++)layout.RowStyles.Add(i==4?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.AutoSize));Controls.Add(layout);
+        for(int i=0;i<4;i++)layout.RowStyles.Add(i==2?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.AutoSize));Controls.Add(layout);
         var header=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=Padding.Empty};
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         var brand=new FlowLayoutPanel{AutoSize=true,WrapContents=false,Margin=Padding.Empty};brand.Controls.Add(new ModLoaderLogo{Size=new Size(44,44),Margin=new Padding(0,0,12,0)});
         var brandTitle=new Label{Text="MOD LOADER",AutoSize=true,Font=GeneralStyle.Font(27,true),ForeColor=GeneralStyle.Accent,Margin=Padding.Empty};brand.Controls.Add(brandTitle);header.Controls.Add(brand,0,0);
         var menu=(GeneralButton)GeneralStyle.Button("",ToggleHomeMenu);menu.Name="HomeMenu";menu.Bare=true;menu.IconKind="menu";menu.AccessibleName=T("Menu","Menu");menu.Size=new Size(44,44);menu.AutoSize=false;menu.MinimumSize=new Size(44,44);menu.Dock=DockStyle.Fill;menu.Margin=Padding.Empty;header.Controls.Add(menu,1,0);layout.Controls.Add(header,0,0);
         var intro=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.TopDown,WrapContents=false,Margin=Padding.Empty};
-        AddHomeModVersionNotice(intro);
         intro.Controls.Add(new Label{Name="HomeIntro",Text=T("Criado por Nask e Codex. Se achou ruim, faz você.","Made by Nask and Codex. If you don't like it, make your own."),AutoSize=true,ForeColor=GeneralStyle.Muted,Margin=new Padding(0,10,0,4)});
-        storageSize=new GeneralStorageLabel(cache){Name="HomeStorage",Text=T("Calculando espaço…","Calculating size…"),AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(0,0,0,18),MaximumSize=new Size(Math.Max(200,ClientSize.Width-68),0)};intro.Controls.Add(storageSize);layout.Controls.Add(intro,0,1);
-        var actions=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=new Padding(0,0,0,22)};actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
-        var create=GeneralStyle.Button(T("Criar novo projeto","Create new project"),()=>Guard(()=>OpenRequested(CreateProject(false))),true);create.Name="NewProject";create.Dock=DockStyle.Fill;create.AutoSize=false;create.MinimumSize=new Size(140,44);create.MaximumSize=new Size(0,44);create.Height=44;create.Margin=new Padding(0,0,8,0);actions.Controls.Add(create,0,0);
-        var import=GeneralStyle.Button(T("Importar projeto","Import project"),()=>Guard(()=>OpenRequested(ImportProject())));import.Name="ImportProject";import.Dock=DockStyle.Fill;import.AutoSize=false;import.MinimumSize=new Size(140,44);import.MaximumSize=new Size(0,44);import.Height=44;import.Margin=new Padding(8,0,0,0);actions.Controls.Add(import,1,0);layout.Controls.Add(actions,0,2);
-        layout.Controls.Add(Heading(T("Projetos salvos","Saved projects")),0,3);
-        var surface=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(10),Margin=new Padding(0,0,0,18)};
-        var custom=index.Projects.Where(item=>item.TemplateId==null).ToArray();
-        if(custom.Length==0)surface.Controls.Add(new Label{Name="EmptyProjects",Text=T("Seus projetos salvos aparecerão aqui.","Your saved projects will appear here."),Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleCenter,ForeColor=GeneralStyle.Muted});
-        else{
-            saved=new ListBox{Name="SavedProjects",Dock=DockStyle.Fill,BorderStyle=BorderStyle.None,IntegralHeight=false,DrawMode=DrawMode.OwnerDrawFixed,ItemHeight=56,AccessibleName=T("Projetos salvos","Saved projects")};
-            foreach(var project in custom.Reverse())saved.Items.Add(new Choice(project));
-            saved.DrawItem+=(s,e)=>{if(e.Index<0)return;bool selected=hoverSaved>=0?e.Index==hoverSaved:(e.State&DrawItemState.Selected)!=0;GeneralStyle.PaintChoice(e.Graphics,e.Bounds,selected);using(var font=GeneralStyle.Font(13,true))TextRenderer.DrawText(e.Graphics,((ListBox)s).Items[e.Index].ToString(),font,new Rectangle(e.Bounds.X+12,e.Bounds.Y,e.Bounds.Width-68,e.Bounds.Height),GeneralStyle.Foreground,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);var trash=DeleteProjectBounds(e.Bounds);LucideIcons.Draw(e.Graphics,"trash",new Rectangle(trash.X+12,trash.Y+12,20,20),GeneralStyle.Danger);};
-            saved.AccessibleDescription=T("Enter abre o projeto selecionado. Delete exclui com duas confirmações.","Enter opens the selected project. Delete removes it after two confirmations.");
-            saved.MouseMove+=(s,e)=>{var list=(ListBox)s;int at=list.IndexFromPoint(e.Location);if(at!=hoverSaved){hoverSaved=at;list.Invalidate();}string hint=at>=0&&DeleteProjectBounds(list.GetItemRectangle(at)).Contains(e.Location)?T("Excluir projeto","Delete project"):"";if(savedTips.GetToolTip(list)!=hint)savedTips.SetToolTip(list,hint);};
-            saved.MouseLeave+=(s,e)=>{hoverSaved=-1;savedTips.SetToolTip((Control)s,"");((ListBox)s).Invalidate();};
-            saved.MouseClick+=(s,e)=>{var list=(ListBox)s;int at=list.IndexFromPoint(e.Location);if(e.Button!=MouseButtons.Left||at<0)return;var item=((Choice)list.Items[at]).Project;if(DeleteProjectBounds(list.GetItemRectangle(at)).Contains(e.Location))DeleteSavedProject(item);else Guard(()=>OpenRequested(item));};
-            saved.KeyDown+=(s,e)=>{var list=(ListBox)s;if(list.SelectedItem==null)return;if(e.KeyCode==Keys.Enter){e.SuppressKeyPress=true;Guard(()=>OpenRequested(((Choice)list.SelectedItem).Project));}else if(e.KeyCode==Keys.Delete){e.SuppressKeyPress=true;DeleteSavedProject(((Choice)list.SelectedItem).Project);}};
-            surface.Controls.Add(new GeneralScrollView(saved));
+        intro.Margin=new Padding(0,0,0,22);layout.Controls.Add(intro,0,1);
+        layout.Controls.Add(BuildProjectGallery(index),0,2);
+        update=new LinkLabel{Name="HomeUpdate",AutoSize=true,LinkColor=GeneralStyle.Accent,ActiveLinkColor=GeneralStyle.Foreground,Margin=Padding.Empty};update.LinkClicked+=(s,e)=>{if(available!=null)Guard(()=>GeneralModDownload.OpenSource(available.Page));};layout.Controls.Add(update,0,3);UpdateNotice();
+        GeneralStyle.Apply(this,GeneralStyle.Dark);
+        foreach(Control choices in Controls.Find("NewProjectChoices",true))choices.BackColor=Color.Transparent;
+        brandTitle.ForeColor=GeneralStyle.Accent;ResumeLayout(true);GeneralNativeTheme.ApplyTree(this);
+    }
+    Control BuildProjectGallery(GeneralProjectIndex index){
+        var gallery=new Panel{Name="ProjectGallery"};
+        var heading=Heading(T("Projetos salvos","Saved projects"));heading.Name="SavedProjectsHeading";
+        var readyHeading=Heading(T("Projetos prontos","Ready projects"));readyHeading.Name="ReadyProjectsHeading";
+        var divider=new Panel{Name="ProjectGalleryDivider",Height=1,BackColor=GeneralStyle.Line};
+        var grid=new Panel{Name="ProjectCards"};
+        grid.Controls.AddRange(new Control[]{readyHeading,divider});
+        var cards=new List<HomeProjectCard>();
+        foreach(var project in index.Projects.Where(item=>item.TemplateId==null).Reverse())
+            AddProjectCards(grid,cards,project,ReadCardState(project),false);
+        bool hasSaved=cards.Count!=0;
+        if(hasSaved)AddNewProjectCard(grid,cards,false);
+        var official=index.Projects.FirstOrDefault(item=>item.TemplateId==GeneralProjectStore.CyberpunkTemplate);
+        var officialState=official==null?new GeneralModState{List=GeneralModLibrary.Seed(catalog,new ModImportItem[0]),Language=index.Language}:ReadCardState(official);
+        AddProjectCards(grid,cards,official,officialState,true);
+        if(!hasSaved)AddNewProjectCard(grid,cards,true);
+
+        heading.Visible=hasSaved;
+        gallery.Controls.AddRange(new Control[]{heading,grid});
+        var scroll=new GeneralScrollView(gallery,panelContent:true,reserveBarSpace:true,fitPanelContent:true){Name="ProjectGalleryScroll"};
+        Action reflow=()=>{
+            gallery.SuspendLayout();
+            try{
+                heading.Location=new Point(0,2);
+                PlaceGalleryCards(gallery,grid,cards,hasSaved?heading.Bottom+8:0,scroll.ClientSize.Height);
+            }finally{gallery.ResumeLayout(false);}
+        };
+        gallery.SizeChanged+=(s,e)=>reflow();
+        gallery.DpiChangedAfterParent+=(s,e)=>reflow();
+        scroll.SizeChanged+=(s,e)=>reflow();
+        foreach(var card in cards){
+            card.Enter+=(s,e)=>ShowFocusedCard(scroll,card);
+            card.MouseWheel+=(s,e)=>{if(scroll.RouteWheel(e.Delta)&&e is HandledMouseEventArgs)((HandledMouseEventArgs)e).Handled=true;};
+            if(card.RemoveButton!=null){
+                card.RemoveButton.Enter+=(s,e)=>ShowFocusedCard(scroll,card);
+                card.RemoveButton.MouseWheel+=(s,e)=>{if(scroll.RouteWheel(e.Delta)&&e is HandledMouseEventArgs)((HandledMouseEventArgs)e).Handled=true;};
+            }
         }
-        layout.Controls.Add(surface,0,4);layout.Controls.Add(Heading(T("Projetos prontos","Ready-made projects")),0,5);
-        var ready=GeneralStyle.Button("Cyberpunk 2077  ·  "+T("Pacote pronto","Ready-made pack"),()=>Guard(()=>OpenRequested(CreateProject(true))));ready.Name="ReadyCyberpunk";ready.Dock=DockStyle.Fill;ready.MinimumSize=new Size(200,56);ready.Margin=new Padding(0,0,0,14);layout.Controls.Add(ready,0,6);
-        update=new LinkLabel{Name="HomeUpdate",AutoSize=true,LinkColor=GeneralStyle.Accent,ActiveLinkColor=GeneralStyle.Foreground,Margin=Padding.Empty};update.LinkClicked+=(s,e)=>{if(available!=null)Guard(()=>GeneralModDownload.OpenSource(available.Page));};layout.Controls.Add(update,0,7);UpdateNotice();
-        GeneralStyle.Apply(this,GeneralStyle.Dark);brandTitle.ForeColor=GeneralStyle.Accent;ResumeLayout(true);GeneralNativeTheme.ApplyTree(this);if(IsHandleCreated)RefreshStorageSize();
+        var token=coverRequests.Token;
+        gallery.HandleCreated+=(s,e)=>LoadCoverImages(cards.ToArray(),token);
+        return scroll;
     }
-    async void RefreshStorageSize(){
-        int version=buildVersion;var label=storageSize;
-        try{var size=await Task.Run(()=>GeneralProjectStorage.Measure(store,catalog,cache));if(!IsDisposed&&version==buildVersion&&!label.IsDisposed)label.SetSize(size,true);}
-        catch(Exception){if(!IsDisposed&&version==buildVersion&&!label.IsDisposed)label.SetSize(null,true);}
+
+    void AddNewProjectCard(Panel grid,List<HomeProjectCard> cards,bool official){
+        var card=new HomeProjectCard(null,null,T("Novo projeto","New project"),null,null,null,official,true){Name="NewProjectCard"};
+        card.ConfigureNewProjectActions(
+            ()=>Guard(()=>{var project=CreateProject(false);if(project!=null)OpenRequested(project,null);}),
+            ()=>Guard(()=>{var project=ImportProject();if(project!=null)OpenRequested(project,null);}));
+        var slot=new Panel{TabIndex=cards.Count};
+        slot.Controls.Add(card);grid.Controls.Add(slot);cards.Add(card);
+        card.Click+=(s,e)=>card.ToggleChoices();
     }
-    internal static Rectangle DeleteProjectBounds(Rectangle row){return new Rectangle(row.Right-44,row.Y+(row.Height-44)/2,44,44);}
+
+    GeneralModState ReadCardState(GeneralProject project){
+        try { return store.Load(project,true); }
+        catch(IOException) { return null; }
+        catch(UnauthorizedAccessException) { return null; }
+    }
+
+    void AddProjectCards(Panel grid,List<HomeProjectCard> cards,GeneralProject project,GeneralModState state,bool official){
+        string projectName=project==null?"Cyberpunk 2077":project.Name;
+        string domain=GeneralGameCoverCache.Identify(project??new GeneralProject{TemplateId=GeneralProjectStore.CyberpunkTemplate},state);
+        var card=new HomeProjectCard(project,null,projectName,null,ProjectCardDetails(state),domain,official);
+        using(var local=ProjectCoverImage.ReadLocal(store.CoverPath(project)))if(local!=null)card.SetCover((Image)local.Clone());
+        card.Name=official?"ReadyCyberpunk":"SavedProjectCard";
+        card.Click+=(s,e)=>Guard(()=>OpenRequested(project??CreateProject(true),null));
+        cards.Add(card);
+        var slot=new Panel{TabIndex=cards.Count-1};
+        card.TabIndex=0;slot.Controls.Add(card);grid.Controls.Add(slot);
+        savedTips.SetToolTip(card,card.AccessibleName+"\r\n"+T("Tamanho dos pacotes de origem conhecidos. O tamanho instalado pode variar.","Known source package sizes. Installed size may vary."));
+        if(official)return;
+        card.KeyDown+=(s,e)=>{if(e.KeyCode==Keys.Delete){e.SuppressKeyPress=true;DeleteSavedProject(project);}};
+        var remove=new HomeCardAction(true){Name="DeleteSavedProject",AccessibleName=T("Excluir projeto","Delete project")+" "+projectName,TabIndex=1};
+        var edit=new HomeCardAction(false){Name="EditSavedProject",AccessibleName=T("Editar projeto","Edit project")+" "+projectName,TabIndex=2};
+        remove.Click+=(s,e)=>DeleteSavedProject(project);edit.Click+=(s,e)=>Guard(()=>EditSavedProject(project,card));
+        card.ConfigureActions(remove,edit);
+        savedTips.SetToolTip(remove,remove.AccessibleName);savedTips.SetToolTip(edit,edit.AccessibleName);
+    }
+
+    string ProjectCardDetails(GeneralModState state){
+        if(state==null)return T("Dados indisponíveis","Details unavailable");
+        var members=new HashSet<string>(state.List.Mods.Select(mod=>mod.Id),StringComparer.Ordinal);
+        if(members.Count==0)return "0 mods  ·  0 B";
+        var sources=new Dictionary<string,long>(StringComparer.OrdinalIgnoreCase);
+        bool partial=false,estimated=false;
+        Action<string,long> add=(identity,bytes)=>{
+            if(String.IsNullOrEmpty(identity)||bytes<=0){partial=true;return;}
+            long previous;sources.TryGetValue(identity,out previous);
+            sources[identity]=Math.Max(previous,bytes);
+        };
+        foreach(var entry in state.List.Mods.Where(mod=>members.Contains(mod.Id))){
+            var mod=entry;
+            string variantId;if(!state.ChosenVariants.TryGetValue(mod.Id,out variantId))variantId=mod.DefaultVariant;
+            var variant=mod.Variants.FirstOrDefault(item=>item.Id==variantId)??mod.Variants.FirstOrDefault();
+            if(variant==null){partial=true;continue;}
+            var fixedMod=variant.CyberpunkId==null?null:catalog.Packages.FirstOrDefault(item=>item.Id==variant.CyberpunkId);
+            if(fixedMod!=null){
+                var density=fixedMod.DensityProfiles==null?null:fixedMod.DensityProfiles.FirstOrDefault(item=>item.Id==variant.CyberpunkVariant);
+                var assets=density==null?fixedMod.Assets:density.Assets;
+                if(assets.Count==0)partial=true;
+                foreach(var asset in assets)add(asset.Sha256??asset.Url,asset.Size);
+                continue;
+            }
+            if(variant.Sources.Count==0)partial=true;
+            foreach(string source in variant.Sources){
+                GeneralSourceInfo info;
+                if(!variant.SourceInfo.TryGetValue(source,out info)){partial=true;continue;}
+                var nexus=GeneralNexusLink.Parse(source);
+                add(nexus!=null?nexus.Url:source,info.Bytes);
+                estimated|=info.SizeApproximate;
+            }
+        }
+        string bytesText=sources.Count==0?T("Tamanho desconhecido","Unknown size"):
+            (estimated?"≈ ":"")+GeneralStorageSize.Format(sources.Values.Sum())+(partial?T(" parcial"," partial"):"");
+        return members.Count+" "+(members.Count==1?"mod":"mods")+"  ·  "+bytesText;
+    }
+
+    void PlaceGalleryCards(Panel gallery,Panel grid,List<HomeProjectCard> cards,int top,int viewportHeight){
+        int dpi=gallery.DeviceDpi,gap=18*dpi/96;
+        int width=Math.Max(1,gallery.Width);
+        int columns=Math.Max(1,Math.Min(3,(width+gap)/(165*dpi/96+gap)));
+        int captionHeight=HomeProjectCard.CaptionHeight(dpi);
+        int heightLimit=Math.Max(162*dpi/96,(viewportHeight-top-captionHeight-6)*2/3);
+        int cardWidth=Math.Min(Math.Min(heightLimit,275*dpi/96),Math.Max(1,(width-(columns-1)*gap)/columns));
+        int cardHeight=cardWidth*3/2+captionHeight;
+        int offset=Math.Max(0,(width-columns*cardWidth-(columns-1)*gap)/2);
+        int savedCount=cards.Count(card=>!card.Official),savedRows=(savedCount+columns-1)/columns;
+        int savedHeight=savedRows==0?0:savedRows*(cardHeight+gap)-gap;
+        var divider=grid.Controls.Find("ProjectGalleryDivider",false).Single();
+        var readyHeading=grid.Controls.Find("ReadyProjectsHeading",false).Single();
+        divider.SetBounds(0,savedHeight+20*dpi/96,width,Math.Max(1,dpi/96));
+        divider.Visible=savedCount>0;
+        readyHeading.Location=new Point(0,savedCount>0?divider.Bottom+14*dpi/96:0);
+        int readyTop=readyHeading.Bottom+8*dpi/96;
+        int readyRows=(cards.Count-savedCount+columns-1)/columns;
+        grid.SetBounds(0,top,width,readyTop+Math.Max(0,readyRows*(cardHeight+gap)-gap));
+        for(int i=0;i<cards.Count;i++){
+            var card=cards[i];
+            int index=card.Official?i-savedCount:i;
+            int rowTop=(card.Official?readyTop:0)+(index/columns)*(cardHeight+gap);
+            card.Parent.SetBounds(offset+(index%columns)*(cardWidth+gap),rowTop,cardWidth,cardHeight);
+            card.Bounds=new Rectangle(0,0,cardWidth,cardHeight);
+            card.PlaceActions();
+        }
+    }
+
+    static void ShowFocusedCard(GeneralScrollView scroll,HomeProjectCard card){
+        int top=card.Parent.Top+card.Parent.Parent.Top;
+        int position=scroll.Bar.Value;
+        if(top<position||card.Height>scroll.ClientSize.Height)scroll.ScrollTo(top);
+        else if(top+card.Height>position+scroll.ClientSize.Height)
+            scroll.ScrollTo(Math.Min(top,top+card.Height-scroll.ClientSize.Height));
+    }
+
+    void StopCoverRequests(){
+        if(coverRequests==null)return;
+        coverRequests.Cancel();coverRequests.Dispose();coverRequests=null;
+    }
+
+    async void LoadCoverImages(HomeProjectCard[] cards,CancellationToken token){
+        foreach(var group in cards.Where(card=>card.Domain!=null&&!card.HasCover).GroupBy(card=>card.Domain,StringComparer.OrdinalIgnoreCase)){
+            if(token.IsCancellationRequested||IsDisposed)return;
+            try{
+                using(var cover=await coverCache.GetAsync(group.Key,token)){
+                    if(token.IsCancellationRequested||IsDisposed)return;
+                    if(cover!=null)foreach(var card in group.Where(card=>!card.IsDisposed))card.SetCover((Image)cover.Clone());
+                }
+            }catch(OperationCanceledException){return;}
+            catch(IOException){ }
+            catch(UnauthorizedAccessException){ }
+        }
+    }
+
+    internal sealed partial class HomeProjectCard : Button {
+        const TextFormatFlags CaptionFlags=TextFormatFlags.SingleLine|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix;
+        readonly string subtitle,details;
+        Image cover;
+        bool hover,pressed;
+        internal readonly GeneralProject Project;
+        internal readonly string PresetId,Domain;
+        internal readonly bool Official;
+        internal readonly bool IsNew;
+        Panel choices;
+        internal Button RemoveButton,EditButton;
+        internal bool HasCover {get{return cover!=null;}}
+        internal static int CaptionHeight(int dpi){return 100*dpi/96;}
+
+        internal HomeProjectCard(GeneralProject project,string presetId,string title,string subtitle,string details,string domain,bool official,bool isNew=false){
+            Project=project;PresetId=presetId;Domain=domain;Official=official;IsNew=isNew;Text=title;this.subtitle=subtitle;this.details=details;
+            AccessibleName=String.Join(" · ",new[]{title,subtitle,details}.Where(part=>!String.IsNullOrEmpty(part)));
+            AccessibleRole=AccessibleRole.PushButton;
+            Cursor=Cursors.Hand;UseMnemonic=false;Font=GeneralStyle.Font(13,true);
+            SetStyle(ControlStyles.UserPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);
+            InitializeInteraction();
+        }
+
+        internal void ConfigureNewProjectActions(Action create,Action import){
+            choices=new Panel{Name="NewProjectChoices",Visible=false,BackColor=Color.Transparent};
+            var first=(GeneralButton)GeneralStyle.Button(T("Criar projeto","Create project"),create,true);
+            var second=(GeneralButton)GeneralStyle.Button(T("Importar projeto","Import project"),import);
+            first.Name="NewProject";second.Name="ImportProject";
+            foreach(var button in new[]{first,second}){
+                button.AutoSize=false;button.MinimumSize=new Size(0,44);button.CompositeParentSurface=true;
+                button.KeyDown+=(s,e)=>{if(e.KeyCode==Keys.Escape){CloseChoices();Focus();e.Handled=true;}};
+                choices.Controls.Add(button);
+            }
+            choices.Resize+=(s,e)=>{first.SetBounds(0,0,choices.Width,44);second.SetBounds(0,54,choices.Width,44);};
+            Controls.Add(choices);choices.BringToFront();SizeChanged+=(s,e)=>PlaceChoices();
+            MouseWheel+=(s,e)=>CloseChoices();
+        }
+        void PlaceChoices(){
+            if(choices==null)return;
+            int art=Math.Min(Width*3/2,Height-CaptionHeight(DeviceDpi));
+            choices.SetBounds(12,Math.Max(12,(art-98)/2),Math.Max(1,Width-24),98);
+        }
+        GeneralClickAway choiceDismissal;
+        internal void CloseChoices(){
+            if(choiceDismissal!=null){choiceDismissal.Dispose();choiceDismissal=null;}
+            if(choices!=null)choices.Visible=false;
+            Invalidate();
+        }
+        internal void ToggleChoices(){
+            if(choices==null)return;
+            if(choices.Visible){CloseChoices();return;}
+            PlaceChoices();choices.Visible=true;
+            choiceDismissal=new GeneralClickAway(this,CloseChoices);Invalidate();
+        }
+        protected override void OnLeave(EventArgs e){
+            base.OnLeave(e);
+            if(choices!=null&&IsHandleCreated)BeginInvoke((Action)(()=>{
+                if(!IsDisposed&&!ContainsFocus)CloseChoices();
+            }));
+        }
+        protected override void OnKeyDown(KeyEventArgs e){
+            if(e.KeyCode==Keys.Escape&&choices!=null&&choices.Visible){CloseChoices();e.Handled=true;}
+            base.OnKeyDown(e);
+        }
+        internal void SetCover(Image image){if(cover!=null)cover.Dispose();cover=image;Invalidate();}
+        protected override void Dispose(bool disposing){if(disposing){if(choiceDismissal!=null)choiceDismissal.Dispose();hoverAnimation.Dispose();SetCover(null);}base.Dispose(disposing);}
+        protected override void OnMouseEnter(EventArgs e){SetPointerOver(true);base.OnMouseEnter(e);}
+        protected override void OnMouseLeave(EventArgs e){pressed=false;SchedulePointerLeave();base.OnMouseLeave(e);}
+        protected override void OnMouseDown(MouseEventArgs e){if(e.Button==MouseButtons.Left){pressed=true;Invalidate();}base.OnMouseDown(e);}
+        protected override void OnMouseUp(MouseEventArgs e){pressed=false;Invalidate();base.OnMouseUp(e);}
+        protected override void OnGotFocus(EventArgs e){base.OnGotFocus(e);SyncInteraction();}
+        protected override void OnLostFocus(EventArgs e){base.OnLostFocus(e);SchedulePointerLeave();}
+
+        protected override void OnPaint(PaintEventArgs e){
+            var g=e.Graphics;g.Clear(GeneralStyle.Surface);g.SmoothingMode=SmoothingMode.AntiAlias;
+            int dpi=DeviceDpi, inset=3*dpi/96;
+            int artHeight=Math.Min(Width*3/2,Height-CaptionHeight(dpi));
+            if(artHeight<8||Width<8)return;
+            var art=new Rectangle(inset,inset,Width-inset*2,artHeight-inset*2);
+            bool focus=Focused&&ShowFocusCues;
+            using(var shape=GeneralStyle.Round(art,12*dpi/96)){
+                var clip=g.Save();g.SetClip(shape,CombineMode.Intersect);
+                if(cover==null){
+                    using(var fill=new SolidBrush(hover?GeneralStyle.Selection:GeneralStyle.DrawerSurface))g.FillRectangle(fill,art);
+                    int icon=Math.Min(52*dpi/96,art.Width/3);
+                    if(choices==null||!choices.Visible)LucideIcons.Draw(g,IsNew?"plus":"package",new Rectangle(art.X+(art.Width-icon)/2,art.Y+(art.Height-icon)/2,icon,icon),IsNew?GeneralStyle.Accent:GeneralStyle.Muted);
+                }else{
+                    g.InterpolationMode=InterpolationMode.HighQualityBicubic;
+                    double scale=Math.Max((double)art.Width/cover.Width,(double)art.Height/cover.Height)*(1+.035*interaction);
+                    var crop=new RectangleF(0,0,(float)(art.Width/scale),(float)(art.Height/scale));
+                    crop.X=(cover.Width-crop.Width)/2;crop.Y=(cover.Height-crop.Height)/2;
+                    g.DrawImage(cover,art,crop,GraphicsUnit.Pixel);
+                    if(pressed){using(var tint=new SolidBrush(Color.FromArgb(36,GeneralStyle.Background)))g.FillRectangle(tint,art);}
+                }
+                g.Restore(clip);
+                if(IsNew){
+                    using(var border=new Pen(hover||focus?GeneralStyle.Accent:GeneralStyle.Line,(focus?2:1)*dpi/96f)){border.DashStyle=DashStyle.Dash;g.DrawPath(border,shape);}
+                }else if(interaction>0){
+                    using(var border=new Pen(Color.FromArgb((int)(255*interaction),Color.White),3*dpi/96f))g.DrawPath(border,shape);
+                }
+            }
+            int x=5*dpi/96,textWidth=Math.Max(1,Width-x*2-(EditButton==null?0:38*dpi/96)),y=artHeight+5*dpi/96;
+            int line=Math.Max(Font.Height+2*dpi/96,25*dpi/96),secondary=19*dpi/96;
+            bool wrap=TextRenderer.MeasureText(Text,Font).Width>textWidth;
+            int heading=wrap?line*2:line;
+            var titleFlags=TextFormatFlags.WordBreak|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix;
+            TextRenderer.DrawText(g,Text,Font,new Rectangle(x,y,textWidth,heading),GeneralStyle.Foreground,titleFlags);
+            using(var font=GeneralStyle.Font(10.5f)){
+                y+=heading;
+                if(!String.IsNullOrEmpty(subtitle)){
+                    TextRenderer.DrawText(g,subtitle,font,new Rectangle(x,y,textWidth,secondary),GeneralStyle.Muted,CaptionFlags);
+                    y+=secondary;
+                }
+                TextRenderer.DrawText(g,details,font,new Rectangle(x,y,textWidth,secondary),GeneralStyle.Muted,CaptionFlags);
+            }
+        }
+    }
     async void DeleteSavedProject(GeneralProject project){await DeleteSavedProjectAsync(project);}
     internal async Task DeleteSavedProjectAsync(GeneralProject project){
         if(DeletingProject||project==null||project.TemplateId!=null)return;
@@ -112,30 +381,31 @@ internal sealed partial class GeneralProjectHome : Form {
             var existing=preferences.Projects.FirstOrDefault(item=>item.TemplateId=="cyberpunk-2077");if(existing!=null)return existing;
             return store.Create("Cyberpunk 2077",GeneralModLibrary.Seed(catalog,new ModImportItem[0]),preferences.Theme,preferences.Language,!fixture&&!GeneralAppPaths.IsDevelopment?Discovery.Find().FirstOrDefault():null,"cyberpunk-2077");
         }
-        using(var name=new GeneralNameDialog(T("Nome do projeto","Project name"),"")){
-            if(name.ShowDialog(this)!=DialogResult.OK)return null;
-            var list=new GeneralModList();list.Presets.Add(new GeneralModPreset{Id="main",Name=name.ResultName});
-            return store.Create(name.ResultName,list,preferences.Theme,preferences.Language);
-        }
+        return ConfigureProject("",null);
     }
     GeneralProject ImportProject(){
         using(var open=new OpenFileDialog{Title=T("Importar projeto","Import project"),Filter=T("Projeto Mod Loader|*.json","Mod Loader project|*.json")}){
             if(open.ShowDialog(this)!=DialogResult.OK)return null;
-            using(var name=new GeneralNameDialog(T("Nome do projeto","Project name"),Path.GetFileNameWithoutExtension(open.FileName))){
-                if(name.ShowDialog(this)!=DialogResult.OK)return null;
-                var list=new GeneralModLibrary(Path.Combine(store.Root,"lista.json")).Import(open.FileName);
-                var preferences=store.Read();return store.Create(name.ResultName,list,preferences.Theme,preferences.Language);
-            }
+            var list=new GeneralModLibrary(Path.Combine(store.Root,"lista.json")).Import(open.FileName);
+            return ConfigureProject(Path.GetFileNameWithoutExtension(open.FileName),list);
         }
     }
-    void OpenProject(GeneralProject project){
+    GeneralProject ConfigureProject(string name,GeneralModList list){
+        using(var dialog=new GeneralProjectCreationDialog(name,list)){
+            if(dialog.ShowDialog(this)!=DialogResult.OK)return null;
+            var preferences=store.Read();
+            return store.Create(dialog.ResultName,dialog.ResultList,preferences.Theme,preferences.Language,dialog.ResultDestination,
+                prepare:dialog.SaveCover);
+        }
+    }
+    void OpenProject(GeneralProject project,string preset){
         while(project!=null){
             string action=null;
             try{
                 var restored=store.Load(project);
                 OnlineDiagnostics.Record("project.open",null,"Projeto aberto.",new{Template=project.TemplateId??"custom",Mods=restored.List.Mods.Count});
                 using(var window=new GeneralModWindow(catalog,cache,store.DataPath(project),fixture?restored:null)){
-                    window.AttachProject(store,project);
+                    window.AttachProject(store,project,preset);preset=null;
                     sharingWindow=window;
                     window.AttachSharingHome(this);
                     window.Shown+=(s,e)=>{window.Refresh();Hide();};
@@ -291,12 +561,12 @@ internal sealed partial class GeneralProjectHome : Form {
 
     void Options(Control anchor){
         var preferences=store.Read();using(var dialog=new GeneralOptionsDialog(preferences.Theme,preferences.Language,preferences.DownloadFolder,cache.PreviewRetainedDownloads,switchSettings:preferences.SwitchSettings)){
-            dialog.AnchorTo(anchor);if(dialog.ShowDialog(this)!=DialogResult.OK){RefreshStorageSize();return;}
+            dialog.AnchorTo(anchor);if(dialog.ShowDialog(this)!=DialogResult.OK)return;
             store.SavePreferences(dialog.ThemeValue,dialog.LanguageValue,dialog.DownloadFolder,dialog.SwitchSettings);Build();
         }
     }
     void Guard(Action action){int before=buildVersion;try{action();if(Visible&&before==buildVersion)Build();}catch(Exception ex){OnlineDiagnostics.Failure("home.action.failed",ex,"Concluir a ação na tela inicial.",stage:action.Method.Name);GeneralDialog.Message(this,ex.Message,T("Não foi possível continuar","Unable to continue"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}}
-    sealed class Choice {internal readonly GeneralProject Project;internal Choice(GeneralProject project){Project=project;}public override string ToString(){return Project.Name;}}
+
 }
 
 internal sealed partial class GeneralModWindow {
@@ -338,7 +608,7 @@ internal sealed partial class GeneralModWindow {
         }catch(IOException ex){OnlineDiagnostics.Failure("project.window-size.failed",ex,"Salvar o tamanho da janela.");}
         catch(UnauthorizedAccessException ex){OnlineDiagnostics.Failure("project.window-size.failed",ex,"Salvar o tamanho da janela.");}
     }
-    internal void AttachProject(GeneralProjectStore store,GeneralProject project){
+    internal void AttachProject(GeneralProjectStore store,GeneralProject project,string requestedPreset=null){
         projectStore=store;this.project=project;state.TemplateId=project.TemplateId;state.ProjectName=project.Name;var preferences=store.Read();
         bool refreshed=false;
         if(BuiltInProject){
@@ -380,6 +650,10 @@ internal sealed partial class GeneralModWindow {
                 refreshed = true;
             }
             if(GeneralModLibrary.GroupBodyOptions(state.List))refreshed=true;
+        }
+        if(requestedPreset!=null&&state.SelectedPreset!=requestedPreset&&state.List.Presets.Any(item=>item.Id==requestedPreset)){
+            GeneralPresetProfiles.Switch(state,requestedPreset);
+            refreshed=true;
         }
         if(refreshed||state.Theme!=preferences.Theme||state.Language!=preferences.Language){
             state.Theme=preferences.Theme;state.Language=preferences.Language;Persist();BuildInterface();

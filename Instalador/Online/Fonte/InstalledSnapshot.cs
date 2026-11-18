@@ -14,12 +14,13 @@ public sealed class InstalledSnapshotManifest {
     public GeneralModList List=new GeneralModList();
     public GeneralModList Project;
     public Dictionary<string,string> SyncGameInventory;
+    public List<SnapshotOutputScope> OutputScopes=new List<SnapshotOutputScope>();
     public List<InstalledSnapshotFile> Files=new List<InstalledSnapshotFile>();
 }
 public sealed class InstalledSnapshotFile {
     public string Path,Sha256,Kind,Section,Content;
     public long Size;
-    public bool ReuseLocal;
+    public bool ReuseLocal,Generated;
     public List<string> Owners=new List<string>();
 }
 public static partial class InstalledSnapshot {
@@ -350,7 +351,7 @@ public static partial class InstalledSnapshot {
         Validate(manifest,catalog,false);
     }
     internal static void Validate(InstalledSnapshotManifest manifest,FixedCatalog catalog,bool localReceipt) {
-        if(manifest==null||(manifest.Schema!=1&&manifest.Schema!=2)||manifest.Schema==2&&manifest.Project==null||manifest.List==null||manifest.List.Mods==null||manifest.Files==null||manifest.Files.Count==0&&manifest.Project==null||manifest.Files.Count>MaxFiles||String.IsNullOrWhiteSpace(manifest.Name)||manifest.Name.Length>300||!(manifest.Game=="cyberpunk2077"||manifest.Game=="generic")||(manifest.Game=="cyberpunk2077"&&manifest.GameFileVersion!=catalog.GameFileVersion)||(manifest.Game=="generic"&&manifest.GameFileVersion!=null))throw new IOException("Manifesto de arquivos instalados inválido.");
+        if(manifest==null||(manifest.Schema!=1&&manifest.Schema!=2&&manifest.Schema!=3)||manifest.Schema>=2&&manifest.Project==null||manifest.List==null||manifest.List.Mods==null||manifest.Files==null||manifest.Files.Count==0&&manifest.Project==null||manifest.Files.Count>MaxFiles||String.IsNullOrWhiteSpace(manifest.Name)||manifest.Name.Length>300||!(manifest.Game=="cyberpunk2077"||manifest.Game=="generic")||(manifest.Game=="cyberpunk2077"&&manifest.GameFileVersion!=catalog.GameFileVersion)||(manifest.Game=="generic"&&manifest.GameFileVersion!=null))throw new IOException("Manifesto de arquivos instalados inválido.");
         if(manifest.ProjectName!=null&&(String.IsNullOrWhiteSpace(manifest.ProjectName)||manifest.ProjectName.Length>120||manifest.ProjectName.Any(Char.IsControl)))
             throw new IOException("Nome do projeto recebido inválido.");
         GeneralModLibrary.ValidateList(manifest.List,true);
@@ -371,6 +372,7 @@ public static partial class InstalledSnapshot {
             var variant=mod.Variants[0];
             if(variant==null||!Regex.IsMatch(variant.Id??"",@"\A[A-Za-z0-9_-]{1,120}\z")||variant.Id!=mod.DefaultVariant||variant.Sources==null||variant.Sources.Count==0||variant.Sources.Count>32)throw new IOException("Variante instalada inválida.");
             if(variant.NaturalOption!=null)throw new IOException("O pacote instalado deve conter só a opção usada.");
+            variant.OutputFolders=ModOutputIndex.NormalizeFolders(variant.OutputFolders);
             string owner=Owner(mod,variant);owners.Add(owner,variant);
             if(variant.CyberpunkId!=null) {
                 if(manifest.Game!="cyberpunk2077")throw new IOException("Receita Cyberpunk em destino genérico.");
@@ -385,6 +387,7 @@ public static partial class InstalledSnapshot {
             if(mod.Variants.Single().RequiredMods.Any(id=>!ids.Contains(id)))
                 throw new IOException("Dependência vinculada não incluída: "+mod.Name+".");
         foreach(var recipe in recipes.Values)foreach(string dependency in recipe.Dependencies)if(!recipes.Values.Any(m=>m.Id==dependency))throw new IOException("Dependência não incluída: "+dependency);
+        ValidateOutputScopes(manifest,owners);
         var keys=new HashSet<string>(StringComparer.OrdinalIgnoreCase);var regular=new HashSet<string>(StringComparer.OrdinalIgnoreCase);long total=0,configs=0;
         var reserved=new HashSet<string>(catalog.Packages.SelectMany(NightCityDensity.KnownFiles).Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
         foreach(var file in manifest.Files) {
@@ -393,12 +396,13 @@ public static partial class InstalledSnapshot {
                 throw new IOException("O drone FPV é local e não faz parte do pacote compartilhado.");
             Safe.In(Path.GetTempPath(),file.Path);total+=file.Size;if(total>MaxTotalBytes)throw new IOException("Pacote instalado grande demais.");
             if(GeneralInstallRoutes.External(file.Path)){
-                if(manifest.Schema!=2||file.Kind!="file")throw new IOException("Destino externo não autorizado neste pacote.");
+                if(manifest.Schema<2||file.Kind!="file")throw new IOException("Destino externo não autorizado neste pacote.");
                 string target=GeneralInstallRoutes.ExternalDestination(file.Path);
                 if(file.Owners.Any(owner=>!owners[owner].InstallRoutes.Any(route=>String.Equals(route.Destination,target,StringComparison.OrdinalIgnoreCase))))
                     throw new IOException("O arquivo aponta para um destino ausente na versão do mod.");
             }
             if(file.Kind=="file") {
+                if(file.Generated)throw new IOException("Um arquivo instalado não pode ser marcado como configuração gerada.");
                 if(file.Content!=null||file.Section!=null||!regular.Add(file.Path))throw new IOException("Arquivo binário contém metadados inválidos.");
                 foreach(string owner in file.Owners) {
                     Dictionary<string,FixedFile> paths;
@@ -411,6 +415,10 @@ public static partial class InstalledSnapshot {
             }else {
                 if(file.ReuseLocal)throw new IOException("Configuração local não pode ser referenciada pelo pacote.");
                 InstalledSnapshotConfig.Validate(file);configs+=file.Size;if(configs>1048576)throw new IOException("Configurações grandes demais.");
+                if(file.Generated){
+                    if(reserved.Contains(file.Path))throw new IOException("A configuração gerada ocupa um destino reservado.");
+                    ValidateGeneratedConfig(manifest,file);continue;
+                }
                 foreach(string owner in file.Owners) {
                     FixedMod recipe;
                     if(!recipes.TryGetValue(owner,out recipe)||!(recipe.Files.Any(f=>f.UserData&&f.Path==file.Path&&file.Kind=="json")||(catalog.Defaults!=null&&catalog.Defaults.Any(d=>d.ModId==recipe.Id&&d.Path==file.Path&&d.Format==file.Kind&&d.Section==file.Section))))throw new IOException("Configuração fora da lista autorizada: "+file.Path);

@@ -20,6 +20,13 @@ internal sealed class InventoryLinkData {
     public Dictionary<string,InventoryZipLabel> ZipLabels=new Dictionary<string,InventoryZipLabel>(StringComparer.OrdinalIgnoreCase);
     public List<InventoryLinkGroup> Groups=new List<InventoryLinkGroup>();
     public List<string> Ignored=new List<string>();
+    public List<string> SeenLocalFiles=new List<string>();
+
+    internal void MarkLocalFileSeen(string key){
+        if(SeenLocalFiles.Contains(key))return;
+        if(SeenLocalFiles.Count==5000)SeenLocalFiles.RemoveAt(0);
+        SeenLocalFiles.Add(key);
+    }
 }
 
 internal sealed class InventoryLinkStore {
@@ -45,9 +52,15 @@ internal sealed class InventoryLinkStore {
         Safe.WriteJson(path,links);
     }
 
+    internal static string LocalFileKey(string mod,string relativePath){
+        return InstalledSnapshot.Hash(Encoding.UTF8.GetBytes(mod+"\n"+relativePath.ToUpperInvariant()));
+    }
+
     static void Validate(InventoryLinkData links) {
         if(links==null||links.Groups==null||links.Ignored==null||links.Groups.Count>1000||links.Ignored.Count>1000||
             links.Ignored.Any(key=>String.IsNullOrWhiteSpace(key)||key.Length>250))throw Invalid();
+        if(links.SeenLocalFiles==null||links.SeenLocalFiles.Count>5000||
+            links.SeenLocalFiles.Any(key=>!FixedData.HashValid(key)))throw Invalid();
         if(links.ZipLabels==null||links.ZipLabels.Count>5000)throw Invalid();
         var labelPaths=new HashSet<string>(Paths);
         foreach(var entry in links.ZipLabels){

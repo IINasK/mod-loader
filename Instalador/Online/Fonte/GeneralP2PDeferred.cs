@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Diagnostics;
 using System.IO;
@@ -76,9 +76,13 @@ internal sealed partial class P2PService {
                     var manifest=InstalledSnapshot.Inspect(ExportState(state,session.ExportPreset,session.SelectedMods,session.ExportAllPresets),
                         session.SelectedMods,catalog,appData,includeConfigs,true,checkpoint,
                         (id,name,message)=>ReviewSnapshotProblem(session,id,name,message),scan);
+                    IncludePortableOutputs(session,state.Destination,manifest,checkpoint);
+                    if(manifest.Schema==3)InstalledSnapshot.Validate(manifest,catalog);
                     InstalledSnapshot.Write(part,state.Destination,manifest,report,checkpoint,progress);
                 }else {
                     if(full&&includeConfigs)InstalledSnapshot.AddFullPackConfigurations(plan,state,catalog,appData,checkpoint);
+                    IncludePortableOutputs(session,state.Destination,plan,checkpoint);
+                    if(plan.Schema==3)InstalledSnapshot.Validate(plan,catalog);
                     InstalledSnapshot.Write(part,state.Destination,plan,report,checkpoint,progress);
                 }
                 checkpoint();
@@ -148,6 +152,18 @@ internal sealed partial class P2PService {
         copy.List.Presets=new System.Collections.Generic.List<GeneralModPreset>{preset};GeneralPresetProfiles.Prune(copy.List);
         return copy;
     }
+    internal static void IncludePortableOutputs(P2PSession session,string root,InstalledSnapshotManifest manifest,Action checkpoint){
+        var elapsed=Stopwatch.StartNew();
+        InstalledSnapshot.AddOutputScopes(manifest);
+        var selected=session.GeneratedConfigSelection;
+        if(selected!=null&&selected.Length>0&&manifest.Project!=null&&session.Recipients.Length>0&&session.Recipients.All(peer=>peer.SupportsGeneratedConfigs))
+            InstalledSnapshot.AddGeneratedConfigs(manifest,root,selected,checkpoint);
+        OnlineDiagnostics.Record("p2p.pack.outputs",null,"Reutilizar o mapa de saídas do pacote.",new{
+            Folders=manifest.OutputScopes.Count,Selected=selected==null?0:selected.Length,
+            Included=manifest.Files.Count(file=>file.Generated),Milliseconds=elapsed.ElapsedMilliseconds
+        });
+    }
+
     internal static string ReadyTag(string key,string id,string hash,long size){
         if(!P2PPack.HashValid(key)||!P2PPack.HashValid(hash))throw new IOException("Assinatura de preparação inválida.");
         byte[] bytes=new byte[32];for(int i=0;i<bytes.Length;i++)bytes[i]=Byte.Parse(key.Substring(i*2,2),NumberStyles.HexNumber,CultureInfo.InvariantCulture);

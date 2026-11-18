@@ -22,6 +22,7 @@ internal static class GeneralTableDialogTests {
             {"variants",()=>new GeneralModAlternativeDialog(mods)},
             {"version-conflict",()=>new GeneralVersionChoiceDialog(new ModVersionDifference{Name=mods[0].Name,Current="1.0",Incoming="2.0"})},
             {"category",()=>new GeneralCategoryDetails("Jogabilidade","Descrição",canDelete:true)},
+            {"category-remove",()=>new GeneralCategoryRemovalDialog("Jogabilidade",3)},
             {"categories",()=>new GeneralCategoryEditor(new[]{"Jogabilidade","Núcleo"})},
             {"preset",()=>new GeneralPresetEditor(preset,mods,preset.ModIds)},
             {"switch",()=>new SwitchPerformanceDialog(new SwitchPerformance())},
@@ -31,6 +32,8 @@ internal static class GeneralTableDialogTests {
             {"nexus-trust",()=>new NexusKeyTrustDialog()},
             {"dependencies",()=>new GeneralDependencyReview("Auditoria",new GeneralDependencyIssue[0],0,_=>{})},
             {"manual-capture",()=>new ManualInstallReview(new ManualInstallCapture.FileState[0])},
+            {"project-create",()=>new GeneralProjectCreationDialog()},
+            {"project-edit",()=>new GeneralProjectCreationDialog("Projeto de teste",null,root,editing:true)},
             {"project-delete",()=>new GeneralProjectDeleteChoice("Projeto de teste")},
             {"project-delete-review",()=>new GeneralProjectDeleteReview("Projeto de teste",null)},
             {"sync-review",()=>new GeneralSyncDifferencesDialog(new P2PSyncDifference[0],true)}

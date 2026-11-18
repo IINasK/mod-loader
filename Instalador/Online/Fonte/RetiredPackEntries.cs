@@ -37,6 +37,11 @@ internal static class RetiredPackEntries {
     }),StringComparer.Ordinal);
     static readonly HashSet<string> RetiredArchiveIds=new HashSet<string>(RetiredHashes.Select(hash=>"file-"+hash),StringComparer.Ordinal);
 
+    internal static bool CanRecover(GeneralModEntry mod){
+        return !RetiredIds.Contains(mod.Id)&&!RetiredArchiveIds.Contains(mod.Id)&&
+            !mod.Variants.Any(variant=>RetiredIds.Contains(variant.CyberpunkId))&&!mod.DetectedPaths.Any(LocalDronePath);
+    }
+
     internal static bool PreparedArchive(ModImportItem item){return item!=null&&item.Kind=="Arquivo"&&RetiredHashes.Contains(item.Sha256);}
     internal static HashSet<string> Remove(GeneralModList list){
         // Retire only known built-in identities; a new custom item remains the user's choice.

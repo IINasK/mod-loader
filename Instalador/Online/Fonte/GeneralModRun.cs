@@ -351,18 +351,19 @@ internal sealed partial class GeneralModWindow {
         nexusManual=new Dictionary<string,NexusManualMatch>(StringComparer.Ordinal);
         foreach(var key in statuses.Where(item=>item.Value==GeneralStatusPresentation.NexusManual||
             item.Value==GeneralStatusPresentation.NexusAmbiguous).Select(item=>item.Key).ToArray())statuses.Remove(key);
-        var works=state.List.Mods.Select(MakeWork).ToList();
         var scannedState=state;
         bool cancelledVersionScan=false;
         var lookup=CreateVersionLookup(audit!=null,()=>!IsDisposed&&!exitApproved&&!cancelledVersionScan&&
             Object.ReferenceEquals(state,scannedState)&&state.Destination==root);
-        operationTotal=works.Count;operationFinished=0;skipRequests.Clear();
-        OnlineDiagnostics.Record("general.scan.begin",null,"Conferindo os mods instalados.",new{Mods=works.Count});
-
         try{
-            if(lookup.HasNexusCredential)lookup.Prefetch(works.SelectMany(work=>work.Variant.Sources));
             var elapsed=Stopwatch.StartNew();
             var reads=new ScanReads(this,root);
+            await RecoverModOutputs(root,reads);
+            if(IsDisposed||exitApproved)return;
+            var works=state.List.Mods.Select(MakeWork).ToList();
+            operationTotal=works.Count;operationFinished=0;skipRequests.Clear();
+            OnlineDiagnostics.Record("general.scan.begin",null,"Conferindo os mods instalados.",new{Mods=works.Count});
+            if(lookup.HasNexusCredential)lookup.Prefetch(works.SelectMany(work=>work.Variant.Sources));
             if(audit!=null)audit.Reads=reads;
             var zipLabels=reads.Exists?new Dictionary<string,InventoryZipLabel>(InventoryLinks.ZipLabels,InventoryPaths):null;
             var inventory=reads.Exists?Task.Run(()=>TryReadGameInventory(root,reads,zipLabels)):null;
@@ -415,6 +416,7 @@ internal sealed partial class GeneralModWindow {
                 new{Mods=works.Count,Workers=workers,UniqueHashes=reads.HashCount,ImportsRead=reads.Imports.IsValueCreated,ElapsedMs=elapsed.ElapsedMilliseconds});
             var foundFiles=inventory==null?null:await inventory;
             gameInventory=foundFiles??new List<P2PSyncDifference>();
+            if(foundFiles!=null)await ReconcileModOutputs(root,foundFiles);
             foreach(var active in gameInventory.Where(file=>file.Kind=="verified-variant")){
                 string key=active.ModId+"/"+active.VariantId;
                 string status;
@@ -866,6 +868,7 @@ internal sealed partial class GeneralModWindow {
             }
             RememberInstalledVariant(work);
             await TrackPresetInstall(work,root,work.ReviewReplacement);completed=true;
+            if(work.Applied)await RememberModOutputBaseline(work,root);
             RowStatus(work,"Instalado",100,work.Entry.Name+T(": instalado e conferido.",": installed and verified."));
             OnlineDiagnostics.Record("general.install.complete",work.Entry.Id,"Instalação conferida.",new{Variant=work.Variant.Id});
         }catch(ModVersionKeptException ex){

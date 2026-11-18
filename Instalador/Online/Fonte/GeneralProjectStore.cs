@@ -79,6 +79,8 @@ internal sealed class GeneralProjectStore {
         }
     }
 
+    internal string CoverPath(GeneralProject project){return project==null?null:Safe.In(DataPath(project),"project-cover.png");}
+
     internal string DataPath(GeneralProject project) {
         ValidateProject(project);
         string path = project.Legacy ? Root : Safe.In(Root, "Projetos/" + project.Id);
@@ -86,7 +88,7 @@ internal sealed class GeneralProjectStore {
         return path;
     }
 
-    internal GeneralProject Create(string name, GeneralModList list, string theme, string language, string destination = null, string templateId = null) {
+    internal GeneralProject Create(string name, GeneralModList list, string theme, string language, string destination = null, string templateId = null, Action<string> prepare = null) {
         lock (gate) {
             name = ProjectName(name);
             ValidatePreferences(theme, language);
@@ -107,6 +109,7 @@ internal sealed class GeneralProjectStore {
                 SelectedPreset = list.Presets.Count == 0 ? null : list.Presets[0].Id
             };
             GeneralPresetProfiles.Project(state);
+            if(prepare!=null)prepare(data);
             new GeneralModLibrary(Path.Combine(data, "lista.json")).Save(state);
             index.Projects.Add(project);
             Write(index);
@@ -149,6 +152,10 @@ internal sealed class GeneralProjectStore {
             };
             if(previous!=null){
                 KeepReceivedBindings(previous,state);
+                if(String.Equals(previous.Destination,state.Destination,StringComparison.OrdinalIgnoreCase)){
+                    state.SuppressedModRecovery=previous.SuppressedModRecovery??new List<string>();
+                    state.RecoveredModIds=(previous.RecoveredModIds??new List<string>()).Where(savedId=>list.Mods.Any(mod=>mod.Id==savedId)).ToList();
+                }
                 if(manifest.TemplateSubset){
                     var replaced=new HashSet<string>(incoming.Mods.Select(mod=>mod.Id),StringComparer.Ordinal);
                     foreach(var choice in previous.ChosenVariants.Where(pair=>!replaced.Contains(pair.Key)))
@@ -159,6 +166,9 @@ internal sealed class GeneralProjectStore {
             GeneralPresetProfiles.Project(state);
             state.ReceivedPreset=state.SelectedPreset;
             BindReceivedVariants(state,manifest,session.ReceiptId,receivedDefinitions);
+            try{new ModOutputIndex(data,session.Destination).CaptureReceivedBaseline(session.Destination,manifest);}
+            catch(IOException ex){OnlineDiagnostics.Failure("inventory.outputs.received",ex,"Registrar arquivos locais do receptor.");}
+            catch(UnauthorizedAccessException ex){OnlineDiagnostics.Failure("inventory.outputs.received",ex,"Registrar arquivos locais do receptor.");}
             if(!String.Equals(Path.GetFullPath(sourceData),data,StringComparison.OrdinalIgnoreCase))
                 source.CopyReceivedRecognition(session.ReceiptId,data);
             new GeneralModLibrary(Path.Combine(data,"lista.json")).Save(state);
@@ -225,6 +235,16 @@ internal sealed class GeneralProjectStore {
         }
     }
 
+    internal void Edit(GeneralProject project,string name,Action<string> saveCover){
+        lock(gate){
+            var index=Read();var saved=Registered(index,project);
+            if(saved.TemplateId!=null)throw new IOException("O projeto padrão não pode ser editado.");
+            name=ProjectName(name);
+            if(saveCover!=null)saveCover(DataPath(saved));
+            saved.Name=name;Write(index);project.Name=name;
+        }
+    }
+
     internal void SaveWindowSize(GeneralProject project,int width,int height){
         lock(gate){
             var index=Read();
@@ -249,6 +269,8 @@ internal sealed class GeneralProjectStore {
             var state=Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(edited??Load(source)));
             var copy=new GeneralProject{Id=Guid.NewGuid().ToString("N"),Name=name,WindowWidth=registered.WindowWidth,WindowHeight=registered.WindowHeight};
             string target=DataPath(copy),from=DataPath(source);
+            string cover=CoverPath(source);
+            if(File.Exists(cover))Safe.CopyAtomic(cover,Safe.In(target,"project-cover.png"),Safe.Hash(cover));
             DownloadCache.DuplicateSources(Path.Combine(from,"Cache"),Path.Combine(target,"Cache"));
             if(!String.IsNullOrWhiteSpace(state.Destination)&&Directory.Exists(state.Destination)){
                 new GeneralModInstaller(state.Destination,Path.Combine(from,"Instalacoes")).DuplicateRecognition(Path.Combine(target,"Instalacoes"));

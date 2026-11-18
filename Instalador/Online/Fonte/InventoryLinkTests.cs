@@ -34,6 +34,16 @@ internal sealed partial class GeneralModWindow {
         var catalog=new FixedCatalog{Schema=1,Id="inventory-links-fixture",GameVersion="2.5",GameFileVersion="2.5.0.0",Packages=new List<FixedMod>()};
         var state=new GeneralModState{List=new GeneralModList{Mods=new List<GeneralModEntry>{registered}},Language="pt",DownloadFolder=root};
         Action<bool,string> check=(ok,message)=>{if(!ok)throw new IOException(message);};
+        var variantRecord=new P2PSyncDifference{Kind="verified-variant",ModId=registered.Id,VariantId="default"};
+        var observedFiles=new List<P2PSyncDifference>{variantRecord,new P2PSyncDifference{Kind="found",Path=third}};
+        AssociateDeclaredOutputs(observedFiles,new Dictionary<string,string>(InventoryPaths),
+            new Dictionary<string,string>{{registered.Id,registered.Name}});
+        check(observedFiles.Count==2&&observedFiles.Contains(variantRecord),
+            "An inventory metadata record without a file path survives reconciliation with no declarations.");
+        AssociateDeclaredOutputs(observedFiles,new Dictionary<string,string>(InventoryPaths){{third,registered.Id}},
+            new Dictionary<string,string>{{registered.Id,registered.Name}});
+        check(observedFiles.Contains(variantRecord)&&observedFiles.Single(file=>file.Path==third).Kind=="associated",
+            "A pathless active-variant record also survives when a declared output is linked.");
         TestForm(catalog,state,appData,root,async form=>{
             form.SetDestination(game);
             await form.Scan();
@@ -166,6 +176,109 @@ internal sealed partial class GeneralModWindow {
             state.List.Mods.Remove(night);
             catalog.Packages.RemoveAt(catalog.Packages.Count-1);
 
+            const string legacyFile="red4ext/plugins/legacy-owner/plugin.dll";
+            const string generatedFile="red4ext/plugins/legacy-owner/run.log";
+            string legacyFullPath=Safe.In(game,legacyFile);
+            Directory.CreateDirectory(Path.GetDirectoryName(legacyFullPath));
+            File.WriteAllText(legacyFullPath,"verified");
+            File.WriteAllText(Safe.In(game,generatedFile),"local log");
+            var legacy=new FixedMod{Id="legacy-recipe",Name="Legacy name",Version="1",
+                Dependencies=new string[0],Assets=new List<FixedAsset>(),
+                Files=new List<FixedFile>{new FixedFile{Path=legacyFile,Sha256=Safe.Hash(legacyFullPath),Size=8}}};
+            catalog.Packages.Add(legacy);
+            await form.Scan();
+            check(form.VisibleGameInventory().Any(file=>file.Path==legacyFile&&file.ProvenOwner==legacy.Id),
+                "A verified file without a mod in this project stays outside the catalog.");
+            string registeredKey=Key(registered,registered.Variants[0]);
+            state.CyberpunkImports.Add(registeredKey,legacy.Id);
+            await form.Scan();
+            var legacyInventory=form.DisplayedInventory().Where(file=>file.Path==legacyFile||file.Path==generatedFile).ToArray();
+            check(legacyInventory.Length==2&&legacyInventory.All(file=>file.Kind=="associated"&&file.ModId==registered.Id)&&
+                legacyInventory.Any(file=>file.Path==legacyFile&&file.ProvenOwner==legacy.Id)&&
+                legacyInventory.Any(file=>file.Path==generatedFile&&file.LocalInModFolder&&file.ProvenOwner==null)&&
+                !form.VisibleGameInventory().Any(file=>file.Path==legacyFile||file.Path==generatedFile),
+                "A unique project binding associates verified files and keeps generated files labeled as local.");
+            string acknowledged=InventoryLinkStore.LocalFileKey(registered.Id,generatedFile);
+            for(int visit=0;visit<2;visit++){
+                Exception editorFailure=null;
+                bool inspected=false;
+                using(var timer=new Timer{Interval=40}){
+                    timer.Tick+=(sender,args)=>{
+                        var editor=Application.OpenForms.OfType<GeneralModEditor>().FirstOrDefault(item=>item.Visible);
+                        if(editor==null)return;
+                        timer.Stop();
+                        try{
+                            var fileTree=AllControls(editor).OfType<ListBox>().Single(control=>control.Name=="ArchiveFileTree");
+                            var location=AllControls(editor).OfType<TextBox>().Single(control=>control.Name=="ArchiveCurrentDestination");
+                            var keyDown=typeof(Control).GetMethod("OnKeyDown",BindingFlags.Instance|BindingFlags.NonPublic);
+                            fileTree.SelectedItem=fileTree.Items.Cast<TreeNode>().Single(entryNode=>entryNode.Text=="Arquivos locais");
+                            keyDown.Invoke(fileTree,new object[]{new KeyEventArgs(Keys.Right)});
+                            var log=fileTree.Items.Cast<TreeNode>().Single(entryNode=>(string)entryNode.Tag==generatedFile);
+                            fileTree.SelectedItem=log;
+                            check(location.ReadOnly&&location.Text==Safe.In(game,generatedFile),
+                                "The generated file shows its full game path without allowing route edits.");
+                            check((fileTree.AccessibleDescription!=null)==(visit==0),
+                                "New appears on the first visit and stays cleared after reopening.");
+                            if(visit==0){
+                                using(var screenshot=new Bitmap(fileTree.Width,fileTree.Height)){
+                                    fileTree.DrawToBitmap(screenshot,fileTree.ClientRectangle);
+                                    screenshot.Save(Safe.In(root,"local-file-new.png"));
+                                }
+                            }
+                            var verified=fileTree.Items.Cast<TreeNode>().Single(entryNode=>(string)entryNode.Tag==legacyFile);
+                            fileTree.SelectedItem=verified;
+                            check(fileTree.AccessibleDescription==null,"A verified package file is not marked new.");
+                            fileTree.SelectedItem=log;
+                            var bounds=fileTree.GetItemRectangle(fileTree.SelectedIndex);
+                            typeof(Control).GetMethod("OnMouseClick",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(fileTree,
+                                new object[]{new MouseEventArgs(MouseButtons.Left,1,bounds.X+10,bounds.Y+10,0)});
+                            check(fileTree.AccessibleDescription==null&&store.Load().SeenLocalFiles.Contains(acknowledged),
+                                "Clicking clears the badge and saves acknowledgement immediately.");
+                            inspected=true;
+                        }catch(Exception ex){editorFailure=ex;}
+                        finally{editor.Close();}
+                    };
+                    timer.Start();
+                    await form.EditMod(registered);
+                }
+                if(editorFailure!=null)throw editorFailure;
+                check(inspected,"The mod editor opened for local files.");
+                form.inventoryLinks=null;
+            }
+            var secondOwner=NewEntry("Second mod",null);
+            state.List.Mods.Add(secondOwner);
+            string secondKey=Key(secondOwner,secondOwner.Variants[0]);
+            state.CyberpunkImports.Add(secondKey,legacy.Id);
+            await form.Scan();
+            check(form.VisibleGameInventory().Any(file=>file.Path==legacyFile&&file.ProvenOwner==legacy.Id)&&
+                !form.DisplayedInventory().Any(file=>file.Path==legacyFile&&file.Kind=="associated"),
+                "A verified file with two candidate project mods stays outside the catalog.");
+            state.CyberpunkImports.Remove(secondKey);
+            state.CyberpunkImports.Remove(registeredKey);
+            state.List.Mods.Remove(secondOwner);
+            registered.DetectedPaths.Add(legacyFile);
+            await form.Scan();
+            check(form.DisplayedInventory().Any(file=>file.Path==generatedFile&&file.Kind=="associated"&&file.ModId==registered.Id)&&
+                !form.DetectedModGroups().Any(group=>group.Any(file=>file.Path==legacyFile||file.Path==generatedFile)),
+                "Registering a verified path links its local companion on the next scan.");
+            registered.DetectedPaths.Remove(legacyFile);
+            catalog.Packages.Remove(legacy);
+            string legacyArchive=Safe.In(root,"legacy-origin.zip");
+            using(var zip=ZipFile.Open(legacyArchive,ZipArchiveMode.Create))WriteZipEntry(zip,legacyFile,"verified");
+            await form.Scan();
+            check(form.DetectedModGroups().Any(group=>group.Any(file=>file.Path==legacyFile&&file.VerifiedZip=="legacy-origin.zip")),
+                "The local scan offers packages verified by the original ZIP even without a receipt.");
+            registered.DetectedPaths.Add(legacyFile);
+            await form.Scan();
+            check(form.DisplayedInventory().Any(file=>file.Path==generatedFile&&file.Kind=="associated"&&file.ModId==registered.Id),
+                "A verified ZIP can also anchor a newly detected local companion after registration.");
+            registered.DetectedPaths.Remove(legacyFile);
+            File.Delete(legacyArchive);
+            const string localDrone="red4ext/plugins/FPVDroneInput/FPVDroneInput.dll";
+            check(FixedInstaller.InventoryRegistrationPath(localDrone)&&!FixedInstaller.SyncModPath(localDrone)&&
+                !FixedInstaller.InventoryRegistrationPath("red4ext/plugins/FPVDroneInput/input.log"),
+                "Local registration can identify the drone without including it in sharing or including runtime logs.");
+
             const string framework="bin/x64/plugins/cyber_engine_tweaks/mods/framework/";
             string exact=framework+"projects/villa.json", changed=framework+"projects/changed.json",
                 unknown=framework+"projects/unknown.json", dependency=framework+"init.lua";
@@ -265,8 +378,8 @@ internal sealed partial class GeneralModWindow {
             form.grid.CurrentCell=rowForVilla.Cells["Name"];
             menu.Show(form,new Point(20,20));
             check(menu.Items.Cast<ToolStripItem>().Where(item=>item.Available).Select(item=>item.Text)
-                .SequenceEqual(new[]{"Detalhes","Abrir local no Mod Loader","Abrir local no Explorador"}),
-                "The inventory context menu exposes Details and both location actions directly.");
+                .SequenceEqual(new[]{"Detalhes","Cadastrar mod detectado…","Abrir local no Mod Loader","Abrir local no Explorador"}),
+                "The inventory context menu exposes registration, details and both location actions directly.");
             menu.Close();
             using(var local=new GeneralInventoryTree(game,form.DisplayedInventory(),found[exact].Path)){
                 var list=(ListBox)local.Controls.Find("InventoryFileTree",true).Single();

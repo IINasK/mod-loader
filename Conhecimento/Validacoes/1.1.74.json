@@ -1,0 +1,225 @@
+{
+  "Version": "1.1.74",
+  "Date": "2026-11-18",
+  "GeneralSuitePassed": true,
+  "ArchiveChecks": 17,
+  "LibraryChecks": 45,
+  "Reports": [
+    {
+      "Report": "resultado-project-home.json",
+      "Passed": true,
+      "Checks": 153
+    },
+    {
+      "Report": "resultado-storage-by-mod.json",
+      "Passed": true,
+      "Checks": 40
+    },
+    {
+      "Report": "resultado-project-clone.json",
+      "Passed": true,
+      "Checks": 22
+    },
+    {
+      "Report": "resultado-project-deletion.json",
+      "Passed": true,
+      "Checks": 45
+    },
+    {
+      "Report": "resultado-loader-geral.json",
+      "Passed": true,
+      "Checks": 40
+    },
+    {
+      "Report": "resultado-pintura-botoes.json",
+      "Passed": true,
+      "Checks": 36
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Passed": true,
+      "Checks": 45
+    },
+    {
+      "Report": "resultado-automatic-update.json",
+      "Passed": true,
+      "Checks": 25
+    },
+    {
+      "Report": "resultado.json",
+      "Passed": 45,
+      "Checks": 1
+    },
+    {
+      "Report": "resultado-brand.json",
+      "Passed": true,
+      "Checks": 45
+    },
+    {
+      "Report": "resultado-category-delete.json",
+      "Passed": true,
+      "Checks": 16
+    },
+    {
+      "Report": "resultado-floating.json",
+      "Passed": true,
+      "Checks": 32
+    },
+    {
+      "Report": "resultado-historico.json",
+      "Passed": true,
+      "Checks": 1
+    },
+    {
+      "Report": "resultado-progresso-geral.json",
+      "Passed": true,
+      "Checks": 52
+    },
+    {
+      "Report": "resultado-status-presentation.json",
+      "Passed": 47,
+      "Checks": 47
+    },
+    {
+      "Report": "resultado-organization.json",
+      "Passed": true,
+      "Checks": 19
+    },
+    {
+      "Report": "resultado-p2p.json",
+      "Passed": true,
+      "Checks": 63
+    },
+    {
+      "Report": "resultado-p2p-ui.json",
+      "Passed": true,
+      "Checks": 422
+    },
+    {
+      "Report": "resultado-preset-clean.json",
+      "Passed": true,
+      "Checks": 26
+    },
+    {
+      "Report": "resultado-redesign.json",
+      "Passed": true,
+      "Checks": 78
+    },
+    {
+      "Report": "resultado-snapshot.json",
+      "Passed": true,
+      "Checks": 67
+    },
+    {
+      "Report": "resultado-snapshot-density.json",
+      "Passed": true,
+      "Checks": 1
+    },
+    {
+      "Report": "resultado-table-dialogs.json",
+      "Passed": true,
+      "Checks": 482
+    },
+    {
+      "Report": "resultado-ui-v2.json",
+      "Passed": true,
+      "Checks": 109
+    },
+    {
+      "Report": "resultado-updates.json",
+      "Passed": true,
+      "Checks": 30
+    },
+    {
+      "Report": "resultado-snapshot-installer.json",
+      "Passed": true,
+      "Checks": 45
+    },
+    {
+      "Report": "resultado-version-choice.json",
+      "Passed": true,
+      "Checks": 107
+    },
+    {
+      "Report": "resultado-project-search.json",
+      "Passed": true,
+      "Checks": 34
+    },
+    {
+      "Report": "resultado-project-card.json",
+      "Passed": true,
+      "Checks": 75
+    },
+    {
+      "Report": "resultado-preset-draft.json",
+      "Passed": true,
+      "Checks": 69
+    },
+    {
+      "Report": "resultado-project-store.json",
+      "Passed": true,
+      "Checks": 55
+    },
+    {
+      "Report": "resultado-menu-host.json",
+      "Passed": true,
+      "Checks": 73
+    },
+    {
+      "Report": "resultado-no-copy.json",
+      "Passed": true,
+      "Checks": 28
+    },
+    {
+      "Report": "resultado-project-creation.json",
+      "Passed": true,
+      "Checks": 15
+    },
+    {
+      "Report": "resultado-project-hub.json",
+      "Passed": true,
+      "Checks": 127
+    },
+    {
+      "Report": "resultado-popup-stability.json",
+      "Passed": true,
+      "Checks": 287
+    },
+    {
+      "Report": "resultado-app-paths.json",
+      "Passed": true,
+      "Checks": 11
+    }
+  ],
+  "Additional": {
+    "ProvenanceChecks": 25,
+    "VerificationChecks": 16,
+    "P2PLifecycleChecks": 17,
+    "P2PTopology": "Two isolated local instances",
+    "HumanFlowPassed": true,
+    "ModUpdatesPassed": true,
+    "UiStressRunsPassed": 3
+  },
+  "Installer": {
+    "Framework": "Velopack 1.2.161",
+    "FixtureInstallPassed": true,
+    "FixtureUninstallPassed": true,
+    "FixtureStatePreserved": true,
+    "ProductionInstallationTouched": false
+  },
+  "Changes": [
+    "Project gallery, custom covers and offline image cache",
+    "Create/import card with transparent actions and outside-click dismissal",
+    "Category removal, categorization, reordering and gradual edge scrolling",
+    "Confirmed generated outputs and persistent new-file acknowledgement",
+    "Portable P2P ownership maps and optional compatible generated settings",
+    "Parallel file verification and scan null-key correction"
+  ],
+  "Limits": [
+    "Generated files are associated only with unique verified ownership evidence; ambiguous files remain unlinked",
+    "Optional generated settings accept only portable eligible JSON data; logs, caches, saves and private data stay local",
+    "No new end-to-end validation between the users computers over the Internet"
+  ],
+  "RealGameTouched": false,
+  "PrivateEvidencePublished": false
+}

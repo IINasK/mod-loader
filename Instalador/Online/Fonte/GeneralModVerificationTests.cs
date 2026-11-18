@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
@@ -38,6 +39,36 @@ internal sealed partial class GeneralModWindow {
             if(form.statuses.Count!=0)
                 throw new IOException("Verificar sem pasta precisa informar o pré-requisito antes de varrer.");
             form.SetDestination(game);
+            if(!form.verifyAction.Visible||!form.verifyAction.Enabled)
+                throw new IOException("Recarregar deve estar disponível antes do scan.");
+            var title=form.Controls.Find("ProjectBrandTitle",true).Single();
+            if(form.verifyAction.Parent!=title.Parent||form.verifyAction.Left<=title.Right||
+                form.verifyAction.Size!=new System.Drawing.Size(44,44)||
+                Math.Abs((form.verifyAction.Top+form.verifyAction.Height/2)-(title.Top+title.Height/2))>8)
+                throw new IOException("Recarregar deve estar à direita do título Mod Loader, alinhado ao centro.");
+            Func<bool> pressF5=()=>{
+                var message=Message.Create(form.Handle,0x0100,(IntPtr)Keys.F5,IntPtr.Zero);
+                return form.ProcessCmdKey(ref message,Keys.F5);
+            };
+            bool sawLocalScan=false;
+            form.testStage=(key,phase)=>{
+                if(phase!="scan.begin")return;
+                sawLocalScan=true;
+                if(form.verifyAction.Visible)throw new IOException("Recarregar deve sumir no scan automático.");
+            };
+            await form.Scan();
+            if(!sawLocalScan||!form.verifyAction.Visible||!form.verifyAction.Enabled)
+                throw new IOException("Recarregar deve voltar ao fim do scan automático.");
+            var checkedMods=new HashSet<string>();
+            bool hiddenDuringScan=true;
+            bool acceptedDuringScan=true;
+            bool repeatedScan=false;
+            form.testStage=(key,phase)=>{
+                if(phase!="scan.begin")return;
+                hiddenDuringScan&=!form.verifyAction.Visible;
+                if(checkedMods.Count==0)acceptedDuringScan=pressF5();
+                repeatedScan|=!checkedMods.Add(key);
+            };
 
             Exception dialogFailure=null;
             int step=0;
@@ -85,9 +116,14 @@ internal sealed partial class GeneralModWindow {
                     }
                 };
                 timer.Start();
-                await form.VerifyProject();
+                if(!pressF5())throw new IOException("F5 deve iniciar a verificação do projeto.");
+                while(form.verifyingProject&&DateTime.UtcNow<deadline.AddSeconds(2))await Task.Delay(25);
             }
+            form.testStage=null;
             if(dialogFailure!=null)throw dialogFailure;
+            if(form.verifyingProject||!hiddenDuringScan||!acceptedDuringScan||repeatedScan||checkedMods.Count!=state.List.Mods.Count||
+                !form.verifyAction.Visible||!form.verifyAction.Enabled)
+                throw new IOException("Recarregar deve sumir durante o scan, ignorar F5 repetido e reaparecer ao terminar.");
             if(step!=3||form.working||
                 File.Exists(dependencyPath)||File.ReadAllText(installedPath)!=owner.Id||File.ReadAllText(manualPath)!="manual")
                 throw new IOException("Cancelar na confirmação deve preservar os arquivos locais e deixar a fila vazia.");
@@ -139,11 +175,20 @@ internal sealed partial class GeneralModWindow {
             Directory.CreateDirectory(Path.GetDirectoryName(relatedPath));
             File.WriteAllText(relatedPath,"manual script");
             await form.Scan();
-            var inventoryRow=form.grid.Rows.Cast<DataGridViewRow>().Single(item=>item.Tag is P2PSyncDifference);
+            if(!form.detectedModsReview.Visible||form.DetectedModGroups().Length!=1||form.state.List.Mods.Any(mod=>mod.Name=="Mod detectado"))
+                throw new IOException("O scan deve oferecer a revisão sem alterar a lista.");
             using(var timer=new Timer{Interval=40}){
                 timer.Tick+=(s,e)=>{
                     var editor=Application.OpenForms.OfType<GeneralModEditor>().FirstOrDefault(item=>item.Visible);
-                    if(editor==null)return;
+                    if(editor==null){
+                        var review=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(item=>item.Visible&&
+                            AllControls(item).Any(control=>control.Name=="DetectedMods"));
+                        if(review==null)return;
+                        var table=AllControls(review).OfType<DataGridView>().Single();
+                        table.CurrentCell=table.Rows[0].Cells[0];
+                        AllControls(review).OfType<Button>().Single(button=>button.Name=="RegisterDetectedMod").PerformClick();
+                        return;
+                    }
                     timer.Stop();
                     try{
                         var save=(Button)editor.AcceptButton;
@@ -157,7 +202,7 @@ internal sealed partial class GeneralModWindow {
                     }catch(Exception ex){dialogFailure=ex;editor.Complete(DialogResult.Cancel);}
                 };
                 timer.Start();
-                form.OpenRowEditor(inventoryRow);
+                form.ReviewDetectedMods();
                 await Until(()=>!form.scanning&&!timer.Enabled);
             }
             if(dialogFailure!=null)throw dialogFailure;
@@ -165,7 +210,7 @@ internal sealed partial class GeneralModWindow {
             var adoptedWork=form.MakeWork(form.state.List.Mods.Single(mod=>mod.Id==adopted.Id));
             if(!new HashSet<string>(adopted.DetectedPaths).SetEquals(new[]{extraPath,related})||
                 form.Status(adoptedWork,game)!=GeneralStatusPresentation.DetectedFiles||
-                form.VisibleGameInventory().Any()||form.state.SnapshotReceipts.ContainsKey(adoptedWork.Key)||
+                form.VisibleGameInventory().Any()||form.detectedModsReview.Visible||form.state.SnapshotReceipts.ContainsKey(adoptedWork.Key)||
                 File.ReadAllText(manualPath)!="manual"||File.ReadAllText(relatedPath)!="manual script")
                 throw new IOException("Incluir o item deve registrar pistas de múltiplas pastas sem assumir instalação ou mexer nos arquivos.");
 
@@ -180,6 +225,54 @@ internal sealed partial class GeneralModWindow {
                 if(browser.Enabled||opened.Count!=1)
                     throw new IOException("O relatório não pode abrir uma referência de arquivo local como página.");
             }
+        });
+    }
+
+    internal static void RunOutputRecoveryTests(string parent){
+        string root=OnlineTests.NestedRoot(parent,"outputs-");
+        string game=Path.Combine(root,"g");
+        Directory.CreateDirectory(game);
+        File.WriteAllText(Safe.In(game,".fixture-only"),"fixture");
+        const string code="mods/clothes/entry.bin",older="mods/clothes/preexisting.json",later="mods/clothes/run/48317.log";
+        string archive=TestZip(root,"clothes.zip",code,"installed data");
+        var entry=NewEntry("Roupas de teste",archive);
+        var state=new GeneralModState{DownloadFolder=root,Language="pt"};
+        state.List.Mods.Add(entry);
+        var catalog=new FixedCatalog{Packages=new List<FixedMod>()};
+        TestForm(catalog,state,Path.Combine(root,"d"),root,async form=>{
+            form.SetDestination(game);
+            var work=form.MakeWork(entry);
+            form.Generic(game).Install(archive,work.Receipt(0),null);
+            string existing=Safe.In(game,older);
+            File.WriteAllText(existing,"{\"quality\":1}");
+            await form.RememberModOutputBaseline(work,game);
+            string generated=Safe.In(game,later);
+            Directory.CreateDirectory(Path.GetDirectoryName(generated));
+            File.WriteAllText(generated,"runtime only");
+            state.List.Mods.RemoveAll(mod=>mod.Id==entry.Id);
+            foreach(var preset in state.List.Presets){
+                preset.ModIds.Remove(entry.Id);
+                preset.Configurations.Remove(entry.Id);
+            }
+            await form.Scan();
+            var installed=state.List.Mods.Single(mod=>mod.Id==entry.Id);
+            if(installed.Name!=entry.Name||state.List.Presets.Any(preset=>preset.ModIds.Contains(entry.Id))||
+                !state.RecoveredModIds.Contains(entry.Id)||!form.ModRows().Any(row=>Equals(row.Tag,entry.Id)))
+                throw new IOException("O cadastro deve recuperar o nome e aparecer sem entrar no preset.");
+            var files=form.DisplayedInventory().Where(file=>file.Kind=="associated").ToDictionary(file=>file.Path,InventoryPaths);
+            if(!files[older].PreexistingOutput||!files[later].GeneratedOutput||files[later].ModId!=entry.Id)
+                throw new IOException("O scan em nova sessão deve separar o arquivo anterior da saída posterior.");
+            File.WriteAllText(Safe.In(game,code),"modified data");
+            await form.Scan();
+            if(!form.DisplayedInventory().Any(file=>file.Path==code&&file.RecordedChange)||
+                form.DisplayedInventory().Any(file=>file.Path==later&&file.Kind=="associated"))
+                throw new IOException("Alterar a referência deve invalidar a associação sem transformar o arquivo editado em saída nova.");
+            File.WriteAllText(Safe.In(game,code),"installed data");
+            state.List.Mods.RemoveAll(mod=>mod.Id==entry.Id);
+            state.SuppressedModRecovery.Add(entry.Id);
+            await form.Scan();
+            if(state.List.Mods.Any(mod=>mod.Id==entry.Id)||!File.Exists(generated))
+                throw new IOException("Um cadastro removido intencionalmente deve continuar removido.");
         });
     }
 

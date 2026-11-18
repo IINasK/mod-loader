@@ -123,7 +123,10 @@ internal sealed partial class GeneralModWindow {
                 check(Math.Abs(expand.Top-(expand.Parent.ClientSize.Width-expand.Right))<=1,
                     "Expandir usa recuos superior e lateral equivalentes: "+theme);
                 var verify=AllControls(form).OfType<Button>().Single(button=>button.Name=="VerifyProject");
-                check(verify.PointToScreen(Point.Empty).Y==install.PointToScreen(Point.Empty).Y,"Verificar e a ação principal compartilham o alinhamento: "+theme);
+                var brand=AllControls(form).Single(control=>control.Name=="ProjectBrandTitle");
+                check(verify.Parent==brand.Parent&&verify.Left>brand.Right&&
+                    Math.Abs(verify.Top+verify.Height/2-brand.Top-brand.Height/2)<=8,
+                    "Verificar fica alinhado ao título no cabeçalho: "+theme);
                 var windowBounds=form.Bounds;int rows=form.grid.RowCount,height=form.grid.Height;string selectedPreset=form.state.SelectedPreset;var markedBefore=form.marked.ToArray();
                 form.expandList.PerformClick();form.PerformLayout();await Task.Delay(25);
                 check(form.listExpanded&&form.Bounds==windowBounds&&form.grid.Height>height+100&&form.tableName.Visible&&form.expandList.Visible,"Expandir aumenta só a lista dentro da janela: "+theme);

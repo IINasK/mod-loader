@@ -180,8 +180,12 @@ public sealed partial class FixedInstaller {
             .OrderBy(path=>path,StringComparer.OrdinalIgnoreCase).ToList();
     }
 
+    internal static bool InventoryRegistrationPath(string path) {
+        return !String.IsNullOrEmpty(path)&&!InstalledFileOwnership.PrivateState(path)&&ExtraFilePath(path)&&InstalledSnapshot.SafeGenericPath(path);
+    }
+
     internal static bool SyncModPath(string path) {
-        return !String.IsNullOrEmpty(path)&&!RetiredPackEntries.LocalDronePath(path)&&!InstalledFileOwnership.PrivateState(path)&&ExtraFilePath(path)&&InstalledSnapshot.SafeGenericPath(path);
+        return !RetiredPackEntries.LocalDronePath(path)&&InventoryRegistrationPath(path);
     }
 
     static bool SyncBundlePath(string path,bool localCleanup=false) {

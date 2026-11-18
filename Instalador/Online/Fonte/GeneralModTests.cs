@@ -246,6 +246,8 @@ internal sealed partial class GeneralModWindow {
         RunProgressTests(root);HistoricalReceiptTests.Run(root);
         RunUiTests(root);
         RunVerificationFlowTests(root);
+        RunOutputRecoveryTests(root);
+        RunOrganizationTests(root);
         GeneralButtonPaintTests.Run(root);
         GeneralP2PTests.Run(root);
         GeneralP2PUiTests.Run(root);
@@ -254,9 +256,10 @@ internal sealed partial class GeneralModWindow {
         RunFloatingTests(root);GeneralCategoryDeleteTests.Run(root);GeneralTableDialogTests.Run(root);RunRedesignTests(root);
         GeneralUpdatesTests.Run(root);GeneralAutomaticUpdateTests.Run(root);ModVersionChoiceTests.Run(root);RunPresetIsolationTests(root);
         GeneralBrandTests.Run(root);
-        GeneralProjectStoreTests.Run(root);RunProjectHomeTests(root);RunProjectDeletionTests(root);RunProjectHubTests(root);GeneralAppPathsTests.Run(root);RunStorageTests(root);RunNoCopyTests(root);RunProjectCloneTests(root);
-        GeneralMenuHostTests.Run(root);RunPresetDraftTests(root);GeneralPresetTests.Run(root);RunPresetLoadingTests(root);
-        GeneralPopupStabilityTests.Run(root);RunProjectSearchTests(root);
+        // Composite suites create their own isolated roots; avoid nesting another receipt tree below this one.
+        GeneralProjectStoreTests.Run(parent);RunProjectHomeTests(parent);RunProjectDeletionTests(parent);RunProjectHubTests(parent);GeneralAppPathsTests.Run(parent);RunStorageTests(parent);RunNoCopyTests(parent);RunProjectCloneTests(parent);
+        GeneralMenuHostTests.Run(parent);RunPresetDraftTests(parent);GeneralPresetTests.Run(parent);RunPresetLoadingTests(parent);
+        GeneralPopupStabilityTests.Run(parent);RunProjectSearchTests(parent);
         Safe.WriteJson(Path.Combine(root,"resultado-loader-geral.json"),new{Passed=true,Tests=checks,ArchiveChecks=archiveChecks,LibraryChecks=libraryChecks,RealGameTouched=false,NetworkUsed=false});
     }
     static string TestZip(string root,string name,string entry,string contents){
@@ -285,7 +288,7 @@ internal sealed partial class GeneralModWindow {
         });
         ui.IsBackground=true;ui.SetApartmentState(System.Threading.ApartmentState.STA);ui.Start();
         if(!ui.Join(60000))throw new IOException("A janela de teste excedeu o tempo limite.");
-        if(failure!=null)throw failure;
+        if(failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
         if(!completed)throw new IOException("A janela de teste fechou sem completar o fluxo.");
     }
 }

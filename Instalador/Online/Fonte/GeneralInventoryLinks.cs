@@ -37,14 +37,243 @@ internal sealed partial class GeneralModWindow {
             .Where(file=>file.Kind!="found"||file.InventoryGroupId!=null||!recognized.Contains(file.Path));
     }
 
-    void UpdateInventoryLinks(Action<InventoryLinkData> update){
+    void UpdateInventoryLinks(Action<InventoryLinkData> update,bool redraw=true){
         var current=InventoryLinks;
         if(inventoryLoadError!=null)throw new IOException(inventoryLoadError);
         var copy=Safe.Json.Deserialize<InventoryLinkData>(Safe.Json.Serialize(current));
         update(copy);
         new InventoryLinkStore(data,state.Destination).Save(copy);
         inventoryLinks=copy;
-        DrawRows();
+        if(redraw)DrawRows();
+    }
+
+    LinkLabel detectedModsReview,unlinkedFilesReview;
+
+    void AddDetectedModsReview(Control summary){
+        detectedModsReview=new LinkLabel{
+            Name="ReviewDetectedMods",AutoSize=true,Visible=false,LinkColor=GeneralStyle.Accent,
+            ActiveLinkColor=GeneralStyle.Foreground,Margin=new Padding(16,0,0,0),Font=GeneralStyle.Font(10.5f)
+        };
+        detectedModsReview.LinkClicked+=(s,e)=>Guard(ReviewDetectedMods);
+        summary.Controls.Add(detectedModsReview);
+        unlinkedFilesReview=new LinkLabel{Name="ReviewUnlinkedFiles",AutoSize=true,Visible=false,LinkColor=GeneralStyle.Accent,
+            ActiveLinkColor=GeneralStyle.Foreground,Margin=new Padding(16,0,0,0),Font=GeneralStyle.Font(10.5f)};
+        unlinkedFilesReview.LinkClicked+=(s,e)=>Guard(()=>{
+            if(!CanEditInventory)return;
+            using(var dialog=new GeneralInventoryTree(state.Destination,DisplayedInventory().Where(file=>file.Kind=="unlinked")))
+                dialog.ShowDialog(this);
+        });
+        summary.Controls.Add(unlinkedFilesReview);
+    }
+
+    IGrouping<string,P2PSyncDifference>[] DetectedModGroups(){
+        var listed=new HashSet<string>(state.List.Mods.SelectMany(mod=>mod.DetectedPaths),InventoryPaths);
+        return DisplayedInventory().Where(file=>file.Kind=="found"&&!file.LocalInModFolder&&!listed.Contains(file.Path)&&
+            FixedInstaller.InventoryRegistrationPath(file.Path)).GroupBy(InventoryLinkStore.Key,InventoryPaths).ToArray();
+    }
+
+    void UpdateDetectedModsReview(){
+        if(detectedModsReview==null)return;
+        int count=DetectedModGroups().Length;
+        detectedModsReview.Text=T("Revisar mods detectados","Review detected mods")+" ("+count+")";
+        detectedModsReview.Visible=count>0;
+        detectedModsReview.Enabled=CanEditInventory;
+        int unlinked=gameInventory.Count(file=>file.Kind=="unlinked");
+        unlinkedFilesReview.Text=T("Arquivos sem vínculo","Unlinked files")+" ("+unlinked+")";
+        unlinkedFilesReview.Visible=unlinked>0;
+        unlinkedFilesReview.Enabled=CanEditInventory;
+    }
+
+    void ReviewDetectedMods(){
+        if(!CanEditInventory)return;
+        var groups=DetectedModGroups();
+        if(groups.Length==0)return;
+        P2PSyncDifference selected=null;
+        bool linkExisting=false;
+        using(var dialog=new GeneralDialog(T("Mods detectados no jogo","Mods detected in the game")){ClientSize=new Size(780,495)}){
+            var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(20,8,20,20)};
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var instructions=new Label{AutoSize=true,Margin=new Padding(0,0,0,10),Text=T(
+                "Selecione um item para cadastrar no projeto ou vincular a um mod existente.",
+                "Select an item to register in the project or link to an existing mod.")};
+            layout.Controls.Add(instructions,0,0);
+            var table=GeneralTableDialogLayout.SingleColumnTable("DetectedMods",dialog.Text,T("Mod ou grupo de arquivos","Mod or file group"));
+            table.Columns.Add(new DataGridViewTextBoxColumn{HeaderText=T("Arquivos","Files"),Width=82,SortMode=DataGridViewColumnSortMode.NotSortable});
+            table.Columns.Add(new DataGridViewTextBoxColumn{HeaderText=T("Origem","Origin"),Width=166,SortMode=DataGridViewColumnSortMode.NotSortable});
+            foreach(var group in groups){
+                var first=group.FirstOrDefault(file=>file.ProvenOwner!=null||file.VerifiedZip!=null)??group.First();
+                string origin=first.ProvenOwner!=null?T("Confirmada","Verified"):
+                    first.VerifiedZip!=null?T("ZIP conferido","Verified ZIP"):T("A confirmar","Unconfirmed");
+                var row=table.Rows[table.Rows.Add(first.Mod??first.Path,group.Count(),origin)];
+                row.Tag=first;
+                row.Cells[0].ToolTipText=String.Join(Environment.NewLine,group.Select(file=>file.Path).Take(12));
+            }
+            layout.Controls.Add(GeneralTableDialogLayout.TableSurface(table),0,1);
+            var commands=GeneralTableDialogLayout.Commands();
+            Action<bool> choose=link=>{
+                if(table.CurrentRow==null)return;
+                var item=(P2PSyncDifference)table.CurrentRow.Tag;
+                if(link&&!CanLinkInventoryFile(item))return;
+                selected=item;
+                linkExisting=link;
+                dialog.Complete(DialogResult.OK);
+            };
+            var add=GeneralStyle.Button(T("Cadastrar…","Register…"),()=>choose(false),true);
+            add.Name="RegisterDetectedMod";
+            var linkMod=GeneralStyle.Button(T("Vincular a um mod…","Link to a mod…"),()=>choose(true));
+            var close=GeneralStyle.Button(T("Fechar","Close"),()=>dialog.Complete(DialogResult.Cancel));
+            commands.Controls.AddRange(new Control[]{add,linkMod,close});
+            Action update=()=>{
+                var item=table.CurrentRow==null?null:table.CurrentRow.Tag as P2PSyncDifference;
+                add.Enabled=item!=null;
+                linkMod.Enabled=CanLinkInventoryFile(item);
+            };
+            table.SelectionChanged+=(s,e)=>update();
+            table.CellDoubleClick+=(s,e)=>{if(e.RowIndex>=0)choose(false);};
+            update();
+            layout.Controls.Add(commands,0,2);
+            dialog.Content.Controls.Add(layout);
+            dialog.CancelButton=close;
+            GeneralStyle.Apply(dialog,GeneralStyle.Dark);
+            if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+        }
+        if(linkExisting)PickInventoryOwner(selected);
+        else RegisterDetectedMod(selected);
+    }
+
+    List<ModOutputInstallation> FindRecoverableMods(string root,ScanReads reads){
+        var records=new ModOutputIndex(data,root).Load().Installations;
+        records.AddRange(Snapshot(root).OutputRecoveryCandidates());
+        if(reads.Cyberpunk&&projectStore!=null){
+            foreach(var source in projectStore.Read(true).Projects.Where(item=>project==null||item.Id!=project.Id)){
+                GeneralModState previous;
+                try{previous=projectStore.Load(source,true);}
+                catch(IOException){continue;}
+                catch(UnauthorizedAccessException){continue;}
+                if(!InventoryPaths.Equals(previous.Destination,root))continue;
+                var imports=previous.CyberpunkImports.ToLookup(pair=>WorkKeyFromReceipt(pair.Key),StringComparer.Ordinal);
+                foreach(var entry in previous.List.Mods)
+                    foreach(var variant in entry.Variants.Where(option=>imports.Contains(Key(entry,option))))
+                        records.Add(new ModOutputInstallation{Entry=entry,Variant=variant.Id,
+                            Imports=imports[Key(entry,variant)].ToDictionary(pair=>pair.Key,pair=>pair.Value)});
+            }
+        }
+        var present=new HashSet<string>(state.List.Mods.Select(mod=>mod.Id),StringComparer.Ordinal);
+        present.UnionWith(state.SuppressedModRecovery??new List<string>());
+        var sources=new HashSet<string>(state.List.Mods.SelectMany(mod=>RecoverySources(mod)),StringComparer.Ordinal);
+        var valid=new List<ModOutputInstallation>();
+        foreach(var group in records.Where(item=>item!=null&&item.Entry!=null&&item.Entry.Id!=null&&!present.Contains(item.Entry.Id))
+            .GroupBy(item=>item.Entry.Id,StringComparer.Ordinal)){
+            var matches=group.Where(item=>RetiredPackEntries.CanRecover(item.Entry)&&
+                !RecoverySources(item.Entry).Any(sources.Contains)&&VerifyOutputRecovery(item,root,reads))
+                .GroupBy(item=>item.Variant+"\n"+String.Join("\n",item.Imports.OrderBy(pair=>pair.Key).Select(pair=>pair.Value))+
+                    "\n"+String.Join("\n",RecoverySources(item.Entry))).Select(items=>items.First()).Take(2).ToArray();
+            if(matches.Length==1)valid.Add(matches[0]);
+        }
+        var duplicateIds=valid.SelectMany(item=>RecoverySources(item.Entry).Select(source=>new{source,item.Entry.Id}))
+            .GroupBy(item=>item.source,StringComparer.Ordinal).Where(items=>items.Select(item=>item.Id).Distinct().Count()>1)
+                .SelectMany(items=>items.Select(item=>item.Id));
+        var duplicates=new HashSet<string>(duplicateIds,StringComparer.Ordinal);
+        return valid.Where(item=>!duplicates.Contains(item.Entry.Id)).ToList();
+    }
+
+    static IEnumerable<string> RecoverySources(GeneralModEntry mod){
+        return mod.Variants.SelectMany(variant=>variant.Sources).Select(GeneralNexusLink.Parse).Where(link=>link!=null)
+            .Select(link=>link.Game+"/"+link.Mod).Distinct(StringComparer.Ordinal).OrderBy(source=>source,StringComparer.Ordinal);
+    }
+
+    bool VerifyOutputRecovery(ModOutputInstallation item,string root,ScanReads reads){
+        try{
+            var variant=item.Entry.Variants.FirstOrDefault(option=>option.Id==item.Variant);
+            if(variant==null||variant.Sources.Count==0)return false;
+            string owner=InstalledSnapshot.Owner(item.Entry,variant);
+            if(item.SnapshotId!=null)
+                return Snapshot(root).ReadInstalledFiles(item.SnapshotId,owner,includeConfigs:false).Count>0;
+            if(variant.CyberpunkId!=null){
+                if(!reads.Cyberpunk||!catalog.Packages.Any(mod=>mod.Id==variant.CyberpunkId))return false;
+                var recipe=ProfileRecipe(new Work{Entry=item.Entry,Variant=variant});
+                return reads.Fixed(recipe).IsCorrect;
+            }
+            return Enumerable.Range(0,variant.Sources.Count).All(index=>{
+                string slot=P2PPack.Slot(item.Entry,variant,index);
+                if(!reads.Cyberpunk)return Generic(root).Status(slot,null,reads.Hash,variant.InstallRoutes)==GeneralModInstaller.Installed;
+                string id;
+                return P2PPack.TrySlot(item.Imports,item.Entry,variant,index,out id)&&reads.Imports.Value.Contains(id);
+            });
+        }catch(IOException){return false;}catch(UnauthorizedAccessException){return false;}
+    }
+
+    async Task RecoverModOutputs(string root,ScanReads reads){
+        if(projectDraft!=null||!reads.Exists)return;
+        try{
+            var missing=await Task.Run(()=>FindRecoverableMods(root,reads));
+            if(missing.Count==0||IsDisposed||exitApproved)return;
+            var next=CopyProjectState();
+            if(next.RecoveredModIds==null)next.RecoveredModIds=new List<string>();
+            foreach(var item in missing){
+                var entry=item.Entry;
+                entry.DefaultVariant=item.Variant;
+                next.List.Mods.Add(entry);
+                if(!next.RecoveredModIds.Contains(entry.Id))next.RecoveredModIds.Add(entry.Id);
+                foreach(var binding in item.Imports)next.CyberpunkImports[binding.Key]=binding.Value;
+                if(item.SnapshotId!=null)next.SnapshotReceipts[entry.Id+"/"+item.Variant]=item.SnapshotId;
+            }
+            library.Save(next);
+            state.List=next.List;
+            state.RecoveredModIds=next.RecoveredModIds;
+            state.CyberpunkImports=next.CyberpunkImports;
+            state.SnapshotReceipts=next.SnapshotReceipts;
+        }catch(IOException ex){OnlineDiagnostics.Failure("inventory.recovery",ex,"Recuperar cadastros com recibo íntegro.");}
+         catch(UnauthorizedAccessException ex){OnlineDiagnostics.Failure("inventory.recovery",ex,"Recuperar cadastros com recibo íntegro.");}
+    }
+
+    async Task ReconcileModOutputs(string root,IEnumerable<P2PSyncDifference> files){
+        try{
+            var installed=state.List.Mods.Where(mod=>mod.Variants.Any(variant=>{
+                string status;
+                return statuses.TryGetValue(Key(mod,variant),out status)&&GeneralStatusPresentation.Kind(status)=="installed";
+            })).Select(mod=>mod.Id).ToArray();
+            string projectData=data;
+            await Task.Run(()=>new ModOutputIndex(projectData,root).Reconcile(files,verifiedOwners:installed));
+        }
+        catch(IOException ex){OnlineDiagnostics.Failure("inventory.outputs",ex,"Atualizar o índice de arquivos gerados.");}
+        catch(UnauthorizedAccessException ex){OnlineDiagnostics.Failure("inventory.outputs",ex,"Atualizar o índice de arquivos gerados.");}
+    }
+
+    async Task RememberModOutputBaseline(Work work,string root){
+        try{
+            var key=Key(work.Entry,work.Variant);
+            var record=new ModOutputInstallation{
+                Entry=Safe.Json.Deserialize<GeneralModEntry>(Safe.Json.Serialize(work.Entry)),Variant=work.Variant.Id,
+                Imports=state.CyberpunkImports.Where(pair=>WorkKeyFromReceipt(pair.Key)==key).ToDictionary(pair=>pair.Key,pair=>pair.Value)
+            };
+            string projectData=data;
+            await Task.Run(()=>{
+                bool cyberpunk=IsCyberpunk(root);
+                IEnumerable<string> installed;
+                if(work.Variant.CyberpunkId!=null){
+                    var recipe=ProfileRecipe(work);
+                    var routed=GeneralInstallRoutes.FixedPaths(catalog,recipe,work.Variant.InstallRoutes);
+                    installed=recipe.Files.Where(file=>!file.UserData).Select(file=>routed[file.Path]);
+                }else if(cyberpunk){
+                    installed=Cyberpunk(root).ProjectDeletionFiles(new HashSet<string>(record.Imports.Values,StringComparer.Ordinal),true)
+                        .Select(file=>file.Path);
+                }else{
+                    installed=Generic(root).ProjectDeletionFiles(true)
+                        .Where(file=>file.OwnerKeys.Any(owner=>WorkKeyFromReceipt(owner)==key)).Select(file=>file.Path);
+                }
+                var paths=new HashSet<string>(installed.Where(path=>!GeneralInstallRoutes.External(path)),InventoryPaths);
+                Func<string,string> scope=cyberpunk?(Func<string,string>)FixedInstaller.ModFolder:InstalledFileOwnership.GenericScope;
+                var scopes=paths.Where(path=>!InstalledFileOwnership.Companion(path)).Select(scope).Where(folder=>folder!=null)
+                    .Concat(work.Variant.OutputFolders??new List<string>());
+                var files=InstalledFileOwnership.Walk(root,scopes).Where(path=>!paths.Contains(path))
+                    .Select(path=>new P2PSyncDifference{Path=path,Kind="associated",ModId=work.Entry.Id,LocalInModFolder=true});
+                new ModOutputIndex(projectData,root).Reconcile(files,record);
+            });
+        }catch(IOException ex){OnlineDiagnostics.Failure("inventory.outputs.baseline",ex,"Registrar os arquivos presentes ao instalar o mod.");}
+         catch(UnauthorizedAccessException ex){OnlineDiagnostics.Failure("inventory.outputs.baseline",ex,"Registrar os arquivos presentes ao instalar o mod.");}
     }
 
     void OpenInventoryTree(string selectedPath=null,IWin32Window owner=null){
@@ -125,12 +354,24 @@ internal sealed partial class GeneralModWindow {
         var point=table.PointToClient(Cursor.Position);
         if(!table.ClientRectangle.Contains(point))return;
         int start=table.ColumnHeadersVisible?table.ColumnHeadersHeight:0;
-        int direction=point.Y<start+36?-1:point.Y>=table.ClientSize.Height-40?1:0;
+        int speed=DragScrollSpeed(point.Y,start,table.ClientSize.Height,table.DeviceDpi);
         int first=table.FirstDisplayedScrollingRowIndex;
-        if(direction==0||first<0)return;
-        int index=direction<0?table.Rows.GetPreviousRow(first,DataGridViewElementStates.Visible)
-            :table.Rows.GetNextRow(first,DataGridViewElementStates.Visible);
-        if(index>=0)table.FirstDisplayedScrollingRowIndex=index;
+        if(speed==0||first<0)return;
+        int index=first;
+        for(int step=0;step<Math.Abs(speed);step++){
+            int next=speed<0?table.Rows.GetPreviousRow(index,DataGridViewElementStates.Visible)
+                :table.Rows.GetNextRow(index,DataGridViewElementStates.Visible);
+            if(next<0)break;
+            index=next;
+        }
+        if(index!=first)table.FirstDisplayedScrollingRowIndex=index;
+    }
+
+    static int DragScrollSpeed(int y,int top,int bottom,int dpi){
+        int zone=Math.Min(64*dpi/96,Math.Max(1,(bottom-top)/3));
+        if(y<top+zone)return -(1+3*Math.Min(zone,Math.Max(0,zone-(y-top)))/zone);
+        if(y>=bottom-zone)return 1+3*Math.Min(zone,Math.Max(0,zone-(bottom-y)))/zone;
+        return 0;
     }
 
     void DropInventoryGroup(DragEventArgs args){

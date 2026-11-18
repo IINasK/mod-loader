@@ -22,6 +22,7 @@ internal static class GeneralAppPathsTests {
         check(GeneralAppPaths.WindowTitle.StartsWith(product+" ",StringComparison.Ordinal)&&
             P2PService.TransferStore==Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),product,"Pacotes P2P"),
             "The edition's title and P2P transfer folder use the same identity.");
+        GeneralGameCoverCacheTests.Run(root);
         Safe.WriteJson(Path.Combine(root,"resultado-app-paths.json"),new{Passed=true,Tests=checks,PersonalDataTouched=false,GameTouched=false});
     }
 }

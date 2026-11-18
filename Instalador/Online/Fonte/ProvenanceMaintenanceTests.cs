@@ -80,9 +80,86 @@ internal static class ProvenanceMaintenanceTests {
         check(Directory.GetFiles(game,"*",SearchOption.AllDirectories).Length==7&&
             File.ReadAllText(Path.Combine(folder,"slot.sav"))=="local user data",
             "Provenance inspection writes no tags into payloads and preserves local saves.");
+        CheckGeneratedOutputs(OnlineTests.NestedRoot(parent,"output-"),check);
         Safe.WriteJson(Path.Combine(root,"result.json"),new{Passed=true,Checks=checks,RealGameTouched=false,
             NetworkUsed=false,AutomaticGeneratedFileDeletion=false,ExtraPayloadCopies=0,RestoredBackupBytesReleased=8192});
         return checks.Count;
+    }
+
+    static void CheckGeneratedOutputs(string root,Action<bool,string> check){
+        string host=Path.Combine(root,"h"),receiver=Path.Combine(root,"r"),metadata=Path.Combine(root,"m");
+        Directory.CreateDirectory(host);Directory.CreateDirectory(receiver);
+        File.WriteAllText(Path.Combine(receiver,".fixture-only"),"fixture");
+        const string code="mods/clothes/main.bin",preexisting="mods/clothes/older.json",
+            generated="mods/clothes/fresh.json",runLog="mods/clothes/runtime.log";
+        Directory.CreateDirectory(Path.GetDirectoryName(Safe.In(host,code)));
+        File.WriteAllText(Safe.In(host,code),"installed");
+        File.WriteAllText(Safe.In(host,preexisting),"{\"quality\":1}");
+        var mod=new GeneralModEntry{Id="clothes",Name="Clothes",DefaultVariant="default",
+            Variants=new List<GeneralModVariant>{new GeneralModVariant{Id="default",Name="Main",Sources=new List<string>{"installed://clothes/default"}}}};
+        Func<string,P2PSyncDifference> observed=path=>new P2PSyncDifference{Path=path,ModId=mod.Id,Kind="associated",LocalInModFolder=true};
+        var baseline=observed(preexisting);
+        new ModOutputIndex(metadata,host).Reconcile(new[]{baseline},new ModOutputInstallation{Entry=mod,Variant="default"});
+        File.WriteAllText(Safe.In(host,generated),"{\"quality\":2,\"enabled\":true}");
+        File.WriteAllText(Safe.In(host,runLog),"local only");
+        var fresh=observed(generated);
+        var reopened=new ModOutputIndex(metadata,host);
+        reopened.Reconcile(new[]{baseline,fresh,observed(runLog)});
+        check(baseline.PreexistingOutput&&!baseline.GeneratedOutput&&fresh.GeneratedOutput&&reopened.Load().Files.Count==3,
+            "A new app instance remembers the installation baseline and identifies a later output.");
+        check(!ModOutputIndex.CanSend(runLog)&&!ModOutputIndex.CanSend("mods/clothes/saves/slot.json"),
+            "Generated logs and private state are never eligible for transfer.");
+        var manifest=new InstalledSnapshotManifest{Schema=2,Name="Clothes",Game="generic",Project=new GeneralModList()};
+        manifest.List.Mods.Add(mod);
+        manifest.Project.Mods.Add(mod);
+        manifest.Files.Add(new InstalledSnapshotFile{Path=code,Kind="file",Sha256=Safe.Hash(Safe.In(host,code)),Size=9,
+            Owners=new List<string>{"clothes/default"}});
+        string json=InstalledSnapshot.ReadGeneratedConfig(host,generated);
+        var selected=new P2POutputSelection{Owner=mod.Id,Path=generated,
+            Hash=InstalledSnapshot.Hash(System.Text.Encoding.UTF8.GetBytes(json))};
+        mod.Variants[0].OutputFolders.Add("output/clothes");
+        string declared=Safe.In(host,"output/clothes/settings.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(declared));
+        File.WriteAllText(declared,"{\"quality\":1}");
+        var anchors=new[]{new ModFileAnchor{Path=code,Owner=mod.Id,Hash=Safe.Hash(Safe.In(host,code))}};
+        var claim=new KeyValuePair<string,string>("output/clothes",mod.Id);
+        check(InstalledFileOwnership.FindDeclared(host,new[]{claim},anchors,Safe.Hash).Single().Key=="output/clothes/settings.json"&&
+            !InstalledFileOwnership.FindDeclared(host,new[]{claim,new KeyValuePair<string,string>("output/clothes","other")},anchors,Safe.Hash).Any(),
+            "A declared destination outside the package folder works when its installed owner is unique.");
+        var session=new P2PSession{GeneratedConfigSelection=new[]{selected},
+            Recipients=new[]{new P2PRecipient{SupportsGeneratedConfigs=false}}};
+        var catalog=new FixedCatalog{Packages=new List<FixedMod>()};
+        P2PService.IncludePortableOutputs(session,host,manifest,null);
+        check(manifest.Schema==2&&manifest.OutputScopes.Count==2&&manifest.Files.Count==1,
+            "Older receivers get portable scope metadata and the original payload format.");
+        string standard=Path.Combine(root,"standard.zip");
+        InstalledSnapshot.Write(standard,host,manifest,null,null,null);
+        session.Recipients[0].SupportsGeneratedConfigs=true;
+        P2PService.IncludePortableOutputs(session,host,manifest,null);
+        check(manifest.Schema==3&&manifest.Files.Single(file=>file.Generated).Path==generated,
+            "Compatible receivers get only the output explicitly selected by the host.");
+        string zip=Path.Combine(root,"o.zip");
+        InstalledSnapshot.Write(zip,host,manifest,null,null,null);
+        Directory.CreateDirectory(Path.GetDirectoryName(Safe.In(receiver,generated)));
+        File.WriteAllText(Safe.In(receiver,generated),"{\"quality\":9}");
+        var engine=new InstalledSnapshotInstaller(receiver,metadata,catalog,true);
+        var id=engine.Install(zip,Safe.Hash(zip),null);
+        check(File.ReadAllText(Safe.In(receiver,generated))=="{\"quality\":9}"&&
+            engine.Status(id,"clothes/default")==GeneralModInstaller.Installed&&engine.ReadOutputScopes().Count()==2&&
+            engine.ReadInstalledFiles(id,"clothes/default").Count==1,
+            "The receiver preserves existing local settings and does not treat generated outputs as installed files.");
+        string clean=Path.Combine(root,"clean");
+        Directory.CreateDirectory(clean);
+        File.WriteAllText(Safe.In(clean,".fixture-only"),"fixture");
+        var cleanEngine=new InstalledSnapshotInstaller(clean,metadata,catalog,true);
+        string cleanId=cleanEngine.Install(zip,Safe.Hash(zip),null);
+        check(File.ReadAllText(Safe.In(clean,generated))==json,"An approved generated config is installed only when missing.");
+        cleanEngine.Remove(cleanId,new[]{"clothes/default"},null);
+        check(File.Exists(Safe.In(clean,generated)),"A generated config remains local after uninstall.");
+        File.WriteAllText(Safe.In(host,generated),"{\"name\":\"local-machine\"}");
+        bool blocked=false;
+        try{InstalledSnapshot.ReadGeneratedConfig(host,generated);}catch(IOException){blocked=true;}
+        check(blocked,"Strings in generated settings stay local.");
     }
 
     static string Zip(string root,string name,string entry,string content){

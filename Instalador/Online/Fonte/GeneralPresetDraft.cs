@@ -24,6 +24,8 @@ internal sealed partial class GeneralModWindow {
         var saved=CopyProjectState();
         saved.List=GeneralPresetProfiles.Copy(projectDraft.List);
         saved.ChosenVariants=new Dictionary<string,string>(projectDraft.ChosenVariants);
+        saved.SuppressedModRecovery=new List<string>(projectDraft.SuppressedModRecovery??new List<string>());
+        saved.RecoveredModIds=new List<string>(projectDraft.RecoveredModIds??new List<string>());
         saved.BodyChoice=projectDraft.BodyChoice;
         if(!saved.List.Presets.Any(preset=>preset.Id==saved.SelectedPreset))
             saved.SelectedPreset=projectDraft.SelectedPreset;
@@ -70,7 +72,8 @@ internal sealed partial class GeneralModWindow {
         if(projectDraft==null)return;
         var saved=CommittedProject();
         state.List=saved.List;state.ChosenVariants=saved.ChosenVariants;state.SelectedPreset=saved.SelectedPreset;state.BodyChoice=saved.BodyChoice;
-        state.SnapshotReceipts=saved.SnapshotReceipts;GeneralPresetProfiles.Project(state);
+        state.SnapshotReceipts=saved.SnapshotReceipts;state.SuppressedModRecovery=saved.SuppressedModRecovery;
+        state.RecoveredModIds=saved.RecoveredModIds;GeneralPresetProfiles.Project(state);
         marked.IntersectWith(state.List.Mods.Select(mod=>mod.Id));
         statuses.Clear();statusDetails.Clear();progress.Clear();ResetColumnFilters();
         EndProjectEdit();
