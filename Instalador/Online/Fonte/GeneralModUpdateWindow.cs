@@ -42,13 +42,67 @@ internal sealed partial class GeneralModWindow {
         return InstalledVersion(status)||GeneralStatusPresentation.Kind(status)=="installed";
     }
 
-    string[] SelectedUpdateLinks(){
-        if(marked.Count==0&&updateFocusedId==null)return new string[0];
+    GeneralModEntry[] SelectedUpdateMods(){
+        if(!CanUpdateActivePreset()||marked.Count==0&&updateFocusedId==null)return new GeneralModEntry[0];
         var selected=new HashSet<string>(TableSelectionIds()
             .Where(id=>marked.Count>0?marked.Contains(id):id==updateFocusedId),StringComparer.Ordinal);
-        return state.List.Mods.Where(mod=>selected.Contains(mod.Id)&&VersionInstalled(ListStatus(mod)))
-            .SelectMany(mod=>versionsByWork[MakeWork(mod).Key]).Where(HasSourceUpdate)
-            .Select(row=>row.Online.Url).Where(GeneralModDownload.IsWebSource).Distinct(StringComparer.Ordinal).ToArray();
+        return state.List.Mods.Where(mod=>selected.Contains(mod.Id)&&!ManualUpdatesOnly(mod.Id)&&UpdateLinks(mod).Length>0).ToArray();
+    }
+
+    string[] UpdateLinks(GeneralModEntry mod){
+        if(presetProtected.Contains(mod.Id)||!VersionInstalled(ListStatus(mod)))return new string[0];
+        return versionsByWork[MakeWork(mod).Key].Where(HasSourceUpdate).Select(row=>row.Online.Url)
+            .Where(GeneralModDownload.IsWebSource).Distinct(StringComparer.Ordinal).ToArray();
+    }
+
+    bool CanUpdateIndividualMod(GeneralModEntry mod){
+        return mod!=null&&!String.IsNullOrWhiteSpace(state.Destination)&&CanUpdateActivePreset()&&
+            (InstallableUpdates(includeManual:true).Any(work=>work.Entry.Id==mod.Id)||UpdateLinks(mod).Length>0);
+    }
+
+    async Task UpdateIndividualMod(GeneralModEntry mod){
+        if(working||scanning||loadingPreset||associationChoice!=null||!CanUpdateIndividualMod(mod))return;
+        if(projectDraft!=null&&!ConfirmProjectNavigation())return;
+        if(!state.List.Mods.Contains(mod))return;
+        try{
+            var work=InstallableUpdates(includeManual:true).FirstOrDefault(item=>item.Entry.Id==mod.Id);
+            if(work==null){
+                await OpenUpdateLinks(new[]{mod},manual:true);
+                return;
+            }
+            work.UpdateRequested=true;
+            await PlanAndConfirmJobs(new List<Work>{work},Root(),ModAction.Update,
+                ReadSwitchPerformance().Workers(Environment.ProcessorCount),manual:true);
+        }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
+    }
+
+    async Task OpenUpdateLinks(GeneralModEntry[] mods,bool manual=false){
+        var choices=mods.Select(mod=>new GeneralUpdateConfirmation.Choice(mod.Name,true)).ToArray();
+        var decision=await ConfirmModUpdates(choices,mods,manual?null:Enumerable.Range(0,mods.Length),offerBackup:false);
+        if(decision==null)return;
+        foreach(string url in decision.Item1.SelectMany(index=>UpdateLinks(mods[index])).Distinct(StringComparer.Ordinal))launch(url);
+    }
+
+    async Task<Tuple<int[],bool>> ConfirmModUpdates(GeneralUpdateConfirmation.Choice[] choices,GeneralModEntry[] mods,
+        IEnumerable<int> deferrable,bool offerBackup){
+        var existing=OwnedForms.OfType<GeneralUpdateConfirmation>().FirstOrDefault(dialog=>!dialog.IsDisposed);
+        if(existing!=null){existing.Activate();return null;}
+        var original=state;
+        string presetId=state.SelectedPreset,root=state.Destination;
+        using(var dialog=new GeneralUpdateConfirmation(choices,offerBackup,deferrable)){
+            var answer=await dialog.ShowForUpdate(this);
+            if(IsDisposed||exitApproved||working||scanning||associationChoice!=null||!ReferenceEquals(original,state)||
+                presetId!=state.SelectedPreset||!InventoryPaths.Equals(root,state.Destination)||mods.Any(mod=>!state.List.Mods.Contains(mod)))return null;
+            if(answer==DialogResult.Ignore){
+                var previous=state.ManualUpdateMods;
+                state.ManualUpdateMods=previous.Concat(dialog.SelectedIndices.Select(index=>mods[index].Id))
+                    .Distinct(StringComparer.Ordinal).ToList();
+                try{Persist();}
+                catch{state.ManualUpdateMods=previous;throw;}
+                DrawRows();
+            }
+            return answer==DialogResult.OK?Tuple.Create(dialog.SelectedIndices,dialog.CreateBackup):null;
+        }
     }
 
     static bool HasSourceUpdate(ModUpdateRow row){
@@ -75,6 +129,8 @@ internal sealed partial class GeneralModWindow {
         var updates=versionsByWork[key].Where(HasSourceUpdate).Select(update=>update.Online.Version)
             .Where(value=>!String.IsNullOrWhiteSpace(value)).Distinct(StringComparer.Ordinal).ToArray();
         if(updates.Length>0)text+="\n"+T("Versão mais recente na origem ","Newer upstream version ")+String.Join(", ",updates);
+        if(ManualUpdatesOnly(entry.Id)&&(updates.Length>0||status==UpdateAvailableStatus))
+            text+="\n"+T("Use Atualizar mod nas opções deste item.","Use Update mod in this item's options.");
         var pending=versionsByWork[key].Where(observation=>observation.Online==null||
             observation.Online.State!="current"&&observation.Online.State!="update")
             .Select(observation=>UpdateState(observation.Online)).Distinct().ToArray();
@@ -103,7 +159,7 @@ internal sealed partial class GeneralModWindow {
             Total=groups.Length,
             Checked=groups.Count(VersionChecked),
             Ready=InstallableUpdates().Count(work=>keys==null||keys.Contains(work.Key)),
-            Review=modUpdates.Where(HasSourceUpdate).Select(row=>row.Key).Distinct(StringComparer.Ordinal).Count(),
+            Review=groups.Count(group=>!ManualUpdatesOnly(group.Key.Split('/')[0])&&group.Any(HasSourceUpdate)),
             Unchecked=groups.Count(group=>group.Any(row=>row.Provider!=null&&
                 (row.Online==null||row.Online.State!="update"&&row.Online.State!="current"))),
             Unsupported=groups.Count(group=>group.Any(row=>row.Provider==null))
@@ -128,7 +184,7 @@ internal sealed partial class GeneralModWindow {
         switch(versionFilter.Value){
             case VersionFilter.Checked:return VersionChecked(rows);
             case VersionFilter.Update:return actionable.Contains(key);
-            case VersionFilter.Review:return rows.Any(HasSourceUpdate);
+            case VersionFilter.Review:return !ManualUpdatesOnly(mod.Id)&&rows.Any(HasSourceUpdate);
             default:return rows.Any()&&!VersionChecked(rows);
         }
     }

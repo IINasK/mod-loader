@@ -164,7 +164,7 @@ internal sealed partial class GeneralModWindow {
             if(IsDisposed)return;
             if(pending.Count>0){
                 foreach(var work in pending)work.DependencyQueue=true;
-                ConfirmAndEnqueue(pending,root,downloads,false);
+                await ConfirmAndEnqueue(pending,root,downloads,false);
             }
         }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
         finally{

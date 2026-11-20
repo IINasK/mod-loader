@@ -423,12 +423,15 @@ internal sealed partial class GeneralModWindow : Form {
         copyFailures.Name="CopyInstallFailures";
         var undo=GeneralMenuRenderer.Add(menu,T("Cyberpunk: desfazer operação","Cyberpunk: undo operation"),async()=>await CyberpunkMaintenance(false));
         var clean=GeneralMenuRenderer.Add(menu,T("Cyberpunk: limpar extras","Cyberpunk: remove extra mods"),async()=>await CyberpunkMaintenance(true));
+        var manualUpdate=GeneralMenuRenderer.Add(menu,T("Atualizar mod","Update mod"),async()=>await UpdateIndividualMod(FocusedEntry()));
+        manualUpdate.Name="UpdateIndividualMod";
         menu.Opening+=(s,e)=>{
             if(associationChoice!=null){e.Cancel=true;return;}
             bool inventory=FocusedInventoryFile()!=null;
             var focused=FocusedEntry();
             var folder=FocusedFolder();
             bool editFolders=!working&&!scanning;
+            manualUpdate.Visible=editFolders&&CanUpdateIndividualMod(focused);
             makeFolder.Visible=editFolders&&(focused!=null||folder!=null)&&TableSelectionIds().Where(marked.Contains).Take(2).Count()==2;
             renameFolder.Visible=dissolveFolder.Visible=editFolders&&folder!=null;
             details.Visible=inventory||focused!=null;
@@ -876,7 +879,8 @@ internal sealed partial class GeneralModWindow : Form {
     Font optionSelectedFont,groupIndicatorFont;
 
     string InstallationStatus(GeneralModEntry entry,string status){
-        if(VersionInstalled(status)&&versionsByWork[MakeWork(entry).Key].Any(HasSourceUpdate))
+        if(ManualUpdatesOnly(entry.Id)&&status==UpdateAvailableStatus)return "Instalado";
+        if(!ManualUpdatesOnly(entry.Id)&&VersionInstalled(status)&&versionsByWork[MakeWork(entry).Key].Any(HasSourceUpdate))
             return UpdateAvailableStatus;
         if(!IsBigBody(entry))return status;
         if(status==GeneralStatusPresentation.OtherChoice)return "Não iniciado";

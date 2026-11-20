@@ -182,13 +182,15 @@ internal sealed partial class GeneralModWindow {
             if(startedBeforeLocal!=1)throw new IOException("The fixture did not observe an overlapping lookup.");
             form.updateFocusedId=installed.Id;
             form.RefreshPrimaryAction();
-            if(form.primaryAction.Text!="Abrir atualização")throw new IOException("Selecting an online update must not fall back to Disable.");
+            if(form.primaryAction.Text!="Atualizar mod")throw new IOException("Selecting an online update must not fall back to Disable.");
             var open=form.launch;
             string openedLink=null;
             form.launch=url=>openedLink=url;
-            try{form.StartSelected();}
-            finally{form.launch=open;}
-            if(openedLink!=nexus.Replace("file_id=10","file_id=11"))throw new IOException("The action must open the reported successor file.");
+            try{
+                form.StartSelected();
+                await ChooseUpdateResponse("ConfirmPendingInstall");
+            }finally{form.launch=open;}
+            if(openedLink!=nexus.Replace("file_id=10","file_id=11"))throw new IOException("The action must confirm before opening the reported successor file.");
             form.updateFocusedId=null;
             Func<DataGridViewRow> installedRow=()=>form.ModRows().Single(row=>Equals(row.Tag,entry.Id));
             var cell=installedRow().Cells["Status"];
@@ -221,6 +223,32 @@ internal sealed partial class GeneralModWindow {
                 form.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));
                 image.Save(Safe.In(root,"installed-version-table.png"));
             }
+            form.updateFocusedId=installed.Id;
+            openedLink=null;form.launch=url=>openedLink=url;
+            try{
+                form.StartSelected();
+                await ChooseUpdateResponse("CancelPendingInstall");
+                if(openedLink!=null||form.ManualUpdatesOnly(installed.Id)||form.SelectedUpdateMods().Length!=1)
+                    throw new IOException("No must cancel only this attempt.");
+
+                form.StartSelected();
+                await ChooseUpdateResponse("DeferSelectedUpdates");
+                if(openedLink!=null||form.SelectedUpdateMods().Length!=0||
+                    !form.library.Load().ManualUpdateMods.SequenceEqual(new[]{installed.Id}))
+                    throw new IOException("Don't ask again must persist just the selected mod and open no link.");
+
+                form.grid.CurrentCell=installedRow().Cells["Name"];
+                var menu=form.grid.ContextMenuStrip;
+                menu.Show(form.grid,new Point(100,100));
+                var action=(ToolStripMenuItem)menu.Items.Find("UpdateIndividualMod",false).Single();
+                if(!action.Visible||action.Text!="Atualizar mod"||menu.Items[menu.Items.Count-1]!=action)
+                    throw new IOException("The mod menu must keep the manual action at the bottom.");
+                action.PerformClick();menu.Close();
+                await ChooseUpdateResponse("ConfirmPendingInstall",manual:true);
+                if(openedLink!=nexus.Replace("file_id=10","file_id=11")||!form.ManualUpdatesOnly(installed.Id))
+                    throw new IOException("A manual update opens the correct source without changing the saved preference.");
+            }finally{form.launch=open;form.updateFocusedId=null;}
+
             form.testModUpdateSession=new NexusUpdateSession(null,(GeneralNexusLink link,string key,out HttpStatusCode status)=>{
                 throw new IOException("Without authentication the fixture must not request Nexus.");
             });
@@ -347,6 +375,18 @@ internal sealed partial class GeneralModWindow {
             if(result!=DialogResult.OK||dialog.PersonalKey!="fixture-key"||attempts!=2)
                 throw new IOException("The connection dialog did not accept the validated test key.");
         }
+    }
+
+    static async Task ChooseUpdateResponse(string action,bool manual=false){
+        await Until(()=>Application.OpenForms.OfType<GeneralUpdateConfirmation>().Any(item=>item.Visible));
+        var dialog=Application.OpenForms.OfType<GeneralUpdateConfirmation>().Single(item=>item.Visible);
+        var defer=dialog.Controls.Find("DeferSelectedUpdates",true);
+        if(dialog.Text!="Você deseja atualizar?"||manual!=(defer.Length==0)||
+            dialog.Controls.Find("ConfirmPendingInstall",true).Single().Text!="Sim"||
+            dialog.Controls.Find("CancelPendingInstall",true).Single().Text!="Não")
+            throw new IOException("The correct update options must be visible before opening a download.");
+        ((Button)dialog.Controls.Find(action,true).Single()).PerformClick();
+        await Until(()=>dialog.IsDisposed);
     }
 
     internal static void RunModUpdateUiTests(string parent){

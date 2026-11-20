@@ -84,6 +84,7 @@ public sealed class GeneralModState {
     public Dictionary<string, string> SnapshotReceipts = new Dictionary<string, string>();
     public List<string> SuppressedModRecovery = new List<string>();
     public List<string> RecoveredModIds = new List<string>();
+    public List<string> ManualUpdateMods = new List<string>();
 }
 
 public sealed class GeneralModLibrary {
@@ -580,6 +581,8 @@ public sealed class GeneralModLibrary {
         foreach(var path in state.ResolvedDownloads.Values)
             if(!GeneralModDownload.IsArchivePath(path))throw new IOException("Referência local de download inválida.");
         var mods = state.List.Mods.ToDictionary(mod => mod.Id, StringComparer.Ordinal);
+        state.ManualUpdateMods=(state.ManualUpdateMods??new List<string>()).Where(id=>id!=null&&mods.ContainsKey(id))
+            .Distinct(StringComparer.Ordinal).ToList();
         foreach (string id in state.ChosenVariants.Keys.ToArray()) {
             GeneralModEntry mod;
             if (!mods.TryGetValue(id, out mod) || !mod.Variants.Any(variant => variant.Id == state.ChosenVariants[id]))

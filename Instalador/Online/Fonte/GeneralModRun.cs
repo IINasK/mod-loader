@@ -14,6 +14,7 @@ internal sealed partial class GeneralModWindow {
         internal GeneralModVariant Variant;
         internal bool Ended,Applied,SwitchAlternatives,DependencyQueue,SaveVariant,ReviewReplacement,UpdateRequested,RecognizedUpdate;
         internal HashSet<string> DropConflicts;
+        internal bool BackupUpdate;
         internal string DropDensity, BodyChoice, ScanError, DiagnosticStage, DiagnosticVersion;
         internal double Fraction;
         internal string Key { get{return GeneralModWindow.Key(Entry,Variant);} }
@@ -492,9 +493,9 @@ internal sealed partial class GeneralModWindow {
             }
             var jobs=SelectedUpdates();
             if(jobs.Count==0){
-                var links=SelectedUpdateLinks();
-                if(links.Length>0){
-                    foreach(string link in links)launch(link);
+                var mods=SelectedUpdateMods();
+                if(mods.Length>0){
+                    await OpenUpdateLinks(mods);
                     return;
                 }
             }
@@ -536,21 +537,23 @@ internal sealed partial class GeneralModWindow {
                 workers=ChooseSwitchWorkers();
                 if(workers==0)return;
             }
-            OnlineDiagnostics.Record("general.install.plan.begin",null,"Conferindo a seleção e suas dependências.",
-                new{Action=command.ToString(),Count=jobs.Count,Mods=jobs.Select(work=>work.Entry.Id).ToArray()});
-            jobs=WithLinkedDependencies(jobs);
-            var pending=new List<Work>();
-            List<string> downloads;
-            scanning=true;Busy(true);next.Visible=false;
-
-            try{downloads=await Task.Run(()=>PlanSelected(jobs,root,pending,workers));}
-            finally{scanning=false;Busy(false);}
-            if(IsDisposed)return;
-            OnlineDiagnostics.Record("general.install.plan.complete",null,"Conferência da seleção concluída.",
-                new{Total=jobs.Count,Pending=pending.Count});
-            if(pending.Count==0)return;
-            ConfirmAndEnqueue(pending,root,downloads,false);
+            await PlanAndConfirmJobs(jobs,root,command,workers);
         }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
+    }
+
+    async Task PlanAndConfirmJobs(List<Work> jobs,string root,ModAction command,int workers,bool manual=false){
+        OnlineDiagnostics.Record("general.install.plan.begin",null,"Conferindo a seleção e suas dependências.",
+            new{Action=command.ToString(),Count=jobs.Count,Mods=jobs.Select(work=>work.Entry.Id).ToArray()});
+        jobs=WithLinkedDependencies(jobs);
+        var pending=new List<Work>();
+        List<string> downloads;
+        scanning=true;Busy(true);next.Visible=false;
+        try{downloads=await Task.Run(()=>PlanSelected(jobs,root,pending,workers));}
+        finally{scanning=false;Busy(false);}
+        if(IsDisposed)return;
+        OnlineDiagnostics.Record("general.install.plan.complete",null,"Conferência da seleção concluída.",
+            new{Total=jobs.Count,Pending=pending.Count});
+        if(pending.Count>0)await ConfirmAndEnqueue(pending,root,downloads,false,manual);
     }
 
     static List<Work> ChooseAlternatives(List<Work> jobs,Func<IReadOnlyList<GeneralModEntry>,string> choose){
@@ -684,8 +687,24 @@ internal sealed partial class GeneralModWindow {
         return reads==null?InstalledSnapshot.MatchesBodyReceipt(Snapshot(root),work.Entry,work.Variant,receipt):
             reads.Snapshots.Value.Matches(receipt,work.Entry,work.Variant);
     }
-    void ConfirmAndEnqueue(List<Work> jobs,string root,IReadOnlyList<string> downloads,bool urgent){
-        if(!urgent){
+    async Task ConfirmAndEnqueue(List<Work> jobs,string root,IReadOnlyList<string> downloads,bool urgent,bool manual=false){
+        if(!urgent&&jobs.Any(work=>work.UpdateRequested)){
+            var choices=jobs.Select(work=>{
+                var required=new HashSet<string>(work.Variant.RequiredMods,StringComparer.Ordinal);
+                if(work.Variant.CyberpunkId!=null)
+                    required.UnionWith(FixedData.Expand(catalog,new[]{work.Variant.CyberpunkId}).Select(mod=>mod.Id));
+                var indices=Enumerable.Range(0,jobs.Count).Where(index=>jobs[index]!=work&&
+                    (required.Contains(jobs[index].Entry.Id)||required.Contains(jobs[index].Variant.CyberpunkId))).ToArray();
+                return new GeneralUpdateConfirmation.Choice(work.Entry.Name,downloads.Contains(work.Entry.Name)||
+                    downloads.Contains(work.Entry.Name+" — "+work.Variant.Name),indices);
+            }).ToArray();
+            var entries=jobs.Select(work=>work.Entry).ToArray();
+            var deferrable=Enumerable.Range(0,jobs.Count).Where(index=>jobs[index].UpdateRequested).ToArray();
+            var decision=await ConfirmModUpdates(choices,entries,manual?null:deferrable,offerBackup:true);
+            if(decision==null)return;
+            jobs=decision.Item1.Select(index=>jobs[index]).ToList();
+            foreach(var work in jobs)work.BackupUpdate=work.UpdateRequested&&decision.Item2;
+        }else if(!urgent){
             using(var dialog=new GeneralInstallConfirmation(root,jobs.Count,downloads)){
                 if(dialog.ShowDialog(this)!=DialogResult.OK){
                     OnlineDiagnostics.Record("general.install.cancelled",null,"Instalação cancelada.",new{Count=jobs.Count});
@@ -732,7 +751,7 @@ internal sealed partial class GeneralModWindow {
         string root=Root();
         var requested=IsBigBody(entry)?BigBodyVersions(new[]{entry},GameEdition.HasPL(root))
             .First(work=>work.BodyChoice==(bodyChoice??ActiveBodyChoice(entry))):MakeWork(entry);
-        ConfirmAndEnqueue(WithLinkedDependencies(new List<Work>{requested}),root,new string[0],true);
+        await ConfirmAndEnqueue(WithLinkedDependencies(new List<Work>{requested}),root,new string[0],true);
     }
 
     async void Enqueue(IEnumerable<Work> jobs,bool urgent){
@@ -1055,6 +1074,15 @@ internal sealed partial class GeneralModWindow {
         RowStatus(work,"Instalando",null,work.Entry.Name+T(": preparando e instalando…",": preparing and installing…"));
         Action install=()=>{
             var engine=Cyberpunk(root);
+            if(work.BackupUpdate&&work.RecognizedUpdate){
+                using(engine.LockForRouteChange()){
+                    if(FixedData.Scan(recipe,root).State!=UpdateAvailableStatus)
+                        throw new IOException(T("A versão anterior mudou antes do backup.","The previous version changed before backup."));
+                    var originals=recipe.Files.Where(file=>!file.UserData&&File.Exists(Safe.In(root,file.Path))).Select(file=>
+                        new KeyValuePair<string,string>(file.Path,Safe.Hash(Safe.In(root,file.Path)))).ToArray();
+                    GeneralUpdateBackup.Create(data,root,originals,()=>CheckSkip(work));
+                }
+            }
             if(mapped!=null){
                 if(recipe.Dependencies.Length>0)engine.Install(recipe.Dependencies,true,IgnoreInstallProgress);
                 if(pending.Any(mod=>mod.Id==recipe.Id))

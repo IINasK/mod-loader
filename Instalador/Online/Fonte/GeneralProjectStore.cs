@@ -152,6 +152,7 @@ internal sealed class GeneralProjectStore {
             };
             if(previous!=null){
                 KeepReceivedBindings(previous,state);
+                state.ManualUpdateMods=previous.ManualUpdateMods;
                 if(String.Equals(previous.Destination,state.Destination,StringComparison.OrdinalIgnoreCase)){
                     state.SuppressedModRecovery=previous.SuppressedModRecovery??new List<string>();
                     state.RecoveredModIds=(previous.RecoveredModIds??new List<string>()).Where(savedId=>list.Mods.Any(mod=>mod.Id==savedId)).ToList();

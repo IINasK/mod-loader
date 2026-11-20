@@ -13,18 +13,22 @@ internal sealed partial class GeneralModWindow {
     const string UpdateAvailableStatus="Atualização disponível";
 
     // A scan produces candidates for the active preset. Selection only limits this batch.
-    List<Work> InstallableUpdates(){
+    List<Work> InstallableUpdates(bool includeManual=false){
         var candidates=ActivePreset==null?state.List.Mods.Select(MakeWork):PresetWorks();
         return candidates.Where(work=>{
             string status;
-            return !presetProtected.Contains(work.Entry.Id)&&statuses.TryGetValue(work.Key,out status)&&status==UpdateAvailableStatus;
+            return !presetProtected.Contains(work.Entry.Id)&&(includeManual||!ManualUpdatesOnly(work.Entry.Id))&&
+                statuses.TryGetValue(work.Key,out status)&&status==UpdateAvailableStatus;
         }).ToList();
     }
 
+    bool CanUpdateActivePreset(){return !PresetRecoveryPending&&(state.AppliedPreset==null||state.AppliedPreset==state.SelectedPreset);}
+
+    bool ManualUpdatesOnly(string id){return state.ManualUpdateMods.Contains(id);}
+
     List<Work> SelectedUpdates(){
+        if(!CanUpdateActivePreset())return new List<Work>();
         var updates=InstallableUpdates();
-        if(updates.Count==0||PresetRecoveryPending||state.AppliedPreset!=null&&state.AppliedPreset!=state.SelectedPreset)
-            return new List<Work>();
         if(marked.Count!=0)return updates.Where(work=>marked.Contains(work.Entry.Id)).ToList();
         return updates.Where(work=>updateFocusedId==null||work.Entry.Id==updateFocusedId).ToList();
     }
@@ -221,8 +225,8 @@ internal sealed partial class GeneralModWindow {
         var updates=SelectedUpdates();
         if(updates.Count!=0)return updateFocusedId==null&&marked.Count==0||updates.Count>1
             ?T("Atualizar mods","Update mods"):T("Atualizar mod","Update mod");
-        var updateLinks=SelectedUpdateLinks();
-        if(updateLinks.Length>0)return updateLinks.Length==1?T("Abrir atualização","Open update"):T("Abrir atualizações","Open updates");
+        var updateMods=SelectedUpdateMods();
+        if(updateMods.Length>0)return updateMods.Length==1?T("Atualizar mod","Update mod"):T("Atualizar mods","Update mods");
         if(NeedsPresetLoad&&ActivePreset!=null)return T("Carregar preset","Load preset");
         List<Work> ignored;
         switch(ClassifyJobs(SelectedJobs(),out ignored)){
