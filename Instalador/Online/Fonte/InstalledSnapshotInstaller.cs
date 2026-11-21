@@ -49,11 +49,14 @@ public sealed partial class InstalledSnapshotInstaller {
         records = Safe.In(this.appData, "Snapshots/" + Fingerprint(this.destination.ToUpperInvariant()));
     }
 
-    public string Install(string zipPath, string expectedHash, Action<string> report, int failAfter = -1, Func<ModVersionDifference,bool> chooseVersion = null, Action<string> transaction = null, Action checkpoint = null, Action<P2PInstallProgress> progress = null, bool allowReuse = false, Func<string[],bool> approveUserFolders = null,Func<int,bool?> chooseUpdates=null) {
+    public string Install(string zipPath, string expectedHash, Action<string> report, int failAfter = -1, Func<ModVersionDifference,bool> chooseVersion = null, Action<string> transaction = null, Action checkpoint = null, Action<P2PInstallProgress> progress = null, bool allowReuse = false, Func<string[],bool> approveUserFolders = null,Func<int,bool?> chooseUpdates=null,bool requireExact=false,IEnumerable<OwnedChange> exactCleanup=null,InstalledSnapshotManifest exactPreview=null,bool receivingP2P=false) {
         // The archive is leased throughout verification and copying; no archive is kept in the receipt store.
         zipPath = Path.GetFullPath(zipPath); Safe.NoLinks(zipPath);
         using (var source = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
             var manifest = InstalledSnapshot.Read(source, expectedHash, catalog);
+            if(receivingP2P&&manifest.TemplateId==GeneralProjectStore.CyberpunkTemplate&&(!requireExact||exactPreview==null))
+                throw new IOException(GeneralStyle.T("O pacote pronto exige um novo convite com conferência de paridade.","The built-in pack needs a new invitation with parity verification."));
+            if(exactPreview!=null)P2PService.VerifyExactContents(exactPreview,manifest);
             if(!allowReuse&&manifest.Files.Any(file=>file.ReuseLocal))throw new IOException("O recebimento não autorizou reutilizar arquivos locais.");
             using (AcquireLock(manifest.Game)) {
                 if(manifest.Schema<2)ValidateEnvironment(manifest);
@@ -62,6 +65,7 @@ public sealed partial class InstalledSnapshotInstaller {
                 var pending=receipts.Where(r=>r.Status=="preparing"||r.Status=="installing").ToList();
                 if(pending.Count!=0){
                     if(pending.Count!=1||!pending[0].Recoverable||!(pending[0].PackageHash==null?SameManifest(pending[0].Manifest,manifest):pending[0].PackageHash==expectedHash))throw new IOException("Há outra instalação interrompida nesta pasta. Preserve os recibos e restaure a operação antes de continuar.");
+                    if(requireExact)RequireAllDestinations(pending[0].SkippedDestinations);
                     if(manifest.Schema>=2)ValidateEnvironment(pending[0].Manifest);
                     if(transaction!=null)transaction(pending[0].Id);
                     if(pending[0].Manifest.Schema>=2)
@@ -71,12 +75,17 @@ public sealed partial class InstalledSnapshotInstaller {
                 var skippedDestinations=InstalledSnapshot.SkipMissingDestinations(manifest,catalog,destination,approveUserFolders);
                 if(manifest.Schema>=2){
                     skippedDestinations.AddRange(SkipIncompatibleMods(manifest,chooseVersion));
+                    if(requireExact)RequireAllDestinations(skippedDestinations);
                     ValidateEnvironment(manifest);
                 }
                 var complete=receipts.FirstOrDefault(r=>r.Status=="installed"&&r.ActiveOwners.Count==WorkKeys(manifest).Count()&&SameManifest(r.Manifest,manifest)&&r.Files.All(Matches));
-                if(complete!=null){CleanStage(Safe.In(destination,".mod-loader-snapshot-"+complete.Id));return complete.Id;}
+                if(complete!=null){
+                    if(requireExact)RequireAllDestinations(complete.SkippedDestinations);
+                    CleanStage(Safe.In(destination,".mod-loader-snapshot-"+complete.Id));return complete.Id;
+                }
                 var skipBackup=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var approvals=ConfirmVersions(manifest,chooseVersion,receipts,skippedDestinations,chooseUpdates,skipBackup);
+                var approvals=ConfirmVersions(manifest,chooseVersion,receipts,skippedDestinations,chooseUpdates,skipBackup,requireExact,exactCleanup);
+                if(requireExact)RequireAllDestinations(skippedDestinations);
                 var groups=manifest.Files.GroupBy(f=>f.Path,StringComparer.OrdinalIgnoreCase).ToArray();
                 CheckDistinctTargets(groups.Select(group=>group.Key));
                 CheckSpace(manifest);
@@ -142,6 +151,10 @@ public sealed partial class InstalledSnapshotInstaller {
                 } finally { if(!keepStage)CleanStage(stage); }
             }
         }
+    }
+
+    static void RequireAllDestinations(IEnumerable<string> skipped){
+        if(skipped!=null&&skipped.Any())throw new IOException(GeneralStyle.T("A sincronização exige estes mods: ","Synchronization requires these mods: ")+String.Join(", ",skipped));
     }
 
     void CheckDistinctTargets(IEnumerable<string> paths) {
@@ -257,9 +270,13 @@ public sealed partial class InstalledSnapshotInstaller {
     }
 
     Dictionary<string,string> ConfirmVersions(InstalledSnapshotManifest manifest,Func<ModVersionDifference,bool> choose,
-        List<Receipt> receipts,List<string> skippedMods,Func<int,bool?> chooseUpdates,HashSet<string> skipBackup){
+        List<Receipt> receipts,List<string> skippedMods,Func<int,bool?> chooseUpdates,HashSet<string> skipBackup,bool requireExact,IEnumerable<OwnedChange> exactCleanup){
         var ids=new HashSet<string>(manifest.List.Mods.Select(m=>m.Id),StringComparer.Ordinal);
         var paths=new HashSet<string>(manifest.Files.Where(f=>f.Kind=="file").Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
+        if(requireExact&&exactCleanup!=null){
+            foreach(var item in exactCleanup)
+                if(FixedData.HashValid(item.Before)&&!IsImmutable(item.Path)&&HashOrNull(Target(item.Path))==item.Before)paths.Add(item.Path);
+        }
         var obsolete=receipts.Where(r=>r.Status=="installed").SelectMany(r=>r.Manifest.Files
             .Where(f=>f.Kind=="file"&&!paths.Contains(f.Path)&&(File.Exists(Target(f.Path))||Directory.Exists(Target(f.Path))))
             .SelectMany(f=>f.Owners.Where(o=>r.ActiveOwners.Contains(o)).Select(o=>new{Id=o.Split('/')[0],f.Path})))
@@ -293,7 +310,7 @@ public sealed partial class InstalledSnapshotInstaller {
         }).ToList();
         var approvedUpdates=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if(chooseUpdates!=null&&manifest.Schema>=2&&changed.Count>0){
-            var eligible=RecognizedOutdatedMods(manifest,receipts,changed,expected,skipped);
+            var eligible=RecognizedVersionChanges(manifest,receipts,changed,expected,skipped,requireExact);
             if(eligible.Count>0){
                 bool? backup=chooseUpdates(eligible.Count);
                 if(!backup.HasValue)skipped.UnionWith(eligible);
@@ -317,8 +334,8 @@ public sealed partial class InstalledSnapshotInstaller {
         return expected;
     }
 
-    HashSet<string> RecognizedOutdatedMods(InstalledSnapshotManifest incoming,List<Receipt> receipts,
-        List<InstalledSnapshotFile> changed,Dictionary<string,string> hashes,HashSet<string> skipped){
+    HashSet<string> RecognizedVersionChanges(InstalledSnapshotManifest incoming,List<Receipt> receipts,
+        List<InstalledSnapshotFile> changed,Dictionary<string,string> hashes,HashSet<string> skipped,bool allowDowngrade){
         var incomingPaths=new HashSet<string>(incoming.Files.Select(file=>file.Path),StringComparer.OrdinalIgnoreCase);
         var conflicts=changed.SelectMany(file=>file.Owners.Select(owner=>new{Id=owner.Split('/')[0],File=file}))
             .ToLookup(entry=>entry.Id,entry=>entry.File,StringComparer.Ordinal);
@@ -344,14 +361,14 @@ public sealed partial class InstalledSnapshotInstaller {
                 var previous=row.Mod.Variants.Single();
                 string owner=InstalledSnapshot.Owner(row.Mod,previous);
                 var previousPaths=new HashSet<string>(row.Receipt.Manifest.Files.Where(file=>file.Kind=="file"&&file.Owners.Contains(owner)).Select(file=>file.Path),StringComparer.OrdinalIgnoreCase);
-                return IsVersionUpgrade(previous,next)&&files.All(file=>previousPaths.Contains(file.Path)&&
+                return RecognizedVersionChange(previous,next,allowDowngrade)&&files.All(file=>previousPaths.Contains(file.Path)&&
                     row.Receipt.Files.Any(old=>old.Applied&&!old.Reverted&&String.Equals(old.Path,file.Path,StringComparison.OrdinalIgnoreCase)&&old.After==hashes[file.Path]));
             })){
                 eligible.Add(mod.Id);continue;
             }
             var oldMod=local==null?null:local.List.Mods.FirstOrDefault(entry=>entry.Id==mod.Id);
             var oldVariant=oldMod==null?null:oldMod.Variants.FirstOrDefault(option=>option.Id==next.Id);
-            if(oldVariant==null||!IsVersionUpgrade(oldVariant,next))continue;
+            if(oldVariant==null||!RecognizedVersionChange(oldVariant,next,allowDowngrade))continue;
             GeneralModInstaller.Record record;
             try{record=engine.ReadPackageRecord(P2PPack.Slot(oldMod,oldVariant,0));}
             catch(IOException){continue;}catch(UnauthorizedAccessException){continue;}
@@ -372,7 +389,7 @@ public sealed partial class InstalledSnapshotInstaller {
         return eligible;
     }
 
-    static bool IsVersionUpgrade(GeneralModVariant previous,GeneralModVariant next){
+    static bool RecognizedVersionChange(GeneralModVariant previous,GeneralModVariant next,bool allowDowngrade){
         if(previous.Id!=next.Id||previous.Sources.Count!=1||next.Sources.Count!=1)return false;
         string from=previous.Sources[0],to=next.Sources[0];
         if(from==to)return false;
@@ -382,10 +399,12 @@ public sealed partial class InstalledSnapshotInstaller {
             oldNexus.File>0&&newNexus.File>0){
             GeneralSourceInfo before,after;
             return previous.SourceInfo.TryGetValue(from,out before)&&next.SourceInfo.TryGetValue(to,out after)&&
-                before.NexusChecked&&after.NexusChecked&&ModVersionNumbers.Compare(after.Version,before.Version)>0;
+                before.NexusChecked&&after.NexusChecked&&(ModVersionNumbers.Compare(after.Version,before.Version)>0||
+                    allowDowngrade&&ModVersionNumbers.Compare(before.Version,after.Version)>0);
         }
         return GeneralGithubLink.SameRepository(oldGithub,newGithub)&&oldGithub.Asset!=null&&newGithub.Asset!=null&&
-            GeneralGithubUpdatePackage.SameAssetLine(oldGithub,newGithub)&&ModVersionNumbers.Compare(newGithub.Tag,oldGithub.Tag)>0;
+            GeneralGithubUpdatePackage.SameAssetLine(oldGithub,newGithub)&&(ModVersionNumbers.Compare(newGithub.Tag,oldGithub.Tag)>0||
+                allowDowngrade&&ModVersionNumbers.Compare(oldGithub.Tag,newGithub.Tag)>0);
     }
 
     internal IEnumerable<SnapshotOutputScope> ReadOutputScopes(){

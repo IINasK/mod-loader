@@ -7,7 +7,25 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
+internal sealed class P2PReceiveOptions {
+    public bool Exact, UpdateKnown, BackupUpdates, ReplaceConflicts;
+    public string[] UserFolders = new string[0];
+
+    internal bool? UpdateBackup() { return Exact || UpdateKnown ? (bool?)BackupUpdates : null; }
+    internal bool Replace(ModVersionDifference difference) {
+        if ((Exact || ReplaceConflicts) && difference.CanReplace) return true;
+        if (Exact) throw new IOException(difference.Name + ": " + difference.Detail);
+        difference.SkipSelected = difference.AllowSkip;
+        return false;
+    }
+    internal bool AllowsFolders(string[] requested) {
+        return UserFolders != null && requested.All(path => UserFolders.Contains(path, StringComparer.OrdinalIgnoreCase));
+    }
+}
+
 internal sealed class P2PSession {
+    public bool? SendVerifiedOnly;
+    public P2PReceiveOptions ReceiveOptions;
     public string Id, Name, Hash, Peer, Mode, Destination, ReceiptId, Error, Stage, RelayDevice;
     public bool Lifecycle, Held, ReceiptClosed, ExportAllPresets, CompareBeforePack;
     public volatile bool Discarded;
@@ -359,7 +377,7 @@ internal sealed partial class P2PService : IDisposable {
         }
         return invite.Encode();
     }
-    internal P2PSession Accept(string code,string destination=null,bool autoInstall=false){
+    internal P2PSession Accept(string code,string destination=null,bool autoInstall=false,P2PReceiveOptions options=null){
         var invite=P2PInvite.Decode(code);if(invite.Kind!="offer")throw new IOException("Cole o convite de quem está enviando o pacote.");
         if(!Engine.Running||invite.Device==Engine.Device)throw new IOException("Use o convite do outro computador.");
         var existing=SnapshotSessions().FirstOrDefault(s=>s.Id==invite.Folder);
@@ -385,7 +403,7 @@ internal sealed partial class P2PService : IDisposable {
         if(autoInstall&&invite.Game==P2PInvite.CyberpunkGame&&P2PInvite.CyberpunkFolder(destination)==null)
             throw new IOException("Escolha a pasta do Cyberpunk 2077 que contém bin\\x64\\Cyberpunk2077.exe.");
         if(invite.Mode=="installed-zip"&&autoInstall){if(String.IsNullOrWhiteSpace(destination)||!Directory.Exists(destination))throw new IOException("Escolha a pasta de instalação antes de receber.");Safe.NoLinks(destination);}
-        var session=new P2PSession{Id=invite.Folder,Name=invite.Name,Hash=invite.ManifestHash,Peer=invite.Device,Mode=invite.Mode,Size=invite.Size,Deferred=invite.Deferred,Automatic=invite.Automatic,Lifecycle=invite.Schema>=2,CompareBeforePack=invite.Schema==3,Destination=destination,AutoInstall=autoInstall,RelayDevice=invite.RelayDevice};
+        var session=new P2PSession{ReceiveOptions=options,Id=invite.Folder,Name=invite.Name,Hash=invite.ManifestHash,Peer=invite.Device,Mode=invite.Mode,Size=invite.Size,Deferred=invite.Deferred,Automatic=invite.Automatic,Lifecycle=invite.Schema>=2,CompareBeforePack=invite.Schema==3,Destination=destination,AutoInstall=autoInstall,RelayDevice=invite.RelayDevice};
         string folder=Folder(session);Directory.CreateDirectory(folder);
         // Receive the pinned manifest first. Other remote files are ignored until its allow-list is validated.
         File.WriteAllText(Safe.In(folder,".stignore"),invite.Mode=="installed-zip"?(invite.Deferred?DeferredIgnores(session):"!pack.zip\n*\n"):"!pack.json\n*\n",new UTF8Encoding(false));

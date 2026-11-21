@@ -15,6 +15,7 @@ $expected=@{
  'CyberpunkCoop.Reader.Licenses.txt'=(Join-Path $reader 'Licenses.txt')
  'CyberpunkCoop.Reader.Source.tar.xz'=(Join-Path $reader '7z2605-src.tar.xz')
  'ModLoader.Hyst.modloader.json'=(Join-Path $project 'Conhecimento\Candidatos\Hyst - corpo opcional.modloader.json')
+ 'ModLoader.CoopMods.json'=(Join-Path $project 'Conhecimento\Candidatos\Complementos coop.modloader.json')
  'ModLoader.Jost.ttf'=(Join-Path $PSScriptRoot 'Assets\Jost.ttf')
  'ModLoader.Jost-OFL.txt'=(Join-Path $PSScriptRoot 'Assets\Jost-OFL.txt')
  'ModLoader.Lucide.ttf'=(Join-Path $PSScriptRoot 'Assets\Lucide.ttf')

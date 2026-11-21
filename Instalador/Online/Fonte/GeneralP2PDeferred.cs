@@ -90,6 +90,7 @@ internal sealed partial class P2PService {
                     if(full&&includeConfigs)InstalledSnapshot.AddFullPackConfigurations(plan,state,catalog,appData,checkpoint);
                     IncludePortableOutputs(session,state.Destination,plan,checkpoint);
                     if(plan.Schema==3)InstalledSnapshot.Validate(plan,catalog);
+                    if(plan.TemplateId==GeneralProjectStore.CyberpunkTemplate)VerifyHostOutsideFiles(session,state,plan,checkpoint);
                     InstalledSnapshot.Write(part,state.Destination,plan,report,checkpoint,progress,catalog);
                 }
                 checkpoint();
@@ -118,13 +119,30 @@ internal sealed partial class P2PService {
         }catch(Exception ex){session.Stage=null;if(!session.Discarded){session.Error=ex.Message;Save();}throw;}
         finally{session.SyncProgress=null;}
     }
-    InstalledSnapshotManifest InspectForTransfer(P2PSession session,
+    internal InstalledSnapshotManifest InspectForTransfer(P2PSession session,
         Func<Func<string,string,string,bool>,InstalledSnapshotManifest> inspect){
         var failures=new List<P2PVerificationFailure>();
         var manifest=inspect((id,name,message)=>{
             failures.Add(new P2PVerificationFailure(id,name,message));
             return true;
         });
+        if(manifest.TemplateId==GeneralProjectStore.CyberpunkTemplate){
+            var profile=manifest.Project.Presets.FirstOrDefault(preset=>preset.Id==session.ExportPreset)
+                ??manifest.Project.Presets.FirstOrDefault();
+            var selected=new HashSet<string>(session.SelectedMods,StringComparer.Ordinal);
+            var includedIds=new HashSet<string>(manifest.List.Mods.Select(mod=>mod.Id),StringComparer.Ordinal);
+            var absent=manifest.Project.Mods.Where(mod=>{
+                string chosen;
+                return selected.Contains(mod.Id)&&!includedIds.Contains(mod.Id)&&(mod.AlternativeGroup==null||
+                    profile==null||profile.AlternativeChoices==null||!profile.AlternativeChoices.TryGetValue(mod.AlternativeGroup,out chosen)||chosen==mod.Id);
+            }).Select(mod=>mod.Name).Concat(failures.Select(item=>item.Name)).Distinct().ToArray();
+            if(absent.Length>0){
+                foreach(var failure in failures)OnlineDiagnostics.Record("p2p.verify.failed",failure.Id,failure.Message);
+                throw new IOException(GeneralStyle.T("Pacote pronto incompleto. Instale, ative ou repare estes mods no anfitrião e tente novamente: ",
+                    "The ready-made pack is incomplete. Install, enable or repair these mods on the host and try again: ")+String.Join(", ",absent));
+            }
+            return manifest;
+        }
         int included=manifest.List.Mods.Count;
         bool reviewed=ReviewSnapshotProblems(session,failures,included);
         if(failures.Count!=0&&included==0)
@@ -139,6 +157,18 @@ internal sealed partial class P2PService {
         var approved=new HashSet<string>(session.SkippedVerificationMods??new string[0],StringComparer.Ordinal);
         var pending=failures.Where(failure=>included==0||!approved.Contains(failure.Id)).ToArray();
         if(pending.Length==0)return true;
+        if(session.SendVerifiedOnly.HasValue){
+            foreach(var failure in pending)OnlineDiagnostics.Record("p2p.verify.failed",failure.Id,failure.Message);
+            if(included==0)return false;
+            if(!session.SendVerifiedOnly.Value)
+                throw new IOException(GeneralStyle.T("Envio interrompido na conferência. Mods com falha: ",
+                    "Transfer stopped at verification. Failed mods: ")+String.Join(", ",pending.Select(item=>item.Name)));
+            lock(session){
+                session.SkippedVerificationMods=approved.Concat(pending.Select(item=>item.Id)).Distinct(StringComparer.Ordinal).ToArray();
+                Save();
+            }
+            return true;
+        }
         var issue=new P2PVerificationIssue(pending,included);
         session.VerificationIssue=issue;
         try{

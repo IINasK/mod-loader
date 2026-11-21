@@ -34,8 +34,11 @@ internal static class GeneralP2PAutomaticTests {
             receiver.Notice=complete=>{if(complete)System.Threading.Interlocked.Increment(ref receivedSounds);};
             var libraryReceived=new GeneralProjectStore(Path.Combine(root,"p"));
             receiver.RegisterProject=session=>{libraryReceived.CreateReceived(session,receivedData,catalog);return true;};
-            receiver.ReviewReceived=list=>GeneralNexusInfo.ReviewReceivedList(list,url=>Task.FromResult(
-                new GeneralSourceInfo{Name="Mod from Nexus",ModVersion="1.5",NexusChecked=true,Tags=new[]{"From Nexus"}}));
+            int nexusQueries=0;
+            receiver.ReviewReceived=list=>GeneralNexusInfo.ReviewReceivedList(list,url=>{
+                System.Threading.Interlocked.Increment(ref nexusQueries);
+                return Task.FromResult(new GeneralSourceInfo{Name="Mod from Nexus",ModVersion="1.5",NexusChecked=true,Tags=new[]{"From Nexus"}});
+            });
             Exception failure=null;P2PSession sent=null,accepted=null;
             using(var host=new Form{ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)})using(var dialog=new GeneralP2PDialog(sender,state,catalog)){
                 dialog.ShowInTaskbar=false;dialog.StartPosition=FormStartPosition.Manual;dialog.Location=new Point(-30000,-30000);
@@ -43,7 +46,8 @@ internal static class GeneralP2PAutomaticTests {
                 host.Shown+=async(s,e)=>{try{
                     dialog.Show(host);var output=(TextBox)dialog.Content.Controls.Find("p2p-output",true).Single();var copy=(Button)dialog.Content.Controls.Find("p2p-copy",true).Single();
                     await Wait(()=>copy.Enabled,"No automatic invitation appeared.");sent=sender.Sessions.Single();string offer=output.Text;copy.PerformClick();
-                    check(Clipboard.GetText()==offer&&sent.Automatic,"Opening fills a copy-only automatic invitation.");
+                    await Wait(()=>Clipboard.GetText()==offer,"Copying the invitation did not finish.");
+                    check(sent.Automatic,"Opening fills a copy-only automatic invitation.");
                     var sendLabel=dialog.Content.Controls.Find("p2p-send-label",true).Single();
                     check(sendLabel.Text.EndsWith(P2PService.DiagnosticId(sent.Id),StringComparison.Ordinal),"The host sees the ID of the current invitation.");
                     await Task.Delay(1300);check(sent.PayloadHash==null&&!Directory.GetFiles(sender.Folder(sent),"*.zip*").Any(),"Leaving the dialog open without a friend creates no ZIP or partial ZIP.");
@@ -117,6 +121,10 @@ internal static class GeneralP2PAutomaticTests {
                     check(mod.Tags.Contains("From Nexus")&&mod.Variants.Single(v=>v.Id=="alternate").SourceInfo[alternate].NexusChecked&&
                         imported.SnapshotReceipts.ContainsKey(mod.Id+"/"+mod.DefaultVariant),
                         "The whole imported list is reviewed, including alternate Nexus sources, and installed mods retain Mod Loader recognition.");
+                    var presetMod=GeneralPresetProfiles.Selected(imported).Configurations[mod.Id];
+                    check(nexusQueries==1&&presetMod.Tags.Contains("From Nexus")&&
+                        presetMod.Variants.Single(v=>v.Id=="alternate").SourceInfo[alternate].NexusChecked,
+                        "The saved preset retains alternate Nexus metadata and shares a single lookup with the project.");
                 }catch(Exception ex){failure=ex;}if(!dialog.IsDisposed)dialog.Dispose();if(!host.IsDisposed)host.Close();};Application.Run(host);
             }
             if(failure!=null)throw failure;

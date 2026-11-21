@@ -39,6 +39,33 @@ internal static class GeneralP2PTests {
             other.VerificationIssue.Decision.TrySetResult(false);
             check(!pending.GetAwaiter().GetResult()&&other.SkippedVerificationMods==null,
                 "Cancelar preserva o envio sem aprovar uma lista incompleta.");
+            other.SendVerifiedOnly=false;
+            bool stopped=false;
+            try{service.ReviewSnapshotProblems(other,failures,3);}catch(IOException ex){stopped=failures.All(item=>ex.Message.Contains(item.Name));}
+            check(stopped&&other.VerificationIssue==null,"Interromper na primeira conferência apresenta todas as falhas sem pop-up.");
+            other.SendVerifiedOnly=true;
+            check(service.ReviewSnapshotProblems(other,failures,3)&&other.VerificationIssue==null&&
+                !service.ReviewSnapshotProblems(other,failures,0),"A escolha inicial permite apenas mods verificados e nunca um pacote vazio.");
+            var ready=new GeneralModEntry{Id="ready",Name="Active",AlternativeGroup="choice"};
+            var inactive=new GeneralModEntry{Id="inactive",Name="Alternative",AlternativeGroup="choice"};
+            var absent=new GeneralModEntry{Id="absent",Name="Missing component"};
+            var builtIn=new InstalledSnapshotManifest{TemplateId=GeneralProjectStore.CyberpunkTemplate,
+                List=new GeneralModList(),Project=new GeneralModList()};
+            builtIn.List.Mods.Add(ready);
+            builtIn.Project.Mods.AddRange(new[]{ready,inactive,absent});
+            var profile=new GeneralModPreset{Id="primary",Name="Primary"};
+            profile.AlternativeChoices["choice"]=ready.Id;
+            builtIn.Project.Presets.Add(profile);
+            other.ExportPreset=profile.Id;other.SelectedMods=new[]{ready.Id,inactive.Id,absent.Id};
+            bool incomplete=false;
+            try{service.InspectForTransfer(other,review=>builtIn);}catch(IOException ex){
+                incomplete=ex.Message.Contains(absent.Name)&&!ex.Message.Contains(inactive.Name);
+            }
+            check(incomplete&&other.VerificationIssue==null,"O pacote pronto bloqueia um item ativo ausente, mesmo com a opção de envio parcial.");
+            other.SelectedMods=new[]{ready.Id,inactive.Id};
+            check(service.InspectForTransfer(other,review=>builtIn)==builtIn,"Uma alternativa inativa não bloqueia o pacote pronto completo.");
+            other.SendVerifiedOnly=null;other.SkippedVerificationMods=null;
+            service.SaveGeneratedConfigChoice();
             pending=System.Threading.Tasks.Task.Run(()=>service.ReviewSnapshotProblems(other,failures,0));
             if(!SpinWait.SpinUntil(()=>other.VerificationIssue!=null,3000))throw new IOException("Missing review of an empty transfer.");
             other.VerificationIssue.Decision.TrySetResult(true);

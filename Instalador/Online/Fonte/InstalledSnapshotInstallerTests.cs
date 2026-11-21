@@ -80,6 +80,7 @@ public static class InstalledSnapshotInstallerTests {
         ResumeTransactions(root,catalog);
         ParallelTransactions(root,catalog);
         BatchUpdateChoices(root,catalog);
+        ExactVersions(root,catalog);
         if(testOfficialProject){
             TestPortableDestinations(root,parent,catalog);
             BuiltInProjectReceive(root,catalog);
@@ -126,6 +127,48 @@ public static class InstalledSnapshotInstallerTests {
             }
         }
     }
+    static void ExactVersions(string root,FixedCatalog catalog){
+        string folder=Directory.CreateDirectory(Safe.In(root,"exact")).FullName;
+        string game=Directory.CreateDirectory(Safe.In(folder,"g")).FullName;
+        File.WriteAllText(Safe.In(game,".fixture-only"),"fixture");
+        var installer=new InstalledSnapshotInstaller(game,Safe.In(folder,"data"),catalog,true);
+        Func<int,bool,string> pack=(version,ignored)=>{
+            string source="https://github.com/example/clothing/releases/download/v"+version+".0/clothing-v"+version+".0.zip";
+            var mod=RoutedEntry("clothing",source);
+            var manifest=new InstalledSnapshotManifest{Schema=2,Game="generic",Name="Exact fixture"};
+            manifest.List.Mods.Add(mod);
+            manifest.Project=Safe.Json.Deserialize<GeneralModList>(Safe.Json.Serialize(manifest.List));
+            if(ignored)manifest.ManualUpdateMods=new List<string>{mod.Id};
+            var content=Encoding.UTF8.GetBytes("version "+version);
+            var hash=InstalledSnapshot.Hash(content);
+            manifest.Files.Add(new InstalledSnapshotFile{Kind="file",Path="mods/clothing.txt",Size=content.Length,Sha256=hash,
+                Owners=new List<string>{InstalledSnapshot.Owner(mod,mod.Variants.Single())}});
+            string zip=Safe.In(folder,"v"+version+(ignored?"-pinned":"")+".zip");
+            WritePack(zip,manifest,new Dictionary<string,byte[]>{{hash,content}});
+            return zip;
+        };
+        string old=pack(1,false),current=pack(2,false),pinned=pack(1,true);
+        string path=Safe.In(game,"mods/clothing.txt");
+        installer.Install(old,Safe.Hash(old),null,requireExact:true);
+        int changes=0;
+        Func<string,string> sync=zip=>installer.Install(zip,Safe.Hash(zip),null,requireExact:true,
+            chooseVersion:d=>{throw new IOException("A recognized version prompted again: "+d.Name);},
+            chooseUpdates:count=>{changes+=count;return true;});
+        sync(current);
+        Check(changes==1&&File.ReadAllText(path)=="version 2","A sincronização exata atualiza uma versão mais antiga pelo recibo.");
+        var changedPreview=InstalledSnapshot.Read(pinned,Safe.Hash(pinned),catalog);
+        changedPreview.Files.Single().Sha256=new string('1',64);
+        Throws(()=>installer.Install(pinned,Safe.Hash(pinned),null,requireExact:true,exactPreview:changedPreview),
+            "Um pacote diferente do preview aprovado é rejeitado antes de instalar.");
+        Check(File.ReadAllText(path)=="version 2","A rejeição do preview preserva a versão local do receptor.");
+        string receipt=sync(pinned);
+        Check(changes==2&&File.ReadAllText(path)=="version 1"&&installer.ReadManifest(receipt).ManualUpdateMods.SequenceEqual(new[]{"clothing"}),
+            "O mesmo receptor volta à versão antiga do anfitrião e herda a atualização ignorada.");
+        Throws(()=>installer.Install(current,Safe.Hash(current),null,requireExact:true,chooseUpdates:count=>null),
+            "Uma instalação exata não pode terminar com um mod pulado.");
+        Check(File.ReadAllText(path)=="version 1","Uma escolha incompatível com a sincronização exata é barrada antes da gravação.");
+    }
+
     static void HistoricalSnapshot(string root) {
         string target=Directory.CreateDirectory(Safe.In(root,"old-game")).FullName;
         string data=Directory.CreateDirectory(Safe.In(root,"old-data")).FullName;
@@ -383,6 +426,11 @@ public static class InstalledSnapshotInstallerTests {
             "O projeto oficial preserva o outro preset e ativa a variante efetivamente instalada, mesmo quando o padrão da lista é diferente.");
         Check(refreshed.ManualUpdateMods.SequenceEqual(new[]{previousChoice.Id,mod.Id}),
             "A preferência do anfitrião é somada àquela que o receptor já tinha para outro mod.");
+        var nextSync=Safe.Json.Deserialize<InstalledSnapshotManifest>(Safe.Json.Serialize(manifest));
+        nextSync.ManualUpdateMods=null;
+        GeneralProjectStore.BindReceivedVariants(refreshed,nextSync,receipt,syncUpdatePreferences:true);
+        Check(refreshed.ManualUpdateMods.SequenceEqual(new[]{previousChoice.Id}),
+            "Quando o anfitrião reativa as atualizações, o próximo envio exato limpa só a preferência do mod recebido.");
         var freshStore=new GeneralProjectStore(Path.Combine(root,"n"));
         var first=freshStore.CreateReceived(session,inbox,catalog);
         session.Id="ml-"+Guid.NewGuid().ToString("N");

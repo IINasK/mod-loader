@@ -43,6 +43,16 @@ internal static class GeneralP2PLifecycleTests {
         Safe.WriteJson(receipt,"updated");
         Check(checks,File.ReadAllText(receipt)=="\"updated\""&&!Directory.GetFiles(directory,"*.tmp").Any(),
             "A receipt in a deep project folder saves and replaces without expanding its temporary filename.");
+        string data=Safe.In(root,"blob.dat");
+        File.WriteAllText(data,"from host");
+        string hash=Safe.Hash(data);
+        string blob=Safe.In(directory,hash+".zip");
+        Safe.CopyAtomic(data,blob,hash);
+        System.Threading.Tasks.Parallel.For(0,4,i=>Safe.CopyAtomic(data,blob,hash));
+        bool rejected=false;
+        try{Safe.CopyAtomic(data,blob,new string('0',64));}catch(IOException){rejected=true;}
+        Check(checks,rejected&&Safe.Hash(blob)==hash&&Directory.GetFiles(directory).Length==2,
+            "Concurrent copies of a deep package preserve its contents and a failed check leaves no temporary file.");
     }
 
     internal static void RunEngine(string parent,string helper){
@@ -303,8 +313,12 @@ internal static class GeneralP2PLifecycleTests {
                     "Both peers should record when the transport connects.");
                 sent.OfferSource=offerSource;
                 Wait(()=>received.Phase=="review","The receiver did not reach the version confirmation. "+sent.Error+" "+received.Error);
-                Check(checks,friend.TransferStatus(received).HostDecision==P2PService.HostPreparing,
-                    "The receiver gets the host confirmation once preparation starts.");
+                Wait(()=>{
+                    var status=friend.TransferStatus(received);
+                    return status.HostDecision==P2PService.HostPreparing&&status.HostScan!=null&&
+                        status.HostScan.Packing&&status.HostScan.Done==100&&status.HostScan.Total==100;
+                },"The final authenticated packing status did not reach the receiver.");
+                checks.Add("The receiver gets final packing progress even if the ZIP arrives first.");
                 var packed=InstalledSnapshot.Read(zip,sent.PayloadHash,Catalog);
                 Check(checks,packed.List.Mods.Count==3&&packed.Files.Single(file=>file.Path=="mods/same.txt").ReuseLocal==!full,
                     full?"The full option sends the complete pack.":"The delta keeps all records and reuses the matching file.");
@@ -445,6 +459,80 @@ internal static class GeneralP2PLifecycleTests {
                 File.ReadAllText(Safe.In(target,stop+"/stopNCPD.log"))==stop+"/stopNCPD.log"&&
                 File.Exists(Safe.In(target,script+"/nested/mod.reds"))&&Directory.Exists(Safe.In(target,oldShell+"/nested")),
                 "Undo restores CET logs and database, scripts and nested empty directories.");
+        }
+    }
+
+    internal static void RunExact(string parent,string helper){
+        string root=OnlineTests.NestedRoot(parent,"exact-");Directory.CreateDirectory(root);
+        string result=Path.Combine(root,"resultado-p2p-exact.json");
+        var checks=new List<string>();
+        try{
+            FixedAsset unused;
+            var catalog=OnlineTests.MakeCatalog(root,out unused);
+            string from=OnlineTests.Fixture(root,"a"),to=OnlineTests.Fixture(root,"b");
+            var state=new GeneralModState{Destination=from,List=GeneralModLibrary.Seed(catalog,new ModImportItem[0]),TemplateId=GeneralProjectStore.CyberpunkTemplate};
+            state.ManualUpdateMods.Add("Extra");
+            foreach(var file in catalog.Packages.SelectMany(mod=>mod.Files)){
+                WriteSyncFile(from,file.Path,"test "+file.Path);
+                WriteSyncFile(to,file.Path,"test "+file.Path);
+            }
+            string pinned=catalog.Packages.Single(mod=>mod.Id=="Extra").Files.First().Path;
+            const string unknown="archive/pc/mod/unregistered.archive";
+            const string hostShell="mods/LegacyCollection",receiverShell="r6/tweaks/LegacyVehicle";
+            Directory.CreateDirectory(Safe.In(from,hostShell+"/nested/empty"));
+            using(var host=Service(root,"h",Path.Combine(root,"dh"),helper,catalog:catalog))
+            using(var friend=Service(root,"f",Path.Combine(root,"df"),helper,catalog:catalog)){
+                host.SetPreparationState(state);
+                friend.ChooseVersion=diff=>{throw new IOException("Unexpected version prompt");};
+                friend.ChooseUpdates=count=>{throw new IOException("Unexpected update prompt");};
+                foreach(bool full in new[]{false,true}){
+                    WriteSyncFile(to,pinned,full?"receiver newer":"receiver older");
+                    var sent=host.BeginDeferred(state,new[]{"Extra"},true,compareBeforePack:true);
+                    var received=friend.Accept(host.Invitation(sent),to,true);
+                    ConnectTo(friend,host);
+                    Wait(()=>{if(sent.Error!=null)throw new IOException(sent.Error);return friend.HasSyncPreview(received);},"Missing official preview.");
+                    if(!full){
+                        var shellReview=friend.CompareIncoming(received);
+                        shellReview.ReceiveOptions=new P2PReceiveOptions{Exact=true,BackupUpdates=true};
+                        Directory.CreateDirectory(Safe.In(to,receiverShell));
+                        string folderError="";
+                        try{friend.SubmitSyncChoice(shellReview,false);}catch(IOException ex){folderError=ex.Message;}
+                        Check(checks,folderError.Contains(receiverShell)&&folderError.Contains("1")&&!friend.HasSyncChoice(received)&&
+                            Directory.Exists(Safe.In(to,receiverShell))&&Directory.Exists(Safe.In(from,hostShell+"/nested/empty")),
+                            "Host-only empty REDmod and receiver-only empty tweak groups block preflight, preserving both directories.");
+                        Directory.CreateDirectory(Safe.In(to,hostShell));
+                        Directory.Delete(Safe.In(to,receiverShell));
+                        WriteSyncFile(to,unknown,"unknown local mod");
+                        var first=friend.CompareIncoming(received,full:full);
+                        first.ReceiveOptions=new P2PReceiveOptions{Exact=true,BackupUpdates=true};
+                        bool refused=false;
+                        try{friend.SubmitSyncChoice(first,full);}catch(IOException){refused=true;}
+                        Check(checks,refused&&!friend.HasSyncChoice(received)&&File.Exists(Safe.In(to,unknown)),
+                            "An unregistered active mod prevents exact sync before ZIP preparation and stays on disk.");
+                        File.Delete(Safe.In(to,unknown));
+                    }
+                    int decisions=0;
+                    friend.ChooseIncoming(received,full,review=>{
+                        decisions++;
+                        Check(checks,review.Exact&&review.Different.Contains("Mod de teste")&&
+                            !review.Extras.Any(extra=>extra.Files.Any(file=>file.Path==hostShell)),
+                            "Initial review identifies divergent installed bytes and omits matching empty groups.");
+                        review.ReceiveOptions=new P2PReceiveOptions{Exact=true,BackupUpdates=true};
+                        return new int[0];
+                    }).GetAwaiter().GetResult();
+                    Wait(()=>{
+                        if(sent.Error!=null||received.Error!=null)throw new IOException("Exact sync: "+sent.Error+" "+received.Error);
+                        return received.Completed&&sent.Completed;
+                    },"The official package did not complete on both peers.");
+                    var installed=friend.InstalledManifest(received);
+                    Check(checks,decisions==1&&installed.ManualUpdateMods.Contains("Extra")&&
+                        installed.Files.Where(file=>file.Kind=="file").All(file=>Safe.Hash(Safe.In(to,file.Path))==Safe.Hash(Safe.In(from,file.Path))),
+                        full?"Full receive retains the ignored release and matches every host file.":"Differential receive retains the ignored release and matches every host file.");
+                }
+            }
+            Safe.WriteJson(result,new{Passed=true,Tests=checks});
+        }catch(Exception error){
+            Safe.WriteJson(result,new{Passed=false,Tests=checks,Error=error.ToString()});throw;
         }
     }
 

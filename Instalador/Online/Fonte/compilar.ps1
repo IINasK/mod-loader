@@ -13,6 +13,7 @@ $extensions=@('OnlineDensityWindowTests.cs','OnlineDensity.cs','OnlineDensityTes
 $extensions += '/resource:'+(Join-Path $out 'catalogo.json')+',CyberpunkCoop.catalogo.json'
 $project=Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 $extensions += '/resource:'+(Join-Path $project 'Conhecimento\Candidatos\Hyst - corpo opcional.modloader.json')+',ModLoader.Hyst.modloader.json'
+$extensions += '/resource:'+(Join-Path $project 'Conhecimento\Candidatos\Complementos coop.modloader.json')+',ModLoader.CoopMods.json'
 $extensions += Join-Path $PSScriptRoot 'OnlineGameEdition.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineGameEditionTests.cs'
 $extensions += Join-Path $PSScriptRoot 'OnlineCategories.cs'

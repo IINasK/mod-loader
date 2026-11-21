@@ -77,13 +77,22 @@ public static class Safe {
     }
     public static void CopyAtomic(string source,string destination,string expectedHash) {
         NoLinks(source); NoLinks(destination); Directory.CreateDirectory(System.IO.Path.GetDirectoryName(destination));
-        string tmp=destination+".coopmods-"+Guid.NewGuid().ToString("N")+".tmp";
+        string tmp=System.IO.Path.Combine(System.IO.Path.GetDirectoryName(destination),System.IO.Path.GetRandomFileName());
+        bool owned=false;
         try {
-            File.Copy(source,tmp,false);
+            using(File.Open(tmp,FileMode.CreateNew,FileAccess.Write,FileShare.None)){owned=true;}
+            File.Copy(source,tmp,true);
             if(Hash(tmp)!=expectedHash) throw new IOException("A cópia não passou na verificação. Tente novamente.");
-            NoLinks(destination);
-            if(File.Exists(destination)) File.Replace(tmp,destination,null); else File.Move(tmp,destination);
-        } finally { if(File.Exists(tmp)) File.Delete(tmp); }
+            byte[] pathKey=Encoding.UTF8.GetBytes(System.IO.Path.GetFullPath(destination).ToUpperInvariant());
+            using(var sha=SHA256.Create())
+            using(var commit=new System.Threading.Mutex(false,@"Local\ModLoader.Copy."+Hex(sha.ComputeHash(pathKey)))){
+                try{commit.WaitOne();}catch(System.Threading.AbandonedMutexException){/* The new caller owns it. */}
+                try{
+                    NoLinks(destination);
+                    if(File.Exists(destination)) File.Replace(tmp,destination,null); else File.Move(tmp,destination);
+                }finally{commit.ReleaseMutex();}
+            }
+        } finally { if(owned&&File.Exists(tmp)) File.Delete(tmp); }
     }
     public static bool Allowed(string p) { return Regex.IsMatch(p,@"^(bin|engine|r6|archive|red4ext)/",RegexOptions.IgnoreCase); }
 }

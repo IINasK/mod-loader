@@ -1,0 +1,89 @@
+{
+  "Schema": 1,
+  "Mods": [
+    {
+      "Id": "local-mod-31642",
+      "Name": "FPV Drone",
+      "Category": "Jogabilidade",
+      "DefaultVariant": "default",
+      "Variants": [
+        {
+          "Id": "default",
+          "Name": "Principal",
+          "Sources": [
+            "https://www.nexusmods.com/cyberpunk2077/mods/31642?tab=files&file_id=168826"
+          ],
+          "RequiredMods": [
+            "NightCoop",
+            "CET",
+            "redscript",
+            "Codeware",
+            "TweakXL",
+            "Audioware",
+            "NativeSettings",
+            "ArchiveXL"
+          ]
+        }
+      ]
+    },
+    {
+      "Id": "mod-36281",
+      "Name": "Level Cap Plus",
+      "Category": "Jogabilidade",
+      "DefaultVariant": "default",
+      "Variants": [
+        {
+          "Id": "default",
+          "Name": "Principal",
+          "Sources": [
+            "https://www.nexusmods.com/cyberpunk2077/mods/36281?tab=files&file_id=179575"
+          ],
+          "RequiredMods": [
+            "CET",
+            "redscript",
+            "NativeSettings"
+          ]
+        }
+      ]
+    },
+    {
+      "Id": "mod-8572",
+      "Name": "OneSlowZZ · Virtual Store",
+      "Category": "Lojas",
+      "DefaultVariant": "default",
+      "Variants": [
+        {
+          "Id": "default",
+          "Name": "Principal",
+          "Sources": [
+            "https://www.nexusmods.com/cyberpunk2077/mods/8572?tab=files&file_id=64194"
+          ],
+          "RequiredMods": [
+            "mod-2987"
+          ]
+        }
+      ]
+    },
+    {
+      "Id": "mod-8594",
+      "Name": "OneSlowZZ · MMM Watchya Saaay",
+      "Category": "Roupas e acessórios",
+      "DefaultVariant": "default",
+      "Variants": [
+        {
+          "Id": "default",
+          "Name": "Principal",
+          "Sources": [
+            "https://www.nexusmods.com/cyberpunk2077/mods/8594?tab=files&file_id=45756"
+          ],
+          "RequiredMods": [
+            "ArchiveXL",
+            "TweakXL",
+            "mod-6945",
+            "mod-8572"
+          ]
+        }
+      ]
+    }
+  ]
+}

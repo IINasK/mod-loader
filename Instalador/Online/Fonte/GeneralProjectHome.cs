@@ -753,17 +753,7 @@ internal sealed partial class GeneralModWindow {
                 }
             }
             var removed=new HashSet<string>(state.SuppressedModRecovery??Enumerable.Empty<string>(),StringComparer.Ordinal);
-            var added=seed.Mods.Where(item=>!removed.Contains(item.Id)&&!state.List.Mods.Any(current=>current.Id==item.Id)).ToArray();
-            if(added.Length!=0){
-                state.List.Mods.AddRange(added);
-                foreach(var category in seed.Categories)
-                    if(!state.List.Categories.Contains(category))state.List.Categories.Add(category);
-                foreach(var reference in seed.Presets){
-                    var saved=state.List.Presets.FirstOrDefault(p=>p.Id==reference.Id);
-                    if(saved!=null)saved.ModIds.AddRange(added.Where(item=>reference.ModIds.Contains(item.Id)).Select(item=>item.Id));
-                }
-                refreshed=true;
-            }
+            if(GeneralModLibrary.MergeBuiltInEntries(state,seed))refreshed=true;
             const string eclipse=GeneralModLibrary.EclipseTattooId;
             foreach(var reference in seed.Presets.Where(p=>!removed.Contains(eclipse)&&p.ModIds.Contains(eclipse))){
                 var saved=state.List.Presets.FirstOrDefault(p=>p.Id==reference.Id);

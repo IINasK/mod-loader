@@ -4,6 +4,65 @@ using System.IO;
 using System.Linq;
 
 public static partial class InstalledSnapshot {
+    static List<GeneralUpdateOwnershipContext> RegisteredSnapshotProjects(string root,string data){
+        var directory=new DirectoryInfo(Path.GetFullPath(data));
+        string store=directory.Parent!=null&&directory.Parent.Parent!=null&&directory.Parent.Name.Equals("Projetos",StringComparison.OrdinalIgnoreCase)
+            ?directory.Parent.Parent.FullName:directory.FullName;
+        bool systemStore=GeneralModWindow.RegisteredStores(null,true).Contains(store,StringComparer.OrdinalIgnoreCase);
+        var seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var contexts=new List<GeneralUpdateOwnershipContext>();
+        GeneralModWindow.ReadRegisteredUpdateContexts(root,GeneralModWindow.RegisteredStores(store,systemStore),seen,peer=>{
+            if(peer!=null&&peer.State!=null&&seen.Add(Path.GetFullPath(peer.Data).TrimEnd('\\')))contexts.Add(peer);
+        });
+        return contexts;
+    }
+
+    static List<InstalledSnapshotFile> SharedSnapshotFiles(IEnumerable<GeneralUpdateOwnershipContext> projects,
+        string data,string root,GeneralModEntry mod,GeneralModVariant variant,FixedCatalog catalog,bool includeConfigs,Action checkpoint){
+        if(variant.CyberpunkId!=null||!variant.Sources.All(GeneralModDownload.IsWebSource))return null;
+        string owner=Owner(mod,variant);
+        foreach(var peer in projects){
+            string receipt;
+            if(String.Equals(Path.GetFullPath(data),peer.Data,StringComparison.OrdinalIgnoreCase)||
+                !peer.State.SnapshotReceipts.TryGetValue(owner,out receipt))continue;
+            var tracked=peer.State.List.Mods.FirstOrDefault(item=>item.Id==mod.Id);
+            if(tracked==null||!tracked.Variants.Any(option=>option.Id==variant.Id&&GeneralUpdateOwnership.SameSourcePayload(option,variant)))continue;
+            var engine=new InstalledSnapshotInstaller(root,peer.Data,catalog);
+            var files=engine.ReadMatchingInstalledFiles(receipt,mod,variant,includeConfigs,checkpoint:checkpoint);
+            if(files!=null)return files;
+        }
+        return null;
+    }
+
+    static GeneralModWindow.SharedInstalledUpdate VerifiedSnapshotUpdate(GeneralModEntry entry,GeneralModVariant variant,
+        Lazy<ILookup<string,GeneralModWindow.SharedInstalledUpdate>> index,FixedCatalog catalog,Action checkpoint){
+        if(variant.Sources.Count!=1||variant.NaturalOption!=null||variant.CyberpunkVariant!=null||
+            variant.CyberpunkId!=null&&FixedRecipe(catalog,variant).Immutable)return null;
+        GeneralModWindow.SharedInstalledUpdate selected=null;
+        foreach(var match in index.Value[Owner(entry,variant)]){
+            var record=match.Receipt;
+            if(!match.Matches(variant)||!match.IsIntact(path=>SnapshotVerification.Hash(path,checkpoint)))continue;
+            if(selected!=null&&selected.Receipt.SourceSha256!=record.SourceSha256)
+                throw new IOException("Mais de um pacote atualizado corresponde à instalação de "+entry.Name+".");
+            selected=match;
+        }
+        return selected;
+    }
+
+    static void UseVerifiedUpdate(GeneralModVariant target,GeneralModWindow.SharedInstalledUpdate match,FixedCatalog catalog){
+        var info=match.Receipt.Upgrade;
+        if(target.Id!=match.Variant.Id||target.NaturalOption!=null||target.CyberpunkVariant!=null||!match.Matches(target))return;
+        target.CyberpunkId=null;
+        target.Sources=new List<string>{info.Source};
+        GeneralSourceInfo sourceInfo;
+        if(!match.Variant.SourceInfo.TryGetValue(info.Source,out sourceInfo))sourceInfo=new GeneralSourceInfo{Name=target.Name};
+        sourceInfo=Clone(sourceInfo);sourceInfo.Version=info.Version;
+        target.SourceInfo=new Dictionary<string,GeneralSourceInfo>{{info.Source,sourceInfo}};
+        var recipe=catalog.Packages.FirstOrDefault(item=>item.Id==info.PreviousFixed);
+        if(recipe!=null)
+            target.RequiredMods=target.RequiredMods.Concat(recipe.Dependencies).Distinct(StringComparer.Ordinal).ToList();
+    }
+
     // SHA-256 dos arquivos das versões 5.0.0 e dos refits fixados no catálogo Hyst.
     const string HystScript="r6/scripts/VTK_Hyst_CC_Edit/VTK_Hyst_CC_Edit.reds";
     const string HystScriptHash="659169a46016336a92ab7bdb93540e30f3d8837fc1a1347351bb8f12c61403f4";

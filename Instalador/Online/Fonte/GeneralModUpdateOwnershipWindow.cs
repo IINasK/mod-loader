@@ -17,20 +17,37 @@ internal sealed partial class GeneralModWindow {
     }
     readonly Dictionary<string,SourceOwnershipCache> sourceUpdateOwnership=new Dictionary<string,SourceOwnershipCache>(StringComparer.Ordinal);
 
-    sealed class SharedInstalledUpdate {
+    internal sealed class SharedInstalledUpdate {
         internal GeneralModInstaller Installer;
         internal GeneralModInstaller.Record Receipt;
         internal GeneralModVariant Variant;
         internal string Fingerprint;
+
+        internal bool Matches(GeneralModVariant variant){
+            var update=Receipt.Upgrade;
+            return variant.Sources.Count==1&&(variant.Sources[0]==update.Source||variant.Sources[0]==update.PreviousSource)&&
+                (variant.CyberpunkId==null||variant.CyberpunkId==update.PreviousFixed)&&
+                GeneralInstallRoutes.Same(variant.InstallRoutes,Receipt.InstallRoutes);
+        }
+        internal bool IsIntact(Func<string,string> hash){
+            return !Installer.RecoveryPending&&
+                Installer.Status(Receipt.Key,null,hash,Receipt.InstallRoutes)==GeneralModInstaller.Installed&&
+                GeneralUpdateOwnership.ReceiptFingerprint(Installer.ReadUpdateRecord(Receipt.Key))==Fingerprint&&
+                !Installer.RecoveryPending;
+        }
     }
 
     readonly Dictionary<string,GeneralModInstaller.UpgradeInfo> sharedInstalledVersions=
         new Dictionary<string,GeneralModInstaller.UpgradeInfo>(StringComparer.Ordinal);
 
     ILookup<string,SharedInstalledUpdate> ReadSharedInstalledUpdates(string root){
+        return ReadSharedInstalledUpdates(root,ReadUpdateContexts(root).Skip(1));
+    }
+
+    internal static ILookup<string,SharedInstalledUpdate> ReadSharedInstalledUpdates(string root,IEnumerable<GeneralUpdateOwnershipContext> contexts){
         var updates=new List<SharedInstalledUpdate>();
         if(String.IsNullOrWhiteSpace(root)||!Directory.Exists(root))return updates.ToLookup(item=>item.Receipt.Upgrade.Owner);
-        foreach(var peer in ReadUpdateContexts(root).Skip(1).Where(context=>context.State!=null&&!String.IsNullOrWhiteSpace(context.Proof))){
+        foreach(var peer in contexts.Where(context=>context.State!=null&&!String.IsNullOrWhiteSpace(context.Proof))){
             try{
                 if(String.IsNullOrWhiteSpace(peer.State.Destination)||!String.Equals(Path.GetFullPath(peer.State.Destination).TrimEnd('\\'),
                     Path.GetFullPath(root).TrimEnd('\\'),StringComparison.OrdinalIgnoreCase))continue;
@@ -64,18 +81,9 @@ internal sealed partial class GeneralModWindow {
         if(work.Variant.Sources.Count!=1||work.Variant.NaturalOption!=null||work.Variant.CyberpunkVariant!=null||
             work.Variant.CyberpunkId!=null&&Recipe(work).Immutable)return null;
         foreach(var match in reads.SharedUpdates.Value[work.Key]){
-            var receipt=match.Receipt;
-            var update=receipt.Upgrade;
-            string current=work.Variant.Sources[0];
-            if(current!=update.Source&&current!=update.PreviousSource||
-                work.Variant.CyberpunkId!=null&&work.Variant.CyberpunkId!=update.PreviousFixed||
-                !GeneralInstallRoutes.Same(work.Variant.InstallRoutes,receipt.InstallRoutes))continue;
+            if(!match.Matches(work.Variant))continue;
             try{
-                if(!match.Installer.RecoveryPending&&
-                    match.Installer.Status(receipt.Key,null,reads.Hash,work.Variant.InstallRoutes)==GeneralModInstaller.Installed&&
-                    GeneralUpdateOwnership.ReceiptFingerprint(match.Installer.ReadUpdateRecord(receipt.Key))==match.Fingerprint&&
-                    !match.Installer.RecoveryPending)
-                    return match;
+                if(match.IsIntact(reads.Hash))return match;
             }catch(IOException ex){OnlineDiagnostics.Record("scan.shared.verify",work.Entry.Id,ex.GetType().Name);}
             catch(UnauthorizedAccessException ex){OnlineDiagnostics.Record("scan.shared.verify",work.Entry.Id,ex.GetType().Name);}
         }
@@ -141,19 +149,28 @@ internal sealed partial class GeneralModWindow {
             }catch(IOException){add(null);}
             return contexts;
         }
-        var stores=new List<GeneralProjectStore>();
-        var roots=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        Action<string> knownStore=path=>{
-            try {
-                path=Path.GetFullPath(path).TrimEnd('\\');Safe.NoLinks(path);
-                if(roots.Add(path)&&(File.Exists(Path.Combine(path,"projects.json"))||File.Exists(Path.Combine(path,"lista.json"))))
-                    stores.Add(new GeneralProjectStore(path));
-            }catch(IOException){add(null);}
-             catch(UnauthorizedAccessException){add(null);}
-        };
-        if(projectStore!=null)knownStore(projectStore.Root);
+        ReadRegisteredUpdateContexts(root,RegisteredStores(projectStore==null?null:projectStore.Root,true),seen,add);
+        return contexts;
+    }
+
+    internal static IEnumerable<string> RegisteredStores(string ownStore,bool otherChannels){
+        if(ownStore!=null)yield return ownStore;
+        if(!otherChannels)yield break;
         string local=Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        foreach(string relative in new[]{"ModLoaderDev/Config","ModLoader/Config","ModLoaderGeral"})knownStore(Path.Combine(local,relative.Replace('/',Path.DirectorySeparatorChar)));
+        foreach(string relative in new[]{"ModLoaderDev/Config","ModLoader/Config","ModLoaderGeral"})
+            yield return Path.Combine(local,relative.Replace('/',Path.DirectorySeparatorChar));
+    }
+
+    internal static void ReadRegisteredUpdateContexts(string root,IEnumerable<string> candidates,
+        HashSet<string> seen,Action<GeneralUpdateOwnershipContext> add){
+        var stores=new List<GeneralProjectStore>();
+        foreach(var candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase)){
+            try{
+                string path=Path.GetFullPath(candidate).TrimEnd('\\');Safe.NoLinks(path);
+                if(File.Exists(Path.Combine(path,"projects.json"))||File.Exists(Path.Combine(path,"lista.json")))
+                    stores.Add(new GeneralProjectStore(path));
+            }catch(IOException){add(null);}catch(UnauthorizedAccessException){add(null);}
+        }
         foreach(var store in stores.Take(4)) {
             try {
                 string indexProof=store.IndexFingerprint();
@@ -177,7 +194,6 @@ internal sealed partial class GeneralModWindow {
             }catch(IOException){add(null);}
              catch(UnauthorizedAccessException){add(null);}
         }
-        return contexts;
     }
 
     static bool MissingSourceStatus(string status) {

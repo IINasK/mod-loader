@@ -66,9 +66,15 @@ internal sealed class GeneralP2PDialog : GeneralDialog, IGeneralModMessageContex
                 var owner=promptOwner();
                 if(owner==null||owner.IsDisposed||session.Discarded||session.Completed){decision.TrySetResult(false);return;}
                 try{
-                    using(var dialog=CreateConnectionPrompt(owner,session.Name)){
+                    bool official=session.OfferSource!=null&&session.OfferSource.TemplateId==GeneralProjectStore.CyberpunkTemplate;
+                    using(var dialog=CreateConnectionPrompt(owner,session.Name,!official)){
                         service.Notify();
-                        decision.TrySetResult(dialog.ShowDialog(owner)==DialogResult.Yes);
+                        bool accepted=dialog.ShowDialog(owner)==DialogResult.Yes;
+                        if(accepted){
+                            var skip=dialog.Content.Controls.Find("queue-errors-suppress",true).OfType<CheckBox>().Single();
+                            session.SendVerifiedOnly=!official&&skip.Checked;
+                        }
+                        decision.TrySetResult(accepted);
                     }
                 }catch(Exception ex){
                     OnlineDiagnostics.Record("p2p.approval",null,ex.GetType().Name);
@@ -79,10 +85,11 @@ internal sealed class GeneralP2PDialog : GeneralDialog, IGeneralModMessageContex
         return decision.Task;
     }
 
-    internal static GeneralDialog CreateConnectionPrompt(Control owner,string packName){
+    internal static GeneralDialog CreateConnectionPrompt(Control owner,string packName,bool allowPartial=false){
         var dialog=GeneralDialog.CreateMessage(owner,
             packName+"\r\n\r\n"+T("Seu amigo quer receber este pacote.","Your friend wants to receive this pack."),
             T("Conexão solicitada","Connection requested"),MessageBoxButtons.YesNo,signal:false,
+            remember:allowPartial?(Action<bool>)(value=>{}):null,rememberLabel:T("Se houver falhas, enviar só os mods verificados","If verification fails, send only verified mods"),
             yesLabel:T("Aceitar","Accept"),noLabel:T("Recusar","Decline"),modNames:new[]{packName});
         var accept=(Button)dialog.AcceptButton;
         var decline=(Button)dialog.CancelButton;
@@ -444,13 +451,19 @@ internal sealed class GeneralP2PDialog : GeneralDialog, IGeneralModMessageContex
             if(!Directory.Exists(destination.Text))throw new IOException(T("Escolha a pasta de instalação.","Choose the installation folder."));
             string target=CheckedDestination(destination.Text,invite);
             string prompt=invite.Schema==3?T("Comparar os mods do pacote ","Compare mods from the pack "):T("Receber e instalar o pacote ","Receive and install pack ");
-            if(GeneralDialog.Message(this,prompt+invite.Name+T(" em:\n"," into:\n")+target+T("\n\nMantenha o jogo fechado. Configurações anteriores terão backup.","\n\nKeep the game closed. Previous settings will be backed up."),T("Conectar ao anfitrião","Connect to the host"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
+            P2PReceiveOptions legacyOptions=null;
+            if(invite.Schema==3){
+                if(GeneralDialog.Message(this,prompt+invite.Name+T(" em:\n"," into:\n")+target+T("\n\nMantenha o jogo fechado.","\n\nKeep the game closed."),T("Conectar ao anfitrião","Connect to the host"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
+            }else{
+                legacyOptions=ChooseReceiveOptions(invite.Name+"\r\n"+target,false,new string[0],true);
+                if(legacyOptions==null)return;
+            }
             service.ArmConnectionDiagnostic(invite.Folder,false);
             P2PSession session;
             try{
                 if(!service.Engine.Running)await Task.Run(()=>service.Start(Report));
                 session=await Task.Run(()=>{
-                    var accepted=service.Accept(code,target,true);
+                    var accepted=service.Accept(code,target,true,legacyOptions);
                     if(!accepted.Completed&&(accepted.Held||accepted.Error!=null||!accepted.AutoInstall||
                         !String.Equals(accepted.Destination,target,StringComparison.OrdinalIgnoreCase)))service.RetryInstalled(accepted,target);
                     return accepted;
@@ -484,9 +497,63 @@ internal sealed class GeneralP2PDialog : GeneralDialog, IGeneralModMessageContex
     }
     int[] ReviewSyncExtras(P2PSyncComparison comparison){
         if(IsDisposed||comparison.Session.Discarded)return null;
+        string summary=comparison.Session.Name;
+        if(comparison.Different!=null){
+            summary+=String.Format(T("\r\n{0} mods a instalar · {1} diferentes · {2} iguais","\r\n{0} mods to install · {1} different · {2} matching"),
+                comparison.Missing.Length,comparison.Different.Length,comparison.Matching);
+        }
+        var options=ChooseReceiveOptions(summary,comparison.Exact,comparison.UserFolders,false);
+        if(options==null)return null;
+        comparison.ReceiveOptions=options;
+        if(comparison.Extras.Length==0&&comparison.HostOutsideDifferences.Length==0)return new int[0];
         using(var dialog=new GeneralSyncReviewDialog(comparison)){
             var answer=dialog.ShowDialog(this);
             return answer==DialogResult.Yes?dialog.SelectedExtras:answer==DialogResult.No?new int[0]:null;
+        }
+    }
+
+    P2PReceiveOptions ChooseReceiveOptions(string name,bool exact,string[] folders,bool legacy){
+        using(var dialog=new GeneralDialog(T("Confirmar sincronização","Confirm sync")){RequiresDecision=true,ClientSize=new Size(680,410)}){
+            var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,Padding=new Padding(22,8,22,18)};
+            var intro=GeneralMessageText.Create(name+"\r\n\r\n"+(exact
+                ?T("O receptor vai usar as versões do anfitrião, inclusive as mais antigas. Se algum mod divergir ao final, a sincronização ficará incompleta.",
+                   "The receiver will use the host's versions, including older ones. Any remaining mismatch leaves the sync incomplete.")
+                :T("Escolha como instalar este pacote.","Choose how to install this pack."))+
+                (legacy?T("\r\nEste convite antigo só autoriza a pasta do jogo.","\r\nThis older invitation only authorizes the game folder."):""),new[]{name});
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            layout.Controls.Add(new GeneralScrollView(intro),0,0);
+            var update=new CheckBox{AutoSize=true,Checked=true,Text=T("Atualizar mods com versão anterior reconhecida","Update mods with a recognized older version")};
+            var backup=new CheckBox{AutoSize=true,Checked=true,Text=exact?T("Guardar backup das versões reconhecidas que serão trocadas","Back up recognized versions being replaced"):
+                    T("Guardar backup dessas atualizações","Back up recognized updates")};
+            var replace=new CheckBox{AutoSize=true,Text=T("Usar os arquivos do anfitrião em outros conflitos permitidos","Use the host's files for other replaceable conflicts")};
+            update.CheckedChanged+=(s,e)=>backup.Enabled=update.Checked;
+            var controls=exact?new[]{backup}:new[]{update,backup,replace};
+            foreach(var control in controls){
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                layout.Controls.Add(control,0,layout.RowStyles.Count-1);
+            }
+            var personal=new CheckBox{AutoSize=true,Text=T("Permitir instalação nas pastas abaixo","Allow installation in the folders below")};
+            if(folders.Length>0){
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                layout.Controls.Add(personal,0,layout.RowStyles.Count-1);
+                var paths=GeneralMessageText.Create(String.Join("\r\n",folders),new string[0]);
+                layout.RowStyles.Add(new RowStyle(SizeType.Percent,70));
+                layout.Controls.Add(new GeneralScrollView(paths),0,layout.RowStyles.Count-1);
+            }
+            var commands=GeneralTableDialogLayout.Commands();
+            var start=GeneralStyle.Button(T("Continuar","Continue"),()=>dialog.Complete(DialogResult.OK),true);
+            if(exact&&folders.Length>0){
+                start.Enabled=false;
+                personal.CheckedChanged+=(s,e)=>start.Enabled=personal.Checked;
+            }
+            var cancel=GeneralStyle.Button(T("Cancelar","Cancel"),()=>dialog.Complete(DialogResult.Cancel));
+            commands.Controls.Add(start);commands.Controls.Add(cancel);
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));layout.Controls.Add(commands,0,layout.RowStyles.Count-1);
+            dialog.Content.Controls.Add(layout);dialog.CancelButton=cancel;
+            GeneralStyle.Apply(dialog,GeneralStyle.Dark);
+            if(dialog.ShowDialog(this)!=DialogResult.OK)return null;
+            return new P2PReceiveOptions{Exact=exact,UpdateKnown=update.Checked,BackupUpdates=backup.Checked,ReplaceConflicts=replace.Checked,
+                UserFolders=personal.Checked?folders:new string[0]};
         }
     }
 
@@ -958,7 +1025,7 @@ internal sealed partial class GeneralModWindow {
                             if(p2p!=service)return;
                             if(sharingHome==null&&String.Equals(state.Destination,session.Destination,StringComparison.OrdinalIgnoreCase)){
                                 var received=p2p.InstalledManifest(session);
-                                GeneralProjectStore.BindReceivedVariants(state,received,session.ReceiptId);
+                                GeneralProjectStore.BindReceivedVariants(state,received,session.ReceiptId,syncUpdatePreferences:session.ReceiveOptions!=null&&session.ReceiveOptions.Exact);
                                 Persist();if(!working&&!scanning)await Scan();
                             }
 

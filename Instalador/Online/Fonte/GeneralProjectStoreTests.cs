@@ -13,6 +13,20 @@ internal static class GeneralProjectStoreTests {
         var checks = new List<string>(); var skipped = new List<string>();
         Action<bool, string> check = (ok, message) => { if (!ok) throw new IOException(message); checks.Add(message); };
         var store = new GeneralProjectStore(Path.Combine(root, "library"));
+        var officialSeed=GeneralModLibrary.Seed(FixedData.Load(),new ModImportItem[0]);
+        var coopIds=new[]{"local-mod-31642","mod-36281","mod-8572","mod-8594"};
+        var oldProject=new GeneralModState{List=Safe.Json.Deserialize<GeneralModList>(Safe.Json.Serialize(officialSeed))};
+        foreach(var preset in oldProject.List.Presets)preset.ModIds.RemoveAll(coopIds.Contains);
+        oldProject.List.Mods.RemoveAll(mod=>mod.Id=="local-mod-31642");
+        oldProject.SuppressedModRecovery.Add("mod-8594");
+        GeneralModLibrary.MergeBuiltInEntries(oldProject,officialSeed);
+        var withDlc=oldProject.List.Presets.Single(preset=>preset.Id=="all");
+        check(coopIds.All(id=>officialSeed.Presets.Single(preset=>preset.Id=="all").ModIds.Contains(id))&&
+            coopIds.Take(3).All(withDlc.ModIds.Contains)&&!withDlc.ModIds.Contains("mod-8594"),
+            "Pacote pronto inclui os quatro mods coop e respeita uma remoção explícita na migração.");
+        withDlc.ModIds.Remove("local-mod-31642");
+        check(!GeneralModLibrary.MergeBuiltInEntries(oldProject,officialSeed)&&!withDlc.ModIds.Contains("local-mod-31642"),
+            "Uma edição do preset após a migração é preservada ao reabrir.");
         var initial = store.Read();
         check(initial.Projects.Count == 0 && initial.Theme == "light-red" && initial.Language == "pt", "Biblioteca nova começa sem projetos nem pacote Cyberpunk automático.");
         var empty = store.Create("Meu projeto", null, "light-red", "pt");

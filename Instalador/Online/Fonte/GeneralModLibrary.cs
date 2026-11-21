@@ -73,6 +73,7 @@ public sealed class GeneralModVariant {
 
 public sealed class GeneralModState {
     public int PresetStateVersion;
+    public bool CoopCatalogMembershipApplied;
     public string AppliedPreset, AppliedPresetFingerprint;
     public string Destination, DownloadFolder;
     internal string TemplateId, ProjectName;
@@ -313,6 +314,40 @@ public sealed class GeneralModLibrary {
         }
     }
 
+    static readonly Lazy<GeneralModList> CoopCatalog=new Lazy<GeneralModList>(()=>{
+        using(var reader=new StreamReader(typeof(GeneralModLibrary).Assembly.GetManifestResourceStream("ModLoader.CoopMods.json")))
+            return Safe.Json.Deserialize<GeneralModList>(reader.ReadToEnd());
+    });
+
+    internal static bool MergeBuiltInEntries(GeneralModState state,GeneralModList seed){
+        var removed=new HashSet<string>(state.SuppressedModRecovery??Enumerable.Empty<string>(),StringComparer.Ordinal);
+        var added=seed.Mods.Where(item=>!removed.Contains(item.Id)&&!state.List.Mods.Any(current=>current.Id==item.Id)).ToArray();
+        if(added.Length>0){
+            state.List.Mods.AddRange(added);
+            foreach(var category in seed.Categories)
+                if(!state.List.Categories.Contains(category))state.List.Categories.Add(category);
+            foreach(var reference in seed.Presets){
+                var saved=state.List.Presets.FirstOrDefault(preset=>preset.Id==reference.Id);
+                if(saved!=null)saved.ModIds.AddRange(added.Where(item=>reference.ModIds.Contains(item.Id)&&!saved.ModIds.Contains(item.Id)).Select(item=>item.Id));
+            }
+        }
+        return IncludeCoopCatalogMembers(state)||added.Length>0;
+    }
+
+    static bool IncludeCoopCatalogMembers(GeneralModState state){
+        if(state.CoopCatalogMembershipApplied||!String.IsNullOrEmpty(state.ReceivedPreset))return false;
+        var preset=state.List.Presets.FirstOrDefault(item=>item.Id=="all");
+        if(preset==null)return false;
+        foreach(var reference in CoopCatalog.Value.Mods){
+            if(state.List.Mods.Any(item=>item.Id==reference.Id)&&
+                !state.List.Presets.Any(item=>item.ModIds.Contains(reference.Id))&&
+                !(state.SuppressedModRecovery??new List<string>()).Contains(reference.Id))
+                preset.ModIds.Add(reference.Id);
+        }
+        state.CoopCatalogMembershipApplied=true;
+        return true;
+    }
+
     public static GeneralModList Seed(FixedCatalog catalog, IEnumerable<ModImportItem> items) {
         var list = new GeneralModList { Categories = CyberpunkCategories.Skip(1).ToList() };
         list.Categories.AddRange(new[]{"Roupas femininas","Roupas masculinas","Roupas para ambas",BodyCategory});
@@ -356,6 +391,11 @@ public sealed class GeneralModLibrary {
                     Id = "default", Name = "Principal", Sources = new List<string> { item.Source }
                 } }
             });
+        }
+        foreach(var entry in CoopCatalog.Value.Mods){
+            if(list.Mods.Any(mod=>mod.Id==entry.Id)||!entry.Variants.Single().RequiredMods.All(id=>list.Mods.Any(mod=>mod.Id==id)))continue;
+            if(!list.Categories.Contains(entry.Category))list.Categories.Add(entry.Category);
+            list.Mods.Add(Safe.Json.Deserialize<GeneralModEntry>(Safe.Json.Serialize(entry)));
         }
         GroupBodyOptions(list);
         list.Presets.Add(new GeneralModPreset { Id = "all", Name = "Com DLC Phantom Liberty", ModIds = list.Mods.Select(mod => mod.Id).ToList() });

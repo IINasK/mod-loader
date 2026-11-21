@@ -1,5 +1,12 @@
 # Cyberpunk 2077 — pacote coop
 
+## Pacote pronto e validação local
+
+- Os mods pedidos para este pacote coop pertencem ao projeto pronto distribuído pelo aplicativo. Registre a definição portátil no catálogo oficial e respeite o preset e as alternativas aplicáveis.
+- Na sincronização do pacote pronto, a instalação verificada do anfitrião define as versões, inclusive as mantidas por atualização ignorada. Confira também com um receptor limpo e um receptor com versões diferentes. Uma dependência ativa ausente impede anunciar o pacote como completo.
+- Compile e teste a Dev localmente. A publicação para outras pessoas exige solicitação explícita.
+
+
 ## Regra prioritaria: arquivos de desenvolvimento dentro do projeto
 
 - Criar logs, capturas, relatorios, fixtures, backups e temporarios SOMENTE

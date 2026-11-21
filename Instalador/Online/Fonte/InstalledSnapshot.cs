@@ -14,6 +14,8 @@ public sealed class InstalledSnapshotManifest {
     public GeneralModList List=new GeneralModList();
     public GeneralModList Project;
     public Dictionary<string,string> SyncGameInventory;
+    public string OutsideModFingerprint;
+    public string[] OutsideFolderIds;
     public List<string> ManualUpdateMods;
     public List<SnapshotOutputScope> OutputScopes=new List<SnapshotOutputScope>();
     public List<InstalledSnapshotFile> Files=new List<InstalledSnapshotFile>();
@@ -100,6 +102,9 @@ public static partial class InstalledSnapshot {
             }
         }
         var fixedEngine=cyberpunk?new FixedInstaller(catalog,root):null;
+        var registeredProjects=new Lazy<List<GeneralUpdateOwnershipContext>>(()=>RegisteredSnapshotProjects(root,appData));
+        var updateIndex=new Lazy<ILookup<string,GeneralModWindow.SharedInstalledUpdate>>(()=>GeneralModWindow.ReadSharedInstalledUpdates(root,registeredProjects.Value));
+        var sharedUpdates=new Dictionary<string,GeneralModWindow.SharedInstalledUpdate>(StringComparer.Ordinal);
         var genericEngine=new GeneralModInstaller(root,Path.Combine(appData,"Instalacoes"));
         var receivedEngine=new InstalledSnapshotInstaller(root,appData,catalog);
         var disabled=new DisabledMods(root,appData).Read();
@@ -115,7 +120,12 @@ public static partial class InstalledSnapshot {
                 if(allowMissing)continue;
                 throw new IOException("Este mod está desabilitado.");
             }
-            if(allowMissing&&Uninstalled(state,mod,variant,catalog,root,appData))continue;
+            var verifiedUpdate=VerifiedSnapshotUpdate(mod,variant,updateIndex,catalog,checkpoint);
+            List<InstalledSnapshotFile> sharedSnapshot=null;
+            if(verifiedUpdate==null&&variant.CyberpunkId==null&&!state.SnapshotReceipts.ContainsKey(Owner(mod,variant))&&
+                !Enumerable.Range(0,variant.Sources.Count).Any(i=>genericEngine.HasSnapshotRecord(P2PPack.Slot(mod,variant,i))))
+                sharedSnapshot=SharedSnapshotFiles(registeredProjects.Value,appData,root,mod,variant,catalog,includeConfigs,checkpoint);
+            if(sharedSnapshot==null&&verifiedUpdate==null&&allowMissing&&Uninstalled(state,mod,variant,catalog,root,appData))continue;
             bool fixedChoice=profile!=null&&(state.AppliedPreset!=null||profile.VariantChoices!=null&&profile.VariantChoices.ContainsKey(mod.Id));
             var expectedRecipe=variant;
             if(!fixedChoice&&cyberpunk && variant.CyberpunkId==NightCityDensity.ModId) {
@@ -136,9 +146,11 @@ public static partial class InstalledSnapshot {
             string work=Owner(mod,variant);
             var originalSources=variant.Sources.ToList();
             string snapshotId;
-            var receivedFiles=variant.CyberpunkId!="NightCoop"&&CatalogModVersions.Previous(catalog,variant.CyberpunkId)==null&&
+            if(verifiedUpdate!=null)UseVerifiedUpdate(variant,verifiedUpdate,catalog);
+            var receivedFiles=sharedSnapshot??(verifiedUpdate!=null?verifiedUpdate.Receipt.Files.Select(file=>new InstalledSnapshotFile{
+                Path=file.Path,Size=file.Size,Sha256=file.Sha256,Kind="file"}).ToList():variant.CyberpunkId!="NightCoop"&&CatalogModVersions.Previous(catalog,variant.CyberpunkId)==null&&
                 state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(work,out snapshotId)
-                ?receivedEngine.ReadMatchingInstalledFiles(snapshotId,mod,variant,includeConfigs,checkpoint:checkpoint):null;
+                ?receivedEngine.ReadMatchingInstalledFiles(snapshotId,mod,variant,includeConfigs,checkpoint:checkpoint):null);
             var files=receivedFiles??new List<InstalledSnapshotFile>();
             if(receivedFiles==null&&variant.CyberpunkId!=null) {
                 if(!cyberpunk)throw new IOException(mod.Name+": o destino não é Cyberpunk 2077.");
@@ -216,6 +228,7 @@ public static partial class InstalledSnapshot {
                 }
             }
             if(!additions.Values.Concat(shared).Any(f=>f.Kind=="file"))throw new IOException("Nenhum arquivo instalado foi encontrado.");
+            if(verifiedUpdate!=null)sharedUpdates.Add(work,verifiedUpdate);
             mod.DetectedPaths.Clear();list.Mods.Add(mod);
             foreach(var pair in additions){byPath.Add(pair.Key,pair.Value);manifest.Files.Add(pair.Value);}
             foreach(var file in shared)if(!file.Owners.Contains(work))file.Owners.Add(work);
@@ -270,7 +283,7 @@ public static partial class InstalledSnapshot {
         if(list.Presets.Count==0)list.Presets.Add(new GeneralModPreset{Id="installed",Name=manifest.Name,ModIds=list.Mods.Select(m=>m.Id).ToList()});
         if(IncludesBodyChoice(list,state.BodyChoice))manifest.BodyChoice=state.BodyChoice;
         if(allowMissing||HasInstallRoutes(manifest)||manifest.BodyChoice!=null||state.List.Presets.Any(p=>p.Configurations.Count>0||p.VariantChoices.Count>0||p.AlternativeChoices.Count>0)){
-            manifest.Project=ProjectDefinition(state,manifest.List);
+            manifest.Project=ProjectDefinition(state,manifest.List,sharedUpdates,catalog);
             if(cyberpunk&&state.TemplateId==GeneralProjectStore.CyberpunkTemplate){
                 manifest.TemplateId=state.TemplateId;
                 manifest.TemplateSubset=state.TemplateSubset;

@@ -111,7 +111,9 @@ internal static partial class GeneralNexusInfo {
 
     internal static void ReviewReceivedList(GeneralModList list,Func<string,Task<GeneralSourceInfo>> lookup=null) {
         bool exact=HasTestKey;
-        var sources=list.Mods.SelectMany(mod=>mod.Variants.SelectMany(variant=>variant.Sources
+        var definitions=list.Mods.Concat(list.Presets.Where(preset=>preset.Configurations!=null)
+            .SelectMany(preset=>preset.Configurations.Values)).Distinct();
+        var sources=definitions.SelectMany(mod=>mod.Variants.SelectMany(variant=>variant.WithNaturalOption()).SelectMany(variant=>variant.Sources
             .Select(source=>new{Mod=mod,Variant=variant,Source=source,Link=GeneralNexusLink.Parse(source)})))
             .Where(item=>item.Link!=null).ToArray();
         Func<GeneralNexusLink,string> key=link=>exact?link.Url:new GeneralNexusLink{Game=link.Game,Mod=link.Mod}.Url;

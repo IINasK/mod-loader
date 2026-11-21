@@ -312,6 +312,45 @@ internal static class InstalledSnapshotTests {
         check(manifest.List.Mods.Count==3&&ids.All(id=>installer.Status(receipt,id+"/default")==GeneralModInstaller.Installed)&&
             File.ReadAllText(Safe.In(target,library))=="updated",
             "O catálogo confere a versão atualizada pelo recibo e mantém seu dependente no envio para uma pasta limpa.");
+        // The sender still has the old definition. A registered sibling installed the verified update.
+        var store=new GeneralProjectStore(Safe.In(root,"library"));
+        var sibling=store.Create("Owner",Copy(state.List),"dark","pt",source);
+        var baseline=new GeneralModState{Destination=source,List=GeneralModLibrary.Seed(catalog,new ModImportItem[0])};
+        var sender=store.Create("Sender",Copy(baseline.List),"dark","pt",source);
+        string siblingData=store.DataPath(sibling),senderData=store.DataPath(sender);
+        string updateKey=old.Id+"/default/0/"+current;
+        WriteGenericRecord(source,siblingData,updateKey,new[]{library,dataFile});
+        var siblingEngine=new GeneralModInstaller(source,Path.Combine(siblingData,"Instalacoes"));
+        var updated=siblingEngine.ReadPackageRecord(updateKey);
+        updated.SourceSha256=new string('a',64);
+        updated.Upgrade=new GeneralModInstaller.UpgradeInfo{Owner=old.Id+"/default",PreviousFixed=old.Id,PreviousSource=
+            baseline.List.Mods.Single(item=>item.Id==old.Id).Variants.Single().Sources.Single(),Source=current,Version="2.0",
+            Reconciled=true,PredecessorsRetired=true,PackageSha256=updated.SourceSha256};
+        string recordPath=Directory.EnumerateFiles(Path.Combine(siblingData,"Instalacoes"),"*.json",SearchOption.AllDirectories).Single();
+        Safe.WriteJson(recordPath,updated);
+        var shared=InstalledSnapshot.Inspect(baseline,new[]{dependent.Id},catalog,senderData,false,true);
+        check(shared.List.Mods.Single(item=>item.Id==old.Id).Variants.Single().Sources.Single()==current&&
+            shared.Project.Mods.Single(item=>item.Id==old.Id).Variants.Single().Sources.Single()==current&&
+            baseline.List.Mods.Single(item=>item.Id==old.Id).Variants.Single().CyberpunkId==old.Id&&
+            shared.Files.Single(file=>file.Path==library).Sha256==Safe.Hash(Safe.In(source,library)),
+            "A registered peer receipt exports the installed update and its dependent without modifying the sender's preset.");
+        Write(source,library,"tampered");
+        refuse(()=>InstalledSnapshot.Inspect(baseline,new[]{dependent.Id},catalog,senderData,false,true),
+            "A different hash on disk invalidates the shared update before packing.");
+        Write(source,library,"updated");
+        var snapshotStore=new GeneralProjectStore(Safe.In(root,"snapshot-peers"));
+        var receivedDefinition=Copy(manifest.Project);
+        var receiptPeer=snapshotStore.Create("Received",receivedDefinition,"dark","pt",target);
+        var recipient=snapshotStore.Load(receiptPeer);
+        GeneralProjectStore.BindReceivedVariants(recipient,manifest,receipt);
+        var peerData=snapshotStore.DataPath(receiptPeer);
+        installer.CopyReceivedRecognition(receipt,peerData);
+        new GeneralModLibrary(Safe.In(peerData,"lista.json")).Save(recipient);
+        var explicitMod=State(target,custom.Variants.Single().Sources.Single());
+        var next=snapshotStore.Create("Another sender",Copy(explicitMod.List),"dark","pt",target);
+        var third=InstalledSnapshot.Inspect(explicitMod,new[]{"fixture"},catalog,snapshotStore.DataPath(next),false,true);
+        check(third.List.Mods.Count==1&&third.Files.Single().Path==runtime&&explicitMod.SnapshotReceipts.Count==0,
+            "Only the requested matching mod is forwarded from a peer snapshot; its other items and removal rights stay private.");
         var redirected=Copy(manifest);
         foreach(var list in new[]{redirected.List,redirected.Project})
             list.Mods.Single(mod=>mod.Id==old.Id).Variants.Single().Sources[0]="https://github.com/unrelated/fixture/releases/download/v2/FixtureLib.zip";

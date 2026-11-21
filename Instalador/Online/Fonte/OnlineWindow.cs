@@ -730,6 +730,7 @@ static class OnlineProgram {
         if(args.Length==2&&args[0]=="--self-test-storage"){GeneralModWindow.RunStorageTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-save-backups"){OnlineStorageTests.Run(args[1]);return 0;}
         if(args.Length==3&&args[0]=="--self-test-p2p-sync"){GeneralP2PLifecycleTests.RunSync(args[1],args[2]);return 0;}
+        if(args.Length==3&&args[0]=="--self-test-p2p-exact"){GeneralP2PLifecycleTests.RunExact(args[1],args[2]);return 0;}
         if(args.Length==3&&args[0]=="--self-test-nightcoop"){NightCoopReleaseTests.Run(args[1],args[2]);return 0;}
         if(args.Length==3&&args[0]=="--self-test-p2p-engine"){GeneralP2PLifecycleTests.RunEngine(args[1],args[2]);return 0;}
         if(args.Length==3&&args[0]=="--self-test-p2p-engine-owner"){GeneralP2PLifecycleTests.RunEngineOwner(args[1],args[2]);return 0;}

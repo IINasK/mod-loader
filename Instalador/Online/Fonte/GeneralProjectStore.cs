@@ -105,6 +105,7 @@ internal sealed class GeneralProjectStore {
             string data = DataPath(project);
             var state = new GeneralModState {
                 List = list, Theme = theme, Language = language, Destination = destination,
+                CoopCatalogMembershipApplied = templateId == CyberpunkTemplate,
                 DownloadFolder = index.DownloadFolder,
                 SelectedPreset = list.Presets.Count == 0 ? null : list.Presets[0].Id
             };
@@ -166,7 +167,7 @@ internal sealed class GeneralProjectStore {
             var receivedDefinitions=state.List.Mods.ToDictionary(m=>m.Id,StringComparer.Ordinal);
             GeneralPresetProfiles.Project(state);
             state.ReceivedPreset=state.SelectedPreset;
-            BindReceivedVariants(state,manifest,session.ReceiptId,receivedDefinitions);
+            BindReceivedVariants(state,manifest,session.ReceiptId,receivedDefinitions,session.ReceiveOptions!=null&&session.ReceiveOptions.Exact);
             try{new ModOutputIndex(data,session.Destination).CaptureReceivedBaseline(session.Destination,manifest);}
             catch(IOException ex){OnlineDiagnostics.Failure("inventory.outputs.received",ex,"Registrar arquivos locais do receptor.");}
             catch(UnauthorizedAccessException ex){OnlineDiagnostics.Failure("inventory.outputs.received",ex,"Registrar arquivos locais do receptor.");}
@@ -178,7 +179,7 @@ internal sealed class GeneralProjectStore {
         }
     }
 
-    internal static void BindReceivedVariants(GeneralModState state,InstalledSnapshotManifest manifest,string receipt,Dictionary<string,GeneralModEntry> receivedDefinitions=null){
+    internal static void BindReceivedVariants(GeneralModState state,InstalledSnapshotManifest manifest,string receipt,Dictionary<string,GeneralModEntry> receivedDefinitions=null,bool syncUpdatePreferences=false){
         var entries=state.List.Mods.ToDictionary(mod=>mod.Id,StringComparer.Ordinal);
         var manual=new HashSet<string>(manifest.ManualUpdateMods??Enumerable.Empty<string>(),StringComparer.Ordinal);
         foreach(var mod in manifest.List.Mods){
@@ -193,7 +194,9 @@ internal sealed class GeneralProjectStore {
                 entry.Variants.Add(GeneralPresetProfiles.Copy(alternate));
             }
             state.SnapshotReceipts[mod.Id+"/"+mod.DefaultVariant]=receipt;
-            if(manual.Contains(mod.Id)&&!state.ManualUpdateMods.Contains(mod.Id))state.ManualUpdateMods.Add(mod.Id);
+            if(manual.Contains(mod.Id)){
+                if(!state.ManualUpdateMods.Contains(mod.Id))state.ManualUpdateMods.Add(mod.Id);
+            }else if(syncUpdatePreferences)state.ManualUpdateMods.Remove(mod.Id);
             if(entry.DefaultVariant==mod.DefaultVariant)state.ChosenVariants.Remove(mod.Id);
             else state.ChosenVariants[mod.Id]=mod.DefaultVariant;
         }

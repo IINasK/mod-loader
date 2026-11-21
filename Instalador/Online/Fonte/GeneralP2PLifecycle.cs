@@ -236,7 +236,15 @@ internal sealed partial class P2PService {
     }
 
     void StartDeferredPreparation(P2PSession session,Func<bool> ready){
-        if(session.Discarded||DeferredPrepared(session))return;
+        if(session.Discarded)return;
+        if(DeferredPrepared(session)){
+            // The ZIP and the host notice travel in independent folders. Retry the final notice
+            // if the first publication raced a transport reader or the host restarted after packing.
+            if(session.CompareBeforePack&&session.Recipients.Length==1)
+                PublishHostDecision(session,session.Recipients[0].Device,HostPreparing,
+                    new P2PSyncProgress{Done=100,Total=100,Packing=true});
+            return;
+        }
         var state=session.OfferSource??preparationState;
         bool choiceReceived=session.CompareBeforePack&&HasSyncChoice(session);
         if(session.CompareBeforePack&&session.Recipients.Length!=0){
@@ -419,8 +427,10 @@ internal sealed partial class P2PService {
                 if(session.Phase==null)Notify(true);
                 SetPhase(session,"installing");
                 var installer=new InstalledSnapshotInstaller(session.Destination,installedData,installedCatalog,installedFixture);
+                var options=session.ReceiveOptions;
                 var chooseUpdates=ChooseUpdates;
                 session.ReceiptId=installer.Install(zip,session.Deferred?session.PayloadHash:session.Hash,message=>session.Stage=message,-1,difference=>{
+                    if(options!=null)return options.Replace(difference);
                     SetPhase(session,"review");
                     var choice=ChooseVersion;
                     bool replace=choice!=null&&choice(difference);
@@ -428,21 +438,24 @@ internal sealed partial class P2PService {
                     if(replace||difference.SkipSelected)SetPhase(session,"installing");
                     return replace;
                 },id=>{session.TransactionId=id;Save();},checkpoint,value=>session.InstallProgress=value,allowReuse:AllowsLocalReuse(session),approveUserFolders:folders=>{
+                    if(options!=null)return options.AllowsFolders(folders);
                     SetPhase(session,"review");
                     bool allowed=ApproveUserFolders!=null&&ApproveUserFolders(folders);
                     checkpoint();
                     SetPhase(session,"installing");
                     return allowed;
-                },chooseUpdates:chooseUpdates==null?(Func<int,bool?>)null:count=>{
+                },chooseUpdates:options!=null?(Func<int,bool?>)(count=>options.UpdateBackup()):chooseUpdates==null?(Func<int,bool?>)null:count=>{
                     SetPhase(session,"review");
                     bool? backup=chooseUpdates(count);
                     checkpoint();SetPhase(session,"installing");
                     return backup;
-                });
+                },requireExact:options!=null&&options.Exact,exactCleanup:session.SyncCleanup,
+                    exactPreview:options!=null&&options.Exact?ReadExactPreview(session):null,receivingP2P:true);
                 var manifest=installer.ReadManifest(session.ReceiptId);
                 if(installer.ReadSkippedDestinations(session.ReceiptId).Length==0)
                     ApplyApprovedSyncCleanup(session,manifest);
                 else session.SyncCleanup=null;
+                VerifyExactSync(session,manifest,checkpoint);
                 session.ModsOutsidePack=InstalledSnapshot.CountOutsidePack(manifest);
                 session.ReceivedGeneratedConfigs=manifest.Files.Where(file=>file.Generated).Select(file=>file.Path).ToArray();
                 if(session.ModsOutsidePack>0)ReportDiagnosticFailure(session,"mods_outside_pack",null);
@@ -516,8 +529,9 @@ internal sealed partial class P2PService {
             if(session.TransactionId!=null||(!session.Lifecycle&&expectedHash!=null&&File.Exists(zip))){
                 var installer=new InstalledSnapshotInstaller(session.Destination,installedData,installedCatalog,installedFixture);
                 string installed=installer.DiscardInterrupted(session.TransactionId,zip,expectedHash);
-                if(installed!=null){
-                    session.ReceiptId=installed;
+                if(installed!=null)session.ReceiptId=installed;
+                if(installed!=null&&(session.ReceiveOptions==null||!session.ReceiveOptions.Exact)&&
+                    installer.ReadManifest(installed).TemplateId!=GeneralProjectStore.CyberpunkTemplate){
                     session.Completed=true;
                     session.Error=null;
                     SetPhase(session,"installed");

@@ -97,8 +97,13 @@ public static partial class InstalledSnapshot {
         if(variant.SourceInfo!=null)variant.SourceInfo=variant.SourceInfo.Where(pair=>variant.Sources.Contains(pair.Key)&&GeneralModDownload.IsWebSource(pair.Key)).ToDictionary(pair=>pair.Key,pair=>pair.Value);
     }
 
-    static GeneralModList ProjectDefinition(GeneralModState state,GeneralModList installed){
+    static GeneralModList ProjectDefinition(GeneralModState state,GeneralModList installed,Dictionary<string,GeneralModWindow.SharedInstalledUpdate> updates,FixedCatalog catalog){
         var project=Clone(state.List);
+        if(updates.Count>0)foreach(var entry in project.Mods.Concat(project.Presets.SelectMany(preset=>preset.Configurations.Values)))
+            foreach(var option in entry.Variants){
+                GeneralModWindow.SharedInstalledUpdate update;
+                if(updates.TryGetValue(Owner(entry,option),out update))UseVerifiedUpdate(option,update,catalog);
+            }
         foreach(var mod in project.Mods){
             mod.DetectedPaths.Clear();
             mod.DefaultVariant=Selected(state,mod);
