@@ -16,6 +16,7 @@ public sealed class InstalledSnapshotManifest {
     public Dictionary<string,string> SyncGameInventory;
     public string OutsideModFingerprint;
     public string[] OutsideFolderIds;
+    public Dictionary<string,string> OutsideLuaSettings;
     public List<string> ManualUpdateMods;
     public List<SnapshotOutputScope> OutputScopes=new List<SnapshotOutputScope>();
     public List<InstalledSnapshotFile> Files=new List<InstalledSnapshotFile>();

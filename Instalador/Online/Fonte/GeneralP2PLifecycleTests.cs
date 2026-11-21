@@ -478,8 +478,18 @@ internal static class GeneralP2PLifecycleTests {
             }
             string pinned=catalog.Packages.Single(mod=>mod.Id=="Extra").Files.First().Path;
             const string unknown="archive/pc/mod/unregistered.archive";
+            const string settings="bin/x64/plugins/cyber_engine_tweaks/mods/Flight/settings.lua";
+            const string extraAsi="bin/x64/plugins/foreign.asi";
+            WriteSyncFile(from,settings,"return { sensitivity = 2 }");
+            WriteSyncFile(from,"bin/x64/plugins/cyber_engine_tweaks/mods/Flight/README.md","documentation");
+            WriteSyncFile(from,"red4ext/plugins/Core/Persistent/cache.dat","auxiliary data");
+            WriteSyncFile(from,"red4ext/plugins/City/locations.ncl","auxiliary locations");
             const string hostShell="mods/LegacyCollection",receiverShell="r6/tweaks/LegacyVehicle";
             Directory.CreateDirectory(Safe.In(from,hostShell+"/nested/empty"));
+            var dll=FixedData.Load().Packages.SelectMany(item=>item.Files).First(NightCoopRelease.IsUpgradeTarget);
+            var modernFiles=new[]{new InstalledSnapshotFile{Path=dll.Path,Sha256=dll.Sha256,Size=dll.Size}};
+            Check(checks,new FixedInstaller(catalog,from,true).OutsideGroupFolders(modernFiles,null,()=>{}).Count==0,
+                "The verified mods_true_list build ignores empty mod groups while unknown builds keep the historical comparison.");
             using(var host=Service(root,"h",Path.Combine(root,"dh"),helper,catalog:catalog))
             using(var friend=Service(root,"f",Path.Combine(root,"df"),helper,catalog:catalog)){
                 host.SetPreparationState(state);
@@ -502,6 +512,17 @@ internal static class GeneralP2PLifecycleTests {
                             "Host-only empty REDmod and receiver-only empty tweak groups block preflight, preserving both directories.");
                         Directory.CreateDirectory(Safe.In(to,hostShell));
                         Directory.Delete(Safe.In(to,receiverShell));
+                        string configError="";
+                        try{friend.SubmitSyncChoice(shellReview,false);}catch(IOException ex){configError=ex.Message;}
+                        Check(checks,configError.Contains("Lua")&&!friend.HasSyncChoice(received),
+                            "A missing settings.lua is reported as an outside Lua setting and cannot be silently omitted.");
+                        WriteSyncFile(to,settings,"return { sensitivity = 2 }");
+                        WriteSyncFile(to,extraAsi,"extra plugin");
+                        bool asiBlocked=false;
+                        try{friend.SubmitSyncChoice(shellReview,false);}catch(IOException){asiBlocked=true;}
+                        Check(checks,asiBlocked&&!friend.HasSyncChoice(received)&&File.Exists(Safe.In(to,extraAsi)),
+                            "A top-level ASI plug-in blocks exact transfer without authorizing removal.");
+                        File.Delete(Safe.In(to,extraAsi));
                         WriteSyncFile(to,unknown,"unknown local mod");
                         var first=friend.CompareIncoming(received,full:full);
                         first.ReceiveOptions=new P2PReceiveOptions{Exact=true,BackupUpdates=true};

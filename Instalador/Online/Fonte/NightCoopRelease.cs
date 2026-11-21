@@ -15,6 +15,11 @@ internal static class NightCoopRelease {
     const string DllHash="03c621297ffb5e634e42ccbae542e7435d237986ca527dc40bd91cd93e68b19a";
     const long DllSize=23604224;
 
+    // compat-b1 / mods_true_list: this verified build excludes folders without mod files.
+    internal static bool IgnoresEmptyGroups(System.Collections.Generic.IEnumerable<InstalledSnapshotFile> files){
+        return files.Any(file=>String.Equals(file.Path,DllPath,StringComparison.OrdinalIgnoreCase)&&file.Size==DllSize&&file.Sha256==DllHash);
+    }
+
     internal static readonly string[] AddedPaths={
         "red4ext/plugins/NightCoop/redscript/NightCoopSdk.reds",
         "red4ext/plugins/NightCoop/redscript/NightCoopSdkNative.reds",

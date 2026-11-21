@@ -35,6 +35,7 @@ internal sealed class P2PSyncDifference {
 
 internal sealed partial class P2PService {
     const int MaxSyncMessage = 12000000;
+    const int ExactParityVersion = 2;
     const string PreviewName = "sync-preview.json", ChoiceName = "sync-choice.json";
 
     sealed class SyncMessage {
@@ -103,12 +104,15 @@ internal sealed partial class P2PService {
             throw new IOException("A lista de comparação do anfitrião é inválida.");
         var inventory=preview.SyncGameInventory;
         if(preview.TemplateId==GeneralProjectStore.CyberpunkTemplate&&
-            (inventory==null||!P2PPack.HashValid(preview.OutsideModFingerprint)||preview.OutsideFolderIds==null))
+            (inventory==null||!P2PPack.HashValid(preview.OutsideModFingerprint)||preview.OutsideFolderIds==null||preview.OutsideLuaSettings==null))
             throw new IOException(GeneralStyle.T("O anfitrião precisa atualizar o Mod Loader e gerar um novo convite para conferir o pacote pronto.",
                 "The host must update Mod Loader and create a new invitation to verify the built-in pack."));
         if(preview.OutsideFolderIds!=null&&(preview.OutsideFolderIds.Length>InstalledSnapshot.MaxFiles||
             preview.OutsideFolderIds.Any(id=>!P2PPack.HashValid(id))||preview.OutsideFolderIds.Distinct().Count()!=preview.OutsideFolderIds.Length))
             throw new IOException("O inventário de pastas do anfitrião é inválido.");
+        if(preview.OutsideLuaSettings!=null&&(preview.OutsideLuaSettings.Count>InstalledSnapshot.MaxFiles||
+            preview.OutsideLuaSettings.Any(item=>!P2PPack.HashValid(item.Key)||!P2PPack.HashValid(item.Value))))
+            throw new IOException("O inventário de configurações Lua do anfitrião é inválido.");
         if(inventory!=null&&(preview.Game!="cyberpunk2077"||inventory.Count>InstalledSnapshot.MaxFiles||
             inventory.Keys.Distinct(StringComparer.OrdinalIgnoreCase).Count()!=inventory.Count||
             inventory.Any(item=>!FixedInstaller.SyncInventoryEntry(item.Key,item.Value))))
@@ -145,7 +149,8 @@ internal sealed partial class P2PService {
                         };
                         preview.SyncGameInventory=engine.ReadSyncInventory(preview.Files,checkpoint,installedData);
                         if(preview.TemplateId==GeneralProjectStore.CyberpunkTemplate){
-                            preview.OutsideModFingerprint=engine.OutsideModFingerprint(preview.Files,null,checkpoint);
+                            preview.OutsideLuaSettings=new Dictionary<string,string>(StringComparer.Ordinal);
+                            preview.OutsideModFingerprint=engine.OutsideModFingerprint(preview.Files,null,checkpoint,preview.OutsideLuaSettings);
                             preview.OutsideFolderIds=engine.OutsideGroupFolders(preview.Files,null,checkpoint).Keys.OrderBy(id=>id,StringComparer.Ordinal).ToArray();
                         }
                     }
@@ -168,7 +173,7 @@ internal sealed partial class P2PService {
         var choice=Safe.Json.Deserialize<SyncChoice>(ReadSyncMessage(session,device,choiceFile,ChoiceName,out ignored));
         if(choice==null||choice.PreviewHash!=previewHash||choice.Required==null||choice.Required.Length>previewManifest.List.Mods.Count)
             throw new IOException("A escolha não corresponde à comparação deste convite.");
-        if(previewManifest.TemplateId==GeneralProjectStore.CyberpunkTemplate&&(!choice.Exact||choice.ParityVersion!=1))
+        if(previewManifest.TemplateId==GeneralProjectStore.CyberpunkTemplate&&(!choice.Exact||choice.ParityVersion!=ExactParityVersion))
             throw new IOException(GeneralStyle.T("O receptor precisa atualizar o Mod Loader para sincronizar todas as versões do pacote pronto.",
                 "The recipient must update Mod Loader to sync every version in the built-in pack."));
         var required=new HashSet<string>(choice.Required,StringComparer.Ordinal);
@@ -266,8 +271,9 @@ internal sealed partial class P2PService {
             extras=new FixedInstaller(installedCatalog,destination,installedFixture).PlanSyncExtras(preview,checkpoint,installedData);
             if(comparison.Exact){
                 var hostFolders=new HashSet<string>(preview.OutsideFolderIds,StringComparer.Ordinal);
+                bool ignoresEmpty=NightCoopRelease.IgnoresEmptyGroups(preview.Files);
                 extras=extras.Where(extra=>!extra.Files.All(file=>file.Before==null&&
-                    hostFolders.Contains(FixedInstaller.SyncFolderId(file.Path)))).ToArray();
+                    (ignoresEmpty||hostFolders.Contains(FixedInstaller.SyncFolderId(file.Path))))).ToArray();
             }
             foreach(var item in preview.SyncGameInventory){
                 checkpoint();
@@ -314,9 +320,17 @@ internal sealed partial class P2PService {
                 "Compare the mods and r6/tweaks folders on both PCs before retrying."));
             throw new IOException(String.Join(Environment.NewLine,lines));
         }
-        if(engine.OutsideModFingerprint(preview.Files,pending,checkpoint)!=preview.OutsideModFingerprint)
+        var settings=new Dictionary<string,string>(StringComparer.Ordinal);
+        if(engine.OutsideModFingerprint(preview.Files,pending,checkpoint,settings)!=preview.OutsideModFingerprint){
+            int missing=preview.OutsideLuaSettings.Keys.Count(id=>!settings.ContainsKey(id));
+            int different=settings.Count(item=>preview.OutsideLuaSettings.ContainsKey(item.Key)&&preview.OutsideLuaSettings[item.Key]!=item.Value);
+            int extra=settings.Keys.Count(id=>!preview.OutsideLuaSettings.ContainsKey(id));
+            if(missing+different+extra>0)
+                throw new IOException(String.Format(GeneralStyle.T("Configurações Lua fora do pacote: {0} ausentes neste PC, {1} diferentes, {2} extras locais. Confira os arquivos settings.lua nas pastas dos mods nos dois PCs. Depois de igualar as configurações, refaça a comparação.",
+                    "Lua settings outside the pack: {0} missing on this PC, {1} different, {2} local extras. Check the settings.lua files in the mod folders on both PCs. Once the settings match, compare again."),missing,different,extra));
             throw new IOException(GeneralStyle.T("Os arquivos de mods fora do pacote ainda diferem. Confira os mods extras nos dois PCs antes de sincronizar.",
                 "Mod files outside the pack still differ. Review extra mods on both PCs before syncing."));
+        }
     }
 
     internal void VerifyHostOutsideFiles(P2PSession session,GeneralModState state,InstalledSnapshotManifest plan,Action checkpoint){
@@ -330,6 +344,7 @@ internal sealed partial class P2PService {
                 "The host's mods changed after comparison. Create a new invitation."));
         plan.OutsideModFingerprint=null;
         plan.OutsideFolderIds=null;
+        plan.OutsideLuaSettings=null;
     }
 
     internal InstalledSnapshotManifest ReadExactPreview(P2PSession session){
@@ -338,7 +353,7 @@ internal sealed partial class P2PService {
         string hash,ignored;
         var preview=ReadSyncPreview(session,Engine.Device,out hash);
         var choice=Safe.Json.Deserialize<SyncChoice>(ReadSyncMessage(session,Engine.Device,ChoicePath(session,Engine.Device),ChoiceName,out ignored));
-        if(preview.TemplateId!=GeneralProjectStore.CyberpunkTemplate||choice==null||!choice.Exact||choice.ParityVersion!=1||choice.PreviewHash!=hash)
+        if(preview.TemplateId!=GeneralProjectStore.CyberpunkTemplate||choice==null||!choice.Exact||choice.ParityVersion!=ExactParityVersion||choice.PreviewHash!=hash)
             throw new IOException(GeneralStyle.T("A seleção inicial deste convite mudou.","The initial selection for this invitation has changed."));
         return preview;
     }
@@ -482,7 +497,7 @@ internal sealed partial class P2PService {
             session.SyncLocalExtrasKept = kept.Length;
             session.SyncHostFilesDifferent = comparison.HostOutsideDifferences.Length;
             Save();
-            var choice=new SyncChoice{PreviewHash=hash,Full=full,Exact=exact,ParityVersion=exact?1:0,Required=full?new string[0]:comparison.Required};
+            var choice=new SyncChoice{PreviewHash=hash,Full=full,Exact=exact,ParityVersion=exact?ExactParityVersion:0,Required=full?new string[0]:comparison.Required};
             WriteSyncMessage(session,Engine.Device,ChoicePath(session,Engine.Device),ChoiceName,choice);
             OnlineDiagnostics.Record("p2p.choice.submitted",null,"Seleção de recebimento confirmada.",
                 new{Id=DiagnosticId(session.Id),Mode=full?"full":"update",Count=choice.Required.Length});
@@ -499,6 +514,7 @@ public sealed partial class FixedInstaller {
     // Missing folders covered by the incoming files will be created by installation.
     internal Dictionary<string,string> OutsideGroupFolders(IEnumerable<InstalledSnapshotFile> files,IEnumerable<string> removal,Action checkpoint){
         var groups=new Dictionary<string,string>(StringComparer.Ordinal);
+        if(NightCoopRelease.IgnoresEmptyGroups(files))return groups;
         var covered=new HashSet<string>(files.Select(file=>ModFolder(file.Path)).Where(folder=>folder!=null),StringComparer.OrdinalIgnoreCase);
         var removing=new HashSet<string>(removal??Enumerable.Empty<string>(),StringComparer.OrdinalIgnoreCase);
         var pruned=new HashSet<string>(removing.SelectMany(SyncParentFolders),StringComparer.OrdinalIgnoreCase);
@@ -534,17 +550,36 @@ public sealed partial class FixedInstaller {
         return true;
     }
 
-    // Only a digest of non-personal mod assets leaves the PC. Paths with no ownership
-    // evidence are useful for comparison but never authorize export or removal.
-    internal string OutsideModFingerprint(IEnumerable<InstalledSnapshotFile> files,IEnumerable<string> removal,Action checkpoint){
+    // compat-b1 enumerates mod formats in the game roots. Owned files of any type
+    // are already covered by the package manifest and receipt checks.
+    static readonly HashSet<string> NightCoopPayloadExtensions=new HashSet<string>(new[]{
+        ".dll",".reds",".archive",".xl",".yaml",".yml",".tweak",".asi",".lua",".ws"
+    },StringComparer.OrdinalIgnoreCase);
+    static bool NightCoopPayload(string path){
+        string extension=Path.GetExtension(path);
+        if(InFolder(path,ExtraFileRoots[0])||InFolder(path,ExtraFileRoots[1])||InFolder(path,ExtraFileRoots[2]))
+            return ExtraFilePath(path);
+        if(InFolder(path,ExtraBundleRoots[1]))return String.Equals(extension,".lua",StringComparison.OrdinalIgnoreCase);
+        return NightCoopPayloadExtensions.Contains(extension)||(InFolder(path,RedmodRoot)&&
+            Path.GetFileName(path).Equals("info.json",StringComparison.OrdinalIgnoreCase));
+    }
+
+    internal string OutsideModFingerprint(IEnumerable<InstalledSnapshotFile> files,IEnumerable<string> removal,Action checkpoint,
+        IDictionary<string,string> luaSettings=null){
         var exclude=new HashSet<string>(files.Select(file=>file.Path),StringComparer.OrdinalIgnoreCase);
         if(removal!=null)exclude.UnionWith(removal);
-        var paths=FindExtraPaths(true,false).Where(path=>!exclude.Contains(path)&&!InstalledFileOwnership.PrivateState(path)&&
-            (!InstalledFileOwnership.Companion(path)||path.EndsWith(".lua",StringComparison.OrdinalIgnoreCase)||
-             path.EndsWith("/info.json",StringComparison.OrdinalIgnoreCase)))
+        string plugins=Safe.In(game,"bin/x64/plugins");Safe.NoLinks(plugins);
+        var asi=Directory.Exists(plugins)?Directory.EnumerateFiles(plugins,"*.asi",SearchOption.TopDirectoryOnly)
+            .Select(RelativeGamePath):Enumerable.Empty<string>();
+        var paths=FindExtraPaths(true,false).Concat(asi).Where(path=>!exclude.Contains(path)&&!InstalledFileOwnership.PrivateState(path)&&NightCoopPayload(path))
             .OrderBy(path=>path,StringComparer.OrdinalIgnoreCase).ToArray();
         if(paths.Length>InstalledSnapshot.MaxFiles)throw new IOException("Há arquivos de mods demais fora do pacote.");
-        var entries=SnapshotVerification.Map(paths,(path,poll)=>path.ToUpperInvariant()+"\n"+SnapshotVerification.Hash(Safe.In(game,path),poll),checkpoint);
+        var hashes=SnapshotVerification.Map(paths,(path,poll)=>SnapshotVerification.Hash(Safe.In(game,path),poll),checkpoint);
+        if(luaSettings!=null)for(int index=0;index<paths.Length;index++)
+            if(paths[index].EndsWith("/settings.lua",StringComparison.OrdinalIgnoreCase)||
+                paths[index].EndsWith("_settings.lua",StringComparison.OrdinalIgnoreCase))
+                luaSettings.Add(SyncFolderId(paths[index]),hashes[index]);
+        var entries=paths.Select((path,index)=>path.ToUpperInvariant()+"\n"+hashes[index]);
         return InstalledSnapshot.Hash(Encoding.UTF8.GetBytes(String.Join("\n",entries)));
     }
 }
