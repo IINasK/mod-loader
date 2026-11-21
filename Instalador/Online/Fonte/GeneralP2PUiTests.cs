@@ -59,7 +59,11 @@ internal static class GeneralP2PUiTests {
                         check(!Find<Button>(dialog,"p2p-copy").Enabled,"Empty invitation is not copyable: "+theme+locale);
                         var generate=Find<Button>(dialog,"modpack-generate");check(generate.Enabled&&!service.Engine.Running,"Offline modpack generation is available without a running P2P engine: "+theme+locale);
                         check(!connect.Enabled&&dialog.Content.Controls.Find("p2p-pause",true).Length==0&&!destination.Visible,"Estado inicial oferece Conectar sem lista de sessões ou pausa vazia: "+theme+locale);
-                        check(!Children(dialog.Content).OfType<ListBox>().Any()&&!Children(dialog.Content).OfType<CheckBox>().Any(),"Sem lista, seleção de configuração ou ações legadas: "+theme+locale);
+                        var settings=Find<CheckBox>(dialog,"p2p-send-configs");
+                        check(settings.Visible&&!settings.Checked&&!Find<LinkLabel>(dialog,"p2p-select-configs").Visible&&
+                            settings.RectangleToScreen(settings.ClientRectangle).Bottom<=output.RectangleToScreen(output.ClientRectangle).Top,
+                            "A opção de enviar configurações aparece antes do convite e começa desmarcada: "+theme+locale);
+                        check(!Children(dialog.Content).OfType<ListBox>().Any(),"Nenhuma lista adicional ao abrir: "+theme+locale);
                         var offered=new P2PInvite{Device=String.Join("-",Enumerable.Repeat("AAAAAAA",8)),Folder="ml-"+new string('a',32),ManifestHash=new string('b',64),Kind="offer",Name="Pacote do amigo",Mode="installed-zip",Size=1024};input.Text=offered.Encode();output.Text=offered.Encode();Application.DoEvents();
                         check(destination.Visible&&destination.ReadOnly&&Find<Button>(dialog,"p2p-folder").Enabled,"Colar convite mostra destino local e escolha de pasta antes de conectar: "+theme+locale);
                         var folderHint=Find<Label>(dialog,"p2p-folder-hint");

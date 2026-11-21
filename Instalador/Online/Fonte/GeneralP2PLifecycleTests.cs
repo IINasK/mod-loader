@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Text;
 using System.Threading;
 
 internal static class GeneralP2PLifecycleTests {
@@ -469,6 +470,12 @@ internal static class GeneralP2PLifecycleTests {
         try{
             FixedAsset unused;
             var catalog=OnlineTests.MakeCatalog(root,out unused);
+            const string settingsFolder="bin/x64/plugins/cyber_engine_tweaks/mods/Flight/";
+            const string settings=settingsFolder+"settings.lua", json=settingsFolder+"options.json";
+            string anchor=settingsFolder+"init.lua";
+            byte[] anchorBytes=Encoding.UTF8.GetBytes("test "+anchor);
+            catalog.Packages.Single(mod=>mod.Id=="Extra").Files.Add(new FixedFile{
+                Asset="a0",Entry=anchor,Path=anchor,Sha256=InstalledSnapshot.Hash(anchorBytes),Size=anchorBytes.Length});
             string from=OnlineTests.Fixture(root,"a"),to=OnlineTests.Fixture(root,"b");
             var state=new GeneralModState{Destination=from,List=GeneralModLibrary.Seed(catalog,new ModImportItem[0]),TemplateId=GeneralProjectStore.CyberpunkTemplate};
             state.ManualUpdateMods.Add("Extra");
@@ -478,9 +485,9 @@ internal static class GeneralP2PLifecycleTests {
             }
             string pinned=catalog.Packages.Single(mod=>mod.Id=="Extra").Files.First().Path;
             const string unknown="archive/pc/mod/unregistered.archive";
-            const string settings="bin/x64/plugins/cyber_engine_tweaks/mods/Flight/settings.lua";
             const string extraAsi="bin/x64/plugins/foreign.asi";
             WriteSyncFile(from,settings,"return { sensitivity = 2 }");
+            WriteSyncFile(from,json,"{\"speed\":2}");
             WriteSyncFile(from,"bin/x64/plugins/cyber_engine_tweaks/mods/Flight/README.md","documentation");
             WriteSyncFile(from,"red4ext/plugins/Core/Persistent/cache.dat","auxiliary data");
             WriteSyncFile(from,"red4ext/plugins/City/locations.ncl","auxiliary locations");
@@ -495,13 +502,21 @@ internal static class GeneralP2PLifecycleTests {
                 host.SetPreparationState(state);
                 friend.ChooseVersion=diff=>{throw new IOException("Unexpected version prompt");};
                 friend.ChooseUpdates=count=>{throw new IOException("Unexpected update prompt");};
-                foreach(bool full in new[]{false,true}){
-                    WriteSyncFile(to,pinned,full?"receiver newer":"receiver older");
+                foreach(string scenario in new[]{"delta","full","settings-only"}){
+                    bool full=scenario=="full",settingsOnly=scenario=="settings-only";
+                    if(!settingsOnly)WriteSyncFile(to,pinned,full?"receiver newer":"receiver older");
+                    if(full||settingsOnly){
+                        WriteSyncFile(to,settings,"return { sensitivity = 8 }");
+                        WriteSyncFile(to,json,"{\"speed\":8}");
+                    }
                     var sent=host.BeginDeferred(state,new[]{"Extra"},true,compareBeforePack:true);
+                    sent.GeneratedConfigSelection=new[]{settings,json}.Select(path=>new P2POutputSelection{
+                        Owner="Extra",Path=path,Hash=InstalledSnapshot.GeneratedConfigHash(path,InstalledSnapshot.ReadGeneratedConfig(from,path))
+                    }).ToArray();
                     var received=friend.Accept(host.Invitation(sent),to,true);
                     ConnectTo(friend,host);
                     Wait(()=>{if(sent.Error!=null)throw new IOException(sent.Error);return friend.HasSyncPreview(received);},"Missing official preview.");
-                    if(!full){
+                    if(scenario=="delta"){
                         var shellReview=friend.CompareIncoming(received);
                         shellReview.ReceiveOptions=new P2PReceiveOptions{Exact=true,BackupUpdates=true};
                         Directory.CreateDirectory(Safe.In(to,receiverShell));
@@ -512,11 +527,8 @@ internal static class GeneralP2PLifecycleTests {
                             "Host-only empty REDmod and receiver-only empty tweak groups block preflight, preserving both directories.");
                         Directory.CreateDirectory(Safe.In(to,hostShell));
                         Directory.Delete(Safe.In(to,receiverShell));
-                        string configError="";
-                        try{friend.SubmitSyncChoice(shellReview,false);}catch(IOException ex){configError=ex.Message;}
-                        Check(checks,configError.Contains("Lua")&&!friend.HasSyncChoice(received),
-                            "A missing settings.lua is reported as an outside Lua setting and cannot be silently omitted.");
-                        WriteSyncFile(to,settings,"return { sensitivity = 2 }");
+                        Check(checks,!File.Exists(Safe.In(to,settings))&&shellReview.GeneratedConfigs.Contains(settings)&&
+                            shellReview.GeneratedConfigs.Contains(json),"The initial comparison includes both selected host settings while the receiver still lacks them.");
                         WriteSyncFile(to,extraAsi,"extra plugin");
                         bool asiBlocked=false;
                         try{friend.SubmitSyncChoice(shellReview,false);}catch(IOException){asiBlocked=true;}
@@ -538,6 +550,7 @@ internal static class GeneralP2PLifecycleTests {
                         Check(checks,review.Exact&&review.Different.Contains("Mod de teste")&&
                             !review.Extras.Any(extra=>extra.Files.Any(file=>file.Path==hostShell)),
                             "Initial review identifies divergent installed bytes and omits matching empty groups.");
+                        if(settingsOnly)Check(checks,review.Required.Length==0,"When only settings differ, the differential transfer requests no mod payload.");
                         review.ReceiveOptions=new P2PReceiveOptions{Exact=true,BackupUpdates=true};
                         return new int[0];
                     }).GetAwaiter().GetResult();
@@ -546,10 +559,29 @@ internal static class GeneralP2PLifecycleTests {
                         return received.Completed&&sent.Completed;
                     },"The official package did not complete on both peers.");
                     var installed=friend.InstalledManifest(received);
+                    Check(checks,installed.Files.Count(file=>file.Generated)==2&&new[]{settings,json}.All(path=>
+                        Safe.Hash(Safe.In(to,path))==Safe.Hash(Safe.In(from,path)))&&received.ReceivedGeneratedConfigs.Contains(settings),
+                        full?"Full sync replaces divergent host settings without a second prompt.":settingsOnly?
+                            "Settings-only sync restores both host configurations.":"Delta sync installs missing Lua and JSON settings without manual copying.");
+                    if(settingsOnly)Check(checks,installed.Files.Where(file=>file.Kind=="file").All(file=>file.ReuseLocal),
+                        "All unchanged files are reused on a settings-only transfer.");
                     Check(checks,decisions==1&&installed.ManualUpdateMods.Contains("Extra")&&
                         installed.Files.Where(file=>file.Kind=="file").All(file=>Safe.Hash(Safe.In(to,file.Path))==Safe.Hash(Safe.In(from,file.Path))),
                         full?"Full receive retains the ignored release and matches every host file.":"Differential receive retains the ignored release and matches every host file.");
                 }
+                WriteSyncFile(to,settings,"return { sensitivity = 7 }");
+                var without=host.BeginDeferred(state,new[]{"Extra"},true,compareBeforePack:true);
+                without.GeneratedConfigSelection=new P2POutputSelection[0];
+                var localSettings=friend.Accept(host.Invitation(without),to,true);
+                ConnectTo(friend,host);
+                Wait(()=>{if(without.Error!=null)throw new IOException(without.Error);return friend.HasSyncPreview(localSettings);},"Missing preview without host settings.");
+                var excluded=friend.CompareIncoming(localSettings);
+                excluded.ReceiveOptions=new P2PReceiveOptions{Exact=true};
+                string reason="";
+                try{friend.SubmitSyncChoice(excluded,false);}catch(IOException ex){reason=ex.Message;}
+                Check(checks,excluded.GeneratedConfigs.Length==0&&reason.Contains("Lua")&&!friend.HasSyncChoice(localSettings)&&
+                    File.ReadAllText(Safe.In(to,settings))=="return { sensitivity = 7 }",
+                    "Opting out keeps local settings and a divergent Lua prevents a false exact completion.");
             }
             Safe.WriteJson(result,new{Passed=true,Tests=checks});
         }catch(Exception error){

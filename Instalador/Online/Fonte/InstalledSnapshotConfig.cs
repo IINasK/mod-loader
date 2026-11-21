@@ -47,6 +47,12 @@ public static class InstalledSnapshotConfig {
         return result;
     }
     internal static void Validate(InstalledSnapshotFile file) {
+        if(file.Kind==PortableLuaSettings.Kind){
+            if(!file.Generated||file.Section!=null||!PortableLuaSettings.IsSettingsPath(file.Path))throw new IOException("Formato de configuração Lua inválido.");
+            byte[] raw=PortableLuaSettings.Bytes(file.Content);
+            if(raw.LongLength!=file.Size||InstalledSnapshot.Hash(raw)!=file.Sha256)throw new IOException("Hash da configuração Lua divergente.");
+            return;
+        }
         var data=Object(file.Content);
         if(file.Kind=="ini-section") {
             if(String.IsNullOrWhiteSpace(file.Section)||file.Section.Length>256||file.Section.IndexOfAny(new[]{'[',']','\r','\n'})>=0||data.Count==0||data.Any(p=>!Regex.IsMatch(p.Key,"^[A-Za-z_][A-Za-z0-9_]{0,127}$")||!(p.Value is string)||!Regex.IsMatch((string)p.Value,"^[A-Za-z0-9_.+-]{1,128}$")))
@@ -57,6 +63,7 @@ public static class InstalledSnapshotConfig {
     }
     public static byte[] Apply(InstalledSnapshotFile file,byte[] currentBytes) {
         Validate(file);
+        if(file.Kind==PortableLuaSettings.Kind)return Convert.FromBase64String(file.Content);
         if(file.Kind=="json")return Utf8.GetBytes(file.Content);
         string current=Decode(currentBytes);ParseIni(current);
         string newline=current.Contains("\r\n")?"\r\n":"\n";
@@ -70,5 +77,138 @@ public static class InstalledSnapshotConfig {
         output.Append('[').Append(file.Section).Append(']').Append(newline);
         foreach(var pair in Object(file.Content).OrderBy(p=>p.Key,StringComparer.Ordinal))output.Append(pair.Key).Append(" = ").Append((string)pair.Value).Append(newline);
         return Utf8.GetBytes(output.ToString());
+    }
+}
+
+// Only a literal return-table is accepted. Nothing is evaluated by a Lua runtime.
+internal sealed class PortableLuaSettings {
+    internal const string Kind="lua-settings";
+    const int MaxBytes=262144;
+    readonly string source;
+    int offset;
+
+    static readonly Regex Identifier=new Regex(@"\G[A-Za-z_][A-Za-z0-9_]{0,127}",RegexOptions.CultureInvariant);
+    static readonly Regex Number=new Regex(@"\G-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?",RegexOptions.CultureInvariant);
+    static readonly Regex PrivateKey=new Regex(@"password|passwd|secret|credential|cookie|token|user|account|machine|deviceid|address|directory|path|email|hostname|license|login|apikey|privatekey|accesskey|session|steamid|discord|oauth|auth|bearer|(?:^|_)(?:key|ip|host|port|home|name|id)(?:$|_)",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant);
+    static readonly Regex Comment=new Regex(@"\A[A-Za-z0-9 \t.,:;'()_+-]{0,768}\z",RegexOptions.CultureInvariant);
+    static readonly Regex PrivateComment=new Regex(@"password|passwd|secret|credential|cookie|token|api.?key|private.?key|username|user.?id|session.?id|account|(?:\d{1,3}\.){3}\d{1,3}|[A-Za-z0-9_-]{32,}|\d{9,}",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant);
+    static readonly Regex ShortValue=new Regex(@"\A(?:[A-Za-z][A-Za-z0-9_ -]{0,31})?\z",RegexOptions.CultureInvariant);
+    static readonly HashSet<string> Keywords=new HashSet<string>("and break do else elseif end false for function goto if in local nil not or repeat return then true until while".Split(' '),StringComparer.Ordinal);
+
+    PortableLuaSettings(string text){source=text;}
+    internal static bool IsSettingsPath(string path){
+        string name=Path.GetFileName(path);
+        return name!=null&&(name.Equals("settings.lua",StringComparison.OrdinalIgnoreCase)||name.EndsWith("_settings.lua",StringComparison.OrdinalIgnoreCase));
+    }
+    internal static string Encode(byte[] raw){
+        Validate(raw);
+        return Convert.ToBase64String(raw);
+    }
+    internal static byte[] Bytes(string content){
+        if(content==null||content.Length>((MaxBytes+2)/3)*4)throw Invalid();
+        byte[] raw;
+        try{raw=Convert.FromBase64String(content);}catch(FormatException){throw Invalid();}
+        if(Convert.ToBase64String(raw)!=content)throw Invalid();
+        Validate(raw);
+        return raw;
+    }
+    static IOException Invalid(){return new IOException("Somente tabelas Lua de configurações portáteis podem ser compartilhadas.");}
+    static void Validate(byte[] raw){
+        if(raw==null||raw.Length==0||raw.Length>MaxBytes)throw Invalid();
+        int start=0;
+        Encoding encoding=new UTF8Encoding(false,true);
+        if(raw.Length>=2&&((raw[0]==255&&raw[1]==254)||(raw[0]==254&&raw[1]==255))){
+            encoding=new UnicodeEncoding(raw[0]==254,false,true);
+            start=2;
+        }else if(raw.Length>=3&&raw[0]==239&&raw[1]==187&&raw[2]==191)start=3;
+        string text;
+        try{text=encoding.GetString(raw,start,raw.Length-start);}catch(DecoderFallbackException){throw Invalid();}
+        var parser=new PortableLuaSettings(text);
+        parser.Space();
+        if(parser.Word()!="return")throw Invalid();
+        parser.Space();
+        parser.Table(0);
+        parser.Space();
+        if(parser.Take(';'))parser.Space();
+        if(parser.offset!=text.Length)throw Invalid();
+    }
+    bool Take(char ch){
+        if(offset>=source.Length||source[offset]!=ch)return false;
+        offset++;
+        return true;
+    }
+    void Space(){
+        while(offset<source.Length){
+            char ch=source[offset];
+            if(ch==' '||ch=='\t'||ch=='\r'||ch=='\n'){offset++;continue;}
+            if(ch!='-'||offset+1>=source.Length||source[offset+1]!='-')break;
+            int start=offset+2;offset=start;
+            while(offset<source.Length&&source[offset]!='\r'&&source[offset]!='\n')offset++;
+            if(offset-start>768)throw Invalid();
+            string comment=source.Substring(start,offset-start);
+            if(!Comment.IsMatch(comment)||PrivateComment.IsMatch(comment))throw Invalid();
+        }
+    }
+    string Word(){
+        var word=Identifier.Match(source,offset);
+        if(!word.Success)return null;
+        offset+=word.Length;
+        return word.Value;
+    }
+    string Quoted(){
+        if(offset>=source.Length||(source[offset]!='\''&&source[offset]!='"'))throw Invalid();
+        char quote=source[offset++];
+        int end=source.IndexOf(quote,offset);
+        if(end<0||end-offset>128)throw Invalid();
+        string literal=source.Substring(offset,end-offset);
+        offset=end+1;
+        return literal;
+    }
+    void Table(int depth){
+        if(depth>=32||!Take('{'))throw Invalid();
+        Space();
+        var keys=new HashSet<string>(StringComparer.Ordinal);
+        while(!Take('}')){
+            int start=offset;
+            string key;
+            if(Take('[')){
+                Space();key=Quoted();Space();
+                if(!Take(']')||!Regex.IsMatch(key,@"\A[A-Za-z_][A-Za-z0-9_]{0,127}\z"))throw Invalid();
+                Space();
+                if(!Take('='))throw Invalid();
+            }else{
+                key=Word();Space();
+                if(key==null||!Take('=')){key=null;offset=start;}
+                else if(Keywords.Contains(key))throw Invalid();
+            }
+            if(key!=null&&(!keys.Add(key)||PrivateKey.IsMatch(key)))throw Invalid();
+            Space();
+            Value(depth);
+            Space();
+            if(!Take(',')&&!Take(';')){
+                if(!Take('}'))throw Invalid();
+                return;
+            }
+            Space();
+        }
+    }
+    void Value(int depth){
+        if(offset>=source.Length)throw Invalid();
+        char ch=source[offset];
+        if(ch=='{'){Table(depth+1);return;}
+        if(ch=='\''||ch=='"'){
+            string text=Quoted();
+            if(!ShortValue.IsMatch(text)||PrivateKey.IsMatch(text))throw Invalid();
+            return;
+        }
+        if(ch=='-'||(ch>='0'&&ch<='9')){
+            var number=Number.Match(source,offset);
+            if(!number.Success||number.Length>40)throw Invalid();
+            double value;
+            if(!Double.TryParse(number.Value,System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out value)||Double.IsInfinity(value))throw Invalid();
+            offset+=number.Length;return;
+        }
+        string word=Word();
+        if(word!="true"&&word!="false")throw Invalid();
     }
 }

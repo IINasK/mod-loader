@@ -123,7 +123,8 @@ internal sealed class GeneralProjectStore {
             var index=Read();
             var id=session.Id.Substring(3);
             var source=new InstalledSnapshotInstaller(session.Destination,sourceData,catalog);
-            var manifest=source.ReadManifest(session.ReceiptId);
+            HashSet<string> appliedOutputs;
+            var manifest=source.ReadReceivedManifest(session.ReceiptId,out appliedOutputs);
             bool official=manifest.TemplateId==CyberpunkTemplate;
             var existing=index.Projects.FirstOrDefault(item=>official?item.TemplateId==CyberpunkTemplate:item.Id==id);
             if(existing!=null&&!official)return existing;
@@ -168,7 +169,7 @@ internal sealed class GeneralProjectStore {
             GeneralPresetProfiles.Project(state);
             state.ReceivedPreset=state.SelectedPreset;
             BindReceivedVariants(state,manifest,session.ReceiptId,receivedDefinitions,session.ReceiveOptions!=null&&session.ReceiveOptions.Exact);
-            try{new ModOutputIndex(data,session.Destination).CaptureReceivedBaseline(session.Destination,manifest);}
+            try{new ModOutputIndex(data,session.Destination).CaptureReceivedBaseline(session.Destination,manifest,appliedOutputs);}
             catch(IOException ex){OnlineDiagnostics.Failure("inventory.outputs.received",ex,"Registrar arquivos locais do receptor.");}
             catch(UnauthorizedAccessException ex){OnlineDiagnostics.Failure("inventory.outputs.received",ex,"Registrar arquivos locais do receptor.");}
             if(!String.Equals(Path.GetFullPath(sourceData),data,StringComparison.OrdinalIgnoreCase))

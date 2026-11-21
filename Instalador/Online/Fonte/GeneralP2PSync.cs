@@ -17,6 +17,7 @@ internal sealed class P2PSyncComparison {
     internal string PreviewHash, Destination;
     internal bool Exact;
     internal string[] UserFolders=new string[0];
+    internal string[] GeneratedConfigs=new string[0];
     internal P2PReceiveOptions ReceiveOptions;
     internal string[] Required, Missing, Different, LocalOnly;
     internal P2PSyncExtra[] Extras=new P2PSyncExtra[0];
@@ -36,6 +37,7 @@ internal sealed class P2PSyncDifference {
 internal sealed partial class P2PService {
     const int MaxSyncMessage = 12000000;
     const int ExactParityVersion = 2;
+    const int HostConfigParityVersion = 3;
     const string PreviewName = "sync-preview.json", ChoiceName = "sync-choice.json";
 
     sealed class SyncMessage {
@@ -100,7 +102,8 @@ internal sealed partial class P2PService {
         string json=ReadSyncMessage(session,device,PreviewPath(session),PreviewName,out hash);
         var preview=Safe.Json.Deserialize<InstalledSnapshotManifest>(json);
         InstalledSnapshot.Validate(preview,installedCatalog);
-        if(preview.Project==null||preview.Files.Any(file=>file.Kind!="file"||file.ReuseLocal))
+        if(preview.Project==null||(preview.HostConfigProtocol!=0&&preview.HostConfigProtocol!=2)||
+            preview.Files.Any(file=>(file.Generated?preview.HostConfigProtocol!=2:file.Kind!="file")||file.ReuseLocal))
             throw new IOException("A lista de comparação do anfitrião é inválida.");
         var inventory=preview.SyncGameInventory;
         if(preview.TemplateId==GeneralProjectStore.CyberpunkTemplate&&
@@ -131,6 +134,14 @@ internal sealed partial class P2PService {
         if(session.Recipients.Length!=1)return false;
         string device=session.Recipients[0].Device;
         if(!HasSyncPreview(session)){
+            var recipient=session.Recipients[0];
+            bool wantsConfigs=session.GeneratedConfigSelection!=null&&session.GeneratedConfigSelection.Length>0;
+            if(wantsConfigs&&!recipient.SupportsConfigPreview){
+                if(ReadNotice(session,recipient)==null)return false;
+                if(!recipient.SupportsConfigPreview)
+                    throw new IOException(GeneralStyle.T("O receptor precisa atualizar o Mod Loader para receber as configurações do anfitrião neste pacote.",
+                        "The recipient must update Mod Loader to receive the host settings in this pack."));
+            }
             session.Stage="Conferindo mods para comparação…";
             Task.Run(()=>{
                 var elapsed=System.Diagnostics.Stopwatch.StartNew();
@@ -142,6 +153,9 @@ internal sealed partial class P2PService {
                         },skipProblem:review,
                         inspectProgress:(done,total,item)=>session.SyncProgress=new P2PSyncProgress{Done=done,Total=total,Item=item},
                         includeUpdatePreferences:true));
+                    preview.HostConfigProtocol=2;
+                    if(wantsConfigs&&recipient.SupportsConfigPreview)
+                        IncludePreviewOutputs(session,source.Destination,preview,()=>{if(disposed||session.Discarded)throw new OperationCanceledException();});
                     if(preview.Game=="cyberpunk2077"){
                         var engine=new FixedInstaller(installedCatalog,source.Destination,installedFixture);
                         Action checkpoint=()=>{
@@ -173,7 +187,8 @@ internal sealed partial class P2PService {
         var choice=Safe.Json.Deserialize<SyncChoice>(ReadSyncMessage(session,device,choiceFile,ChoiceName,out ignored));
         if(choice==null||choice.PreviewHash!=previewHash||choice.Required==null||choice.Required.Length>previewManifest.List.Mods.Count)
             throw new IOException("A escolha não corresponde à comparação deste convite.");
-        if(previewManifest.TemplateId==GeneralProjectStore.CyberpunkTemplate&&(!choice.Exact||choice.ParityVersion!=ExactParityVersion))
+        if((previewManifest.TemplateId==GeneralProjectStore.CyberpunkTemplate&&!choice.Exact)||
+            ((choice.Exact||previewManifest.Files.Any(file=>file.Generated))&&choice.ParityVersion!=PreviewParityVersion(previewManifest)))
             throw new IOException(GeneralStyle.T("O receptor precisa atualizar o Mod Loader para sincronizar todas as versões do pacote pronto.",
                 "The recipient must update Mod Loader to sync every version in the built-in pack."));
         var required=new HashSet<string>(choice.Required,StringComparer.Ordinal);
@@ -181,7 +196,7 @@ internal sealed partial class P2PService {
             throw new IOException("A seleção de mods para sincronizar é inválida.");
         if(!choice.Full){
             foreach(var file in previewManifest.Files){
-                file.ReuseLocal=file.Owners.All(owner=>!required.Contains(owner.Split('/')[0]));
+                file.ReuseLocal=file.Kind=="file"&&file.Owners.All(owner=>!required.Contains(owner.Split('/')[0]));
             }
         }
         previewManifest.SyncGameInventory=null;
@@ -203,7 +218,8 @@ internal sealed partial class P2PService {
             throw new IOException("O pacote e a pasta de instalação pertencem a tipos de jogo diferentes.");
 
         var comparison=new P2PSyncComparison{Session=session,PreviewHash=hash,Destination=destination,
-            Exact=preview.TemplateId==GeneralProjectStore.CyberpunkTemplate,Required=new string[0]};
+            Exact=preview.TemplateId==GeneralProjectStore.CyberpunkTemplate,Required=new string[0],
+            GeneratedConfigs=preview.Files.Where(file=>file.Generated).Select(file=>file.Path).ToArray()};
         var userFolders=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach(var mod in preview.List.Mods){
             try{userFolders.UnionWith(GeneralInstallRoutes.ExternalFolders(destination,mod.Variants.Single().InstallRoutes));}
@@ -224,7 +240,7 @@ internal sealed partial class P2PService {
             catch(DirectoryNotFoundException){return 1;}
             if(File.Exists(path)){
                 bool matching;
-                try{matching=SnapshotVerification.Matches(path,file.Size,file.Sha256,poll);}
+                try{matching=MatchesPreviewFile(destination,file,poll);}
                 catch(IOException){matching=false;}
                 catch(UnauthorizedAccessException){matching=false;}
                 if(!matching)status=2;
@@ -237,7 +253,9 @@ internal sealed partial class P2PService {
         },()=>{
             if(disposed||session.Discarded)throw new OperationCanceledException();
         });
+        var payloadOwners=new HashSet<string>(StringComparer.Ordinal);
         for(int index=0;index<preview.Files.Count;index++){
+            if(fileStates[index]!=0&&preview.Files[index].Kind=="file")payloadOwners.UnionWith(preview.Files[index].Owners);
             if(fileStates[index]==1)missing.UnionWith(preview.Files[index].Owners);
             else if(fileStates[index]==2)different.UnionWith(preview.Files[index].Owners);
         }
@@ -250,7 +268,7 @@ internal sealed partial class P2PService {
             if(different.Contains(owner))differentNames.Add(mod.Name);
             else if(missing.Contains(owner))absentNames.Add(mod.Name);
             else continue;
-            required.Add(mod.Id);
+            if(payloadOwners.Contains(owner))required.Add(mod.Id);
         }
         var localOnly=new List<string>();
         if(local!=null&&String.Equals(local.Destination,destination,StringComparison.OrdinalIgnoreCase)){
@@ -292,9 +310,23 @@ internal sealed partial class P2PService {
         comparison.HostOutsideDifferences=outside.ToArray();
         comparison.HostOutsideMissing=outsideMissing;
         comparison.LocalOnly=localOnly.ToArray();
-        comparison.Matching=preview.List.Mods.Count-required.Count;
+        comparison.Matching=preview.List.Mods.Count-absentNames.Count-differentNames.Count;
         comparison.Unavailable=InstalledSnapshot.CountOutsidePack(preview);
         return comparison;
+    }
+
+    static int PreviewParityVersion(InstalledSnapshotManifest preview){
+        return preview.Files.Any(file=>file.Generated)?HostConfigParityVersion:ExactParityVersion;
+    }
+
+    static bool MatchesPreviewFile(string destination,InstalledSnapshotFile file,Action checkpoint){
+        if(file.Generated&&file.Kind=="json"){
+            try{return InstalledSnapshot.GeneratedConfigHash(file.Path,InstalledSnapshot.ReadGeneratedConfig(destination,file.Path))==file.Sha256;}
+            catch(IOException){return false;}
+            catch(ArgumentException){return false;}
+            catch(InvalidOperationException){return false;}
+        }
+        return SnapshotVerification.Matches(GeneralInstallRoutes.Resolve(destination,file.Path),file.Size,file.Sha256,checkpoint);
     }
 
     void VerifyOutsideFiles(P2PSession session,InstalledSnapshotManifest preview,List<OwnedChange> removal,Action checkpoint){
@@ -353,9 +385,25 @@ internal sealed partial class P2PService {
         string hash,ignored;
         var preview=ReadSyncPreview(session,Engine.Device,out hash);
         var choice=Safe.Json.Deserialize<SyncChoice>(ReadSyncMessage(session,Engine.Device,ChoicePath(session,Engine.Device),ChoiceName,out ignored));
-        if(preview.TemplateId!=GeneralProjectStore.CyberpunkTemplate||choice==null||!choice.Exact||choice.ParityVersion!=ExactParityVersion||choice.PreviewHash!=hash)
+        if(preview.TemplateId!=GeneralProjectStore.CyberpunkTemplate||choice==null||!choice.Exact||choice.ParityVersion!=PreviewParityVersion(preview)||choice.PreviewHash!=hash)
             throw new IOException(GeneralStyle.T("A seleção inicial deste convite mudou.","The initial selection for this invitation has changed."));
         return preview;
+    }
+
+    static InstalledSnapshotFile[] ApprovedGeneratedConfigs(InstalledSnapshotManifest preview){
+        return preview.HostConfigProtocol==2?preview.Files.Where(file=>file.Generated).ToArray():null;
+    }
+
+    InstalledSnapshotFile[] ReadApprovedGeneratedConfigs(P2PSession session){
+        if(!session.CompareBeforePack)return null;
+        string hash,ignored;
+        var preview=ReadSyncPreview(session,Engine.Device,out hash);
+        var selected=ApprovedGeneratedConfigs(preview);
+        if(selected==null)return null;
+        var choice=Safe.Json.Deserialize<SyncChoice>(ReadSyncMessage(session,Engine.Device,ChoicePath(session,Engine.Device),ChoiceName,out ignored));
+        if(choice==null||selected.Length!=0&&choice.ParityVersion!=HostConfigParityVersion||choice.PreviewHash!=hash)
+            throw new IOException(GeneralStyle.T("As configurações recebidas diferem da seleção confirmada.","The received settings differ from the confirmed selection."));
+        return selected;
     }
 
     internal static void VerifyExactContents(InstalledSnapshotManifest preview,InstalledSnapshotManifest installed){
@@ -363,8 +411,9 @@ internal sealed partial class P2PService {
             !(preview.ManualUpdateMods??new List<string>()).SequenceEqual(installed.ManualUpdateMods??new List<string>()))
             throw new IOException(GeneralStyle.T("Os mods recebidos não correspondem à seleção do anfitrião.","Received mods do not match the host's selection."));
         var expected=preview.Files.OrderBy(file=>file.Path,StringComparer.OrdinalIgnoreCase).ToArray();
-        var actual=installed.Files.Where(file=>file.Kind=="file").OrderBy(file=>file.Path,StringComparer.OrdinalIgnoreCase).ToArray();
-        if(expected.Length!=actual.Length||!expected.Zip(actual,(a,b)=>a.Path==b.Path&&a.Sha256==b.Sha256&&a.Size==b.Size&&a.Owners.SequenceEqual(b.Owners)).All(match=>match))
+        bool withConfigs=preview.HostConfigProtocol==2;
+        var actual=installed.Files.Where(file=>file.Kind=="file"||withConfigs&&file.Generated).OrderBy(file=>file.Path,StringComparer.OrdinalIgnoreCase).ToArray();
+        if(expected.Length!=actual.Length||!expected.Zip(actual,(a,b)=>a.Path==b.Path&&a.Kind==b.Kind&&a.Generated==b.Generated&&a.Sha256==b.Sha256&&a.Size==b.Size&&a.Owners.SequenceEqual(b.Owners)).All(match=>match))
             throw new IOException(GeneralStyle.T("A lista dos arquivos recebidos diverge da conferência inicial.","The received file list differs from the initial comparison."));
     }
 
@@ -373,8 +422,7 @@ internal sealed partial class P2PService {
         var preview=ReadExactPreview(session);
         VerifyExactContents(preview,installed);
         VerifyOutsideFiles(session,preview,null,checkpoint);
-        var matches=SnapshotVerification.Map(preview.Files,(file,poll)=>SnapshotVerification.Matches(
-            GeneralInstallRoutes.Resolve(session.Destination,file.Path),file.Size,file.Sha256,poll),checkpoint);
+        var matches=SnapshotVerification.Map(preview.Files,(file,poll)=>MatchesPreviewFile(session.Destination,file,poll),checkpoint);
         int changed=Array.IndexOf(matches,false);
         if(changed>=0)throw new IOException(GeneralStyle.T("Arquivo diferente na conferência final: ","A file differs at final verification: ")+preview.Files[changed].Path);
     }
@@ -497,7 +545,7 @@ internal sealed partial class P2PService {
             session.SyncLocalExtrasKept = kept.Length;
             session.SyncHostFilesDifferent = comparison.HostOutsideDifferences.Length;
             Save();
-            var choice=new SyncChoice{PreviewHash=hash,Full=full,Exact=exact,ParityVersion=exact?ExactParityVersion:0,Required=full?new string[0]:comparison.Required};
+            var choice=new SyncChoice{PreviewHash=hash,Full=full,Exact=exact,ParityVersion=exact||preview.Files.Any(file=>file.Generated)?PreviewParityVersion(preview):0,Required=full?new string[0]:comparison.Required};
             WriteSyncMessage(session,Engine.Device,ChoicePath(session,Engine.Device),ChoiceName,choice);
             OnlineDiagnostics.Record("p2p.choice.submitted",null,"Seleção de recebimento confirmada.",
                 new{Id=DiagnosticId(session.Id),Mode=full?"full":"update",Count=choice.Required.Length});

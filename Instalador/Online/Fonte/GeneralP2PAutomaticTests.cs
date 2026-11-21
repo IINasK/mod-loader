@@ -45,7 +45,21 @@ internal static class GeneralP2PAutomaticTests {
                 sender.ConfirmConnection=session=>GeneralP2PDialog.AskConnection(host,()=>dialog.Visible?(Control)dialog:host,sender,session);
                 host.Shown+=async(s,e)=>{try{
                     dialog.Show(host);var output=(TextBox)dialog.Content.Controls.Find("p2p-output",true).Single();var copy=(Button)dialog.Content.Controls.Find("p2p-copy",true).Single();
-                    await Wait(()=>copy.Enabled,"No automatic invitation appeared.");sent=sender.Sessions.Single();string offer=output.Text;copy.PerformClick();
+                    await Wait(()=>copy.Enabled,"No automatic invitation appeared.");sent=sender.Sessions.Single();
+                    const string configPath="mods/example/settings.lua";
+                    string configLocal=Safe.In(game,configPath);
+                    Directory.CreateDirectory(Path.GetDirectoryName(configLocal));File.WriteAllText(configLocal,"return { scale = 3 }");
+                    var inventory=new ModOutputIndex(data,game);
+                    inventory.Reconcile(new[]{new P2PSyncDifference{ModId="fixture",Path=configPath,Kind="associated",LocalInModFolder=true}});
+                    var configBox=(CheckBox)dialog.Content.Controls.Find("p2p-send-configs",true).Single();
+                    var configLink=dialog.Content.Controls.Find("p2p-select-configs",true).Single();
+                    configBox.AccessibilityObject.DoDefaultAction();
+                    await Wait(()=>copy.Enabled&&configLink.Visible,"No settings were selected by the host checkbox.");
+                    check(sent.GeneratedConfigSelection.Single().Path==configPath,"Checking the host option includes an indexed, portable Lua setting before copying.");
+                    configBox.AccessibilityObject.DoDefaultAction();
+                    await Wait(()=>copy.Enabled&&!configLink.Visible,"Clearing the checkbox left the settings selection active.");
+                    check(sent.GeneratedConfigSelection.Length==0,"Clearing the host option removes the selection from the invitation.");
+                    string offer=output.Text;copy.PerformClick();
                     await Wait(()=>Clipboard.GetText()==offer,"Copying the invitation did not finish.");
                     check(sent.Automatic,"Opening fills a copy-only automatic invitation.");
                     var sendLabel=dialog.Content.Controls.Find("p2p-send-label",true).Single();

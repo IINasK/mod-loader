@@ -295,7 +295,7 @@ internal sealed partial class P2PService : IDisposable {
             s.NextChoiceScanUtc=DateTime.UtcNow.AddSeconds(5);
             ScanSyncFolder(ReceiptFolderId(s,Engine.Device),ChoiceName);
         }
-        if(s.Lifecycle&&!s.Sender&&(s.Phase!=null||s.CompareBeforePack&&(s.SyncMode!=0||HasSyncPreview(s))))PublishNotice(s);
+        if(s.Lifecycle&&!s.Sender&&(s.Phase!=null||s.CompareBeforePack))PublishNotice(s);
         if(!s.Sender&&s.Stage!=null)return;
         if(s.Completed){
             if(!Directory.Exists(Folder(s)))return;

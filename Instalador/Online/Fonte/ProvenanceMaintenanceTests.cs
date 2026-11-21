@@ -156,6 +156,68 @@ internal static class ProvenanceMaintenanceTests {
         check(File.ReadAllText(Safe.In(clean,generated))==json,"An approved generated config is installed only when missing.");
         cleanEngine.Remove(cleanId,new[]{"clothes/default"},null);
         check(File.Exists(Safe.In(clean,generated)),"A generated config remains local after uninstall.");
+        const string lua="mods/clothes/camera_settings.lua";
+        var encoding=new System.Text.UnicodeEncoding(false,true,true);
+        byte[] originalLua=encoding.GetPreamble().Concat(encoding.GetBytes("-- Camera settings\r\nreturn { zoom = 2, levels = { 1, 2 }, mode = 'auto' }\r\n")).ToArray();
+        File.WriteAllBytes(Safe.In(host,lua),originalLua);
+        string encoded=InstalledSnapshot.ReadGeneratedConfig(host,lua);
+        var luaChoice=new P2POutputSelection{Owner=mod.Id,Path=lua,Hash=InstalledSnapshot.GeneratedConfigHash(lua,encoded)};
+        InstalledSnapshot.AddGeneratedConfigs(manifest,host,new[]{luaChoice},null);
+        var luaFile=manifest.Files.Single(f=>f.Path==lua);
+        check(luaFile.Kind==PortableLuaSettings.Kind&&luaFile.Sha256==Safe.Hash(Safe.In(host,lua))&&luaFile.Size==originalLua.Length,
+            "A reviewed Lua table carries the original byte hash, including encoding and line endings.");
+        string luaZip=Path.Combine(root,"settings.zip");
+        InstalledSnapshot.Write(luaZip,host,manifest,null,null,null);
+        string luaPath=Safe.In(receiver,lua);
+        bool blockedIncoming=false;
+        try{engine.Install(luaZip,Safe.Hash(luaZip),null,receivingP2P:true);}catch(IOException){blockedIncoming=true;}
+        check(blockedIncoming&&!File.Exists(luaPath),"P2P Lua needs an approved preview even on a clean destination.");
+        blockedIncoming=false;
+        try{engine.Install(zip,Safe.Hash(zip),null,receivingP2P:true,approvedGeneratedConfigs:manifest.Files.Where(f=>f.Generated));}
+        catch(IOException){blockedIncoming=true;}
+        check(blockedIncoming&&!File.Exists(luaPath),"Generic projects reject a package that omits an approved settings file.");
+        File.WriteAllText(luaPath,"return { zoom=1 }");
+        string receiverOnly="mods/clothes/offline.json";
+        File.WriteAllText(Safe.In(receiver,receiverOnly),"{\"level\":3}");
+        string oldId=engine.Install(luaZip,Safe.Hash(luaZip),null);
+        check(File.ReadAllText(luaPath)=="return { zoom=1 }","A settings package without consent keeps previous values.");
+        HashSet<string> applied;
+        var outputIndex=new ModOutputIndex(metadata,receiver);
+        outputIndex.CaptureReceivedBaseline(receiver,engine.ReadReceivedManifest(oldId,out applied),applied);
+        var state=new GeneralModState{List=manifest.List};
+        check(!GeneralP2PDialog.HostConfigCandidates(metadata,receiver,state,new[]{mod.Id}).Any(),
+            "Preserved settings and unknown settings already on the receiver stay outside its next outgoing package.");
+        string acceptedId=engine.Install(luaZip,Safe.Hash(luaZip),null,approvedGeneratedConfigs:manifest.Files.Where(f=>f.Generated));
+        outputIndex.CaptureReceivedBaseline(receiver,engine.ReadReceivedManifest(acceptedId,out applied),applied);
+        var onward=GeneralP2PDialog.HostConfigCandidates(metadata,receiver,state,new[]{mod.Id});
+        check(onward.Length==2&&onward.Any(f=>f.Path==lua&&f.Hash==luaFile.Sha256)&&onward.All(f=>f.Path!=receiverOnly),
+            "The receiver can send on the two received settings immediately without a scan or sharing other local settings.");
+        check(File.ReadAllBytes(luaPath).SequenceEqual(originalLua),"The approved transaction replaces different settings byte for byte.");
+        var wrongApproval=new InstalledSnapshotFile{Generated=true,Path=lua,Kind=luaFile.Kind,Owners=luaFile.Owners,Size=luaFile.Size,Sha256=new string('0',64)};
+        bool invalid=false;
+        try{engine.Install(luaZip,Safe.Hash(luaZip),null,approvedGeneratedConfigs:new[]{manifest.Files.Single(f=>f.Path==generated),wrongApproval});}
+        catch(IOException){invalid=true;}
+        check(invalid&&File.ReadAllBytes(luaPath).SequenceEqual(originalLua),"A changed settings preview cannot authorize a replacement.");
+        string receiverScript="return getActiveProfile()";
+        File.WriteAllText(luaPath,receiverScript);
+        invalid=false;
+        try{engine.Install(luaZip,Safe.Hash(luaZip),null,approvedGeneratedConfigs:manifest.Files.Where(f=>f.Generated));}
+        catch(IOException){invalid=true;}
+        check(invalid&&File.ReadAllText(luaPath)==receiverScript,"Existing executable Lua remains intact when it is not a settings table.");
+        foreach(string rejected in new[]{"return { zoom = os.execute('command') }","return {}; print('extra')",
+            "return { apiKey = 'private' }","-- C:/Users/personal\nreturn {}","return { value = 'C:/Users/personal' }",
+            "--[=[ code ]=]\nreturn { foo=true }","return { a=true,a=false }","return { a=true } " + (char)0}){
+            var unsafeBytes=System.Text.Encoding.UTF8.GetBytes(rejected);
+            try{PortableLuaSettings.Encode(unsafeBytes);throw new InvalidOperationException("Unsafe outgoing Lua accepted.");}
+            catch(IOException){}
+            var incoming=new InstalledSnapshotFile{Generated=true,Path=lua,Kind=PortableLuaSettings.Kind,Content=Convert.ToBase64String(unsafeBytes),
+                Sha256=InstalledSnapshot.Hash(unsafeBytes),Size=unsafeBytes.Length,Owners=new List<string>{"clothes/default"}};
+            invalid=false;
+            try{InstalledSnapshotConfig.Apply(incoming,null);}catch(IOException){invalid=true;}
+            check(invalid,"Nonportable or executable data is rejected on send and receive.");
+        }
+        check(!ModOutputIndex.CanSend("mods/clothes/init.lua")&&!ModOutputIndex.CanSend("mods/clothes/logs/settings.lua"),
+            "Regular scripts and log folders are never offered as generated settings.");
         File.WriteAllText(Safe.In(host,generated),"{\"name\":\"local-machine\"}");
         bool blocked=false;
         try{InstalledSnapshot.ReadGeneratedConfig(host,generated);}catch(IOException){blocked=true;}

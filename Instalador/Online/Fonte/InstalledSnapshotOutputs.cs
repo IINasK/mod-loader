@@ -99,9 +99,14 @@ public static partial class InstalledSnapshot {
         string location=Safe.In(root,path);
         Safe.NoLinks(location);
         if(!File.Exists(location)||new FileInfo(location).Length>262144)throw new IOException("Configuração gerada ausente ou muito grande.");
+        if(PortableLuaSettings.IsSettingsPath(path))return PortableLuaSettings.Encode(InstalledSnapshotConfig.Read(location));
         string json=InstalledSnapshotConfig.Json(InstalledSnapshotConfig.Read(location));
         CheckPortableValues(InstalledSnapshotConfig.Object(json));
         return json;
+    }
+
+    internal static string GeneratedConfigHash(string path,string content){
+        return Hash(PortableLuaSettings.IsSettingsPath(path)?PortableLuaSettings.Bytes(content):Utf8.GetBytes(content));
     }
 
     static void CheckPortableValues(object value){
@@ -131,8 +136,8 @@ public static partial class InstalledSnapshot {
             var scope=scopes[item.Owner].FirstOrDefault(candidate=>UnderOutputScope(item.Path,candidate.Path));
             if(scope==null||entries.Contains(item.Path))continue;
             string content=ReadGeneratedConfig(root,item.Path);
-            if(Hash(Utf8.GetBytes(content))!=item.Hash)throw new IOException("A configuração gerada mudou após a revisão: "+item.Path);
-            var file=Config(item.Path,"json",null,content);
+            var file=Config(item.Path,PortableLuaSettings.IsSettingsPath(item.Path)?PortableLuaSettings.Kind:"json",null,content);
+            if(file.Sha256!=item.Hash)throw new IOException("A configuração gerada mudou após a revisão: "+item.Path);
             file.Generated=true;
             file.Owners.Add(scope.Owner);
             manifest.Files.Add(file);
@@ -142,9 +147,9 @@ public static partial class InstalledSnapshot {
     }
 
     static void ValidateGeneratedConfig(InstalledSnapshotManifest manifest,InstalledSnapshotFile file){
-        if(manifest.Schema!=3||file.Kind!="json"||file.Owners.Count!=1||!ModOutputIndex.CanSend(file.Path)||
+        if(manifest.Schema!=3||file.Kind!=(PortableLuaSettings.IsSettingsPath(file.Path)?PortableLuaSettings.Kind:"json")||file.Owners.Count!=1||!ModOutputIndex.CanSend(file.Path)||
             !manifest.OutputScopes.Any(scope=>scope.Owner==file.Owners[0]&&UnderOutputScope(file.Path,scope.Path)))
             throw new IOException("Configuração gerada sem pasta de saída comprovada.");
-        CheckPortableValues(InstalledSnapshotConfig.Object(file.Content));
+        if(file.Kind=="json")CheckPortableValues(InstalledSnapshotConfig.Object(file.Content));
     }
 }

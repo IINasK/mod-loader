@@ -87,8 +87,15 @@ internal sealed partial class P2PService {
                     if(manifest.Schema==3)InstalledSnapshot.Validate(manifest,catalog);
                     InstalledSnapshot.Write(part,state.Destination,manifest,report,checkpoint,progress,catalog);
                 }else {
+                    var previewConfigs=plan.Files.Where(file=>file.Generated).ToArray();
+                    foreach(var config in previewConfigs){
+                        checkpoint();
+                        if(InstalledSnapshot.GeneratedConfigHash(config.Path,InstalledSnapshot.ReadGeneratedConfig(state.Destination,config.Path))!=config.Sha256)
+                            throw new IOException(GeneralStyle.T("A configuração do anfitrião mudou após a conferência: ","The host setting changed after comparison: ")+config.Path);
+                    }
                     if(full&&includeConfigs)InstalledSnapshot.AddFullPackConfigurations(plan,state,catalog,appData,checkpoint);
-                    IncludePortableOutputs(session,state.Destination,plan,checkpoint);
+                    if(plan.HostConfigProtocol==0)IncludePortableOutputs(session,state.Destination,plan,checkpoint);
+                    else if(previewConfigs.Length==0)InstalledSnapshot.AddOutputScopes(plan);
                     if(plan.Schema==3)InstalledSnapshot.Validate(plan,catalog);
                     if(plan.TemplateId==GeneralProjectStore.CyberpunkTemplate)VerifyHostOutsideFiles(session,state,plan,checkpoint);
                     InstalledSnapshot.Write(part,state.Destination,plan,report,checkpoint,progress,catalog);
@@ -213,12 +220,22 @@ internal sealed partial class P2PService {
         copy.List.Presets=new System.Collections.Generic.List<GeneralModPreset>{preset};GeneralPresetProfiles.Prune(copy.List);
         return copy;
     }
+    static void IncludePreviewOutputs(P2PSession session,string root,InstalledSnapshotManifest manifest,Action checkpoint){
+        InstalledSnapshot.AddOutputScopes(manifest);
+        InstalledSnapshot.AddGeneratedConfigs(manifest,root,session.GeneratedConfigSelection,checkpoint);
+        var included=new HashSet<string>(manifest.Files.Where(file=>file.Generated).Select(file=>file.Path),StringComparer.OrdinalIgnoreCase);
+        if(session.GeneratedConfigSelection.Any(item=>!included.Contains(item.Path)))
+            throw new IOException(GeneralStyle.T("Uma configuração selecionada perdeu o vínculo com o mod. Confira o projeto e gere outro convite.",
+                "A selected setting no longer belongs to a shared mod. Check the project and create a new invitation."));
+    }
+
     internal static void IncludePortableOutputs(P2PSession session,string root,InstalledSnapshotManifest manifest,Action checkpoint){
         var elapsed=Stopwatch.StartNew();
         InstalledSnapshot.AddOutputScopes(manifest);
         var selected=session.GeneratedConfigSelection;
         if(selected!=null&&selected.Length>0&&manifest.Project!=null&&session.Recipients.Length>0&&session.Recipients.All(peer=>peer.SupportsGeneratedConfigs))
-            InstalledSnapshot.AddGeneratedConfigs(manifest,root,selected,checkpoint);
+            InstalledSnapshot.AddGeneratedConfigs(manifest,root,selected.Where(item=>
+                Path.GetExtension(item.Path).Equals(".json",StringComparison.OrdinalIgnoreCase)),checkpoint);
         OnlineDiagnostics.Record("p2p.pack.outputs",null,"Reutilizar o mapa de saídas do pacote.",new{
             Folders=manifest.OutputScopes.Count,Selected=selected==null?0:selected.Length,
             Included=manifest.Files.Count(file=>file.Generated),Milliseconds=elapsed.ElapsedMilliseconds

@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 internal sealed class P2PRecipient {
     public string Device, Phase;
-    public bool ReceiptClosed, SupportsGeneratedConfigs;
+    public bool ReceiptClosed, SupportsGeneratedConfigs, SupportsConfigPreview;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile string SyncChoicePhase;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PSyncProgress ComparisonProgress;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PInstallProgress InstallProgress;
@@ -33,7 +33,7 @@ internal sealed class P2PRecipientProgress {
 
 internal sealed partial class P2PService {
     sealed class InstallNotice {
-        public string Phase, Hash, Tag, ProgressTag, GeneratedConfigTag;
+        public string Phase, Hash, Tag, ProgressTag, GeneratedConfigTag, ConfigPreviewTag;
         public bool Writing;
         public int Done, Total;
     }
@@ -146,7 +146,7 @@ internal sealed partial class P2PService {
         DateTime now=DateTime.UtcNow;
         if((phase=="installing"||phase=="comparing")&&session.LastPublishedNoticePhase==phase&&now<session.NextProgressNoticeUtc)return true;
         var notice=new InstallNotice{Phase=phase,Hash=hash,Tag=NoticeTag(session,Engine.Device,phase,hash),
-            GeneratedConfigTag=GeneratedConfigTag(session,Engine.Device)};
+            GeneratedConfigTag=GeneratedConfigTag(session,Engine.Device),ConfigPreviewTag=ConfigPreviewTag(session,Engine.Device)};
         var progress=session.InstallProgress;
         if(session.Phase=="installing"&&progress!=null&&progress.Total>0){
             notice.Writing=progress.Writing;
@@ -174,6 +174,10 @@ internal sealed partial class P2PService {
         return ReadyTag(session.Hash,session.Id+"\n"+device+"\ngenerated-configs-v1",EmptyHash,0);
     }
 
+    string ConfigPreviewTag(P2PSession session,string device){
+        return ReadyTag(session.Hash,session.Id+"\n"+device+"\nhost-config-preview-v2",EmptyHash,0);
+    }
+
     InstallNotice ReadNotice(P2PSession session,P2PRecipient recipient) {
         string path=Safe.In(NoticeDirectory(session,recipient.Device),"status.json");
         if(!File.Exists(path)||new FileInfo(path).Length>2048)return null;
@@ -186,6 +190,7 @@ internal sealed partial class P2PService {
         }else if(!NoticePhases.Contains(notice.Phase)||notice.Hash!=session.PayloadHash&&(notice.Phase!="discarded"||notice.Hash!=EmptyHash))return null;
         if(!SameNoticeTag(NoticeTag(session,recipient.Device,notice.Phase,notice.Hash),notice.Tag))return null;
         recipient.SupportsGeneratedConfigs=SameNoticeTag(GeneratedConfigTag(session,recipient.Device),notice.GeneratedConfigTag);
+        recipient.SupportsConfigPreview=SameNoticeTag(ConfigPreviewTag(session,recipient.Device),notice.ConfigPreviewTag);
         return notice;
     }
 
@@ -429,6 +434,7 @@ internal sealed partial class P2PService {
                 var installer=new InstalledSnapshotInstaller(session.Destination,installedData,installedCatalog,installedFixture);
                 var options=session.ReceiveOptions;
                 var chooseUpdates=ChooseUpdates;
+                var exactPreview=options!=null&&options.Exact?ReadExactPreview(session):null;
                 session.ReceiptId=installer.Install(zip,session.Deferred?session.PayloadHash:session.Hash,message=>session.Stage=message,-1,difference=>{
                     if(options!=null)return options.Replace(difference);
                     SetPhase(session,"review");
@@ -450,7 +456,8 @@ internal sealed partial class P2PService {
                     checkpoint();SetPhase(session,"installing");
                     return backup;
                 },requireExact:options!=null&&options.Exact,exactCleanup:session.SyncCleanup,
-                    exactPreview:options!=null&&options.Exact?ReadExactPreview(session):null,receivingP2P:true);
+                    exactPreview:exactPreview,receivingP2P:true,
+                    approvedGeneratedConfigs:exactPreview!=null?ApprovedGeneratedConfigs(exactPreview):ReadApprovedGeneratedConfigs(session));
                 var manifest=installer.ReadManifest(session.ReceiptId);
                 if(installer.ReadSkippedDestinations(session.ReceiptId).Length==0)
                     ApplyApprovedSyncCleanup(session,manifest);

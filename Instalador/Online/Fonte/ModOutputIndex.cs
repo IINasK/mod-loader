@@ -90,11 +90,24 @@ internal sealed class ModOutputIndex {
         Save(current);
     }
 
-    internal void CaptureReceivedBaseline(string root,InstalledSnapshotManifest manifest){
+    internal void CaptureReceivedBaseline(string root,InstalledSnapshotManifest manifest,HashSet<string> appliedOutputs){
         if(manifest.OutputScopes.Count==0)return;
         var current=Load();
-        var paths=new HashSet<string>(manifest.Files.Select(file=>file.Path),Paths);
-        var seen=new HashSet<string>(current.Files.Select(file=>file.Owner+"\n"+file.Path),Paths);
+        var paths=new HashSet<string>(manifest.Files.Where(file=>!file.Generated||appliedOutputs.Contains(file.Path)).Select(file=>file.Path),Paths);
+        var byOwner=current.Files.ToDictionary(file=>file.Owner+"\n"+file.Path,Paths);
+        foreach(var file in manifest.Files.Where(file=>file.Generated&&appliedOutputs.Contains(file.Path))){
+            string owner=file.Owners.Single().Split('/')[0],key=owner+"\n"+file.Path;
+            ModOutputObservation observation;
+            if(!byOwner.TryGetValue(key,out observation)){
+                if(current.Files.Count==Limit)break;
+                observation=new ModOutputObservation{Owner=owner,Path=file.Path};
+                current.Files.Add(observation);
+                byOwner.Add(key,observation);
+            }
+            observation.Added=true;
+            observation.Baseline=false;
+        }
+        var seen=new HashSet<string>(byOwner.Keys,Paths);
         foreach(var scope in manifest.OutputScopes){
             string owner=scope.Owner.Split('/')[0];
             if(!current.KnownOwners.Contains(owner)&&current.KnownOwners.Count<1000)current.KnownOwners.Add(owner);
@@ -122,7 +135,7 @@ internal sealed class ModOutputIndex {
     }
 
     internal static bool CanSend(string path){
-        return !String.IsNullOrEmpty(path)&&Path.GetExtension(path).Equals(".json",StringComparison.OrdinalIgnoreCase)&&
+        return !String.IsNullOrEmpty(path)&&(Path.GetExtension(path).Equals(".json",StringComparison.OrdinalIgnoreCase)||PortableLuaSettings.IsSettingsPath(path))&&
             !GeneralInstallRoutes.External(path)&&!InstalledFileOwnership.PrivateState(path)&&InstalledSnapshot.SafeGenericPath(path)&&
             GeneratedFileProvenance.Category(path)=="configuration";
     }

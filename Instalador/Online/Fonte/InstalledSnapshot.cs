@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 
 public sealed class InstalledSnapshotManifest {
     public int Schema=1;
+    public int HostConfigProtocol;
     public string Name,Game,GameFileVersion,TemplateId,ProjectName,BodyChoice;
     public bool TemplateSubset;
     public GeneralModList List=new GeneralModList();
@@ -374,7 +375,7 @@ public static partial class InstalledSnapshot {
             if(content!=null)yield return Config(config.Path,config.Format,config.Section,content);
         }
     }
-    static InstalledSnapshotFile Config(string path,string kind,string section,string content){byte[] bytes=Utf8.GetBytes(content);return new InstalledSnapshotFile{Path=path,Kind=kind,Section=section,Content=content,Size=bytes.Length,Sha256=Hash(bytes)};}
+    static InstalledSnapshotFile Config(string path,string kind,string section,string content){byte[] bytes=kind==PortableLuaSettings.Kind?PortableLuaSettings.Bytes(content):Utf8.GetBytes(content);return new InstalledSnapshotFile{Path=path,Kind=kind,Section=section,Content=content,Size=bytes.Length,Sha256=Hash(bytes)};}
     sealed class SnapshotCatalogOwnership {
         readonly Dictionary<string,FixedMod> recipes;
         readonly ILookup<string,FixedMod> paths;

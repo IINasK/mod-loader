@@ -24,7 +24,7 @@ public sealed partial class InstalledSnapshotInstaller {
         public string Path, Before, After;
         public string Expected;
         public long Size;
-        public bool Owned, Applied, Reverted;
+        public bool Owned, Applied, Reverted, AcceptedHostSetting;
     }
 
     readonly string destination, appData, records;
@@ -49,7 +49,7 @@ public sealed partial class InstalledSnapshotInstaller {
         records = Safe.In(this.appData, "Snapshots/" + Fingerprint(this.destination.ToUpperInvariant()));
     }
 
-    public string Install(string zipPath, string expectedHash, Action<string> report, int failAfter = -1, Func<ModVersionDifference,bool> chooseVersion = null, Action<string> transaction = null, Action checkpoint = null, Action<P2PInstallProgress> progress = null, bool allowReuse = false, Func<string[],bool> approveUserFolders = null,Func<int,bool?> chooseUpdates=null,bool requireExact=false,IEnumerable<OwnedChange> exactCleanup=null,InstalledSnapshotManifest exactPreview=null,bool receivingP2P=false) {
+    public string Install(string zipPath, string expectedHash, Action<string> report, int failAfter = -1, Func<ModVersionDifference,bool> chooseVersion = null, Action<string> transaction = null, Action checkpoint = null, Action<P2PInstallProgress> progress = null, bool allowReuse = false, Func<string[],bool> approveUserFolders = null,Func<int,bool?> chooseUpdates=null,bool requireExact=false,IEnumerable<OwnedChange> exactCleanup=null,InstalledSnapshotManifest exactPreview=null,bool receivingP2P=false,IEnumerable<InstalledSnapshotFile> approvedGeneratedConfigs=null) {
         // The archive is leased throughout verification and copying; no archive is kept in the receipt store.
         zipPath = Path.GetFullPath(zipPath); Safe.NoLinks(zipPath);
         using (var source = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
@@ -57,6 +57,7 @@ public sealed partial class InstalledSnapshotInstaller {
             if(receivingP2P&&manifest.TemplateId==GeneralProjectStore.CyberpunkTemplate&&(!requireExact||exactPreview==null))
                 throw new IOException(GeneralStyle.T("O pacote pronto exige um novo convite com conferência de paridade.","The built-in pack needs a new invitation with parity verification."));
             if(exactPreview!=null)P2PService.VerifyExactContents(exactPreview,manifest);
+            var approvedOutputs=ApprovedOutputs(manifest,approvedGeneratedConfigs,receivingP2P);
             if(!allowReuse&&manifest.Files.Any(file=>file.ReuseLocal))throw new IOException("O recebimento não autorizou reutilizar arquivos locais.");
             using (AcquireLock(manifest.Game)) {
                 if(manifest.Schema<2)ValidateEnvironment(manifest);
@@ -78,9 +79,18 @@ public sealed partial class InstalledSnapshotInstaller {
                     if(requireExact)RequireAllDestinations(skippedDestinations);
                     ValidateEnvironment(manifest);
                 }
-                var complete=receipts.FirstOrDefault(r=>r.Status=="installed"&&r.ActiveOwners.Count==WorkKeys(manifest).Count()&&SameManifest(r.Manifest,manifest)&&r.Files.All(Matches));
+                var complete=receipts.FirstOrDefault(r=>r.Status=="installed"&&r.ActiveOwners.Count==WorkKeys(manifest).Count()&&
+                    SameManifest(r.Manifest,manifest)&&r.Files.All(file=>{
+                        InstalledSnapshotFile reviewed;
+                        return (!approvedOutputs.TryGetValue(file.Path,out reviewed)||file.After==reviewed.Sha256)&&Matches(file);
+                    }));
                 if(complete!=null){
                     if(requireExact)RequireAllDestinations(complete.SkippedDestinations);
+                    var accepted=complete.Files.Where(f=>!f.AcceptedHostSetting&&approvedOutputs.ContainsKey(f.Path)).ToArray();
+                    if(accepted.Length>0){
+                        foreach(var file in accepted)file.AcceptedHostSetting=true;
+                        Save(complete);
+                    }
                     CleanStage(Safe.In(destination,".mod-loader-snapshot-"+complete.Id));return complete.Id;
                 }
                 var skipBackup=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -111,7 +121,7 @@ public sealed partial class InstalledSnapshotInstaller {
                         () => ZipFile.OpenRead(zipPath),
                         (zip,index) => {
                             var group=groups[index];
-                            var change=PrepareChange(group,zip,manifest,stage,approvals);
+                            var change=PrepareChange(group,zip,manifest,stage,approvals,approvedOutputs.ContainsKey(group.Key));
                             if (change.Expected == change.After) {
                                 var previous=ownership[change.Path].FirstOrDefault(x=>x.File.After==change.Expected);
                                 if(previous!=null) {
@@ -153,6 +163,29 @@ public sealed partial class InstalledSnapshotInstaller {
         }
     }
 
+    static Dictionary<string,InstalledSnapshotFile> ApprovedOutputs(InstalledSnapshotManifest manifest,IEnumerable<InstalledSnapshotFile> approved,bool receivingP2P){
+        var received=manifest.Files.Where(f=>f.Generated).ToArray();
+        var result=new Dictionary<string,InstalledSnapshotFile>(StringComparer.OrdinalIgnoreCase);
+        if(approved==null){
+            if(receivingP2P&&received.Any(f=>f.Kind==PortableLuaSettings.Kind))
+                throw new IOException("As configurações Lua recebidas precisam de uma prévia confirmada.");
+            return result;
+        }
+        var reviewed=approved.ToArray();
+        if(reviewed.Length!=received.Length||reviewed.Any(f=>f==null||!f.Generated||String.IsNullOrEmpty(f.Path)))
+            throw new IOException("As configurações recebidas diferem da lista aprovada.");
+        var byPath=reviewed.ToLookup(f=>f.Path,StringComparer.OrdinalIgnoreCase);
+        foreach(var file in received){
+            var matches=byPath[file.Path];
+            if(matches.Count()!=1)throw new IOException("Configuração diferente da lista aprovada: "+file.Path);
+            var expected=matches.First();
+            if(expected.Kind!=file.Kind||expected.Size!=file.Size||expected.Sha256!=file.Sha256||expected.Owners==null||
+                !expected.Owners.SequenceEqual(file.Owners))throw new IOException("A configuração recebida difere da seleção aprovada: "+file.Path);
+            result.Add(file.Path,file);
+        }
+        return result;
+    }
+
     static void RequireAllDestinations(IEnumerable<string> skipped){
         if(skipped!=null&&skipped.Any())throw new IOException(GeneralStyle.T("A sincronização exige estes mods: ","Synchronization requires these mods: ")+String.Join(", ",skipped));
     }
@@ -166,7 +199,7 @@ public sealed partial class InstalledSnapshotInstaller {
                 if(targets.Contains(parent))throw Conflict(parent);
     }
 
-    Change PrepareChange(IGrouping<string,InstalledSnapshotFile> group,ZipArchive zip,InstalledSnapshotManifest manifest,string stage,Dictionary<string,string> approvals) {
+    Change PrepareChange(IGrouping<string,InstalledSnapshotFile> group,ZipArchive zip,InstalledSnapshotManifest manifest,string stage,Dictionary<string,string> approvals,bool replaceGenerated) {
         string target=Target(group.Key);
         if(Directory.Exists(target))throw Conflict(group.Key);
         string before=HashOrNull(target);
@@ -195,14 +228,16 @@ public sealed partial class InstalledSnapshotInstaller {
             after=file.Sha256;
         } else {
             byte[] content=before!=null?InstalledSnapshotConfig.Read(target):null;
-            foreach(var section in group.Where(section=>!section.Generated||before==null))
+            // An existing script must also be data-only before an approved settings replacement.
+            if(replaceGenerated&&before!=null&&file.Kind==PortableLuaSettings.Kind)PortableLuaSettings.Encode(content);
+            foreach(var section in group.Where(section=>!section.Generated||before==null||replaceGenerated))
                 content=InstalledSnapshotConfig.Apply(section,content);
             File.WriteAllBytes(prepared,content);
             after=InstalledSnapshot.Hash(content);
         }
         if(before!=null&&before!=after)Backup(target,Safe.In(stage,Fingerprint(group.Key)+".rollback"),before);
         long size=file.Kind=="file"?file.Size:new FileInfo(prepared).Length;
-        return new Change { Path=group.Key, Before=before, Expected=before, After=after, Size=size, Owned=before==null&&!file.Generated };
+        return new Change { Path=group.Key, Before=before, Expected=before, After=after, Size=size, AcceptedHostSetting=replaceGenerated, Owned=before==null&&!file.Generated };
     }
 
     void ApplyPrepared(Receipt receipt,string stage,bool resume,Action<string> report,Action checkpoint,
@@ -501,6 +536,19 @@ public sealed partial class InstalledSnapshotInstaller {
             CleanStage(stage);
         }
         return null;
+    }
+
+    internal InstalledSnapshotManifest ReadReceivedManifest(string receiptId,out HashSet<string> appliedOutputs){
+        var receipt=Read(receiptId);
+        if(receipt==null||receipt.Status!="installed")throw new IOException("Recibo de snapshot instalado ausente.");
+        var generated=receipt.Manifest.Files.Where(f=>f.Generated&&f.Owners.Any(receipt.ActiveOwners.Contains))
+            .ToDictionary(f=>f.Path,StringComparer.OrdinalIgnoreCase);
+        appliedOutputs=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach(var change in receipt.Files.Where(c=>c.Applied&&!c.Reverted&&(c.Expected==null||c.AcceptedHostSetting))){
+            InstalledSnapshotFile expected;
+            if(generated.TryGetValue(change.Path,out expected)&&change.After==expected.Sha256)appliedOutputs.Add(change.Path);
+        }
+        return receipt.Manifest;
     }
 
     internal InstalledSnapshotManifest ReadManifest(string receiptId) {
