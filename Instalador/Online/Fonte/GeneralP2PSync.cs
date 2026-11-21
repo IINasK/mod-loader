@@ -121,11 +121,12 @@ internal sealed partial class P2PService {
                 var elapsed=System.Diagnostics.Stopwatch.StartNew();
                 try{
                     var source=ExportState(state,session.ExportPreset,session.SelectedMods,session.ExportAllPresets);
-                    var preview=InstalledSnapshot.Inspect(source,session.SelectedMods,installedCatalog,installedData,false,true,()=>{
-                        if(disposed||session.Completed||session.Discarded)throw new OperationCanceledException();
-                    },skipProblem:(id,name,error)=>ReviewSnapshotProblem(session,id,name,error),
-                      inspectProgress:(done,total,item)=>session.SyncProgress=new P2PSyncProgress{Done=done,Total=total,Item=item},
-                      includeUpdatePreferences:true);
+                    var preview=InspectForTransfer(session,review=>InstalledSnapshot.Inspect(source,session.SelectedMods,
+                        installedCatalog,installedData,false,true,()=>{
+                            if(disposed||session.Completed||session.Discarded)throw new OperationCanceledException();
+                        },skipProblem:review,
+                        inspectProgress:(done,total,item)=>session.SyncProgress=new P2PSyncProgress{Done=done,Total=total,Item=item},
+                        includeUpdatePreferences:true));
                     if(preview.Game=="cyberpunk2077"){
                         preview.SyncGameInventory=new FixedInstaller(installedCatalog,source.Destination,installedFixture).ReadSyncInventory(preview.Files,()=>{
                             if(disposed||session.Discarded)throw new OperationCanceledException();

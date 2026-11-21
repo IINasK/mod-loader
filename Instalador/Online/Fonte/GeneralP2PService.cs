@@ -33,7 +33,6 @@ internal sealed class P2PSession {
     public long PreparationBytes,PreparationTotal;
     public string PayloadHash;
     public string[] SelectedMods, SkippedVerificationMods;
-    public bool SkipVerificationProblems;
     public P2POutputSelection[] GeneratedConfigSelection;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PVerificationIssue VerificationIssue;
     [System.Web.Script.Serialization.ScriptIgnore] public GeneralModList ReviewedProject;

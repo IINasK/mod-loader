@@ -537,23 +537,22 @@ internal sealed class GeneralP2PDialog : GeneralDialog, IGeneralModMessageContex
             status.Text=T("ZIP pronto. Extraia o conteúdo na pasta raiz do jogo de destino.","ZIP ready. Extract its contents into the destination game's root folder.");
         }
     }
-    void AskToSkipVerification(){
+    void AskToReviewVerification(){
         if(reviewingVerification||IsDisposed||!Visible)return;
         var issue=service.SnapshotSessions().Where(session=>!session.Discarded).Select(session=>session.VerificationIssue)
             .FirstOrDefault(pending=>pending!=null&&!pending.Decision.Task.IsCompleted);
         if(issue==null)return;
         reviewingVerification=true;
         try{
-            bool skipRemaining=false;
-            var answer=GeneralDialog.Message(this,issue.ModName+"\r\n"+issue.Message+"\r\n\r\n"+
-                T("Este mod e os que dependem dele ficarão fora se você continuar.",
-                    "This mod and any dependents will be left out if you continue."),
-                T("Conferência dos mods","Mod verification"),MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2,
-                remember:value=>skipRemaining=value,rememberLabel:T("Pular também os próximos mods com falha neste envio",
-                    "Also skip remaining mods that fail in this transfer"),yesLabel:T("Pular mod","Skip mod"),
-                noLabel:T("Parar conferência","Stop verification"),signal:false,modNames:new[]{issue.ModName});
-            issue.Decision.TrySetResult(answer!=DialogResult.Yes?P2PVerificationDecision.Stop:
-                skipRemaining?P2PVerificationDecision.SkipRemaining:P2PVerificationDecision.Skip);
+            var summary=String.Format(T("{0} mods verificados. {1} falharam na conferência.",
+                "{0} mods verified. {1} failed verification."),issue.Included,issue.Failures.Length);
+            var details=String.Join("\r\n\r\n",issue.Failures.Select(failure=>failure.Name+"\r\n"+failure.Message));
+            var answer=GeneralDialog.Message(this,summary+"\r\n"+T("Os mods abaixo e os que dependem deles ficarão fora.",
+                "The mods below and their dependents will be left out.")+"\r\n\r\n"+details,
+                T("Conferência dos mods","Mod verification"),issue.Included==0?MessageBoxButtons.OK:MessageBoxButtons.YesNo,MessageBoxIcon.Warning,
+                issue.Included==0?MessageBoxDefaultButton.Button1:MessageBoxDefaultButton.Button2,yesLabel:T("Enviar verificados","Send verified mods"),
+                noLabel:T("Cancelar envio","Cancel transfer"),signal:false,modNames:issue.Failures.Select(failure=>failure.Name));
+            issue.Decision.TrySetResult(answer==DialogResult.Yes);
         }finally{reviewingVerification=false;}
     }
     async Task Poll(){
@@ -590,7 +589,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog, IGeneralModMessageContex
             UpdateActions();
         }catch(Exception ex){if(!IsDisposed)Failed(ex);}
         finally{polling=false;}
-        AskToSkipVerification();
+        AskToReviewVerification();
         if(!IsDisposed&&autoStart&&offer!=null&&(offer.Completed||offer.Discarded||offer.CompareBeforePack&&offer.Recipients.Length>0)&&!busy){
             offer=null;Run(PrepareLink);
         }
@@ -782,7 +781,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog, IGeneralModMessageContex
             else if(message.Length==0&&session.Phase!=null)message=P2PService.PhaseLabel(session.Phase);
             else if(message.Length==0&&session.Paused)message=T("Pausado por você","Paused by you");
             else if(message.Length==0&&issue!=null)
-                message=T("Erro ao verificar: ","Verification failed: ")+issue.ModName;
+                message=T("Aguardando revisão dos mods…","Waiting for mod review…");
             else if(message.Length==0&&scanning&&scan!=null&&scan.Item!=null)message=scan.Item;
             else if(message.Length==0&&scanningHost)message=hostScan.Packing?T("Compactando os arquivos para envio…","Compressing files for upload…"):
                 T("O anfitrião está verificando os mods…","The host is checking the mods…");

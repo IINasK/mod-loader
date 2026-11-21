@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Diagnostics;
 using System.IO;
@@ -7,12 +8,16 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
-internal enum P2PVerificationDecision { Stop, Skip, SkipRemaining }
+internal sealed class P2PVerificationFailure {
+    internal readonly string Id, Name, Message;
+    internal P2PVerificationFailure(string id,string name,string message){Id=id;Name=name;Message=message;}
+}
 
 internal sealed class P2PVerificationIssue {
-    internal readonly string ModName, Message;
-    internal readonly TaskCompletionSource<P2PVerificationDecision> Decision=new TaskCompletionSource<P2PVerificationDecision>();
-    internal P2PVerificationIssue(string modName,string message){ModName=modName;Message=message;}
+    internal readonly P2PVerificationFailure[] Failures;
+    internal readonly int Included;
+    internal readonly TaskCompletionSource<bool> Decision=new TaskCompletionSource<bool>();
+    internal P2PVerificationIssue(P2PVerificationFailure[] failures,int included){Failures=failures;Included=included;}
 }
 
 internal sealed partial class P2PService {
@@ -75,9 +80,9 @@ internal sealed partial class P2PService {
                 Action<long,long> progress=(done,total)=>{session.PreparationBytes=done;session.PreparationTotal=total;};
                 if(plan==null){
                     Action<int,int,string> scan=(done,total,item)=>session.SyncProgress=item==null?null:new P2PSyncProgress{Done=done,Total=total,Item=item};
-                    var manifest=InstalledSnapshot.Inspect(ExportState(state,session.ExportPreset,session.SelectedMods,session.ExportAllPresets),
-                        session.SelectedMods,catalog,appData,includeConfigs,true,checkpoint,
-                        (id,name,message)=>ReviewSnapshotProblem(session,id,name,message),scan,includeUpdatePreferences:true);
+                    var manifest=InspectForTransfer(session,review=>InstalledSnapshot.Inspect(
+                        ExportState(state,session.ExportPreset,session.SelectedMods,session.ExportAllPresets),
+                        session.SelectedMods,catalog,appData,includeConfigs,true,checkpoint,review,scan,includeUpdatePreferences:true));
                     IncludePortableOutputs(session,state.Destination,manifest,checkpoint);
                     if(manifest.Schema==3)InstalledSnapshot.Validate(manifest,catalog);
                     InstalledSnapshot.Write(part,state.Destination,manifest,report,checkpoint,progress,catalog);
@@ -113,38 +118,50 @@ internal sealed partial class P2PService {
         }catch(Exception ex){session.Stage=null;if(!session.Discarded){session.Error=ex.Message;Save();}throw;}
         finally{session.SyncProgress=null;}
     }
-    internal bool ReviewSnapshotProblem(P2PSession session,string modId,string name,string message){
-        if(session.SkippedVerificationMods!=null&&session.SkippedVerificationMods.Contains(modId,StringComparer.Ordinal))return true;
-        if(session.SkipVerificationProblems)return StoreVerificationSkip(session,modId,message,true);
-        var issue=new P2PVerificationIssue(name,message);
+    InstalledSnapshotManifest InspectForTransfer(P2PSession session,
+        Func<Func<string,string,string,bool>,InstalledSnapshotManifest> inspect){
+        var failures=new List<P2PVerificationFailure>();
+        var manifest=inspect((id,name,message)=>{
+            failures.Add(new P2PVerificationFailure(id,name,message));
+            return true;
+        });
+        int included=manifest.List.Mods.Count;
+        bool reviewed=ReviewSnapshotProblems(session,failures,included);
+        if(failures.Count!=0&&included==0)
+            throw new IOException(GeneralStyle.T("Nenhum mod passou na conferência. Confira os arquivos antes de tentar novamente.",
+                "No mods passed verification. Check the files before trying again."));
+        if(!reviewed)
+            throw new OperationCanceledException(GeneralStyle.T("Envio cancelado na revisão dos mods.","Transfer cancelled during mod review."));
+        return manifest;
+    }
+
+    internal bool ReviewSnapshotProblems(P2PSession session,IEnumerable<P2PVerificationFailure> failures,int included){
+        var approved=new HashSet<string>(session.SkippedVerificationMods??new string[0],StringComparer.Ordinal);
+        var pending=failures.Where(failure=>included==0||!approved.Contains(failure.Id)).ToArray();
+        if(pending.Length==0)return true;
+        var issue=new P2PVerificationIssue(pending,included);
         session.VerificationIssue=issue;
-        Notify();
         try{
+            Notify();
             while(!issue.Decision.Task.Wait(100)){
                 if(disposed||session.Discarded||session.Completed)throw new OperationCanceledException();
             }
-            var answer=issue.Decision.Task.Result;
-            if(answer!=P2PVerificationDecision.Stop)
-                return StoreVerificationSkip(session,modId,message,answer==P2PVerificationDecision.SkipRemaining);
-            if(disposed||session.Discarded||session.Completed)throw new OperationCanceledException();
-            OnlineDiagnostics.Record("p2p.verify.failed",modId,message);
-            return false;
+            lock(session){
+                if(disposed||session.Discarded||session.Completed)throw new OperationCanceledException();
+                if(included==0||!issue.Decision.Task.Result){
+                    foreach(var failure in pending)OnlineDiagnostics.Record("p2p.verify.failed",failure.Id,failure.Message);
+                    return false;
+                }
+                var previous=session.SkippedVerificationMods;
+                session.SkippedVerificationMods=approved.Concat(pending.Select(failure=>failure.Id)).Distinct(StringComparer.Ordinal).ToArray();
+                try{Save();}
+                catch{session.SkippedVerificationMods=previous;throw;}
+                foreach(var failure in pending)OnlineDiagnostics.Record("p2p.verify.skipped",failure.Id,failure.Message);
+                return true;
+            }
         }finally{session.VerificationIssue=null;}
     }
 
-    bool StoreVerificationSkip(P2PSession session,string modId,string message,bool skipRemaining){
-        lock(session){
-            if(disposed||session.Discarded||session.Completed)throw new OperationCanceledException();
-            var previous=session.SkippedVerificationMods;
-            bool previouslySkipping=session.SkipVerificationProblems;
-            session.SkippedVerificationMods=(previous??new string[0]).Concat(new[]{modId}).ToArray();
-            session.SkipVerificationProblems=skipRemaining;
-            try{Save();}
-            catch{session.SkippedVerificationMods=previous;session.SkipVerificationProblems=previouslySkipping;throw;}
-            OnlineDiagnostics.Record("p2p.verify.skipped",modId,message);
-            return true;
-        }
-    }
     internal static GeneralModState ExportState(GeneralModState state,string presetId,string[] ids,bool exportAllPresets=false){
         if(presetId==null&&!exportAllPresets)return state;
         var copy=Safe.Json.Deserialize<GeneralModState>(Safe.Json.Serialize(state));

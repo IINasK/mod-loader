@@ -239,10 +239,10 @@ internal static class GeneralP2PLifecycleTests {
             var checking=host.BeginDeferred(source.Item1,ids,true,compareBeforePack:true);
             var watching=friend.Accept(host.Invitation(checking),target,true);
             ConnectTo(friend,host);
-            Wait(()=>checking.VerificationIssue!=null,"The scan did not pause on the changed file.");
+            Wait(()=>checking.VerificationIssue!=null,"The finished scan did not request a review of the changed file.");
             Wait(()=>{
                 var progress=friend.TransferStatus(watching).HostScan;
-                return progress!=null&&progress.Done==2&&progress.Total==3&&progress.Item==null&&!progress.Packing;
+                return progress!=null&&progress.Done==3&&progress.Total==3&&progress.Item==null&&!progress.Packing;
             },"The receiver did not get the authenticated scan counts.");
             checks.Add("The receiver gets the host's real scan counts without its local path or mod name.");
             host.CancelSend(checking);
