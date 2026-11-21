@@ -18,7 +18,10 @@ internal sealed partial class GeneralProjectHome : Form {
     readonly GeneralMenuHost menus=new GeneralMenuHost();
     GeneralModWindow sharingWindow;
     GeneralP2PDialog sharingDialog;
-    bool exitApproved,waitingForInstallation;
+    bool exitApproved,waitingForInstallation,showTemplateCopies,hasTemplateCopies;
+    bool coverSizeAdjusted;
+    TrackBar coverSize;
+    Action reflowGallery;
     string ReceiveData {get{return Path.Combine(store.Root,"P2P-Inbox");}}
     CancellationTokenSource coverRequests;
     LinkLabel update;
@@ -47,17 +50,27 @@ internal sealed partial class GeneralProjectHome : Form {
     static string T(string pt,string en){return GeneralStyle.T(pt,en);}
     internal void Build(){
         var index=store.Read();GeneralStyle.UseTheme(index.Theme);GeneralStyle.Language=index.Language;
-        menus.Close();buildVersion++;StopCoverRequests();coverRequests=new CancellationTokenSource();
+        menus.Close();buildVersion++;StopCoverRequests();coverRequests=new CancellationTokenSource();reflowGallery=null;
         SuspendLayout();while(Controls.Count>0){var old=Controls[0];Controls.Remove(old);old.Dispose();}
         Font=GeneralStyle.Font(12);BackColor=GeneralStyle.Background;ForeColor=GeneralStyle.Foreground;
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Padding=new Padding(32,28,32,24)};
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         for(int i=0;i<4;i++)layout.RowStyles.Add(i==2?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.AutoSize));Controls.Add(layout);
-        var header=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,Margin=Padding.Empty};
-        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
+        var header=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=3,Margin=Padding.Empty};
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,130));
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
         var brand=new FlowLayoutPanel{AutoSize=true,WrapContents=false,Margin=Padding.Empty};brand.Controls.Add(new ModLoaderLogo{Size=new Size(44,44),Margin=new Padding(0,0,12,0)});
         var brandTitle=new Label{Text="MOD LOADER",AutoSize=true,Font=GeneralStyle.Font(27,true),ForeColor=GeneralStyle.Accent,Margin=Padding.Empty};brand.Controls.Add(brandTitle);header.Controls.Add(brand,0,0);
-        var menu=(GeneralButton)GeneralStyle.Button("",ToggleHomeMenu);menu.Name="HomeMenu";menu.Bare=true;menu.IconKind="menu";menu.AccessibleName=T("Menu","Menu");menu.Size=new Size(44,44);menu.AutoSize=false;menu.MinimumSize=new Size(44,44);menu.Dock=DockStyle.Fill;menu.Margin=Padding.Empty;header.Controls.Add(menu,1,0);layout.Controls.Add(header,0,0);
+        var menu=(GeneralButton)GeneralStyle.Button("",ToggleHomeMenu);menu.Name="HomeMenu";menu.Bare=true;menu.IconKind="menu";menu.AccessibleName=T("Menu","Menu");menu.Size=new Size(44,44);menu.AutoSize=false;menu.MinimumSize=new Size(44,44);menu.Dock=DockStyle.Fill;menu.Margin=Padding.Empty;header.Controls.Add(menu,2,0);
+        coverSizeAdjusted=index.GalleryCoverWidth>=142&&index.GalleryCoverWidth<=275;
+        coverSize=new GalleryScaleSlider{Name="GalleryCoverSize",AccessibleName=T("Tamanho das capas","Cover size"),
+            Minimum=142,Maximum=275,Value=coverSizeAdjusted?index.GalleryCoverWidth:180,SmallChange=8,LargeChange=16,
+            TickStyle=TickStyle.None,AutoSize=false,Height=30,Anchor=AnchorStyles.Left|AnchorStyles.Right,Margin=new Padding(4,0,10,0)};
+        coverSize.ValueChanged+=(s,e)=>{coverSizeAdjusted=true;if(reflowGallery!=null)reflowGallery();};
+        coverSize.MouseUp+=(s,e)=>SaveCoverSize();
+        coverSize.KeyUp+=(s,e)=>SaveCoverSize();
+        savedTips.SetToolTip(coverSize,coverSize.AccessibleName);
+        header.Controls.Add(coverSize,1,0);layout.Controls.Add(header,0,0);
         var intro=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.TopDown,WrapContents=false,Margin=Padding.Empty};
         intro.Controls.Add(new Label{Name="HomeIntro",Text=T("Criado por Nask e Codex. Se achou ruim, faz você.","Made by Nask and Codex. If you don't like it, make your own."),AutoSize=true,ForeColor=GeneralStyle.Muted,Margin=new Padding(0,10,0,4)});
         intro.Margin=new Padding(0,0,0,22);layout.Controls.Add(intro,0,1);
@@ -75,12 +88,19 @@ internal sealed partial class GeneralProjectHome : Form {
         var grid=new Panel{Name="ProjectCards"};
         grid.Controls.AddRange(new Control[]{readyHeading,divider});
         var cards=new List<HomeProjectCard>();
-        foreach(var project in index.Projects.Where(item=>item.TemplateId==null).Reverse())
-            AddProjectCards(grid,cards,project,ReadCardState(project),false);
-        bool hasSaved=cards.Count!=0;
-        if(hasSaved)AddNewProjectCard(grid,cards,false);
         var official=index.Projects.FirstOrDefault(item=>item.TemplateId==GeneralProjectStore.CyberpunkTemplate);
         var officialState=official==null?new GeneralModState{List=GeneralModLibrary.Seed(catalog,new ModImportItem[0]),Language=index.Language}:ReadCardState(official);
+        hasTemplateCopies=false;
+        foreach(var project in index.Projects.Where(item=>item.TemplateId==null).Reverse()){
+            var saved=ReadCardState(project);
+            if(official!=null&&AutomaticTemplateCopy(project,official,saved,officialState)){
+                hasTemplateCopies=true;
+                if(!showTemplateCopies)continue;
+            }
+            AddProjectCards(grid,cards,project,saved,false);
+        }
+        bool hasSaved=cards.Count!=0;
+        if(hasSaved)AddNewProjectCard(grid,cards,false);
         AddProjectCards(grid,cards,official,officialState,true);
         if(!hasSaved)AddNewProjectCard(grid,cards,true);
 
@@ -94,6 +114,7 @@ internal sealed partial class GeneralProjectHome : Form {
                 PlaceGalleryCards(gallery,grid,cards,hasSaved?heading.Bottom+8:0,scroll.ClientSize.Height);
             }finally{gallery.ResumeLayout(false);}
         };
+        reflowGallery=reflow;
         gallery.SizeChanged+=(s,e)=>reflow();
         gallery.DpiChangedAfterParent+=(s,e)=>reflow();
         scroll.SizeChanged+=(s,e)=>reflow();
@@ -108,6 +129,58 @@ internal sealed partial class GeneralProjectHome : Form {
         var token=coverRequests.Token;
         gallery.HandleCreated+=(s,e)=>LoadCoverImages(cards.ToArray(),token);
         return scroll;
+    }
+
+    static bool AutomaticTemplateCopy(GeneralProject copy,GeneralProject official,GeneralModState saved,GeneralModState template){
+        if(saved==null||template==null||String.IsNullOrWhiteSpace(saved.Destination))return false;
+        if(!String.Equals((saved.Destination??"").TrimEnd('\\'),(template.Destination??"").TrimEnd('\\'),
+            StringComparison.OrdinalIgnoreCase))return false;
+        return new[]{" · Minha versão"," · My version"}.Any(suffix=>{
+            string name=official.Name+suffix;
+            if(copy.Name==name)return true;
+            if(!copy.Name.StartsWith(name+" (",StringComparison.Ordinal)||!copy.Name.EndsWith(")",StringComparison.Ordinal))return false;
+            int number;
+            return Int32.TryParse(copy.Name.Substring(name.Length+2,copy.Name.Length-name.Length-3),out number)&&number>=2;
+        });
+    }
+
+    sealed class GalleryScaleSlider : TrackBar {
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        static extern IntPtr SendMessage(IntPtr handle,int message,IntPtr parameter,ref Rectangle bounds);
+        internal GalleryScaleSlider(){
+            SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|
+                ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);
+            ValueChanged+=(s,e)=>Invalidate();
+            GotFocus+=(s,e)=>Invalidate();
+            LostFocus+=(s,e)=>Invalidate();
+        }
+        protected override void OnPaint(PaintEventArgs e){
+            var channel=Rectangle.Empty;
+            var thumb=Rectangle.Empty;
+            SendMessage(Handle,1050,IntPtr.Zero,ref channel);
+            SendMessage(Handle,1049,IntPtr.Zero,ref thumb);
+            int size=12*DeviceDpi/96;
+            int y=ClientSize.Height/2,center=(thumb.X+thumb.Width)/2;
+            int left=channel.X,right=channel.Width;
+            e.Graphics.Clear(Parent==null?GeneralStyle.Surface:Parent.BackColor);
+            e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
+            using(var rail=new Pen(GeneralStyle.Line,3))
+            using(var fill=new SolidBrush(GeneralStyle.Accent)){
+                rail.StartCap=rail.EndCap=LineCap.Round;
+                e.Graphics.DrawLine(rail,left,y,right,y);
+                rail.Color=GeneralStyle.Accent;
+                e.Graphics.DrawLine(rail,left,y,Math.Max(left,center),y);
+                var handle=new Rectangle(center-size/2,y-size/2,size,size);
+                e.Graphics.FillEllipse(fill,handle);
+                if(Focused&&ShowFocusCues){handle.Inflate(3,3);e.Graphics.DrawEllipse(rail,handle);}
+            }
+        }
+    }
+
+    void SaveCoverSize(){
+        if(!coverSizeAdjusted)return;
+        try{store.SaveGalleryCoverWidth(coverSize.Value);}
+        catch(Exception ex){OnlineDiagnostics.Failure("home.gallery.size",ex,"Salvar o tamanho das capas.");}
     }
 
     void AddNewProjectCard(Panel grid,List<HomeProjectCard> cards,bool official){
@@ -189,11 +262,14 @@ internal sealed partial class GeneralProjectHome : Form {
         int width=Math.Max(1,gallery.Width);
         int columns=Math.Max(1,Math.Min(3,(width+gap)/(165*dpi/96+gap)));
         int captionHeight=HomeProjectCard.CaptionHeight(dpi);
-        int heightLimit=Math.Max(162*dpi/96,(viewportHeight-top-captionHeight-6)*2/3);
-        int cardWidth=Math.Min(Math.Min(heightLimit,275*dpi/96),Math.Max(1,(width-(columns-1)*gap)/columns));
+        int savedCount=cards.Count(card=>!card.Official),savedRows=(savedCount+columns-1)/columns;
+        int widthForPreview=savedRows==0?180*dpi/96:
+            Math.Max(142*dpi/96,((viewportHeight-top-110*dpi/96)/savedRows-captionHeight-gap)*2/3);
+        int preferred=coverSize.Value*dpi/96;
+        if(!coverSizeAdjusted)preferred=Math.Min(preferred,widthForPreview);
+        int cardWidth=Math.Min(preferred,Math.Max(1,(width-(columns-1)*gap)/columns));
         int cardHeight=cardWidth*3/2+captionHeight;
         int offset=Math.Max(0,(width-columns*cardWidth-(columns-1)*gap)/2);
-        int savedCount=cards.Count(card=>!card.Official),savedRows=(savedCount+columns-1)/columns;
         int savedHeight=savedRows==0?0:savedRows*(cardHeight+gap)-gap;
         var divider=grid.Controls.Find("ProjectGalleryDivider",false).Single();
         var readyHeading=grid.Controls.Find("ReadyProjectsHeading",false).Single();
@@ -544,8 +620,10 @@ internal sealed partial class GeneralProjectHome : Form {
     void ShowHome(){if(IsDisposed)return;Build();Show();Activate();}
     void ToggleHomeMenu(){
         var anchor=Controls.Find("HomeMenu",true).Single();
-        menus.Toggle(this,anchor,()=>new GeneralActionsMenu(home:true),dialog=>Guard(()=>{
-            if(((GeneralActionsMenu)dialog).ActionId=="share")ShowSharing();
+        menus.Toggle(this,anchor,()=>new GeneralActionsMenu(home:true,hasTemplateCopies:hasTemplateCopies,showTemplateCopies:showTemplateCopies),dialog=>Guard(()=>{
+            string action=((GeneralActionsMenu)dialog).ActionId;
+            if(action=="template-copies"){showTemplateCopies=!showTemplateCopies;Build();}
+            else if(action=="share")ShowSharing();
             else Options(anchor);
         }));
     }
@@ -622,7 +700,8 @@ internal sealed partial class GeneralModWindow {
                     refreshed=true;
                 }
             }
-            var added=seed.Mods.Where(item=>!state.List.Mods.Any(current=>current.Id==item.Id)).ToArray();
+            var removed=new HashSet<string>(state.SuppressedModRecovery??Enumerable.Empty<string>(),StringComparer.Ordinal);
+            var added=seed.Mods.Where(item=>!removed.Contains(item.Id)&&!state.List.Mods.Any(current=>current.Id==item.Id)).ToArray();
             if(added.Length!=0){
                 state.List.Mods.AddRange(added);
                 foreach(var category in seed.Categories)
@@ -634,7 +713,7 @@ internal sealed partial class GeneralModWindow {
                 refreshed=true;
             }
             const string eclipse=GeneralModLibrary.EclipseTattooId;
-            foreach(var reference in seed.Presets.Where(p=>p.ModIds.Contains(eclipse))){
+            foreach(var reference in seed.Presets.Where(p=>!removed.Contains(eclipse)&&p.ModIds.Contains(eclipse))){
                 var saved=state.List.Presets.FirstOrDefault(p=>p.Id==reference.Id);
                 if(saved==null||saved.ModIds.Contains(eclipse))continue;
                 saved.ModIds.Add(eclipse);

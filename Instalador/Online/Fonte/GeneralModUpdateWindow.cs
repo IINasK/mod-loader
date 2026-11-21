@@ -8,7 +8,7 @@ using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
     sealed class ModUpdateRow {
-        internal string Key,Source,Provider,Expected,Local,LocalStatus;
+        internal string Key,Source,LookupSource,Provider,Expected,Local,LocalStatus;
         internal NexusUpdateResult Online;
     }
     List<ModUpdateRow> modUpdates=new List<ModUpdateRow>();
@@ -31,6 +31,7 @@ internal sealed partial class GeneralModWindow {
 
     void ClearModVersions(){
         modUpdateGeneration++;
+        sharedInstalledVersions.Clear();
         versionFilter=null;
         checkingModUpdates=false;
         modUpdates.Clear();
@@ -111,6 +112,8 @@ internal sealed partial class GeneralModWindow {
 
     string VersionInStatus(string key,string status){
         if(!VersionInstalled(status)&&status!=UpdateAvailableStatus&&!LocalChanged(status))return null;
+        GeneralModInstaller.CommittedUpgrade installation;
+        if(sharedInstalledVersions.TryGetValue(key,out installation)&&!String.IsNullOrEmpty(installation.Version))return installation.Version;
         var observations=versionsByWork[key].ToArray();
         string local=observations.Select(row=>row.Local).FirstOrDefault(value=>!String.IsNullOrWhiteSpace(value));
         if(!VersionInstalled(status))return local;
@@ -299,10 +302,15 @@ internal sealed partial class GeneralModWindow {
             NexusManualMatch manual;
             if(localStatus==GeneralStatusPresentation.NexusManual&&nexusManual.TryGetValue(work.Entry.Id,out manual)&&
                 Object.ReferenceEquals(manual.Variant,work.Variant))expected=manual.Version??expected;
-            return (sources.Length==0?new string[]{null}:sources).Select(source=>new ModUpdateRow{
-                Key=work.Key,Source=source,
-                Provider=GeneralNexusLink.Parse(source)!=null?"nexus":GithubModUpdateSession.Supports(source)?"github":null,
-                Expected=expected,LocalStatus=localStatus});
+            GeneralModInstaller.CommittedUpgrade installation;
+            sharedInstalledVersions.TryGetValue(work.Key,out installation);
+            if(installation!=null&&!String.IsNullOrEmpty(installation.Version))expected=installation.Version;
+            return (sources.Length==0?new string[]{null}:sources).Select(source=>{
+                string lookupSource=installation==null?source:installation.Source;
+                return new ModUpdateRow{Key=work.Key,Source=source,LookupSource=lookupSource,
+                    Provider=GeneralNexusLink.Parse(lookupSource)!=null?"nexus":GithubModUpdateSession.Supports(lookupSource)?"github":null,
+                    Expected=expected,LocalStatus=localStatus};
+            });
         }).ToList();
         var knownPaths=new Dictionary<string,List<string>>(StringComparer.Ordinal);
         foreach(var work in state.List.Mods.Select(MakeWork)){
@@ -313,7 +321,7 @@ internal sealed partial class GeneralModWindow {
         Func<bool> active=()=>!IsDisposed&&!exitApproved&&generation==modUpdateGeneration&&Object.ReferenceEquals(captured,state)&&destination==state.Destination;
         try{
             if(lookup==null)lookup=CreateVersionLookup(fresh,active);
-            var requests=rows.Select(async row=>row.Online=await lookup.Check(row.Source)).ToArray();
+            var requests=rows.Select(async row=>row.Online=await lookup.Check(row.LookupSource)).ToArray();
             if(!String.IsNullOrEmpty(destination)&&Directory.Exists(destination)){
                 var paths=await Task.Run(()=>UpdateVersionPaths(destination,knownPaths));
                 if(active())foreach(var row in rows){string version;if(paths.TryGetValue(row.Key,out version))row.Local=version;}

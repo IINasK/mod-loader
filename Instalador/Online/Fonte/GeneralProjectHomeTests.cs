@@ -205,11 +205,11 @@ internal sealed partial class GeneralModWindow {
                                 home.OpenRequested(remaining,null);
                                 answerTransfer.Stop();
                                 if(failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
-                                var edited=store.Read().Projects.Single(item=>item.TemplateId==null);
                                 check(home.IsDisposed&&transferPrompts==2&&draftPrompts==1&&
-                                    store.Load(edited).List.Mods.First().Tags.Contains("salvar ao fechar")&&
-                                    before==Safe.Hash(Path.Combine(store.DataPath(remaining),"lista.json")),
-                                    "Confirmar o X salva o rascunho e encerra o aplicativo sem voltar à Home ou perguntar novamente.");
+                                    store.Read().Projects.Count==1&&
+                                    store.Load(remaining).List.Mods.First().Tags.Contains("salvar ao fechar")&&
+                                    before!=Safe.Hash(Path.Combine(store.DataPath(remaining),"lista.json")),
+                                    "Confirmar o X salva no projeto oficial e encerra o aplicativo sem criar uma cópia.");
                             }
                             completed=true;
                         }catch(Exception ex){failure=ex;}finally{Application.ExitThread();}

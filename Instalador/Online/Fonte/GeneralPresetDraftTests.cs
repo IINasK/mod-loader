@@ -149,23 +149,21 @@ internal sealed partial class GeneralModWindow {
             form.Size=new Size(1060,780);form.OnResizeEnd(EventArgs.Empty);
             var resized=builtInStore.Read().Projects.Single();
             check(resized.WindowWidth>0&&resized.WindowHeight>0,"Redimensionar grava a preferência do projeto.");
-            check(!form.tableName.ReadOnly&&form.preset.DeleteChoice!=null,"Presets oficiais podem ser editados em uma cópia.");
-            string presetName=form.ActivePreset.Name;
+            check(!form.tableName.ReadOnly&&form.preset.DeleteChoice!=null,"Presets podem ser editados na instalação local do projeto oficial.");
             form.optionsButton.PerformClick();var menu=(GeneralActionsMenu)form.menus.Current;
             check(AllControls(menu).OfType<Button>().Where(button=>button.Name!="").Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"details","new","open","options","save-menu","share"}),"Projeto padrão oferece captura manual e compartilhamento.");
             form.optionsButton.PerformClick();await Task.Delay(30);
             string beforeExport=Safe.Hash(Path.Combine(builtInStore.DataPath(builtIn),"lista.json"));form.ProjectCommand("export");form.ProjectCommand("import");
             check(form.Visible&&form.ProjectAction==null&&beforeExport==Safe.Hash(Path.Combine(builtInStore.DataPath(builtIn),"lista.json")),"Projeto padrão também recusa importação/exportação no despacho, sem alterar dados.");
             form.tableName.Text="Meu preset pessoal";form.presetSettings.PerformClick();
-            var personal=builtInStore.Read().Projects.Single(item=>item.TemplateId==null);
-            check(form.ActivePreset.Name=="Meu preset pessoal"&&!form.BuiltInProject&&
-                builtInStore.Load(personal).List.Presets.First(item=>item.Id=="all").Name=="Meu preset pessoal"&&
-                builtInStore.Load(builtIn).List.Presets.First(item=>item.Id=="all").Name==presetName&&
-                beforeExport==Safe.Hash(Path.Combine(builtInStore.DataPath(builtIn),"lista.json")),
-                "Salvar a edição cria um projeto pessoal e preserva o original.");
+            check(form.ActivePreset.Name=="Meu preset pessoal"&&form.BuiltInProject&&
+                builtInStore.Read().Projects.Single().Id==builtIn.Id&&
+                builtInStore.Load(builtIn).List.Presets.First(item=>item.Id=="all").Name=="Meu preset pessoal",
+                "Salvar mantém a mesma entrada local do projeto oficial.");
             form.tableName.Text="Segundo ajuste";form.presetSettings.PerformClick();
-            check(builtInStore.Read().Projects.Count==2&&builtInStore.Load(personal).List.Presets.First(item=>item.Id=="all").Name=="Segundo ajuste",
-                "O próximo salvamento atualiza a mesma cópia.");
+            check(builtInStore.Read().Projects.Single().Id==builtIn.Id&&
+                builtInStore.Load(builtIn).List.Presets.First(item=>item.Id=="all").Name=="Segundo ajuste",
+                "O próximo salvamento mantém as edições no projeto existente.");
             check(!Directory.Exists(Path.Combine(root,"archive")),"Testar presets não instala arquivos do jogo.");
         });
         GeneralStyle.UseTheme("light");GeneralStyle.Language="pt";

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -50,6 +50,10 @@ public sealed partial class GeneralModInstaller {
     internal string Status(string key,string source,Func<string,string> readHash,List<GeneralInstallRoute> installRoutes=null) {
         if(RecoveryPending)return Partial;
         Record record = ReadRecord(RecordPath(key));
+        return CheckRecord(record,source,readHash,installRoutes);
+    }
+
+    string CheckRecord(Record record,string source,Func<string,string> readHash,List<GeneralInstallRoute> installRoutes) {
         if (record == null) return Missing;
         if(installRoutes!=null&&!GeneralInstallRoutes.Same(installRoutes,record.InstallRoutes))return "Versão diferente";
         if(record.SourceSha256!=null&&source!=null&&File.Exists(source)&&readHash(source)!=record.SourceSha256)return "Versão diferente";
@@ -237,11 +241,11 @@ public sealed partial class GeneralModInstaller {
         return Safe.In(records, Fingerprint(key) + ".json");
     }
 
-    Record ReadRecord(string path,bool inspection=false) {
+    Record ReadRecord(string path,bool inspection=false,string receiptText=null) {
         Safe.NoLinks(path);
         if (!File.Exists(path)) return null;
         var serializer = new JavaScriptSerializer { MaxJsonLength = Safe.Json.MaxJsonLength };
-        Record record = serializer.Deserialize<Record>(inspection?GeneralProjectStorage.ReadText(path,16000000):File.ReadAllText(path));
+        Record record = serializer.Deserialize<Record>(receiptText??(inspection?GeneralProjectStorage.ReadText(path,16000000):File.ReadAllText(path)));
         if (record == null || record.SourceSha256!=null&&!FixedData.HashValid(record.SourceSha256) || record.Files == null || record.Files.Count == 0 || RecordPath(record.Key) != path)
             throw new IOException("Registro de instalação inválido: " + path);
         GeneralInstallRoutes.Validate(record.InstallRoutes);

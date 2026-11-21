@@ -77,33 +77,35 @@ internal sealed partial class GeneralProjectHome {
         bool over;
         internal HomeCardAction(bool remove){
             this.remove=remove;
-            SetStyle(ControlStyles.UserPaint|ControlStyles.SupportsTransparentBackColor|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);
-            BackColor=Color.Transparent;Cursor=Cursors.Hand;Text="";AccessibleRole=AccessibleRole.PushButton;
+            SetStyle(ControlStyles.Opaque|ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);
+            FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;
+            Cursor=Cursors.Hand;Text="";AccessibleRole=AccessibleRole.PushButton;
         }
         protected override void OnMouseEnter(EventArgs e){over=true;Invalidate();base.OnMouseEnter(e);}
         protected override void OnMouseLeave(EventArgs e){over=false;Invalidate();base.OnMouseLeave(e);}
         protected override void OnGotFocus(EventArgs e){Invalidate();base.OnGotFocus(e);}
         protected override void OnLostFocus(EventArgs e){Invalidate();base.OnLostFocus(e);}
-        protected override void OnPaintBackground(PaintEventArgs e){
-            if(Parent==null){base.OnPaintBackground(e);return;}
-            var state=e.Graphics.Save();
-            try{
-                e.Graphics.TranslateTransform(-Left,-Top);
-                var args=new PaintEventArgs(e.Graphics,new Rectangle(Left,Top,Width,Height));
-                InvokePaintBackground(Parent,args);InvokePaint(Parent,args);
-            }finally{e.Graphics.Restore(state);}
+        protected override void OnSizeChanged(EventArgs e){
+            base.OnSizeChanged(e);
+            if(ClientSize.IsEmpty)return;
+            var previous=Region;
+            using(var contour=new GraphicsPath()){contour.AddEllipse(ClientRectangle);Region=new Region(contour);}
+            if(previous!=null)previous.Dispose();
         }
         protected override void OnPaint(PaintEventArgs e){
-            var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;
-            int size=(remove?26:30)*DeviceDpi/96;
-            var circle=new Rectangle((Width-size)/2,(Height-size)/2,size,size);
-            Color ink=Enabled?(remove?Color.White:GeneralStyle.Muted):GeneralStyle.Muted;
-            if(remove||over&&Enabled||Focused){
-                using(var fill=new SolidBrush(remove?Color.FromArgb(over&&Enabled?210:155,Color.Black):GeneralStyle.Selection))g.FillEllipse(fill,circle);
-            }
+            var g=e.Graphics;
+            var circle=Rectangle.Inflate(ClientRectangle,-1,-1);
+            var previous=g.Save();
+            if(Region!=null)g.SetClip(Region,CombineMode.Intersect);
+            Color fill=remove?Color.FromArgb(over&&Enabled?26:42,over&&Enabled?26:42,over&&Enabled?26:42):
+                over&&Enabled||Focused?GeneralStyle.Selection:GeneralStyle.Surface;
+            using(var brush=new SolidBrush(fill))g.FillRectangle(brush,ClientRectangle);
+            g.SmoothingMode=SmoothingMode.AntiAlias;
+            Color ink=Enabled&&remove?Color.White:GeneralStyle.Muted;
             if(Focused&&ShowFocusCues)using(var border=new Pen(remove?Color.White:GeneralStyle.Accent,1.5f))g.DrawEllipse(border,circle);
             int icon=(remove?15:20)*DeviceDpi/96;
             LucideIcons.Draw(g,remove?"close":"ellipsis-vertical",new Rectangle((Width-icon)/2,(Height-icon)/2,icon,icon),ink);
+            g.Restore(previous);
         }
     }
 }

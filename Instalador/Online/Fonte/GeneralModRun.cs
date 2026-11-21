@@ -15,6 +15,7 @@ internal sealed partial class GeneralModWindow {
         internal bool Ended,Applied,SwitchAlternatives,DependencyQueue,SaveVariant,ReviewReplacement,UpdateRequested,RecognizedUpdate;
         internal HashSet<string> DropConflicts;
         internal bool BackupUpdate;
+        internal GeneralModInstaller.CommittedUpgrade SharedInstallation;
         internal string DropDensity, BodyChoice, ScanError, DiagnosticStage, DiagnosticVersion;
         internal double Fraction;
         internal string Key { get{return GeneralModWindow.Key(Entry,Variant);} }
@@ -184,9 +185,11 @@ internal sealed partial class GeneralModWindow {
         internal readonly Lazy<GeneralModInstaller> Generic;
         internal readonly Lazy<HashSet<string>> Imports, Disabled;
         internal readonly Lazy<ILookup<long,string>> DownloadNames;
+        internal readonly Lazy<ILookup<string,SharedInstalledUpdate>> SharedUpdates;
         internal int HashCount {get{return hashes.Count;}}
         internal ScanReads(GeneralModWindow window,string root){
             this.root=root;
+            SharedUpdates=new Lazy<ILookup<string,SharedInstalledUpdate>>(()=>window.ReadSharedInstalledUpdates(root));
             Snapshots=new Lazy<InstalledSnapshotInstaller.StatusScan>(()=>new InstalledSnapshotInstaller.StatusScan(window.Snapshot(root),Hash));
             Generic=new Lazy<GeneralModInstaller>(()=>window.Generic(root));
             Exists=!String.IsNullOrEmpty(root)&&Directory.Exists(root);
@@ -373,8 +376,7 @@ internal sealed partial class GeneralModWindow {
             var pending=new Queue<Task<string>>();
             Func<Work,Task<string>> verify=work=>Task.Run(async()=>{
                 if(audit!=null)await audit.ReadSources(work);
-                try{return Status(work,root,reads,false);}
-                catch(Exception ex){work.ScanError=ex.Message;return "Não verificável";}
+                return ScanInstalledStatus(work,root,reads);
             });
             int scheduled=0;
             while(scheduled<Math.Min(works.Count,workers))pending.Enqueue(verify(works[scheduled++]));
@@ -395,6 +397,7 @@ internal sealed partial class GeneralModWindow {
                 statusDetails.Remove(work.Key);
                 if(!skipped)ReportScanError(work);
                 statuses[work.Key]=result;progress.Remove(work.Key);
+                if(!skipped&&work.SharedInstallation!=null)sharedInstalledVersions[work.Key]=work.SharedInstallation;
                 DataGridViewRow row;
                 if(visibleRows.TryGetValue(work.Entry.Id,out row)&&row.DataGridView==grid){
                     string raw=InstallationStatus(work.Entry,result);
@@ -430,12 +433,12 @@ internal sealed partial class GeneralModWindow {
             var otherVersions=state.List.Mods.Where(entry=>entry.Variants.Count>1||IsBigBody(entry))
                 .SelectMany(VersionWorks).Where(work=>checkedKeys.Add(work.Key)).ToArray();
             var versionStatuses=await Task.Run(()=>otherVersions.Select(work=>{
-                try{return Status(work,root,reads,false);}
-                catch(Exception ex){work.ScanError=ex.Message;return "Não verificável";}
+                return ScanInstalledStatus(work,root,reads);
             }).ToArray());
             for(int i=0;i<otherVersions.Length;i++){
                 var work=otherVersions[i];
                 statuses[work.Key]=versionStatuses[i];
+                if(work.SharedInstallation!=null)sharedInstalledVersions[work.Key]=work.SharedInstallation;
                 statusDetails.Remove(work.Key);
                 ReportScanError(work);
             }

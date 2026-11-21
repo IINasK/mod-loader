@@ -14,6 +14,7 @@ internal sealed class GeneralProject {
 
 internal sealed class GeneralProjectIndex {
     public int Schema = 1;
+    public int GalleryCoverWidth;
     public string Theme = "light-red", Language = "pt";
     public string DownloadFolder = OnlineDownloadWatch.DefaultFolder();
     public SwitchPerformance SwitchSettings = new SwitchPerformance();
@@ -301,6 +302,16 @@ internal sealed class GeneralProjectStore {
             var registered = Registered(index, project);
             if (registered.TemplateId != null) throw new IOException("O projeto padrão faz parte do Mod Loader e não pode ser excluído.");
             index.Projects.Remove(registered);
+            Write(index);
+        }
+    }
+
+    internal void SaveGalleryCoverWidth(int width) {
+        lock(gate){
+            var index=Read();
+            width=Math.Max(142,Math.Min(275,width));
+            if(index.GalleryCoverWidth==width)return;
+            index.GalleryCoverWidth=width;
             Write(index);
         }
     }

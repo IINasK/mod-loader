@@ -47,23 +47,8 @@ internal sealed partial class GeneralModWindow {
         if(p2p!=null)p2p.SetPreparationState(state);
     }
     void SaveProjectEdits(Action<string,GeneralModState> register=null){
-        if(BuiltInProject&&projectDraft!=null){
-            var copy=projectStore.Duplicate(project,project.Name+T(" · Minha versão"," · My version"),catalog,state,register);
-            if(register!=null)state.SnapshotReceipts=projectStore.Load(copy).SnapshotReceipts;
-            if(p2p!=null)p2p.SetPreparationState(CommittedProject());
-            ReleaseProjectSharing();
-            project=copy;data=projectStore.DataPath(copy);
-            library=new GeneralModLibrary(Path.Combine(data,"lista.json"));
-            cache=new DownloadCache(Path.Combine(data,"Cache"),()=>state.DownloadFolder,cache.RetainedRoot);
-            state.TemplateId=null;state.TemplateSubset=false;state.ProjectName=copy.Name;
-            inventoryLinks=null;
-            Text=GeneralAppPaths.WindowTitle+" — "+copy.Name;
-            storageGeneration++;
-            RefreshStorageSize();
-        }else{
-            if(register!=null)register(data,state);
-            library.Save(state);
-        }
+        if(register!=null)register(data,state);
+        library.Save(state);
 
         EndProjectEdit();
         UpdatePresetCommands();

@@ -389,9 +389,70 @@ internal sealed partial class GeneralModWindow {
         await Until(()=>dialog.IsDisposed);
     }
 
+    static void CheckSharedInstallationScan(string parent){
+        string root=Directory.CreateDirectory(Safe.In(parent,"v"+Guid.NewGuid().ToString("N").Substring(0,6))).FullName;
+        string game=Directory.CreateDirectory(Safe.In(root,"game")).FullName;
+        string archive=Safe.In(root,"mod.zip");
+        using(var zip=System.IO.Compression.ZipFile.Open(archive,System.IO.Compression.ZipArchiveMode.Create))
+        using(var writer=new StreamWriter(zip.CreateEntry("mods/test.txt").Open()))writer.Write("verified");
+        const string oldSource="https://www.nexusmods.com/skyrimspecialedition/mods/42?tab=files&file_id=10";
+        const string newSource="https://www.nexusmods.com/skyrimspecialedition/mods/42?tab=files&file_id=11";
+        var original=NewEntry("Shared fixture",oldSource);
+        var updated=GeneralPresetProfiles.Copy(original);
+        var option=updated.Variants.Single();
+        option.Sources[0]=newSource;
+        var store=new GeneralProjectStore(Safe.In(root,"config"));
+        var current=store.Create("Current project",new GeneralModList{Mods=new List<GeneralModEntry>{original}},"dark","pt",game);
+        var peer=store.Create("Other project",new GeneralModList{Mods=new List<GeneralModEntry>{updated}},"dark","pt",game);
+        string peerReceipts=Path.Combine(store.DataPath(peer),"Instalacoes");
+        string owner=updated.Id+"/"+option.Id;
+        var installer=new GeneralModInstaller(game,peerReceipts);
+        installer.Install(archive,owner+"/0/"+newSource,_=>{});
+        string receipt=Directory.EnumerateFiles(peerReceipts,"*.json",SearchOption.AllDirectories).Single();
+        var saved=(Dictionary<string,object>)Safe.Json.DeserializeObject(File.ReadAllText(receipt));
+        saved["TransactionId"]=Guid.NewGuid().ToString("N");
+        var upgrade=new GeneralModInstaller.CommittedUpgrade{Owner=owner,PreviousSource=oldSource,Source=newSource,
+            Version="1.1",PackageSha256=Safe.Hash(archive),PredecessorsRetired=true,Reconciled=true};
+        saved["Upgrade"]=upgrade;
+        Safe.WriteJson(receipt,saved);
+        string data=store.DataPath(current);
+        string peerState=Safe.In(store.DataPath(peer),"lista.json"),peerBefore=Safe.Hash(peerState),receiptBefore=Safe.Hash(receipt);
+        TestForm(FixedData.Load(),store.Load(current),data,root,async form=>{
+            form.AttachProject(store,current);
+            form.testModUpdateSession=new NexusUpdateSession("fixture-key",(GeneralNexusLink link,string apiKey,out HttpStatusCode status)=>{
+                status=HttpStatusCode.OK;
+                return "{\"files\":[{\"file_id\":10,\"category_id\":4,\"version\":\"1.0\"},{\"file_id\":11,\"category_id\":1,\"version\":\"1.1\"}],"+
+                    "\"file_updates\":[{\"old_file_id\":10,\"new_file_id\":11}]}";
+            });
+            await form.Scan();
+            await WaitForVersionCheck(form);
+            if(form.statuses[owner]!=GeneralModInstaller.Installed||form.VersionInStatus(owner,GeneralModInstaller.Installed)!="1.1"||
+                form.versionsByWork[owner].Single().LookupSource!=newSource||form.CountVersions().Review!=0||
+                store.Load(current).List.Mods.Single().Variants.Single().Sources.Single()!=oldSource||
+                Safe.Hash(peerState)!=peerBefore||Safe.Hash(receipt)!=receiptBefore)
+                throw new IOException("Shared installation proof: status="+form.statuses[owner]+
+                    ", version="+form.VersionInStatus(owner,GeneralModInstaller.Installed)+
+                    ", source="+form.versionsByWork[owner].Single().LookupSource+
+                    ", review="+form.CountVersions().Review+", peer unchanged="+(Safe.Hash(peerState)==peerBefore)+
+                    ", receipt unchanged="+(Safe.Hash(receipt)==receiptBefore));
+            upgrade.Reconciled=false;
+            Safe.WriteJson(receipt,saved);
+            await form.Scan();
+            await WaitForVersionCheck(form);
+            if(VersionInstalled(form.statuses[owner]))throw new IOException("An uncommitted receipt must not certify the installation.");
+            upgrade.Reconciled=true;
+            Safe.WriteJson(receipt,saved);
+            File.WriteAllText(Safe.In(game,"mods/test.txt"),"tampered");
+            await form.Scan();
+            await WaitForVersionCheck(form);
+            if(VersionInstalled(form.statuses[owner]))throw new IOException("A committed receipt must not certify modified files.");
+        });
+    }
+
     internal static void RunModUpdateUiTests(string parent){
         string root=OnlineTests.NestedRoot(parent,"versions-ui-");Directory.CreateDirectory(root);
         CheckInstalledVersionRows(root);
+        CheckSharedInstallationScan(parent);
         Safe.WriteJson(Path.Combine(root,"result.json"),new{Passed=true,NativeWinForms=true});
     }
 }

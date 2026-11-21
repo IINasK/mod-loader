@@ -49,6 +49,21 @@ internal sealed partial class GeneralModWindow {
                                 card.DrawToBitmap(after,new Rectangle(Point.Empty,after.Size));
                                 for(int y=70;y<art-20;y+=4)for(int x=65;x<card.Width-20;x+=4)
                                     if(before.GetPixel(x,y).ToArgb()!=after.GetPixel(x,y).ToArgb())changed++;
+                                foreach(var button in new[]{card.RemoveButton,card.EditButton}){
+                                    using(var frame=new Bitmap(button.Width,button.Height))
+                                    using(var graphics=Graphics.FromImage(frame))
+                                    using(var paint=new PaintEventArgs(graphics,button.ClientRectangle)){
+                                        graphics.Clear(Color.Magenta);
+                                        button.GetType().GetMethod("OnPaint",BindingFlags.NonPublic|BindingFlags.Instance)
+                                            .Invoke(button,new object[]{paint});
+                                        int clear=Color.Magenta.ToArgb();
+                                        check(button.Region!=null&&!button.Region.IsVisible(2,2)&&
+                                            frame.GetPixel(2,2).ToArgb()==clear&&
+                                            frame.GetPixel(frame.Width-3,frame.Height-3).ToArgb()==clear&&
+                                            frame.GetPixel(frame.Width/2,frame.Height/2).ToArgb()!=clear,
+                                            "O contorno nativo do botão recorta a moldura e a pintura é independente da galeria: "+theme+" "+button.Name);
+                                    }
+                                }
                                 var edge=after.GetPixel(3,art/2);
                                 check(changed>100&&edge.R>230&&edge.G>230&&edge.B>230,
                                     "A imagem amplia dentro da máscara e a borda fica branca: "+theme);
@@ -104,6 +119,19 @@ internal sealed partial class GeneralModWindow {
                         check(!choices.Visible,"Rolar fecha as opções e devolve o sinal de mais: "+theme);
                         plus.SetPointerOver(false);
                         var ready=HomeCards(home,"ReadyProjects").Single();
+                        var galleryScroll=home.Controls.Find("ProjectGalleryScroll",true).Single();
+                        check(ready.RectangleToScreen(ready.ClientRectangle).Top+12<
+                            galleryScroll.RectangleToScreen(galleryScroll.ClientRectangle).Bottom,
+                            "A primeira capa pronta aparece parcialmente sem rolar no tamanho padrão: "+theme);
+                        if(theme=="black"){
+                            var slider=(TrackBar)home.Controls.Find("GalleryCoverSize",true).Single();
+                            int originalWidth=ready.Width;
+                            slider.Value=slider.Maximum;
+                            check(ready.Width>originalWidth&&ready.Width==card.Width,"A barra muda todas as capas em conjunto.");
+                            typeof(Control).GetMethod("OnMouseUp",BindingFlags.Instance|BindingFlags.NonPublic)
+                                .Invoke(slider,new object[]{new MouseEventArgs(MouseButtons.Left,1,20,15,0)});
+                            check(store.Read().GalleryCoverWidth==slider.Maximum,"O tamanho escolhido fica salvo na biblioteca.");
+                        }
                         check(ready.RemoveButton==null&&ready.EditButton==null,"O projeto pronto conserva sua proteção de edição e exclusão: "+theme);
                     }
                     var edited=HomeCards(home,"SavedProjects").Single();edited.SetPointerOver(true);
@@ -119,6 +147,7 @@ internal sealed partial class GeneralModWindow {
                             }catch(Exception ex){failure=ex;dialog.Complete(DialogResult.Cancel);}
                         };
                         timer.Start();edited.EditButton.PerformClick();
+                        await Until(()=>failure!=null||store.Read().Projects.Single().Name=="Nome alterado");
                     }
                     if(failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
                     var saved=store.Read().Projects.Single();
@@ -132,6 +161,7 @@ internal sealed partial class GeneralModWindow {
                             AllControls(dialog).OfType<TextBox>().Single(item=>item.Name=="ProjectNameInput").Text="Não salvar";dialog.Complete(DialogResult.Cancel);
                         };
                         timer.Start();edited.EditButton.PerformClick();
+                        await Until(()=>!timer.Enabled&&!home.OwnedForms.OfType<GeneralProjectCreationDialog>().Any(dialog=>dialog.Visible));
                     }
                     check(store.IndexFingerprint()==indexBefore&&Safe.Hash(store.CoverPath(project))==oldCover&&Safe.Hash(definition)==definitionHash,
                         "Cancelar a edição preserva nome, capa e dados do projeto.");

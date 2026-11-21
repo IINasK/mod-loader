@@ -6,7 +6,7 @@ using System.Windows.Forms;
 internal sealed class GeneralActionsMenu : GeneralDialog {
     internal string ActionId {get;private set;}
 
-    internal GeneralActionsMenu(bool builtIn=false,bool home=false,bool saveMenu=false,bool savePresetItems=false){
+    internal GeneralActionsMenu(bool builtIn=false,bool home=false,bool saveMenu=false,bool savePresetItems=false,bool hasTemplateCopies=false,bool showTemplateCopies=false){
         Text=saveMenu?GeneralStyle.T("Salvar projeto","Save project"):GeneralStyle.T("Menu","Menu");
         ShowCloseButton(false);
         var body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,Padding=new Padding(14,6,14,14),Margin=Padding.Empty};
@@ -29,6 +29,9 @@ internal sealed class GeneralActionsMenu : GeneralDialog {
                     Add(body,"export","Exportar projeto","Export project","export");
                 }
                 Section(body,"ToolsSection","Ferramentas","Tools");
+            }else if(hasTemplateCopies){
+                Add(body,"template-copies",showTemplateCopies?"Ocultar cópias do pacote":"Mostrar cópias do pacote",
+                    showTemplateCopies?"Hide pack copies":"Show pack copies","copy");
             }
             Add(body,"share","Modpack e compartilhamento","Modpack and sharing","share");
             Add(body,"options","Opções","Options","settings");
