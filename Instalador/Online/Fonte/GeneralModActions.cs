@@ -17,8 +17,10 @@ internal sealed partial class GeneralModWindow {
         var candidates=ActivePreset==null?state.List.Mods.Select(MakeWork):PresetWorks();
         return candidates.Where(work=>{
             string status;
-            return !presetProtected.Contains(work.Entry.Id)&&(includeManual||!ManualUpdatesOnly(work.Entry.Id))&&
-                statuses.TryGetValue(work.Key,out status)&&status==UpdateAvailableStatus;
+            if(presetProtected.Contains(work.Entry.Id)||!includeManual&&ManualUpdatesOnly(work.Entry.Id))return false;
+            work.UpdateTarget=SourceUpdateTarget(work);
+            if(statuses.TryGetValue(work.Key,out status)&&status==UpdateAvailableStatus)return true;
+            return work.UpdateTarget!=null;
         }).ToList();
     }
 
@@ -32,6 +34,34 @@ internal sealed partial class GeneralModWindow {
         if(marked.Count!=0)return updates.Where(work=>marked.Contains(work.Entry.Id)).ToList();
         return updates.Where(work=>updateFocusedId==null||work.Entry.Id==updateFocusedId).ToList();
     }
+    Work IndividualUpdate(GeneralModEntry mod){
+        return InstallableUpdates(includeManual:true).FirstOrDefault(work=>work.Entry.Id==mod.Id);
+    }
+
+    bool IndividualSourceReview(GeneralModEntry mod){
+        return !presetProtected.Contains(mod.Id)&&VersionInstalled(ListStatus(mod))&&versionsByWork[MakeWork(mod).Key].Any(HasSourceUpdate);
+    }
+
+    bool CanUpdateIndividualMod(GeneralModEntry mod){
+        return mod!=null&&!String.IsNullOrWhiteSpace(state.Destination)&&CanUpdateActivePreset()&&
+            (IndividualUpdate(mod)!=null||IndividualSourceReview(mod));
+    }
+
+    async Task UpdateIndividualMod(GeneralModEntry mod){
+        if(working||scanning||loadingPreset||associationChoice!=null||mod==null||!state.List.Mods.Contains(mod)||
+            !CanUpdateActivePreset()||String.IsNullOrWhiteSpace(state.Destination))return;
+        try{
+            var work=IndividualUpdate(mod);
+            if(work==null){
+                if(IndividualSourceReview(mod))await ReviewSourceUpdates(new[]{mod},manualUpdate:true);
+                return;
+            }
+            work.UpdateRequested=true;
+            work.Batch=new UpdateBatch();
+            await PlanAndConfirmJobs(new List<Work>{work},Root(),ModAction.Update,manualUpdate:true);
+        }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
+    }
+
     enum ModAction { None, Disable, ChooseDependency, Enable, Change, Update, Install, Download }
 
     static bool IsBigBody(GeneralModEntry mod) {
@@ -214,6 +244,10 @@ internal sealed partial class GeneralModWindow {
 
     void RefreshPrimaryAction() {
         if(primaryAction==null||primaryAction.IsDisposed||grid==null||drawing)return;
+        if(pickingInventoryOwner){
+            primaryAction.SetContextAction(T("Aplicar vínculo","Apply link"),true,false,!testMode,inventoryOwnerIds.Count>0);
+            return;
+        }
         bool running=working||loadingPreset;
         bool available=!running&&!scanning&&associationChoice==null;
         string caption=running?primaryAction.Text:available?PrimaryActionCaption():"";
@@ -225,8 +259,7 @@ internal sealed partial class GeneralModWindow {
         var updates=SelectedUpdates();
         if(updates.Count!=0)return updateFocusedId==null&&marked.Count==0||updates.Count>1
             ?T("Atualizar mods","Update mods"):T("Atualizar mod","Update mod");
-        var updateMods=SelectedUpdateMods();
-        if(updateMods.Length>0)return updateMods.Length==1?T("Atualizar mod","Update mod"):T("Atualizar mods","Update mods");
+        if(SelectedSourceReviews().Length>0)return T("Revisar atualização","Review update");
         if(NeedsPresetLoad&&ActivePreset!=null)return T("Carregar preset","Load preset");
         List<Work> ignored;
         switch(ClassifyJobs(SelectedJobs(),out ignored)){
@@ -300,8 +333,12 @@ internal sealed partial class GeneralModWindow {
                 allFiles.Add(file);
             }
             var fixedWork = jobs.Where(work => work.Variant.CyberpunkId != null).ToLookup(work => work.Variant.CyberpunkId);
+            var updatedCatalog=new HashSet<string>(Generic(root).ReadUpdateRecords().Where(record=>record.Upgrade.PreviousFixed!=null&&
+                state.List.Mods.SelectMany(entry=>entry.Variants.Select(option=>P2PPack.Slot(entry,option,0))).Contains(record.Key))
+                .Select(record=>record.Upgrade.PreviousFixed),StringComparer.Ordinal);
             bool stockEquipment = EquipmentExOptions.StockActive(catalog, root);
             foreach (var package in catalog.Packages) {
+                if(updatedCatalog.Contains(package.Id))continue;
                 var recipe = EquipmentExOptions.Available(package) && stockEquipment ? EquipmentExOptions.Resolve(package,EquipmentExOptions.StockId) : package;
                 if (package.Id == NightCityDensity.ModId) {
                     var density = NightCityDensity.Read(package, root);
@@ -350,7 +387,7 @@ internal sealed partial class GeneralModWindow {
                     !String.Equals(Path.GetFullPath(other.Destination).TrimEnd('\\'), root.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) continue;
                 string peerData = projectStore.DataPath(peer);
                 var files = new InstalledSnapshotInstaller(root, peerData, catalog).ProjectDeletionFiles();
-                if (!cyberpunk) files = files.Concat(new GeneralModInstaller(root, Path.Combine(peerData, "Instalacoes")).ProjectDeletionFiles());
+                files = files.Concat(new GeneralModInstaller(root, Path.Combine(peerData, "Instalacoes")).ProjectDeletionFiles());
                 foreach (var file in files) shared.Add(file.Path);
                 if (cyberpunk) foreach (var key in other.CyberpunkImports.Values)
                     foreach (var file in Cyberpunk(root).ProjectDeletionFiles(new HashSet<string>(new[]{key}))) shared.Add(file.Path);
@@ -423,7 +460,7 @@ internal sealed partial class GeneralModWindow {
         await Scan();
     }
 
-    string RemoveManagedWorks(List<Work> jobs, string root, HashSet<string> disabled,Action<string> progress=null) {
+    string RemoveManagedWorks(List<Work> jobs, string root, HashSet<string> disabled,Action<string> progress=null,bool removeAttachments=false) {
         Action<string> report=progress??IgnoreInstallProgress;
         Action<Work> announce=work=>{
             if(progress!=null)progress(T("Desinstalando · ","Uninstalling · ")+work.Entry.Name);
@@ -431,6 +468,10 @@ internal sealed partial class GeneralModWindow {
         EnsureGameClosed(root);
         KeepLinkedDependencies(jobs,root);
         var notes = new List<string>();
+        var removing=new HashSet<string>(jobs.Select(work=>work.Entry.Id),StringComparer.Ordinal);
+        var sharedAttachments=removeAttachments?new HashSet<string>(new InventoryLinkStore(data,root).Load().Attachments
+            .Where(file=>file.Hash!=null&&file.Owners.Any(owner=>!removing.Contains(owner))).Select(file=>file.Path),InventoryPaths):null;
+        Func<string,bool> preserveAttached=sharedAttachments==null?null:(Func<string,bool>)sharedAttachments.Contains;
         var personalPeers=new Lazy<HashSet<string>>(ExternalFilesInOtherProjects);
         Func<string,bool> preserveExternal=path=>personalPeers.Value.Contains(GeneralInstallRoutes.Resolve(root,path));
         var snapshots = jobs.Where(work => {
@@ -441,7 +482,7 @@ internal sealed partial class GeneralModWindow {
             Receipt=state.SnapshotReceipts[InstalledSnapshot.Owner(work.Entry,work.Variant)], Disabled=disabled.Contains(work.Key)
         })) {
             announce(group.First());
-            notes.Add(Snapshot(root).Remove(group.Key.Receipt,group.Select(work=>InstalledSnapshot.Owner(work.Entry,work.Variant)),report,group.Key.Disabled,preserveExternal));
+            notes.Add(Snapshot(root).Remove(group.Key.Receipt,group.Select(work=>InstalledSnapshot.Owner(work.Entry,work.Variant)),report,group.Key.Disabled,preserveExternal,preserveAttached));
             foreach (var work in group) state.SnapshotReceipts.Remove(InstalledSnapshot.Owner(work.Entry,work.Variant));
         }
         var standard = jobs.Except(snapshots).ToList();
@@ -449,33 +490,37 @@ internal sealed partial class GeneralModWindow {
             .Select(work => work.Variant.CyberpunkId).Distinct().ToArray();
         if (fixedIds.Length > 0) {
             if (!IsCyberpunk(root)) throw new IOException(T("Selecione a pasta do Cyberpunk 2077.", "Select the Cyberpunk 2077 folder."));
-            notes.Add(Cyberpunk(root).DeactivateMany(fixedIds, report, keepBackup: false));
+            notes.Add(Cyberpunk(root).DeactivateMany(fixedIds, report, keepBackup:false,preserveAttached:preserveAttached));
         }
         bool cyberpunk = IsCyberpunk(root);
         foreach(var work in standard.Where(item=>item.Variant.CyberpunkId!=null&&item.Variant.InstallRoutes.Count>0)){
             announce(work);
             using(Cyberpunk(root).LockForRouteChange())
-                notes.Add(Generic(root).Remove(work.Receipt(0),disabled.Contains(work.Key),null,preserveExternal));
+                notes.Add(Generic(root).Remove(work.Receipt(0),disabled.Contains(work.Key),null,preserveExternal,preserveAttached));
         }
         foreach (var work in standard.Where(item => item.Variant.CyberpunkId == null)) {
             announce(work);
             for (int index = work.Variant.Sources.Count - 1; index >= 0; index--) {
                 string key = work.Receipt(index);
-                if (!cyberpunk) {
+                if (!cyberpunk||Generic(root).HasSnapshotRecord(key)) {
                     var engine=Generic(root);
                     notes.Add(engine.Remove(ExistingReceipt(engine,work,index),disabled.Contains(work.Key),
-                        owner=>!disabled.Contains(WorkKeyFromReceipt(owner)),preserveExternal));
+                        owner=>!disabled.Contains(WorkKeyFromReceipt(owner)),preserveExternal,preserveAttached));
                 }
                 else {
                     string id = CyberpunkImportId(work, index);
                     if (id == null) continue;
                     bool anotherOwner = state.CyberpunkImports.Any(pair => pair.Value == id && !jobs.Any(item => item.Key == WorkKeyFromReceipt(pair.Key)));
-                    if (!anotherOwner) notes.Add(Cyberpunk(root).RemoveImported(id, report, disabled.Contains(work.Key)));
+                    if (!anotherOwner) notes.Add(Cyberpunk(root).RemoveImported(id,report,disabled.Contains(work.Key),preserveAttached));
                     state.CyberpunkImports.Remove(key);
                     string legacy=P2PPack.LegacySlot(work.Entry,work.Variant,index);
                     if(legacy!=null)state.CyberpunkImports.Remove(legacy);
                 }
             }
+        }
+        if(removeAttachments){
+            string attachments=RemoveInventoryAttachments(root,removing);
+            if(attachments!=null)notes.Add(attachments);
         }
         return notes.Count == 0 ? T("Mods desinstalados.", "Mods uninstalled.") : String.Join(" ", notes.Distinct());
     }

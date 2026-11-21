@@ -121,18 +121,18 @@ internal sealed partial class GeneralModWindow {
             var ordered=queueState.List.Mods.Take(3).Select(form.MakeWork).ToArray();
             var selected=ordered.Concat(new[]{form.MakeWork(urgent)}).ToList();
             var pending=new List<Work>();
-            var missing=form.PlanSelected(selected,game,pending);
-            check(pending.Count==4&&missing.SequenceEqual(new[]{"fixture1","fixture3"}),"A confirmação lista apenas downloads faltantes e mantém arquivos locais na fila.");
+            form.PlanSelected(selected,game,pending);
+            check(pending.Count==4&&pending.Where(work=>work.PendingDownload).SequenceEqual(new[]{ordered[0],ordered[2]}),"A confirmação lista apenas downloads faltantes e mantém arquivos locais na fila.");
             string manualPath=Safe.In(game,fake.Packages[0].Files[0].Path);
             Directory.CreateDirectory(Path.GetDirectoryName(manualPath));
             File.WriteAllText(manualPath,"fixture1",new UTF8Encoding(false));
             pending.Clear();
-            missing=form.PlanSelected(selected,game,pending);
-            check(!pending.Contains(ordered[0])&&missing.SequenceEqual(new[]{"fixture3"}),"A confirmação reconhece a instalação manual pelos arquivos do jogo.");
+            form.PlanSelected(selected,game,pending);
+            check(!pending.Contains(ordered[0])&&pending.Where(work=>work.PendingDownload).SequenceEqual(new[]{ordered[2]}),"A confirmação reconhece a instalação manual pelos arquivos do jogo.");
             fake.Packages[0].Dependencies=new[]{"fixture3"};
             pending.Clear();
-            missing=form.PlanSelected(selected,game,pending);
-            check(pending.Contains(ordered[0])&&missing.SequenceEqual(new[]{"fixture3"}),"Uma dependência faltante entra uma só vez mesmo quando o mod selecionado já está presente.");
+            form.PlanSelected(selected,game,pending);
+            check(pending.Where(work=>work.PendingDownload).SequenceEqual(new[]{ordered[0],ordered[2]}),"Uma dependência faltante entra uma só vez mesmo quando o mod selecionado já está presente.");
             var review=new ProjectVerification(false){Reads=new ScanReads(form,game)};
             review.Record(ordered[0]);
             var suggested=new Dictionary<string,Work>();
@@ -189,7 +189,8 @@ internal sealed partial class GeneralModWindow {
                 !GeneralStatusPresentation.DownloadComplete(form.ListStatus(baseBody.Entry)),
                 "Corpo manual aparece separado de instalação verificada e exclui a alternativa pendente.");
             pending.Clear();
-            check(form.PlanSelected(new List<Work>{baseBody},game,pending).Count==0&&pending.Count==0,
+            form.PlanSelected(new List<Work>{baseBody},game,pending);
+            check(pending.Count==0,
                 "O corpo detectado não é solicitado outra vez.");
             form.searchTerms=GeneralModSearch.Terms("NSFW");
             check(form.ColumnAllows(baseBody.Entry)&&form.ColumnAllows(pushUp.Entry)&&!form.ColumnAllows(urgent),
@@ -250,6 +251,7 @@ internal sealed partial class GeneralModWindow {
         RunOrganizationTests(root);
         GeneralButtonPaintTests.Run(root);
         GeneralP2PTests.Run(root);
+        GeneralP2PCleanupTests.Run(parent);
         GeneralP2PUiTests.Run(root);
         InstalledSnapshotTests.Run(root);InstalledSnapshotInstallerTests.Run(root);
         GeneralStatusPresentationTests.Run(root);
@@ -260,6 +262,15 @@ internal sealed partial class GeneralModWindow {
         GeneralProjectStoreTests.Run(parent);RunProjectHomeTests(parent);RunProjectDeletionTests(parent);RunProjectHubTests(parent);GeneralAppPathsTests.Run(parent);RunStorageTests(parent);RunNoCopyTests(parent);RunProjectCloneTests(parent);
         GeneralMenuHostTests.Run(parent);RunPresetDraftTests(parent);GeneralPresetTests.Run(parent);RunPresetLoadingTests(parent);
         GeneralPopupStabilityTests.Run(parent);RunProjectSearchTests(parent);
+        GeneralNexusUpdatePackageTests.Run(parent);GeneralModUpdateInstallerTests.Run(parent);GeneralModUpgradeReceiptTests.Run(parent);RunOwnershipResolverTests(parent);RunSourceUpdateTests(parent);RunSharedUpdateTests(parent);
+        GeneralGithubPackageTests.Run(parent);
+        RunVersionProgressTests(parent);
+        RunModUpdateUiTests(parent);
+        RunTableSurfaceTests(parent);
+        GeneralMessageTextTests.Run(parent);
+        RunScrollRegressionTests(parent);
+        GeneralModFolderSourceTests.Run(parent);
+        GeneralModEditorFileTests.RunFiles(parent);
         Safe.WriteJson(Path.Combine(root,"resultado-loader-geral.json"),new{Passed=true,Tests=checks,ArchiveChecks=archiveChecks,LibraryChecks=libraryChecks,RealGameTouched=false,NetworkUsed=false});
     }
     static string TestZip(string root,string name,string entry,string contents){

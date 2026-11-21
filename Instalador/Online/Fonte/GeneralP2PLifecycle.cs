@@ -88,7 +88,7 @@ internal sealed partial class P2PService {
         if(!session.Sender)ReceiveHostDecision(session);
         if(skipPayload||session.Discarded||session.Mode=="installed-zip"&&session.Completed&&(session.Sender||session.Lifecycle||!Directory.Exists(Folder(session))))return;
         Engine.ConfigureSharedFolder(session.Id,Folder(session),session.Sender?session.Name:ReceiveLabel(session),
-            session.Sender,session.Peer==null?new string[0]:new[]{session.Peer},session.Paused||session.Held||session.RecoveryPending);
+            session.Sender,session.Peer==null?new string[0]:new[]{session.Peer},!session.Completed&&(session.Paused||session.Held||session.RecoveryPending));
     }
 
     void ConfigureOutgoing(P2PSession session) {
@@ -132,8 +132,8 @@ internal sealed partial class P2PService {
         return different==0;
     }
 
-    void PublishNotice(P2PSession session) {
-        if(!session.Lifecycle||session.ReceiptClosed||disposed||!Engine.Running)return;
+    bool PublishNotice(P2PSession session) {
+        if(!session.Lifecycle||session.ReceiptClosed||disposed||!Engine.Running)return false;
         string directory=NoticeDirectory(session,Engine.Device);
         string path=Safe.In(directory,"status.json");
         string hash=session.PayloadHash??EmptyHash;
@@ -141,10 +141,10 @@ internal sealed partial class P2PService {
         if(phase==null&&session.CompareBeforePack){
             phase=HasSyncChoice(session)?"choice_sent":session.Error!=null?"choice_failed":session.SyncMode!=0?"comparing":"choosing";
         }
-        if(phase==null)return;
+        if(phase==null)return false;
         // Keep phase changes immediate and let the peer fetch a stable progress file between samples.
         DateTime now=DateTime.UtcNow;
-        if((phase=="installing"||phase=="comparing")&&session.LastPublishedNoticePhase==phase&&now<session.NextProgressNoticeUtc)return;
+        if((phase=="installing"||phase=="comparing")&&session.LastPublishedNoticePhase==phase&&now<session.NextProgressNoticeUtc)return true;
         var notice=new InstallNotice{Phase=phase,Hash=hash,Tag=NoticeTag(session,Engine.Device,phase,hash),
             GeneratedConfigTag=GeneratedConfigTag(session,Engine.Device)};
         var progress=session.InstallProgress;
@@ -162,11 +162,12 @@ internal sealed partial class P2PService {
             }
         }
         string json=Safe.Json.Serialize(notice);
-        if(File.Exists(path)&&new FileInfo(path).Length<=2048&&File.ReadAllText(path)==json)return;
-        Safe.WriteJson(path,notice);
+        if(File.Exists(path)&&new FileInfo(path).Length<=2048&&File.ReadAllText(path)==json)return true;
+        if(!Safe.TryWriteSharedJson(path,notice))return false;
         Engine.Request("POST","db/scan?folder="+ReceiptFolderId(session,Engine.Device)+"&sub=status.json",null);
         session.LastPublishedNoticePhase=phase;
         session.NextProgressNoticeUtc=now.AddSeconds(phase=="comparing"?1:3);
+        return true;
     }
 
     string GeneratedConfigTag(P2PSession session,string device){
@@ -190,7 +191,7 @@ internal sealed partial class P2PService {
 
     void ProcessOutgoing(P2PSession session) {
         if(session.Completed){
-            if(Directory.Exists(Folder(session)))CleanupTransport(session);
+            TryCleanupCompletedTransfer(session);
             foreach(var recipient in session.Recipients.Where(peer=>!peer.ReceiptClosed)){
                 var completion=Engine.Get("db/completion?folder="+ReceiptFolderId(session,recipient.Device)+"&device="+recipient.Device);
                 if(completion==null||!completion.ContainsKey("remoteState")||Convert.ToString(completion["remoteState"])!="notSharing")continue;
@@ -228,8 +229,7 @@ internal sealed partial class P2PService {
             // The receipt is durable before the shared ZIP is removed.
             if(session.Stage!=null)return;
             session.Completed=true;Save();
-            Engine.RemoveFolder(session.Id);
-            CleanupTransport(session);
+            TryCleanupCompletedTransfer(session);
             return;
         }
         StartDeferredPreparation(session,()=>session.Recipients.Any(peer=>!Terminal(peer.Phase)&&RecipientReady(session,peer.Device)));
@@ -374,8 +374,8 @@ internal sealed partial class P2PService {
     }
 
     void FinishIncoming(P2PSession session) {
-        if(!session.ReceiptClosed)PublishNotice(session);
-        if(Directory.Exists(Folder(session)))CleanupTransport(session);
+        TryCleanupCompletedTransfer(session);
+        if(!session.ReceiptClosed&&!PublishNotice(session))return;
         string directory=NoticeDirectory(session,Engine.Device);
         if(session.ReceiptClosed){
             if(Directory.Exists(directory))CloseReceipt(session,Engine.Device);
@@ -419,6 +419,7 @@ internal sealed partial class P2PService {
                 if(session.Phase==null)Notify(true);
                 SetPhase(session,"installing");
                 var installer=new InstalledSnapshotInstaller(session.Destination,installedData,installedCatalog,installedFixture);
+                var chooseUpdates=ChooseUpdates;
                 session.ReceiptId=installer.Install(zip,session.Deferred?session.PayloadHash:session.Hash,message=>session.Stage=message,-1,difference=>{
                     SetPhase(session,"review");
                     var choice=ChooseVersion;
@@ -432,6 +433,11 @@ internal sealed partial class P2PService {
                     checkpoint();
                     SetPhase(session,"installing");
                     return allowed;
+                },chooseUpdates:chooseUpdates==null?(Func<int,bool?>)null:count=>{
+                    SetPhase(session,"review");
+                    bool? backup=chooseUpdates(count);
+                    checkpoint();SetPhase(session,"installing");
+                    return backup;
                 });
                 var manifest=installer.ReadManifest(session.ReceiptId);
                 if(installer.ReadSkippedDestinations(session.ReceiptId).Length==0)
@@ -470,7 +476,7 @@ internal sealed partial class P2PService {
                     SetPhase(session,"retry");
                     Notify();
                 }
-            }finally{session.Stage=null;Interlocked.Exchange(ref installing,0);}
+            }finally{session.Stage=null;Interlocked.Exchange(ref installing,0);TryCleanupCompletedTransfer(session);}
         });
     }
 

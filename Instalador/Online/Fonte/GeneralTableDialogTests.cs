@@ -18,19 +18,18 @@ internal static class GeneralTableDialogTests {
             {"folder",()=>new GeneralNameDialog("Criar pasta",preset.Name,chooseSelectionMode:true)},
             {"described-name",()=>new GeneralNameDialog("Projeto","Nome do projeto","A cópia usa a mesma pasta do jogo.")},
             {"filter",()=>new GeneralColumnFilterDialog("Mods",new[]{"Principal","Opcional"},withSearch:true)},
-            {"install",()=>new GeneralInstallConfirmation(root,1,new[]{"Mod de teste"})},
+            {"install",()=>new GeneralInstallConfirmation(new[]{new GeneralInstallConfirmation.Choice("Mod de teste",true)})},
             {"variants",()=>new GeneralModAlternativeDialog(mods)},
             {"version-conflict",()=>new GeneralVersionChoiceDialog(new ModVersionDifference{Name=mods[0].Name,Current="1.0",Incoming="2.0"})},
             {"category",()=>new GeneralCategoryDetails("Jogabilidade","Descrição",canDelete:true)},
             {"category-remove",()=>new GeneralCategoryRemovalDialog("Jogabilidade",3)},
             {"categories",()=>new GeneralCategoryEditor(new[]{"Jogabilidade","Núcleo"})},
             {"preset",()=>new GeneralPresetEditor(preset,mods,preset.ModIds)},
-            {"switch",()=>new SwitchPerformanceDialog(new SwitchPerformance())},
             {"options-home",()=>new GeneralOptionsDialog("dark","pt",root)},
             {"options-project",()=>new GeneralOptionsDialog("dark","pt",root,()=>null,root,_=>null)},
             {"nexus",()=>new GeneralNexusConnectionDialog(_=>{},_=>System.Threading.Tasks.Task.FromResult(NexusKeyCheck.Accepted))},
             {"nexus-trust",()=>new NexusKeyTrustDialog()},
-            {"dependencies",()=>new GeneralDependencyReview("Auditoria",new GeneralDependencyIssue[0],0,_=>{})},
+            {"dependencies",()=>new GeneralDependencyReview(new[]{new KeyValuePair<string,string>("Auditoria","Concluída")},new GeneralDependencyIssue[0],_=>{})},
             {"manual-capture",()=>new ManualInstallReview(new ManualInstallCapture.FileState[0])},
             {"project-create",()=>new GeneralProjectCreationDialog()},
             {"project-edit",()=>new GeneralProjectCreationDialog("Projeto de teste",null,root,editing:true)},
@@ -58,9 +57,11 @@ internal static class GeneralTableDialogTests {
                     var toolButtons=tools.Controls.OfType<Button>().ToArray();
                     check(toolButtons.Length==3&&toolButtons.All(button=>tools.ClientRectangle.Contains(button.Bounds))&&
                         toolButtons.Select(button=>button.Top).Distinct().Count()==1,label+" fits the three maintenance commands in one row.");
-                    var setting=Find<GeneralPicker>(dialog,"SwitchCpuLimit");
-                    var remember=Find<CheckBox>(dialog,"RememberSwitchPerformance");
-                    check(remember.Parent==setting.Parent&&remember.Left>=setting.Right,label+" keeps the preference inside the CPU field.");
+                }
+                if(example.Key=="install"){
+                    var modsTable=Find<DataGridView>(dialog,"InstallChoices");
+                    check(modsTable.GetRowDisplayRectangle(0,true).Height>=modsTable.RowTemplate.Height,
+                        label+" keeps the single mod row fully visible.");
                 }
                 if(example.Key=="name"){
                     var field=Find<TextBox>(dialog,"NameInput").Parent;
@@ -97,13 +98,14 @@ internal static class GeneralTableDialogTests {
                 check(dialog.DialogResult == DialogResult.Cancel && dialog.ResultName == null, "Cancel does not publish the edited name.");
             }
             var pending = Enumerable.Range(1, 25).Select(index => "Mod " + index).ToArray();
-            using (var dialog = new GeneralInstallConfirmation(Path.Combine(root, "game"), 30, pending)) {
+            using (var dialog = new GeneralInstallConfirmation(pending.Select(name=>new GeneralInstallConfirmation.Choice(name,true)).ToArray())) {
                 Open(dialog);
-                var table = Find<DataGridView>(dialog, "PendingDownloads");
+                var table = Find<DataGridView>(dialog, "InstallChoices");
                 var scroll = Descendants(dialog).OfType<GeneralScrollView>().Single();
                 scroll.RefreshScroll();
-                check(table.ReadOnly && table.Rows.Count == 25 && table.Rows.Cast<DataGridViewRow>().Select(row => (string)row.Cells[0].Value).SequenceEqual(pending),
-                    "Install confirmation shows all pending downloads in individual read-only rows.");
+                check(table.Rows.Count==25&&dialog.SelectedIndices.Length==25&&
+                    table.Rows.Cast<DataGridViewRow>().Select(row=>(string)row.Cells[1].Value).SequenceEqual(pending),
+                    "Install confirmation starts with every queued mod checked and the original names only.");
                 check(scroll.Bar.Visible && table.DisplayedRowCount(false) < pending.Length, "Long confirmations use the shared scrollbar.");
                 table.CurrentCell = null;
                 table.Rows[3].Visible = false;
@@ -122,12 +124,35 @@ internal static class GeneralTableDialogTests {
                 Find<Button>(dialog, "CancelPendingInstall").PerformClick();
                 check(dialog.DialogResult == DialogResult.Cancel, "Cancel leaves the installation unconfirmed.");
             }
-            using (var dialog = new GeneralInstallConfirmation(Path.Combine(root, "game"), 2, new string[0])) {
+            using(var dialog=new GeneralInstallConfirmation(new[]{
+                new GeneralInstallConfirmation.Choice("Base",false),
+                new GeneralInstallConfirmation.Choice("Dependent",true,0),
+                new GeneralInstallConfirmation.Choice("Independent",false)
+            })){
                 Open(dialog);
-                check(!Descendants(dialog).OfType<DataGridView>().Any(), "Already downloaded files can be installed without an empty download table.");
-                check(!Descendants(dialog).OfType<CheckBox>().Any(), "Installation confirmation has no separate adult-content opt-in.");
-                Find<Button>(dialog, "ConfirmPendingInstall").PerformClick();
-                check(dialog.DialogResult == DialogResult.OK, "Ready-to-install files can be confirmed.");
+                var table=Find<DataGridView>(dialog,"InstallChoices");
+                var all=Find<CheckBox>(dialog,"ToggleInstallSelection");
+                var proceed=Find<Button>(dialog,"ConfirmPendingInstall");
+                var summary=Find<Label>(dialog,"InstallSummary");
+                const BindingFlags events=BindingFlags.Instance|BindingFlags.NonPublic;
+                var click=typeof(CheckBox).GetMethod("OnClick",events);
+                var rowClick=typeof(DataGridView).GetMethod("OnCellClick",events);
+                check(dialog.SelectedIndices.SequenceEqual(new[]{0,1,2})&&all.Checked&&all.Text=="Desselecionar tudo"&&summary.Text.Contains("1 com download pendente"),
+                    "The review includes both ready and pending items without the installation path.");
+                click.Invoke(all,new object[]{EventArgs.Empty});
+                check(!proceed.Enabled&&dialog.SelectedIndices.Length==0&&all.Text=="Selecionar tudo",
+                    "Deselect all clears the queue and disables Continue.");
+                click.Invoke(all,new object[]{EventArgs.Empty});
+                check(dialog.SelectedIndices.Length==3&&all.Text=="Desselecionar tudo","Select all restores every checkbox.");
+                rowClick.Invoke(table,new object[]{new DataGridViewCellEventArgs(0,0)});
+                check(dialog.SelectedIndices.SequenceEqual(new[]{2})&&all.CheckState==CheckState.Indeterminate&&summary.Text.Contains("0 com download pendente"),
+                    "Unchecking a prerequisite unchecks its dependent and updates the download count.");
+                rowClick.Invoke(table,new object[]{new DataGridViewCellEventArgs(1,1)});
+                check(dialog.SelectedIndices.Length==3,"Clicking a mod name selects that mod and its required prerequisite.");
+                rowClick.Invoke(table,new object[]{new DataGridViewCellEventArgs(0,2)});
+                proceed.PerformClick();
+                check(dialog.DialogResult==DialogResult.OK&&dialog.SelectedIndices.SequenceEqual(new[]{0,1}),
+                    "Continue returns just the checked rows in queue order.");
             }
             using (var dialog = new GeneralModAlternativeDialog(new[] {
                 new GeneralModEntry { Id = "regular", Name = "Regular", Description = "Less projected" },
@@ -176,8 +201,8 @@ internal static class GeneralTableDialogTests {
             foreach(string theme in new[]{"light","dark","light-red"})foreach(string language in new[]{"pt","en"}){
                 GeneralStyle.UseTheme(theme);GeneralStyle.Language=language;
                 using(var menu=new GeneralActionsMenu()){
-                    Open(menu);var buttons=Descendants(menu).OfType<Button>().Where(button=>button.Name!="").ToArray();
-                    check(buttons.Length==8&&buttons.Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"details","export","import","new","open","options","save-menu","share"}),"List menu includes manual installation capture: "+theme+"/"+language);
+                    Open(menu);var buttons=Descendants(menu.Content).OfType<Button>().Where(button=>button.Name!="").ToArray();
+                    check(buttons.Length==8&&buttons.Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"details","export","import","new","open","options","save-menu","share"}),"List menu exposes the current project actions: "+theme+"/"+language);
                     check(Find<Label>(menu,"NavigationSection").Text==(language=="pt"?"Navegação":"Navigation")&&
                         Find<Label>(menu,"ProjectSection").Visible&&Find<Label>(menu,"ToolsSection").Visible,"List section heading is translated: "+language);
                     var create=Find<Button>(menu,"new");var open=Find<Button>(menu,"open");var sequence=new[]{"new","open","save-menu","details","import","export","share","options"}.Select(id=>Find<Button>(menu,id)).ToArray();
@@ -210,8 +235,8 @@ internal static class GeneralTableDialogTests {
             }
             foreach(string theme in new[]{"light","dark","light-red"})foreach(string language in new[]{"pt","en"}){
                 GeneralStyle.UseTheme(theme);GeneralStyle.Language=language;using(var menu=new GeneralActionsMenu(true)){Open(menu);
-                var buttons=Descendants(menu).OfType<Button>().Where(button=>button.Name!="").ToArray();
-                check(buttons.Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"details","new","open","options","save-menu","share"}),"Built-in menu offers manual capture and modpack sharing: "+theme+"/"+language);
+                var buttons=Descendants(menu.Content).OfType<Button>().Where(button=>button.Name!="").ToArray();
+                check(buttons.Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"details","new","open","options","save-menu","share"}),"Built-in menu offers project actions and modpack sharing: "+theme+"/"+language);
                 check(buttons.All(button=>button.Height==44&&button.Bottom<=button.Parent.Height),"Built-in menu actions fit without clipping: "+theme+"/"+language);
                 using(var bitmap=new Bitmap(menu.Width,menu.Height)){menu.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(root,"builtin-menu-"+language+"-"+theme+".png"));}
             }

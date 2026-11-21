@@ -61,17 +61,13 @@ internal static class GeneralStyle {
         return Round(new RectangleF(0,0,Math.Max(1,size.Width),Math.Max(1,size.Height)),PopupRadius);
     }
     internal static void PaintCard(Graphics graphics,Size size){
-        // The native window mask already defines the outer edge of this border.
-        using(var border=new SolidBrush(Line))graphics.FillRectangle(border,0,0,size.Width,size.Height);
-        var inside=new RectangleF(0,0,size.Width,size.Height);
-        inside.Inflate(-RoundedFaceBorder,-RoundedFaceBorder);
-        if(inside.Width<=0||inside.Height<=0)return;
+        // Keep the antialiased outline inside the binary native window mask.
         var state=graphics.Save();
         try {
+            graphics.SmoothingMode=SmoothingMode.None;
+            using(var background=new SolidBrush(Surface))graphics.FillRectangle(background,0,0,size.Width,size.Height);
             graphics.SmoothingMode=SmoothingMode.AntiAlias;
-            graphics.PixelOffsetMode=PixelOffsetMode.Half;
-            using(var face=Round(inside,PopupRadius-RoundedFaceBorder))using(var brush=new SolidBrush(Surface))
-                graphics.FillPath(brush,face);
+            PaintRoundedFace(graphics,new RectangleF(0,0,size.Width,size.Height),PopupRadius,Line,Surface);
         } finally { graphics.Restore(state); }
     }
     internal const int RoundedFaceInset=2;
@@ -99,6 +95,15 @@ internal static class GeneralStyle {
         var b=new GeneralButton{Text=text,Primary=primary,AutoSize=true,MinimumSize=new Size(80,44),Padding=new Padding(16,0,16,0)};
         b.Click+=(s,e)=>action();return b;
     }
+    internal static void SetLinkActionsAvailable(LinkLabel label,bool available){
+        // Disabling a whole WinForms label embosses all of its text, including counters.
+        // Keep the text drawable and change only link interaction.
+        label.DisabledLinkColor=Muted;
+        foreach(LinkLabel.Link link in label.Links)link.Enabled=available;
+        label.TabStop=available&&label.Links.Cast<LinkLabel.Link>().Any(link=>link.Length!=0);
+        label.Invalidate();
+    }
+
     internal static void Apply(Control control,bool dark){
         Dark=dark;
         control.BackColor=control is ModLoaderLogo?Color.Transparent:control is Form?Background:Surface;control.ForeColor=Foreground;
@@ -109,7 +114,13 @@ internal static class GeneralStyle {
         var combo=control as GeneralPicker;
         if(combo!=null){combo.BackColor=Surface;combo.ForeColor=Foreground;}
         var text=control as TextBox;
-        if(text!=null){text.BackColor=Surface;text.ForeColor=Foreground;if(!(text.Parent is GeneralPicker)&&!(text.Parent is GeneralSurface))text.BorderStyle=BorderStyle.FixedSingle;}
+        if(text!=null){
+            text.BackColor=Surface;text.ForeColor=Foreground;
+            bool framed=false;
+            for(Control parent=text.Parent;parent!=null&&!(parent is Form);parent=parent.Parent)
+                if(parent is GeneralPicker||parent is GeneralSurface){framed=true;break;}
+            text.BorderStyle=framed?BorderStyle.None:BorderStyle.FixedSingle;
+        }
         var checkbox=control as CheckBox;
         if(checkbox!=null)checkbox.UseVisualStyleBackColor=false;
         var progress=control as GeneralProgress;
@@ -156,6 +167,12 @@ internal static class GeneralNativeTheme {
                 SetWindowTheme(control.Handle,GeneralStyle.Dark?"DarkMode_Explorer":"Explorer",null);
             }
         }catch(DllNotFoundException){}catch(EntryPointNotFoundException){}
+    }
+    internal static void DisableWindowTransitions(Form window){
+        const int transitionsForcedDisabled=3;
+        int disabled=1;
+        try{DwmSetWindowAttribute(window.Handle,transitionsForcedDisabled,ref disabled,sizeof(int));}
+        catch(DllNotFoundException){}catch(EntryPointNotFoundException){}
     }
     static void Created(object sender,EventArgs e){Apply((Control)sender);}
 }
@@ -410,6 +427,11 @@ internal sealed class GeneralProgress : Control {
         }
     }
     internal string Caption;
+    Action captionLink;
+    internal Action CaptionLink {
+        get{return captionLink;}
+        set{captionLink=value;TabStop=value!=null;AccessibleRole=value==null?AccessibleRole.ProgressBar:AccessibleRole.Link;Invalidate();}
+    }
     internal GeneralProgress(){Height=37;SetStyle(ControlStyles.UserPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);}
     RectangleF Track {get{return new RectangleF(0,27,Math.Max(1,Width-1),6);}}
 
@@ -441,23 +463,30 @@ internal sealed class GeneralProgress : Control {
     protected override void OnMouseMove(MouseEventArgs e){
         base.OnMouseMove(e);
         var segment=SegmentAt(e.Location);
-        Cursor=segment!=null&&SegmentActivated!=null?Cursors.Hand:Cursors.Default;
+        Cursor=captionLink!=null||(segment!=null&&SegmentActivated!=null)?Cursors.Hand:Cursors.Default;
         string text=segment==null?"":segment.Label+": "+segment.Count+" ("+
             (100.0*segment.Count/Segments.Sum(item=>item.Count)).ToString("0.#")+"%)";
         if(segment!=null&&SegmentActivated!=null)text+=GeneralStyle.T(" · Clique para filtrar"," · Click to filter");
+        if(captionLink!=null)text=(Caption??"")+GeneralStyle.T(" · Clique para abrir a página de download"," · Click to open the download page");
         if(segmentTip.GetToolTip(this)!=text)segmentTip.SetToolTip(this,text);
     }
 
     protected override void OnMouseClick(MouseEventArgs e){
         base.OnMouseClick(e);
-        if(e.Button!=MouseButtons.Left||SegmentActivated==null)return;
+        if(e.Button!=MouseButtons.Left)return;
+        if(captionLink!=null){captionLink();return;}
+        if(SegmentActivated==null)return;
         var segment=SegmentAt(e.Location);
         if(segment!=null)SegmentActivated(segment);
+    }
+    protected override void OnKeyDown(KeyEventArgs e){
+        base.OnKeyDown(e);
+        if(captionLink!=null&&(e.KeyCode==Keys.Enter||e.KeyCode==Keys.Space)){e.SuppressKeyPress=true;captionLink();}
     }
     protected override void Dispose(bool disposing){if(disposing){segmentTip.Dispose();if(pulse!=null)pulse.Dispose();}base.Dispose(disposing);}
     protected override void OnPaint(PaintEventArgs e){
         var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;
-        using(var font=GeneralStyle.Font(10.5f))TextRenderer.DrawText(g,Caption??"",font,new Rectangle(0,0,Width-52,23),GeneralStyle.Muted,TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
+        using(var font=GeneralStyle.Font(10.5f))TextRenderer.DrawText(g,Caption??"",font,new Rectangle(0,0,Width-52,23),captionLink==null?GeneralStyle.Muted:GeneralStyle.Accent,TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis);
         using(var font=GeneralStyle.Font(10.5f,true))TextRenderer.DrawText(g,Indeterminate||NotApplicable?"—":Value+"%",font,new Rectangle(Width-52,0,52,23),GeneralStyle.Accent,TextFormatFlags.Right|TextFormatFlags.SingleLine);
         var track=Track;
         using(var path=GeneralStyle.Round(track,3))using(var brush=new SolidBrush(GeneralStyle.SoftLine))g.FillPath(brush,path);
@@ -477,12 +506,7 @@ internal sealed class GeneralMenuRenderer : ToolStripProfessionalRenderer {
         try{
             using(var shape=GeneralStyle.PopupShape(e.ToolStrip.ClientSize))
             using(var mask=new Region(shape))e.Graphics.IntersectClip(mask);
-            if(e.ToolStrip is GeneralPopupMenu){
-                using(var surface=new SolidBrush(GeneralStyle.Surface))e.Graphics.FillRectangle(surface,e.ToolStrip.ClientRectangle);
-                e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
-                GeneralStyle.PaintRoundedFace(e.Graphics,e.ToolStrip.ClientRectangle,GeneralStyle.PopupRadius,
-                    GeneralStyle.Line,GeneralStyle.Surface);
-            }else GeneralStyle.PaintCard(e.Graphics,e.ToolStrip.ClientSize);
+            GeneralStyle.PaintCard(e.Graphics,e.ToolStrip.ClientSize);
         }finally{e.Graphics.Restore(state);}
     }
     protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e){}

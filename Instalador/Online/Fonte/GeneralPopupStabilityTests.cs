@@ -51,6 +51,23 @@ internal static class GeneralPopupStabilityTests {
                                         .All(pixel=>pixel.ToArgb()==Color.Magenta.ToArgb()),theme+" popup corners expose the backdrop.");
                                     CheckPopupFrame(bitmap,theme+" popup "+size.Width,check);
                                     bitmap.Save(Path.Combine(root,"card-"+theme+"-"+size.Width+".png"),System.Drawing.Imaging.ImageFormat.Png);
+                                    SaveCorners(bitmap,Path.Combine(root,"corners-"+theme+"-"+size.Width+".png"));
+                                }
+                                GeneralStyle.AnimationsEnabled=false;
+                                using(var frame=new GeneralDialog("Popup frame"){ClientSize=new Size(320,210),StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)}){
+                                    frame.Show(owner);
+                                    foreach(var size in new[]{new Size(320,210),new Size(460,300),new Size(320,210)}){
+                                        frame.ClientSize=size;frame.PerformLayout();frame.Refresh();
+                                        using(var painted=new Bitmap(size.Width,size.Height))using(var composed=new Bitmap(size.Width,size.Height))using(var graphics=Graphics.FromImage(composed)){
+                                            frame.DrawToBitmap(painted,new Rectangle(Point.Empty,size));
+                                            graphics.Clear(Color.Magenta);graphics.IntersectClip(frame.Region);graphics.DrawImageUnscaled(painted,0,0);
+                                            CheckPopupFrame(composed,theme+" native dialog "+size.Width,check);
+                                            check(frame.Padding.All==GeneralStyle.RoundedFaceClearance,theme+" native body stays clear of the inset outline after resize.");
+                                            composed.Save(Path.Combine(root,"dialog-"+theme+"-"+size.Width+".png"));
+                                            SaveCorners(composed,Path.Combine(root,"dialog-corners-"+theme+"-"+size.Width+".png"));
+                                        }
+                                    }
+                                    frame.Complete(DialogResult.Cancel);
                                 }
                                 foreach(int width in new[]{120,280}){
                                     using(var surface=new GeneralSurface{Size=new Size(width,44),BackColor=GeneralStyle.Surface}){
@@ -62,6 +79,33 @@ internal static class GeneralPopupStabilityTests {
                                 }
                             }
                             GeneralStyle.UseTheme("light-red");GeneralStyle.AnimationsEnabled=false;
+                            using(var window=new GeneralDialog("Popup window"){ClientSize=new Size(420,260),
+                                MinimumSize=new Size(320,210),StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)}){
+                                var result=window.ShowModelessAsync(owner,"window-state");
+                                var minimize=(Button)((Control)window).Controls.Find("PopupMinimize",true).Single();
+                                var maximize=(Button)((Control)window).Controls.Find("PopupMaximize",true).Single();
+                                var close=(Button)((Control)window).Controls.Find("PopupClose",true).Single();
+                                check(new[]{minimize,maximize,close}.All(button=>button.Visible&&button.Enabled&&button.Width>=44)&&
+                                    minimize.Right==maximize.Left&&maximize.Right==close.Left,
+                                    "Window controls share the same aligned and accessible targets.");
+                                var normal=window.Bounds;
+                                maximize.PerformClick();
+                                check(window.WindowState==FormWindowState.Maximized&&window.Bounds==Screen.FromControl(window).WorkingArea&&
+                                    window.Region==null&&maximize.AccessibleName==GeneralStyle.T("Restaurar tamanho","Restore size"),
+                                    "Maximize fills the monitor working area and clears the rounded clipping.");
+                                minimize.PerformClick();
+                                check(window.WindowState==FormWindowState.Minimized&&owner.Enabled&&!result.IsCompleted,
+                                    "Minimize leaves the project enabled and preserves the popup request.");
+                                check(GeneralDialog.FocusOpen<GeneralDialog>(owner,"window-state")&&window.WindowState==FormWindowState.Maximized&&
+                                    owner.OwnedForms.Count(form=>form is GeneralDialog)==1,
+                                    "Opening the same command restores the existing maximized popup.");
+                                maximize.PerformClick();
+                                check(window.WindowState==FormWindowState.Normal&&window.Bounds==normal&&window.Region!=null,
+                                    "Restore returns to the previous position, size and rounded corners.");
+                                close.PerformClick();
+                                check(await result==DialogResult.Cancel&&!window.Visible,
+                                    "Close completes the restored popup without leaving its window visible.");
+                            }
                             using(var ready=new GeneralDialog("Ready card"){ClientSize=new Size(320,210),StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)}){
                                 int visibleFrames=0;
                                 ready.VisibleChanged+=(ss,ee)=>{
@@ -192,14 +236,35 @@ internal static class GeneralPopupStabilityTests {
         int width=bitmap.Width,height=bitmap.Height,x=width/2,y=height/2;
         Func<int,Color[]> edges=depth=>new[]{bitmap.GetPixel(x,depth),bitmap.GetPixel(x,height-1-depth),
             bitmap.GetPixel(depth,y),bitmap.GetPixel(width-1-depth,y)};
-        for(int depth=0;depth<GeneralStyle.RoundedFaceBorder;depth++)
-            check(edges(depth).All(pixel=>pixel.ToArgb()==GeneralStyle.Line.ToArgb()),label+": border touches the outer mask at depth "+depth+".");
+        for(int depth=0;depth<GeneralStyle.RoundedFaceInset;depth++)
+            check(edges(depth).All(pixel=>pixel.ToArgb()==GeneralStyle.Surface.ToArgb()),label+": native mask is separated from the outline at depth "+depth+".");
         int line=GeneralStyle.Line.ToArgb(),surface=GeneralStyle.Surface.ToArgb();
-        check(edges(GeneralStyle.RoundedFaceBorder+1).All(pixel=>pixel.ToArgb()==surface),label+": the inner fill starts just after the border.");
-        for(int yCorner=0;yCorner<18;yCorner++){
-            int xCorner=0;
-            while(xCorner<18&&bitmap.GetPixel(xCorner,height-1-yCorner).ToArgb()==Color.Magenta.ToArgb())xCorner++;
-            check(xCorner<18&&bitmap.GetPixel(xCorner,height-1-yCorner).ToArgb()==line,label+": no outer fringe around the reported bottom-left corner, row "+yCorner+".");
+        check(edges(GeneralStyle.RoundedFaceInset+1).All(pixel=>pixel.ToArgb()==line),label+": all four straight edges retain the full outline.");
+        check(edges(GeneralStyle.RoundedFaceClearance+1).All(pixel=>pixel.ToArgb()==surface),label+": the body starts inside the outline.");
+        using(var unclipped=new Bitmap(width,height))using(var graphics=Graphics.FromImage(unclipped)){
+        GeneralStyle.PaintCard(graphics,bitmap.Size);
+        for(int corner=0;corner<4;corner++){
+            int blended=0,solid=0;bool outlineInsideMask=true;
+            for(int cy=0;cy<GeneralStyle.PopupRadius;cy++)for(int cx=0;cx<GeneralStyle.PopupRadius;cx++){
+                int px=(corner&1)==0?cx:width-1-cx,py=corner<2?cy:height-1-cy;
+                var pixel=bitmap.GetPixel(px,py);int argb=pixel.ToArgb();
+                if(argb==line)solid++;
+                if(argb!=line&&argb!=surface&&argb!=Color.Magenta.ToArgb())blended++;
+                if(argb==Color.Magenta.ToArgb()&&unclipped.GetPixel(px,py).ToArgb()!=surface)outlineInsideMask=false;
+            }
+            check(blended>=12&&solid>=8,label+": corner "+corner+" has a continuous antialiased arc with a full-color outline.");
+            check(outlineInsideMask,label+": corner "+corner+" outline is clear of the binary native clipping edge.");
+        }
+        }
+    }
+    static void SaveCorners(Bitmap bitmap,string path){
+        const int side=24,scale=6;
+        using(var corners=new Bitmap(side*2*scale,side*2*scale))using(var graphics=Graphics.FromImage(corners)){
+            graphics.InterpolationMode=System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
+            graphics.PixelOffsetMode=System.Drawing.Drawing2D.PixelOffsetMode.Half;
+            for(int corner=0;corner<4;corner++)graphics.DrawImage(bitmap,new Rectangle((corner%2)*side*scale,(corner/2)*side*scale,side*scale,side*scale),
+                new Rectangle((corner%2)==0?0:bitmap.Width-side,corner<2?0:bitmap.Height-side,side,side),GraphicsUnit.Pixel);
+            corners.Save(path,System.Drawing.Imaging.ImageFormat.Png);
         }
     }
     static void CheckBand(Bitmap bitmap,string label,Action<bool,string> check){

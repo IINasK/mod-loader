@@ -78,9 +78,18 @@ jobs:
           dotnet tool install vpk --version 1.2.161 --tool-path "$work/tools"
           dotnet restore ./Instalador/Setup/Velopack.Dependencies.csproj --packages "$work/nuget"
           ./Instalador/Setup/compilar-velopack.ps1 -NuGetPackages "$work/nuget" -Vpk "$work/tools/vpk.exe" -OutputPath $work
-          $fixture = New-Item -ItemType Directory "$work/test"
-          $test = Start-Process -FilePath "$work/App/ModLoader.exe" -ArgumentList '--self-test-updates', ('"' + $fixture.FullName + '"') -PassThru -Wait
-          if ($test.ExitCode -ne 0) { throw "Teste do atualizador falhou ($($test.ExitCode))." }
+          Copy-Item -LiteralPath './Instalador/Online/FixtureGame.exe', './Instalador/Online/FixtureUnsupported.exe' -Destination $work
+          foreach ($suite in @('paths', 'updates', 'p2p', 'snapshot', 'mod-updates', 'save-backups', 'projects', 'project-verification')) {
+            $fixture = New-Item -ItemType Directory "$work/test-$suite"
+            $env:TEMP = $fixture.FullName
+            $env:TMP = $fixture.FullName
+            $test = Start-Process -FilePath "$work/App/ModLoader.exe" -ArgumentList "--self-test-$suite", ('"' + $fixture.FullName + '"') -PassThru -Wait
+            if ($test.ExitCode -ne 0) {
+              $diagnostic = Join-Path $fixture.FullName 'CyberpunkCoopOnline-erro.txt'
+              if (Test-Path -LiteralPath $diagnostic) { Get-Content -LiteralPath $diagnostic }
+              throw "Teste estável falhou: $suite ($($test.ExitCode))."
+            }
+          }
 
       - name: Publicar a atualização
         if: steps.version.outputs.build == 'true'

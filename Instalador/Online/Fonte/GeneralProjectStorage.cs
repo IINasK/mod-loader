@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -35,22 +35,35 @@ internal sealed class GeneralStorageSize {
 }
 internal sealed class GeneralStorageLabel : LinkLabel {
     readonly DownloadCache cache;
-    internal GeneralStorageLabel(DownloadCache cache){
+    string projectFolder;
+    bool linksAvailable=true;
+    internal void SetLinksAvailable(bool available){
+        linksAvailable=available;
+        GeneralStyle.SetLinkActionsAvailable(this,available);
+    }
+
+    internal GeneralStorageLabel(DownloadCache cache,Action<string> showCacheMenu=null){
         this.cache=cache;LinkColor=GeneralStyle.Accent;ActiveLinkColor=GeneralStyle.Foreground;
         VisitedLinkColor=GeneralStyle.Accent;UseCompatibleTextRendering=false;LinkArea=new LinkArea(0,0);
         LinkClicked+=(s,e)=>{
-            try{
-                string folder=e.Link.LinkData as string;
-                if(String.IsNullOrEmpty(folder)||!Directory.Exists(folder))throw new DirectoryNotFoundException(GeneralStyle.T("A pasta não existe mais.","The folder no longer exists."));
-                Safe.NoLinks(folder);
-                Process.Start(new ProcessStartInfo(folder){UseShellExecute=true});
-            }catch(Exception ex){GeneralDialog.Message(FindForm(),ex.Message,GeneralStyle.T("Abrir pasta","Open folder"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+            if(!linksAvailable||!e.Link.Enabled)return;
+            string folder=e.Link.LinkData as string;
+            if(showCacheMenu!=null&&folder!=null&&folder==projectFolder){showCacheMenu(folder);return;}
+            OpenFolder(folder);
         };
     }
+    internal void OpenFolder(string folder){
+        try{
+            if(String.IsNullOrEmpty(folder)||!Directory.Exists(folder))throw new DirectoryNotFoundException(GeneralStyle.T("A pasta não existe mais.","The folder no longer exists."));
+            Safe.NoLinks(folder);
+            Process.Start(new ProcessStartInfo(folder){UseShellExecute=true});
+        }catch(Exception ex){GeneralDialog.Message(FindForm(),ex.Message,GeneralStyle.T("Abrir pasta","Open folder"),MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+    }
     internal void SetSize(GeneralStorageSize size,bool home){
+        projectFolder=home||size==null?null:size.ProjectCacheDirectory;
         Links.Clear();
         Text=size==null?GeneralStyle.T("Espaço indisponível","Size unavailable"):home?GeneralStorageSize.HomeText(size):GeneralStorageSize.ProjectText(size);
-        if(size==null)return;
+        if(size==null){SetLinksAvailable(linksAvailable);return;}
         if(!home&&size.InactiveDirectory!=null&&size.Inactive>0){
             string disabled=GeneralStorageSize.InactiveText(size);int at=Text.LastIndexOf(disabled,StringComparison.Ordinal);if(at>=0)Links.Add(at,disabled.Length,size.InactiveDirectory);
         }
@@ -62,6 +75,7 @@ internal sealed class GeneralStorageLabel : LinkLabel {
             string link=GeneralStorageSize.RetainedText(size);
             Links.Add(Text.LastIndexOf(link,StringComparison.Ordinal),link.Length,cache.RetainedRoot);
         }
+        SetLinksAvailable(linksAvailable);
     }
 }
 internal static class GeneralProjectStorage {

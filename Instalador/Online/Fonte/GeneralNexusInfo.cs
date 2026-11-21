@@ -15,12 +15,19 @@ using System.Windows.Forms;
 public sealed class GeneralSourceInfo {
     public string Name,FileName,Version,ModVersion;
     public bool SizeApproximate,NexusChecked;
+    public bool GithubChecked;
+    public string GithubAssetUrl;
     internal bool Nsfw,NsfwKnown;
     internal string[] Tags;
+    internal string Reference;
+    internal GeneralUpdateChecker.Asset[] ReleaseChoices;
     public long Bytes;
     internal GeneralSourceInfo SavedCopy(){
+        var github=GithubChecked?GeneralGithubLink.Parse(GithubAssetUrl):null;
+        bool verified=github!=null&&github.Asset!=null;
         return new GeneralSourceInfo{Name=Name,FileName=FileName,Version=Version,ModVersion=ModVersion,
-            Bytes=Bytes,SizeApproximate=SizeApproximate,NexusChecked=NexusChecked};
+            Bytes=Bytes,SizeApproximate=SizeApproximate,NexusChecked=NexusChecked,
+            GithubChecked=verified,GithubAssetUrl=verified?github.Url:null};
     }
 }
 internal sealed class GeneralNexusLink {
@@ -73,7 +80,8 @@ internal static partial class GeneralNexusInfo {
         return String.IsNullOrWhiteSpace(key) || key.Length > 256 || key.Any(c => Char.IsControl(c) || Char.IsWhiteSpace(c)) ? null : key;
     }
 
-    internal static Task<GeneralSourceInfo> Read(string source) {
+    internal static Task<GeneralSourceInfo> Read(string source){return Read(source,false);}
+    internal static Task<GeneralSourceInfo> Read(string source,bool editor) {
         var link = GeneralNexusLink.Parse(source);
         string testKey = TestKey();
         if (link == null) return Task.FromResult<GeneralSourceInfo>(null);
@@ -89,7 +97,14 @@ internal static partial class GeneralNexusInfo {
             if ((int)status == 451) return new GeneralSourceInfo { Nsfw = true };
             var info = ParseMod(json, link);
             if (info != null && link.File > 0 && key != null)
+            {
                 ApplyFile(ReadJson("/v1" + resource + "/files/" + link.File + ".json", key, out status), link, info);
+                if(editor&&info.Reference==null&&status==HttpStatusCode.OK){
+                    var details=ParseObject(ReadJson("/v1"+resource+".json",key,out status));
+                    if(MatchesId(details,"mod_id",link.Mod))info.Reference=GeneralNexusGithubMirror.Unique(
+                        GeneralNexusGithubMirror.Repositories(Value(details,"description") as string));
+                }
+            }
             return info;
         });
     }
@@ -247,6 +262,7 @@ internal static partial class GeneralNexusInfo {
         var adult = Value(data, "adult_content");
         return new GeneralSourceInfo {
             Name = name,
+            Reference = GeneralNexusGithubMirror.Unique(GeneralNexusGithubMirror.Repositories(Value(data,"description") as string)),
             NexusChecked = true,
             ModVersion = Text(data, "version", 120),
             Nsfw = adult is bool && (bool)adult,
@@ -295,6 +311,111 @@ internal static partial class GeneralNexusInfo {
     }
 }
 
+internal sealed partial class GeneralModWindow {
+    Dictionary<string,List<GeneralNexusRequirement[]>> publishedRequirements=new Dictionary<string,List<GeneralNexusRequirement[]>>(StringComparer.Ordinal);
+    readonly HashSet<string> choosingDependencyFiles=new HashSet<string>(StringComparer.Ordinal);
+
+    async Task ChooseDependencyFile(Work work){
+        string id=work.Entry.Id;
+        if(GeneralDialog.FocusOpen<GeneralDependencyFileDialog>(this,id)||!choosingDependencyFiles.Add(id))return;
+        try{
+            if(projectDraft!=null&&!ConfirmProjectNavigation())return;
+            var live=state.List.Mods.FirstOrDefault(mod=>mod.Id==id);
+            if(live==null||!GeneralModLibrary.NeedsDependencyVersion(live,Selected(live)))return;
+            work=MakeWork(live);
+            var link=GeneralNexusLink.Parse(work.Entry.DependencySource);
+            if(link==null)return;
+            var preset=state.SelectedPreset;
+            var destination=state.Destination;
+            var original=Safe.Json.Serialize(work.Entry);
+            Func<bool> active=()=>!IsDisposed&&!exitApproved&&!working&&!scanning&&associationChoice==null&&
+                projectDraft==null&&preset==state.SelectedPreset&&InventoryPaths.Equals(destination,state.Destination)&&
+                state.List.Mods.Any(mod=>mod.Id==id&&Selected(mod).Id==work.Variant.Id&&Safe.Json.Serialize(mod)==original);
+            if(!active())return;
+            var ranges=PresetWorks().SelectMany(parent=>parent.Variant.Sources).Select(GeneralNexusLink.Parse)
+                .Where(source=>source!=null&&publishedRequirements.ContainsKey(source.Url)).Select(source=>source.Url)
+                .Distinct(StringComparer.Ordinal).SelectMany(source=>publishedRequirements[source])
+                    .Select(group=>group.Where(range=>range.Source.Url==link.Url).ToArray()).Where(group=>group.Length>0).ToArray();
+            var session=testModUpdateSession??(testMode?new NexusUpdateSession(null):NexusUpdateSession.Session);
+            var result=await session.DependencyChoices(link,work.Entry.DependencyFile,ranges,()=>!IsDisposed);
+            if(!active())return;
+            var file=result.Automatic;
+            if(file==null){
+                using(var dialog=new GeneralDependencyFileDialog(work.Entry.Name,link,work.Entry.DependencyFile,result,launch)){
+                    if(await dialog.ShowModelessAsync(this,id)!=DialogResult.OK||!active())return;
+                    file=dialog.SelectedFile;
+                }
+            }
+            if(file==null)return;
+            var entry=state.List.Mods.Single(mod=>mod.Id==id);
+            var updated=GeneralPresetProfiles.Copy(entry);
+            var variant=updated.Variants.Single(option=>option.Id==work.Variant.Id);
+            string url=new GeneralNexusLink{Game=link.Game,Mod=link.Mod,File=file.file_id}.Url;
+            bool replaced=false;
+            for(int i=0;i<variant.Sources.Count;i++){
+                var old=GeneralNexusLink.Parse(variant.Sources[i]);
+                if(old==null||old.Game!=link.Game||old.Mod!=link.Mod||old.File>0)continue;
+                variant.SourceInfo.Remove(variant.Sources[i]);
+                variant.Sources[i]=url;replaced=true;
+            }
+            if(!replaced)return;
+            variant.Sources=variant.Sources.Distinct(StringComparer.Ordinal).ToList();
+            if(variant.Name=="Indefinida"||variant.Name=="Undefined")variant.Name=file.version??T("Principal","Main");
+            if(file.file_name!=null)variant.SourceInfo[url]=new GeneralSourceInfo{Name=entry.Name,Version=file.version,FileName=file.file_name,NexusChecked=true};
+            BeginProjectEdit();
+            GeneralPresetProfiles.Edit(state,entry,updated,variant.Id,false);
+            FinishProjectEdit();SaveProjectEdits();DrawRows();
+            await Scan();
+        }finally{choosingDependencyFiles.Remove(id);}
+    }
+}
+
+internal sealed class GeneralDependencyFileDialog : GeneralDialog {
+    static string T(string pt,string en){return GeneralStyle.T(pt,en);}
+    internal NexusUpdateSession.FileInfoItem SelectedFile;
+    internal GeneralDependencyFileDialog(string name,GeneralNexusLink link,int pinned,NexusUpdateSession.DependencyFiles result,Action<string> open)
+        :base(T("Escolher arquivo da dependência","Choose dependency file")){
+        ClientSize=new System.Drawing.Size(620,275);
+        var layout=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(20,8,20,18),RowCount=4,ColumnCount=1};
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var title=GeneralModEditor.LabelFor(name);
+        layout.Controls.Add(title,0,0);
+        bool incompatible=result.Failure=="no-compatible-file";
+        bool manual=result.Choices.Length==0&&!incompatible;
+        string advice=incompatible?T("O Nexus não confirmou um arquivo compatível com os requisitos deste preset.","Nexus could not confirm a file compatible with the preset requirements."):manual?(result.Failure=="connect"||result.Failure=="authentication"
+            ?T("Conecte ao Nexus para consultar os arquivos, ou abra a página e cole o link do arquivo abaixo.","Connect to Nexus to check the files, or open the page and paste the file link below.")
+            :T("A consulta não confirmou um arquivo. Abra a lista do Nexus e cole o link do arquivo desejado.","The check did not confirm a file. Open the Nexus file list and paste the desired file link."))
+            :T("Escolha o arquivo publicado que corresponde à dependência do seu mod.","Choose the published file matching your mod’s requirement.");
+        var note=new Label{Text=advice,Dock=DockStyle.Fill,Margin=new Padding(0,8,0,6)};layout.Controls.Add(note,0,1);
+        var picker=new GeneralPicker{Name="DependencyFiles",Dock=DockStyle.Top,Height=44,AccessibleName=T("Arquivos publicados","Published files")};
+        var input=new TextBox{Name="DependencyFileLink",MaxLength=4096,AccessibleName=T("Link do arquivo","File link")};
+        if(manual){layout.Controls.Add(GeneralTableDialogLayout.Input(input),0,2);picker.Dispose();}
+        else if(incompatible){input.Dispose();picker.Dispose();}
+        else{
+            input.Dispose();
+            picker.Items.AddRange(result.Choices.Select(f=>(object)(f.file_name+(String.IsNullOrWhiteSpace(f.version)?"":" · "+f.version))).ToArray());
+            picker.SelectedIndex=result.Choices.Length==1?0:-1;layout.Controls.Add(picker,0,2);
+        }
+        Func<NexusUpdateSession.FileInfoItem> choice=()=>{
+            if(incompatible)return null;
+            if(!manual)return picker.SelectedIndex<0?null:result.Choices[picker.SelectedIndex];
+            var value=GeneralNexusLink.Parse(input.Text.Trim());
+            return value!=null&&value.Game==link.Game&&value.Mod==link.Mod&&value.File>0&&(pinned==0||pinned==value.File)
+                ?new NexusUpdateSession.FileInfoItem{file_id=value.File}:null;
+        };
+        var actions=GeneralTableDialogLayout.Commands();
+        var use=GeneralStyle.Button(T("Usar arquivo","Use file"),()=>{SelectedFile=choice();if(SelectedFile!=null)Complete(DialogResult.OK);},true);
+        var cancel=GeneralStyle.Button(T("Cancelar","Cancel"),()=>Complete(DialogResult.Cancel));
+        actions.Controls.Add(use);actions.Controls.Add(cancel);actions.Controls.Add(GeneralStyle.Button(T("Ver arquivos no Nexus","View files on Nexus"),()=>open(link.Url+"?tab=files")));
+        layout.Controls.Add(actions,0,3);Content.Controls.Add(layout);AcceptButton=use;CancelButton=cancel;
+        if(manual)input.TextChanged+=(s,e)=>use.Enabled=choice()!=null;
+        else if(!incompatible)picker.SelectedIndexChanged+=(s,e)=>use.Enabled=choice()!=null;
+        use.Enabled=choice()!=null;
+        GeneralStyle.Apply(this,GeneralStyle.Dark);title.Font=GeneralStyle.Font(13,true);
+    }
+}
+
 internal sealed partial class GeneralModEditor {
     void ScheduleSourceInfo(){
         if(changing||attachment)return;sourceGeneration++;sourceDelay.Stop();sourceDelay.Start();
@@ -307,14 +428,14 @@ internal sealed partial class GeneralModEditor {
         return sourceQuery;
     }
 
-    async Task QuickFillFromNexus(){
+    async Task QuickFillFromSource(){
         string source=sources.Text.Trim();
-        if(finishing||current==null||refreshLookup==null||GeneralNexusLink.Parse(source)==null||
+        if(finishing||current==null||refreshLookup==null||!GeneralModSourceMetadata.Supports(source)||
             SourceLinkWarning(source,current).Length>0)return;
         string caption=quickFill.Text;
         var choice=GeneralDialog.Message(this,T(
-            "Completar preserva seus dados e adiciona o que falta.\r\nSobrescrever usa o nome, as tags e o status NSFW retornados pelo Nexus.",
-            "Fill gaps keeps your data and adds what is missing.\r\nOverwrite uses the name, tags, and NSFW status returned by Nexus."),
+            "Completar preserva seus dados e adiciona o que falta.\r\nSobrescrever usa as informações retornadas pela fonte.",
+            "Fill gaps keeps your data and adds what is missing.\r\nOverwrite uses information returned by the source."),
             caption,MessageBoxButtons.YesNoCancel,yesLabel:T("Completar","Fill gaps"),noLabel:T("Sobrescrever","Overwrite"));
         if(choice!=DialogResult.Yes&&choice!=DialogResult.No)return;
         sourceDelay.Stop();
@@ -343,8 +464,8 @@ internal sealed partial class GeneralModEditor {
             if(warning.Length>0){sourceInfo.ForeColor=GeneralStyle.Danger;sourceInfo.Text=warning;return;}
         }
         var candidates=new[]{source}
-            .Select(value=>new {Source=value,Nexus=GeneralNexusLink.Parse(value)})
-            .Where(item=>item.Nexus!=null||GeneralModDownload.IsArchivePath(item.Source))
+            .Select(value=>new {Source=value,Nexus=GeneralNexusLink.Parse(value),Github=GeneralGithubLink.Parse(value)})
+            .Where(item=>item.Nexus!=null||item.Github!=null||GeneralModDownload.IsArchivePath(item.Source))
             .GroupBy(item=>item.Nexus==null?item.Source:item.Nexus.Url).Select(group=>group.First()).Take(32).ToList();
         if(candidates.Count==0){sourceInfo.Text="";return;}
         bool overview=candidates.Any(item=>item.Nexus!=null&&item.Nexus.File==0);
@@ -362,13 +483,14 @@ internal sealed partial class GeneralModEditor {
             try{
                 if(item.Nexus==null&&known==null&&File.Exists(item.Source))
                     fresh=new GeneralSourceInfo{Name=Path.GetFileNameWithoutExtension(item.Source),FileName=Path.GetFileName(item.Source),Bytes=new FileInfo(item.Source).Length};
-                else if(item.Nexus!=null){
+                else if(item.Nexus!=null||item.Github!=null){
                     var query=overwrite.HasValue?refreshLookup:lookup;
                     if(query!=null)fresh=await query(item.Source);
                 }
             }catch(Exception){}
             if(IsDisposed||generation!=sourceGeneration||current!=variant)return;
             if(fresh!=null){
+                ApplyReferenceMetadata(source,fresh);
                 received|=fresh.Nsfw||!String.IsNullOrWhiteSpace(fresh.Name);
                 if(overwrite==true&&(fresh.NsfwKnown||fresh.Nsfw)){
                     adultOverride=null;
@@ -396,6 +518,10 @@ internal sealed partial class GeneralModEditor {
             var info=fresh!=null&&!String.IsNullOrWhiteSpace(fresh.Name)?fresh.SavedCopy():known;
             if(info==null)continue;
             if(known!=null&&fresh!=null&&!ReferenceEquals(info,known)){
+                if(known.GithubChecked&&item.Github!=null) {
+                    info.GithubChecked=true;info.GithubAssetUrl=known.GithubAssetUrl;
+                    info.Version=known.Version;info.FileName=known.FileName;info.Bytes=known.Bytes;info.SizeApproximate=known.SizeApproximate;
+                }
                 info.FileName=info.FileName??known.FileName;
                 info.Version=info.Version??known.Version;
                 if(info.Bytes==0||info.SizeApproximate&&!known.SizeApproximate&&known.Bytes>0){
@@ -416,7 +542,7 @@ internal sealed partial class GeneralModEditor {
             modName.Text=preview.Name;
         }
         sourceInfo.Text=overwrite.HasValue&&!received
-            ? advice+T("O Nexus não retornou novos dados.","Nexus returned no new data.")
+            ? advice+T("A fonte não retornou novos dados.","The source returned no new data.")
             : advice.TrimEnd();
         fileDetails.Text=SourceDetails(preview,previewLink);
         editorTips.SetToolTip(fileDetails,fileDetails.Text);
@@ -457,8 +583,8 @@ internal sealed partial class GeneralModEditor {
         var details=new List<string>();
 
         if(!String.IsNullOrWhiteSpace(info.Version))details.Add(T("Versão do arquivo: ","File version: ")+info.Version);
-        else if(link!=null&&link.File==0&&!String.IsNullOrWhiteSpace(info.ModVersion))
-            details.Add(T("Versão na página: ","Version on mod page: ")+info.ModVersion);
+        if(link==null&&!String.IsNullOrWhiteSpace(info.ModVersion)&&info.ModVersion!=info.Version)
+            details.Add(T("Versão na origem: ","Version at source: ")+info.ModVersion);
         if(info.Bytes>0)details.Add(info.SizeApproximate?T("Aprox. ","About ")+GeneralStorageSize.Format(info.Bytes):
             GeneralStorageSize.Format(info.Bytes));
         if(link!=null&&link.File>0&&String.IsNullOrWhiteSpace(info.Version)&&info.Bytes==0)

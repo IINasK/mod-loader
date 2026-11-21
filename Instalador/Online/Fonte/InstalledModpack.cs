@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -23,7 +23,7 @@ public static partial class InstalledSnapshot {
                         if(file.Kind=="file"){
                             string source=GeneralInstallRoutes.Resolve(root,file.Path,true);
                             using(var input=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read))using(var sha=SHA256.Create()){
-                                ValidateCustomData(manifest,file,input);input.Position=0;byte[] buffer=new byte[1048576];long length=0;int n;
+                                ValidateCustomData(manifest,file,input,catalog);input.Position=0;byte[] buffer=new byte[1048576];long length=0;int n;
                                 while((n=input.Read(buffer,0,buffer.Length))>0){length+=n;if(length>file.Size)throw new IOException("Arquivo mudou: "+file.Path);sha.TransformBlock(buffer,0,n,null,0);target.Write(buffer,0,n);}
                                 sha.TransformFinalBlock(new byte[0],0,0);if(length!=file.Size||Safe.Hex(sha.Hash)!=file.Sha256)throw new IOException("Arquivo mudou: "+file.Path);
                             }

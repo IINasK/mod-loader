@@ -173,28 +173,12 @@ internal sealed partial class GeneralModWindow {
         }
         return paths;
     }
-    SwitchPerformance localSwitchPerformance=new SwitchPerformance();
-    SwitchPerformance ReadSwitchPerformance() {
-        return projectStore==null?localSwitchPerformance:projectStore.Read().SwitchSettings;
-    }
-    int ChooseSwitchWorkers() {
-        var settings=ReadSwitchPerformance();
-        if(settings.AskBeforeSwitch) {
-            using(var dialog=new SwitchPerformanceDialog(settings)) {
-                if(dialog.ShowDialog(this)!=DialogResult.OK)return 0;
-                settings=dialog.Settings;
-            }
-            if(projectStore==null)localSwitchPerformance=settings;
-            else projectStore.SaveSwitchPerformance(settings);
-        }
-        return settings.Workers(Environment.ProcessorCount);
-    }
-    async Task LoadPreset(int workers=0) {
+    async Task LoadPreset() {
         if(loadingPreset||FinishingOperations||ActivePreset==null)return;
         if(!ConfirmProjectNavigation()||ActivePreset==null||!NeedsPresetLoad)return;
         string root=Root(),selected=state.SelectedPreset,fingerprint=PresetFingerprint;
         EnsurePresetGameClosed(root);GeneralPresetProfiles.Capture(state);
-        if(workers<=0)workers=GeneralPresetDeployment.VerificationWorkers;
+        int workers=SnapshotVerification.Workers;
         var desiredWorks=PresetWorks().ToArray();
         OnlineDiagnostics.Record("general.preset.begin",null,"Carregando a combinação do preset.",new{Preset=selected,Workers=workers,Mods=desiredWorks.Length});
         foreach(var work in desiredWorks.Where(w=>w.Entry.AlternativeGroup!=null))ActivePreset.AlternativeChoices[work.Entry.AlternativeGroup]=work.Entry.Id;
@@ -243,7 +227,7 @@ internal sealed partial class GeneralModWindow {
 
             scanning=false;
             ShowPresetProgress(T("Atualizando a lista do preset","Refreshing the preset list"),0,0);
-            await Scan(workerLimit:workers);
+            await Scan();
             RefreshStorageSize();
 
             OnlineDiagnostics.Record("general.preset.complete",null,"Carregamento de preset concluído.",

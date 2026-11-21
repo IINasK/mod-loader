@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -13,16 +13,20 @@ internal static class LocalModPackage {
     internal static bool Allowed(string path) {
         string extension = Path.GetExtension(path).ToLowerInvariant();
         if (path.StartsWith("archive/pc/mod/",StringComparison.OrdinalIgnoreCase)) return extension==".archive" || extension==".xl";
+        if (path.StartsWith("r6/audioware/",StringComparison.OrdinalIgnoreCase))
+            return new[]{".yaml",".yml",".wav",".ogg",".flac"}.Contains(extension);
         if (path.StartsWith("r6/scripts/",StringComparison.OrdinalIgnoreCase)) return extension==".reds";
         if (path.StartsWith("r6/tweaks/",StringComparison.OrdinalIgnoreCase)) return extension==".yaml" || extension==".yml" || extension==".tweak";
         if (path.StartsWith(CetMods,StringComparison.OrdinalIgnoreCase))
-            return path.Substring(CetMods.Length).Contains("/") && new[]{".lua",".json",".ini",".txt",".md",".png",".jpg",".csv",".wav",".ogg"}.Contains(extension);
+            return path.Substring(CetMods.Length).Contains("/") &&
+                (Path.GetFileName(path).Equals("LICENSE",StringComparison.OrdinalIgnoreCase)||
+                    new[]{".lua",".json",".ini",".txt",".md",".png",".jpg",".csv",".wav",".ogg"}.Contains(extension));
         if (path.StartsWith("red4ext/plugins/",StringComparison.OrdinalIgnoreCase))
             return new[]{".dll",".json",".ini",".toml",".yaml",".yml",".reds",".wav",".ogg",".txt",".md"}.Contains(extension);
         return false;
     }
 
-    static bool Documentation(string path) {
+    internal static bool Documentation(string path) {
         string extension=Path.GetExtension(path).ToLowerInvariant();
         return new[]{".txt",".md",".pdf",".png",".jpg",".jpeg",".webp",".url"}.Contains(extension) ||
             Path.GetFileName(path).Equals("LICENSE",StringComparison.OrdinalIgnoreCase);
@@ -105,7 +109,7 @@ internal static class LocalModPackage {
 }
 
 public sealed partial class FixedInstaller {
-    internal string RemoveImported(string id,Action<string> report,bool forgetOnly=false) {
+    internal string RemoveImported(string id,Action<string> report,bool forgetOnly=false,Func<string,bool> preserveAttached=null) {
         Closed();Safe.NoLinks(Data);
         string folder=Safe.In(Data,"importados");
         if(!Directory.Exists(folder))return "Nenhuma instalação registrada para remover.";
@@ -115,7 +119,7 @@ public sealed partial class FixedInstaller {
                 .Where(x=>x.Receipt.Status=="instalado"&&x.Receipt.Mods.Count==1&&x.Receipt.Mods[0]==id)
                 .OrderByDescending(x=>x.Receipt.CreatedUtc).FirstOrDefault();
             if(found==null)return "Nenhuma instalação registrada para remover.";
-            if(!forgetOnly)return UndoReceipt(found.Receipt,found.Path,report);
+            if(!forgetOnly)return UndoReceipt(found.Receipt,found.Path,report,preserveAttached);
             found.Receipt.Status="desfeito";
             Save(found.Path,found.Receipt);
             return "Registro da instalação removido.";
@@ -139,7 +143,7 @@ public sealed partial class FixedInstaller {
         return InstallTransaction(new List<FixedMod>{recipe},report,-1,true);
     }
 
-    internal HashSet<string> InstalledImports(Func<string,string> readHash=null) {
+    internal HashSet<string> InstalledImports(Func<string,string> readHash=null,Dictionary<string,string[]> verifiedPaths=null) {
         var result=new HashSet<string>(StringComparer.Ordinal);
         string folder=Safe.In(Data,"importados");
         Safe.NoLinks(folder);
@@ -149,7 +153,12 @@ public sealed partial class FixedInstaller {
                 var receipt=ReadReceiptCore(path,readHash!=null);
                 if(receipt.Operation!=LocalModPackage.ReceiptOperation || receipt.Status!="instalado" || receipt.Files.Count==0)continue;
                 if(receipt.Files.All(f=>f.Applied && File.Exists(Safe.In(game,f.Path)) && (readHash==null?Safe.Hash(Safe.In(game,f.Path)):readHash(Safe.In(game,f.Path)))==f.After))
-                    result.Add(receipt.Mods[0]);
+                {
+                    string id=receipt.Mods[0];
+                    result.Add(id);
+                    if(verifiedPaths!=null&&receipt.Files.All(file=>!file.Reverted&&!file.UndoStarted))
+                        verifiedPaths[id]=receipt.Files.Select(file=>file.Path).ToArray();
+                }
             }catch(IOException ex) {
                 if(readHash==null)throw;
                 OnlineDiagnostics.Failure("scan.import.failed",ex,"Verificar o recibo de importação.");

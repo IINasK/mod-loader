@@ -8,6 +8,30 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 
 internal sealed partial class GeneralModWindow {
+    void ToggleCacheMenu(string folder){
+        if(working||scanning)return;
+        menus.Toggle(this,storageSize,()=>new GeneralActionsMenu(cacheMenu:true),dialog=>Guard(()=>{
+            string action=((GeneralActionsMenu)dialog).ActionId;
+            if(action=="open-cache")storageSize.OpenFolder(folder);
+            if(action=="p2p-temp")OpenP2PTemporaryFiles();
+        }));
+    }
+
+    void OpenP2PTemporaryFiles(){
+        string folder=P2PService.TransferStore;
+        if(p2p!=null){
+            var paths=p2p.SnapshotSessions().Where(session=>!session.Sender&&!session.Discarded).Select(p2p.Folder).Where(Directory.Exists).ToArray();
+            if(paths.Length==1)folder=paths[0];
+        }
+        Safe.NoLinks(folder);
+        if(!Directory.Exists(folder)){
+            GeneralDialog.Message(this,T("Nenhum arquivo temporário P2P disponível.","No P2P temporary files available."),
+                T("Temporários P2P","P2P temporary files"));
+            return;
+        }
+        storageSize.OpenFolder(folder);
+    }
+
     void ToggleListMenu(){
         if(working||scanning)return;
         menus.Toggle(this,optionsButton,()=>new GeneralActionsMenu(BuiltInProject,
@@ -72,14 +96,15 @@ internal sealed partial class GeneralModWindow {
             return true;
         }catch(Exception ex){ShowError(ex);return false;}
     }
-    void EditPreset(bool create){
-        if(working||scanning)return;
+    async void EditPreset(bool create){
+        if(GeneralDialog.FocusOpen<GeneralPresetEditor>(this)||working||scanning)return;
         try{
             var currentPreset=create?null:state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);
             if(currentPreset==null)create=true;
             var item=currentPreset??new GeneralModPreset{Id="preset-"+Guid.NewGuid().ToString("N"),Name=T("Novo preset","New preset")};
             using(var dialog=new GeneralPresetEditor(item,state.List.Mods,item.ModIds)){
-                if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+                if(await dialog.ShowModelessAsync(this)!=DialogResult.OK||IsDisposed||exitApproved||working||scanning||
+                    !create&&!state.List.Presets.Contains(item))return;
                 BeginProjectEdit();
                 if(create)state.List.Presets.Add(dialog.Result);else state.List.Presets[state.List.Presets.IndexOf(item)]=dialog.Result;
                 state.SelectedPreset=dialog.Result.Id;FinishProjectEdit();RebuildPresets();
@@ -92,14 +117,16 @@ internal sealed partial class GeneralModWindow {
         if(GeneralDialog.Message(this,T("Excluir este preset? Os mods permanecem na lista.","Delete this preset? Mods will remain in the list.")+"\n"+item.Name,T("Excluir preset","Delete preset"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
         BeginProjectEdit();state.List.Presets.Remove(item);GeneralPresetProfiles.Project(state);FinishProjectEdit();RebuildPresets();
     }
-    void EditCategory(string category,bool create){
-        if(working||scanning)return;
+    async void EditCategory(string category,bool create){
+        if(GeneralDialog.FocusOpen<GeneralCategoryDetails>(this)||working||scanning)return;
+        string presetId=state.SelectedPreset;
         try{
             string name=create?"":category??UncatName(),description=null;
             if(!create&&category==null)description=state.List.UncategorizedDescription;
             else if(category!=null)state.List.CategoryDescriptions.TryGetValue(category,out description);
             using(var dialog=new GeneralCategoryDetails(name,description,!create&&category==null,!create&&category!=null)){
-                if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+                if(await dialog.ShowModelessAsync(this)!=DialogResult.OK||IsDisposed||exitApproved||working||scanning||
+                    presetId!=state.SelectedPreset||!create&&category!=null&&!state.List.Categories.Contains(category))return;
                 if(dialog.DeleteRequested){
                     RequestDeleteCategory(category);return;
                 }
@@ -148,16 +175,21 @@ internal sealed partial class GeneralModWindow {
         return true;
     }
     async void ShowOptions(){
-        if(working||scanning)return;
-        using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder,            cache.PreviewRetainedDownloads,state.Destination??"",root=>Cyberpunk(root).PreviewOldSaveBackups(),ReadSwitchPerformance())){
-            dialog.AnchorTo(optionsButton);
-            if(dialog.ShowDialog(this)!=DialogResult.OK){RefreshStorageSize();return;}
-            bool moved=SetDestination(dialog.Destination);
-            state.Theme=dialog.ThemeValue;state.Language=dialog.LanguageValue;state.DownloadFolder=dialog.DownloadFolder;
-            Persist();if(projectStore!=null)projectStore.SavePreferences(state.Theme,state.Language,state.DownloadFolder,dialog.SwitchSettings);
-            else localSwitchPerformance=dialog.SwitchSettings;
-            BuildInterface();if(moved)await Scan();else RefreshStorageSize();
-        }
+        if(GeneralDialog.FocusOpen<GeneralOptionsDialog>(this)||working||scanning)return;
+        string destination=state.Destination;
+        try{
+            using(var dialog=new GeneralOptionsDialog(state.Theme,state.Language,state.DownloadFolder,cache.PreviewRetainedDownloads,
+                state.Destination??"",root=>Cyberpunk(root).PreviewOldSaveBackups())){
+                dialog.AnchorTo(optionsButton);
+                var answer=await dialog.ShowModelessAsync(this);
+                if(IsDisposed||exitApproved||working||scanning||!InventoryPaths.Equals(destination,state.Destination))return;
+                if(answer!=DialogResult.OK){RefreshStorageSize();return;}
+                bool moved=SetDestination(dialog.Destination);
+                state.Theme=dialog.ThemeValue;state.Language=dialog.LanguageValue;state.DownloadFolder=dialog.DownloadFolder;
+                Persist();if(projectStore!=null)projectStore.SavePreferences(state.Theme,state.Language,state.DownloadFolder);
+                BuildInterface();if(moved)await Scan();else RefreshStorageSize();
+            }
+        }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
     }
 }
 

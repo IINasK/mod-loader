@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Media;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 internal static class LucideIcons {
@@ -17,8 +18,9 @@ internal static class LucideIcons {
     // Official lucide-static 0.468.0 glyphs; the upstream map and license are in Assets.
     static readonly Dictionary<string,string> glyphs=new Dictionary<string,string>{
         {"menu","\ue118"},{"options","\ue118"},{"list","\ue10b"},{"refresh","\ue148"},{"maximize","\ue116"},{"minimize","\ue11e"},
+        {"window-minimize","\ue11f"},{"window-maximize","\ue16a"},{"window-restore","\ue0a2"},
         {"folder","\ue246"},{"down","\ue071"},{"up","\ue074"},{"left","\ue072"},{"right","\ue073"},{"check","\ue070"},{"close","\ue1b1"},{"settings","\ue157"},{"trash","\ue18d"},{"undo","\ue2a0"},{"package","\ue12c"},
-        {"save","\ue150"},{"new","\ue0cd"},{"open","\ue246"},{"export","\ue19d"},{"import","\ue0b6"},{"share","\ue159"},{"copy","\ue0a2"},{"pause","\ue131"},{"play","\ue13f"},{"home","\ue0f8"},{"search","\ue154"},{"plus","\ue140"},{"ellipsis-vertical","\ue0bb"}
+        {"save","\ue150"},{"new","\ue0cd"},{"open","\ue246"},{"export","\ue19d"},{"import","\ue0b6"},{"share","\ue159"},{"copy","\ue0a2"},{"pause","\ue131"},{"play","\ue13f"},{"home","\ue0f8"},{"search","\ue154"},{"plus","\ue140"},{"ellipsis-vertical","\ue0bb"},{"file-text","\ue0d0"}
     };
     static LucideIcons(){
         using(var stream=typeof(LucideIcons).Assembly.GetManifestResourceStream("ModLoader.Lucide.ttf")){
@@ -79,6 +81,10 @@ internal sealed class GeneralReveal : IDisposable {
         }
     }
     internal void SetRound(){if(target.IsDisposed)return;progress=1;using(var round=GeneralStyle.PopupShape(target.ClientSize))Replace(new Region(round));}
+    internal void SetSquare(){
+        timer.Stop();watch.Stop();complete=null;Running=false;
+        Replace(null);
+    }
     void Replace(Region next){var previous=target.Region;target.Region=next;if(previous!=null)previous.Dispose();target.Invalidate(true);}
     public void Dispose(){timer.Stop();timer.Dispose();complete=null;Running=false;}
 }
@@ -172,12 +178,17 @@ internal static class GeneralAttention {
 
 internal class GeneralDialog : Form {
     protected const int HeaderHeight=52;
+    const int CaptionButtonWidth=44;
     readonly Label title=new Label{Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,AutoEllipsis=true};
     readonly GeneralReveal reveal;
-    readonly TableLayoutPanel header;
-    readonly GeneralButton close;
-    bool allowClose,closing;
+    readonly TableLayoutPanel shell,header;
+    readonly GeneralButton minimize,maximize,close;
+    readonly ToolTip captionTips=new ToolTip();
+    bool allowClose,closing,maximizedShape;
+    FormWindowState beforeMinimize=FormWindowState.Normal;
     Point origin;
+    string modelessKey;
+    TaskCompletionSource<DialogResult> modelessResult;
     internal Panel Content {get;private set;}
     internal bool RequiresDecision {get;set;}
 
@@ -185,6 +196,40 @@ internal class GeneralDialog : Form {
         if(RequiresDecision)GeneralAttention.Play();
         return base.ShowDialog(owner);
     }
+    internal static bool FocusOpen<T>(Form owner,string key="",Action<T> focusAction=null) where T:GeneralDialog {
+        var existing=owner.OwnedForms.OfType<T>().FirstOrDefault(dialog=>!dialog.IsDisposed&&dialog.modelessKey==key);
+        if(existing==null)return false;
+        if(existing.WindowState==FormWindowState.Minimized)existing.WindowState=existing.beforeMinimize;
+        if(existing.Visible){existing.BringToFront();existing.Activate();}
+        if(focusAction!=null)focusAction(existing);
+        return true;
+    }
+
+    internal Task<DialogResult> ShowModelessAsync(Form owner,string key=""){
+        DialogResult=DialogResult.None;
+        modelessKey=key;
+        var completion=new TaskCompletionSource<DialogResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        modelessResult=completion;
+        if(StartPosition==FormStartPosition.CenterParent&&owner.Visible){
+            var area=Screen.FromControl(owner).WorkingArea;
+            int x=owner.Left+(owner.Width-Width)/2,y=owner.Top+(owner.Height-Height)/2;
+            StartPosition=FormStartPosition.Manual;
+            Location=new Point(Math.Max(area.Left,Math.Min(x,area.Right-Width)),
+                Math.Max(area.Top,Math.Min(y,area.Bottom-Height)));
+        }
+        if(RequiresDecision)GeneralAttention.Play();
+        Show(owner);
+        return completion.Task;
+    }
+
+    void FinishModeless(DialogResult result){
+        var completion=modelessResult;
+        modelessResult=null;
+        if(completion==null)return;
+        Hide();
+        completion.TrySetResult(result);
+    }
+
     public new Control.ControlCollection Controls {get{return Content==null?base.Controls:Content.Controls;}}
     [DllImport("user32.dll")]static extern bool ReleaseCapture();
     [DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr window,int message,IntPtr wParam,IntPtr lParam);
@@ -192,17 +237,55 @@ internal class GeneralDialog : Form {
     internal GeneralDialog(string text){
         FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;StartPosition=FormStartPosition.CenterParent;Font=GeneralStyle.Font(12);BackColor=GeneralStyle.Surface;
         Padding=new Padding(GeneralStyle.RoundedFaceClearance);Content=new Panel{Dock=DockStyle.Fill,BackColor=GeneralStyle.Surface};
-        var shell=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=Padding.Empty,Margin=Padding.Empty,BackColor=GeneralStyle.Surface};
-        shell.Resize+=(s,e)=>GeneralStyle.ClipCardBody(shell);
+        shell=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=Padding.Empty,Margin=Padding.Empty,BackColor=GeneralStyle.Surface};
+        shell.Resize+=(s,e)=>UpdateBodyShape();
         shell.RowStyles.Add(new RowStyle(SizeType.Absolute,HeaderHeight));shell.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-        header=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,Margin=Padding.Empty,Padding=new Padding(20,4,8,4)};
-        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
+        header=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,Margin=Padding.Empty,Padding=new Padding(20,4,8,4)};
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        for(int i=0;i<3;i++)header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,CaptionButtonWidth));
         title.Font=GeneralStyle.Font(14,true);title.ForeColor=GeneralStyle.Foreground;header.Controls.Add(title,0,0);
-        close=new GeneralButton{Text="",IconKind="close",Bare=true,Size=new Size(44,44),Dock=DockStyle.Fill,Margin=Padding.Empty,AccessibleName=GeneralStyle.T("Fechar","Close")};
-        close.Click+=(s,e)=>Complete(DialogResult.Cancel);header.Controls.Add(close,1,0);
-        title.MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){ReleaseCapture();SendMessage(Handle,0x00A1,(IntPtr)2,IntPtr.Zero);}};
+        minimize=CaptionButton("PopupMinimize","window-minimize",GeneralStyle.T("Minimizar","Minimize"),MinimizeWindow);
+        maximize=CaptionButton("PopupMaximize","window-maximize",GeneralStyle.T("Maximizar","Maximize"),ToggleMaximize);
+        close=CaptionButton("PopupClose","close",GeneralStyle.T("Fechar","Close"),()=>Complete(DialogResult.Cancel));
+        header.Controls.Add(minimize,1,0);header.Controls.Add(maximize,2,0);header.Controls.Add(close,3,0);
+        title.MouseDown+=(s,e)=>{
+            if(e.Button!=MouseButtons.Left||WindowState!=FormWindowState.Normal)return;
+            ReleaseCapture();
+            SendMessage(Handle,0x00A1,(IntPtr)2,IntPtr.Zero);
+        };
         shell.Controls.Add(header,0,0);shell.Controls.Add(Content,0,1);base.Controls.Add(shell);Text=text;
+        Disposed+=(s,e)=>captionTips.Dispose();
         reveal=new GeneralReveal(this);SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.ResizeRedraw|ControlStyles.OptimizedDoubleBuffer,true);
+    }
+    GeneralButton CaptionButton(string name,string icon,string label,Action action){
+        var button=new GeneralButton{Name=name,Text="",IconKind=icon,Bare=true,Dock=DockStyle.Fill,
+            Margin=Padding.Empty,AccessibleName=label};
+        button.Click+=(s,e)=>action();
+        captionTips.SetToolTip(button,label);
+        return button;
+    }
+    void MinimizeWindow(){
+        // A synchronous confirmation keeps its owner disabled until the answer arrives.
+        if(Modal||closing)return;
+        beforeMinimize=WindowState;
+        WindowState=FormWindowState.Minimized;
+        if(Owner!=null&&Owner.Enabled)Owner.Activate();
+    }
+    void ToggleMaximize(){
+        if(closing)return;
+        if(WindowState==FormWindowState.Maximized){WindowState=FormWindowState.Normal;return;}
+        var monitor=Screen.FromControl(this);
+        var area=monitor.WorkingArea;
+        area.Offset(-monitor.Bounds.Left,-monitor.Bounds.Top);
+        MaximizedBounds=area;
+        WindowState=FormWindowState.Maximized;
+    }
+    void UpdateBodyShape(){
+        if(WindowState!=FormWindowState.Maximized){GeneralStyle.ClipCardBody(shell);return;}
+        var previous=shell.Region;
+        if(previous==null)return;
+        shell.Region=null;
+        previous.Dispose();
     }
     protected override void OnTextChanged(EventArgs e){base.OnTextChanged(e);if(title!=null)title.Text=Text;}
     protected virtual bool AnimateAppearance { get { return true; } }
@@ -210,24 +293,46 @@ internal class GeneralDialog : Form {
         bool opening=value&&!Visible&&reveal!=null;
         if(opening){
             if(MinimumSize.IsEmpty)MinimumSize=Size;
+            minimize.Enabled=!Modal;
             allowClose=closing=false;
             origin=new Point(Width-36,0);
-            if(AnimateAppearance)reveal.PrepareOpen(origin);else reveal.SetRound();
+            if(WindowState==FormWindowState.Maximized)reveal.SetSquare();
+            else if(AnimateAppearance)reveal.PrepareOpen(origin);else reveal.SetRound();
         }
         base.SetVisibleCore(value);
         if(opening&&Visible&&!closing&&!allowClose&&AnimateAppearance)reveal.StartPreparedOpen();
     }
     protected override void OnPaintBackground(PaintEventArgs e){
-        GeneralStyle.PaintCard(e.Graphics,ClientSize);
+        if(WindowState==FormWindowState.Maximized)e.Graphics.Clear(GeneralStyle.Surface);
+        else GeneralStyle.PaintCard(e.Graphics,ClientSize);
     }
-    protected override void OnResize(EventArgs e){base.OnResize(e);if(reveal!=null&&!reveal.Running)reveal.SetRound();}
+    protected override void OnResize(EventArgs e){
+        base.OnResize(e);
+        if(reveal==null||WindowState==FormWindowState.Minimized)return;
+        bool expanded=WindowState==FormWindowState.Maximized;
+        if(expanded!=maximizedShape){
+            maximizedShape=expanded;
+            UpdateBodyShape();
+            string label=expanded?GeneralStyle.T("Restaurar tamanho","Restore size"):GeneralStyle.T("Maximizar","Maximize");
+            maximize.IconKind=expanded?"window-restore":"window-maximize";
+            maximize.AccessibleName=label;
+            captionTips.SetToolTip(maximize,label);
+            maximize.Invalidate();
+        }
+        if(expanded)reveal.SetSquare();
+        else if(!reveal.Running)reveal.SetRound();
+    }
     protected override void WndProc(ref Message message){
         base.WndProc(ref message);
         if(WindowState==FormWindowState.Normal&&(reveal==null||!reveal.Running))
             GeneralPopupPlacement.ResizeHit(this,ref message);
     }
     internal void Complete(DialogResult result){DialogResult=result;if(!Modal)Close();}
-    internal void ShowCloseButton(bool visible){close.Visible=visible;header.ColumnStyles[1].Width=visible?44:0;header.Padding=new Padding(20,4,visible?8:20,4);}
+    internal void ShowCloseButton(bool visible){
+        minimize.Visible=maximize.Visible=close.Visible=visible;
+        for(int i=1;i<4;i++)header.ColumnStyles[i].Width=visible?CaptionButtonWidth:0;
+        header.Padding=new Padding(20,4,visible?8:20,4);
+    }
     internal bool CloseButtonShown {get{return close.Visible;}}
     internal void AnchorTo(Control anchor){AnchorBelow(anchor,new Rectangle(0,0,anchor.Width,anchor.Height),true);}
     internal void AnchorBelow(Control anchor,Rectangle bounds,bool alignRight){
@@ -236,31 +341,62 @@ internal class GeneralDialog : Form {
     }
     protected override bool ProcessCmdKey(ref Message message,Keys keyData){if(keyData==Keys.Escape){Complete(DialogResult.Cancel);return true;}return base.ProcessCmdKey(ref message,keyData);}
     protected override void OnFormClosing(FormClosingEventArgs e){
-        base.OnFormClosing(e);if(e.Cancel||allowClose||!Visible||!AnimateAppearance||!GeneralStyle.AnimationsEnabled)return;
-        e.Cancel=true;if(closing)return;closing=true;
+        base.OnFormClosing(e);
+        if(e.Cancel||e.CloseReason!=CloseReason.UserClosing)return;
         var result=DialogResult==DialogResult.None?DialogResult.Cancel:DialogResult;
+        bool animate=Visible&&WindowState==FormWindowState.Normal&&AnimateAppearance&&GeneralStyle.AnimationsEnabled;
+        if(modelessResult!=null){
+            e.Cancel=true;
+            if(closing)return;
+            if(!animate){FinishModeless(result);return;}
+            closing=true;
+            reveal.Begin(false,origin,()=>FinishModeless(result));
+            return;
+        }
+        if(allowClose||!animate)return;
+        e.Cancel=true;if(closing)return;closing=true;
         reveal.Begin(false,origin,()=>{allowClose=true;Complete(result);});
     }
-    internal static DialogResult Message(IWin32Window owner,string text,string caption,MessageBoxButtons buttons=MessageBoxButtons.OK,MessageBoxIcon icon=MessageBoxIcon.None,MessageBoxDefaultButton defaultButton=MessageBoxDefaultButton.Button1,Action<bool> remember=null,string rememberLabel=null,string yesLabel=null,string noLabel=null,bool signal=true){
-        bool decision=buttons!=MessageBoxButtons.OK||remember!=null||icon==MessageBoxIcon.Warning||icon==MessageBoxIcon.Error;
-        using(var dialog=new GeneralDialog(caption){ClientSize=new Size(620,320),MinimumSize=new Size(420,220),RequiresDecision=signal&&decision}){
-            var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(20,8,20,20)};
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            var preference=new CheckBox{Text=rememberLabel??"",AutoSize=true,Dock=DockStyle.Fill,Margin=new Padding(0,8,0,0),Name="queue-errors-suppress",Visible=remember!=null};
-            var body=new TextBox{Multiline=true,ReadOnly=true,BorderStyle=BorderStyle.None,Dock=DockStyle.Fill,ScrollBars=ScrollBars.Vertical,Text=text,BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground,Font=GeneralStyle.Font(12)};
-            var commands=GeneralTableDialogLayout.Commands();
-            var results=buttons==MessageBoxButtons.YesNoCancel?new[]{DialogResult.Yes,DialogResult.No,DialogResult.Cancel}:buttons==MessageBoxButtons.YesNo?new[]{DialogResult.Yes,DialogResult.No}:buttons==MessageBoxButtons.OKCancel?new[]{DialogResult.OK,DialogResult.Cancel}:new[]{DialogResult.OK};
-            foreach(var result in results.Reverse()){
-                var chosen=result;
-                string label=result==DialogResult.Yes?(yesLabel??GeneralStyle.T("Sim","Yes")):result==DialogResult.No?(noLabel??GeneralStyle.T("Não","No")):result==DialogResult.Cancel?GeneralStyle.T("Cancelar","Cancel"):"OK";
-                var action=GeneralStyle.Button(label,()=>dialog.Complete(chosen),result==results[0]);
-                commands.Controls.Add(action);
-                if(result==DialogResult.Cancel||result==DialogResult.No&&buttons==MessageBoxButtons.YesNo)dialog.CancelButton=action;
-                if(result==results[defaultButton==MessageBoxDefaultButton.Button2&&results.Length>1?1:0])dialog.AcceptButton=action;
-            }
-            layout.Controls.Add(new GeneralScrollView(body),0,0);layout.Controls.Add(preference,0,1);layout.Controls.Add(commands,0,2);dialog.Content.Controls.Add(layout);
-            GeneralStyle.Apply(dialog,GeneralStyle.Dark);body.BorderStyle=BorderStyle.None;var answer=dialog.ShowDialog(owner);if(remember!=null&&answer==DialogResult.OK)remember(preference.Checked);return answer;
+
+    protected override void OnFormClosed(FormClosedEventArgs e){
+        var completion=modelessResult;
+        modelessResult=null;
+        if(completion!=null)completion.TrySetResult(DialogResult.Cancel);
+        base.OnFormClosed(e);
+    }
+    internal static DialogResult Message(IWin32Window owner,string text,string caption,MessageBoxButtons buttons=MessageBoxButtons.OK,MessageBoxIcon icon=MessageBoxIcon.None,MessageBoxDefaultButton defaultButton=MessageBoxDefaultButton.Button1,Action<bool> remember=null,string rememberLabel=null,string yesLabel=null,string noLabel=null,bool signal=true,IEnumerable<string> modNames=null){
+        using(var dialog=CreateMessage(owner,text,caption,buttons,icon,defaultButton,remember,rememberLabel,yesLabel,noLabel,signal,modNames)) {
+            var answer=dialog.ShowDialog(owner);
+            if(remember!=null&&answer==DialogResult.OK)remember(dialog.Content.Controls.Find("queue-errors-suppress",true).OfType<CheckBox>().Single().Checked);
+            return answer;
         }
+    }
+    internal static GeneralDialog CreateMessage(IWin32Window owner,string text,string caption,MessageBoxButtons buttons=MessageBoxButtons.OK,MessageBoxIcon icon=MessageBoxIcon.None,MessageBoxDefaultButton defaultButton=MessageBoxDefaultButton.Button1,Action<bool> remember=null,string rememberLabel=null,string yesLabel=null,string noLabel=null,bool signal=true,IEnumerable<string> modNames=null){
+        bool decision=buttons!=MessageBoxButtons.OK||remember!=null||icon==MessageBoxIcon.Warning||icon==MessageBoxIcon.Error;
+        int textHeight;
+        using(var measureFont=GeneralStyle.Font(12,true))textHeight=TextRenderer.MeasureText(text??"",measureFont,new Size(560,Int32.MaxValue),
+            TextFormatFlags.WordBreak|TextFormatFlags.TextBoxControl|TextFormatFlags.NoPrefix).Height;
+        var dialog=new GeneralDialog(caption){ClientSize=new Size(620,320),MinimumSize=new Size(420,220),RequiresDecision=signal&&decision};
+        var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(20,8,20,20)};
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var preference=new CheckBox{Text=rememberLabel??"",AutoSize=true,Dock=DockStyle.Fill,Margin=new Padding(0,8,0,0),Name="queue-errors-suppress",Visible=remember!=null};
+        var body=GeneralMessageText.Create(text,GeneralMessageText.ModNames(owner,modNames));
+        var commands=GeneralTableDialogLayout.Commands();
+        var results=buttons==MessageBoxButtons.YesNoCancel?new[]{DialogResult.Yes,DialogResult.No,DialogResult.Cancel}:buttons==MessageBoxButtons.YesNo?new[]{DialogResult.Yes,DialogResult.No}:buttons==MessageBoxButtons.OKCancel?new[]{DialogResult.OK,DialogResult.Cancel}:new[]{DialogResult.OK};
+        foreach(var result in results.Reverse()){
+            var chosen=result;
+            string label=result==DialogResult.Yes?(yesLabel??GeneralStyle.T("Sim","Yes")):result==DialogResult.No?(noLabel??GeneralStyle.T("Não","No")):result==DialogResult.Cancel?GeneralStyle.T("Cancelar","Cancel"):"OK";
+            var action=GeneralStyle.Button(label,()=>dialog.Complete(chosen),result==results[0]);
+            commands.Controls.Add(action);
+            if(result==DialogResult.Cancel||result==DialogResult.No&&buttons==MessageBoxButtons.YesNo)dialog.CancelButton=action;
+            if(result==results[defaultButton==MessageBoxDefaultButton.Button2&&results.Length>1?1:0])dialog.AcceptButton=action;
+        }
+        layout.Controls.Add(new GeneralScrollView(body),0,0);layout.Controls.Add(preference,0,1);layout.Controls.Add(commands,0,2);dialog.Content.Controls.Add(layout);
+        GeneralStyle.Apply(dialog,GeneralStyle.Dark);body.BorderStyle=BorderStyle.None;
+        int frameHeight=HeaderHeight+dialog.Padding.Vertical+layout.Padding.Vertical+commands.Margin.Vertical+
+            commands.GetPreferredSize(new Size(560,0)).Height+16;
+        dialog.ClientSize=new Size(620,Math.Max(220,Math.Min(480,frameHeight+textHeight+(remember==null?0:30))));
+        return dialog;
     }
 }
 

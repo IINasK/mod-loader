@@ -12,9 +12,60 @@ internal sealed partial class GeneralModWindow {
         using(var writer=new StreamWriter(zip.CreateEntry(path).Open()))writer.Write(contents);
     }
 
+    static GeneralModEntry DetectedEntryForTest(string name,params string[] paths){
+        var entry=NewEntry(name,null);
+        entry.DetectedPaths.AddRange(paths);
+        entry.Variants[0].Sources.Add("installed://"+entry.Id+"/"+entry.DefaultVariant);
+        return entry;
+    }
+
+    static void CheckInventoryGroupingAndZipCache(string root){
+        const string archive="archive/pc/mod/SharedLabel.archive";
+        const string script="r6/scripts/SharedLabel/one.reds";
+        const string secondScript="r6/scripts/SharedLabel/nested/two.reds";
+        const string otherRoot="r6/tweaks/SharedLabel/other.yaml";
+        var candidates=new[]{archive,script,secondScript,otherRoot}.Select(path=>
+            new P2PSyncDifference{Kind="found",Path=path,Mod="SharedLabel"}).ToArray();
+        if(candidates.Select(InventoryLinkStore.Key).Distinct(InventoryPaths).Count()!=3||
+            InventoryLinkStore.Key(candidates[1])!=InventoryLinkStore.Key(candidates[2]))
+            throw new IOException("Raw inventory groups must follow actual folders and paths, even when names collide.");
+
+        var links=new InventoryLinkData();
+        var saved=InventoryLinkStore.Combine(links,null,"Saved group",null,new[]{archive,script});
+        candidates[1].VerifiedZip="matching.zip";
+        candidates[1].InventoryGroupId="zip:SharedLabel";
+        var grouped=InventoryLinkStore.View(candidates,links,new GeneralModEntry[0]).ToArray();
+        if(grouped.Count(item=>InventoryLinkStore.Key(item)==saved.Id)!=2||
+            grouped.Single(item=>item.Path==script).VerifiedZip!="matching.zip")
+            throw new IOException("ZIP evidence must be preserved without splitting the user-saved group.");
+        candidates[1].ProvenOwner="other-owner";
+        grouped=InventoryLinkStore.View(candidates,links,new GeneralModEntry[0]).ToArray();
+        if(grouped.Count(item=>InventoryLinkStore.Key(item)==saved.Id)!=1||
+            grouped.Single(item=>item.Path==script).ProvenOwner!="other-owner")
+            throw new IOException("A saved group cannot override proof of a separate mod owner.");
+
+        string game=Directory.CreateDirectory(Safe.In(root,"cache-game")).FullName;
+        string downloads=Directory.CreateDirectory(Safe.In(root,"cache-zips")).FullName;
+        string installed=Safe.In(game,script);
+        Directory.CreateDirectory(Path.GetDirectoryName(installed));
+        File.WriteAllText(installed,"old");
+        var labels=new Dictionary<string,InventoryZipLabel>(InventoryPaths){
+            {script,new InventoryZipLabel{Name="previous",Archive="previous.zip",Hash=Safe.Hash(installed)}}
+        };
+        InventoryLinkStore.DiscoverZips(game,new[]{downloads},new[]{script},labels,Safe.Hash);
+        if(labels[script].Archive!="previous.zip")throw new IOException("A valid ZIP label is reused across scans.");
+        File.WriteAllText(installed,"new");
+        string currentZip=Safe.In(downloads,"current.zip");
+        using(var zip=ZipFile.Open(currentZip,ZipArchiveMode.Create))WriteZipEntry(zip,script,"new");
+        InventoryLinkStore.DiscoverZips(game,new[]{downloads},new[]{script},labels,Safe.Hash);
+        if(labels[script].Archive!="current.zip"||labels[script].Hash!=Safe.Hash(installed))
+            throw new IOException("A stale ZIP label cannot prevent matching a new archive at the same path.");
+    }
+
     internal static void RunInventoryLinkTests(string parent){
         string root=OnlineTests.NestedRoot(parent,"inv-links-");
         Directory.CreateDirectory(root);
+        CheckInventoryGroupingAndZipCache(root);
         string game=OnlineTests.Fixture(root,"game"),appData=Safe.In(root,"data");
         const string main="archive/pc/mod/local-drone.archive", input="red4ext/plugins/local-drone-input/input.dll";
         const string third="r6/scripts/local-drone-extra/engine.reds", catalogBase="archive/pc/mod/registered.archive";
@@ -31,8 +82,9 @@ internal sealed partial class GeneralModWindow {
         registered.Variants.Add(new GeneralModVariant{Id="unmapped",Name="Local option",
             Sources=new List<string>{"installed://"+registered.Id+"/unmapped"}});
         registered.DetectedPaths.Add(catalogBase);
+        var other=NewEntry("Another registered mod","https://example.org/another-mod.zip");
         var catalog=new FixedCatalog{Schema=1,Id="inventory-links-fixture",GameVersion="2.5",GameFileVersion="2.5.0.0",Packages=new List<FixedMod>()};
-        var state=new GeneralModState{List=new GeneralModList{Mods=new List<GeneralModEntry>{registered}},Language="pt",DownloadFolder=root};
+        var state=new GeneralModState{List=new GeneralModList{Mods=new List<GeneralModEntry>{registered,other}},Language="pt",DownloadFolder=root};
         Action<bool,string> check=(ok,message)=>{if(!ok)throw new IOException(message);};
         var variantRecord=new P2PSyncDifference{Kind="verified-variant",ModId=registered.Id,VariantId="default"};
         var observedFiles=new List<P2PSyncDifference>{variantRecord,new P2PSyncDifference{Kind="found",Path=third}};
@@ -73,6 +125,58 @@ internal sealed partial class GeneralModWindow {
             check(!form.VisibleGameInventory().Any(file=>InventoryLinkStore.Key(file)==original),
                 "The drop replaces the old visual identities.");
             check(new InventoryLinkStore(appData,root).Load().Groups.Count==0,"A different installation folder has its own grouping.");
+            check(saved.Linked.Count==1&&saved.Linked[0].Name=="local-drone-input"&&saved.Linked[0].Paths.SequenceEqual(new[]{input}),
+                "The merge records the original name and destinations of the dragged item.");
+            form.UpdateInventoryLinks(links=>links.Groups.Single().Linked.Clear());
+            var groupItem=form.VisibleGameInventory().First(file=>file.InventoryGroupId==saved.Id);
+            string originalGroup=Safe.Json.Serialize(store.Load().Groups.Single());
+            int initialModCount=form.state.List.Mods.Count;
+            foreach(bool confirm in new[]{false,true}){
+                bool sawMember=false,removedMember=false,staged=false,linkOnly=false;
+                using(var timer=new Timer{Interval=45}){
+                    timer.Tick+=(s,e)=>{
+                        var editor=Application.OpenForms.OfType<GeneralModEditor>().FirstOrDefault(item=>item.Visible);
+                        if(editor==null)return;
+                        timer.Stop();
+                        try{
+                            var linked=editor.Controls.Find("LinkedInventory",true).Single();
+                            var path=linked.Controls.Find("LinkedInventoryPath",true).Single();
+                            var unlink=(Button)linked.Controls.Find("UnlinkInventoryMember",true).Single();
+                            sawMember=path.Text=="red4ext/plugins/local-drone-input"&&unlink.AccessibleName.Contains("local-drone-input");
+                            var scroller=AllControls(editor).OfType<GeneralScrollView>().First(view=>view.Content.Contains(linked));
+                            scroller.ScrollTo(scroller.Bar.Limit);
+                            if(!confirm)CaptureUi(editor,Safe.In(root,"linked-inventory.png"));
+                            unlink.PerformClick();
+                            removedMember=!linked.Visible;
+                            staged=store.Load().Groups.Count==1&&Safe.Json.Serialize(store.Load().Groups.Single())==originalGroup;
+                            var save=(Button)editor.AcceptButton;
+                            linkOnly=save.Enabled&&save.Text=="Salvar";
+                            if(confirm)save.PerformClick();
+                            else editor.CancelButton.PerformClick();
+                        }finally{if(editor.Visible)editor.Close();}
+                    };
+                    var entry=form.DetectedInventoryEntry(groupItem,form.InventoryRow(saved.Id));
+                    timer.Start();
+                    var edit=form.EditMod(entry,true,inventoryGroupId:saved.Id);
+                    try{await Until(()=>edit.IsCompleted);}
+                    catch(IOException ex){
+                        throw new IOException("Inventory editor remained open after "+(confirm?"Save":"Cancel")+".",ex);
+                    }
+                    await edit;
+                }
+                check(sawMember&&removedMember&&staged&&linkOnly,"Unlink stages the split and enables saving links alone.");
+                if(!confirm)
+                    check(store.Load().Groups.Count==1&&Safe.Json.Serialize(store.Load().Groups.Single())==originalGroup,
+                        "Cancel discards the unlink and reopening the editor shows the member.");
+            }
+            check(store.Load().Groups.Count==2&&store.Load().Groups.Single(group=>group.Id==saved.Id).Paths.SequenceEqual(new[]{main})&&
+                form.VisibleGameInventory().Any(file=>file.Mod=="local-drone-input"&&file.Path==input)&&
+                form.state.List.Mods.Count==initialModCount&&Safe.Hash(Safe.In(game,input))==hashes[1],
+                "Saving a split returns the component to the inventory without registering either mod or changing files.");
+            var detached=store.Load().Groups.Single(group=>group.Id!=saved.Id);
+            form.MergeInventoryRows(detached.Id,saved.Id);
+            check(store.Load().Groups.Single().Linked.Single().Paths.SequenceEqual(new[]{input}),
+                "The detached item's identity remains available when it is linked again.");
 
             form.testNexusPreviews=(link,budget)=>{
                 string[] expected=link.Mod==9990?new[]{main,input,third}:new[]{catalogBase,catalogExtra};
@@ -119,12 +223,20 @@ internal sealed partial class GeneralModWindow {
             form.testManualInventoryLink=(source,owner)=>false;
             form.LinkInventoryToMod(key,registered);
             check(store.Load().Groups.Count==0,"Cancelling confirmation keeps the item outside the catalog.");
+            form.marked.Add(other.Id);
             form.PickInventoryOwner(remaining);
             check(form.associationChoice!=null,"The owner picker is active before Escape.");
-            form.associationChoice.TrySetResult(null);
+            check(form.footerAction.Text=="Cancelar"&&!form.versionFooter.Visible,
+                "The picker replaces the left action and hides update counters: "+form.footerAction.Text+" / "+form.versionFooter.Visible);
+            check(form.primaryAction.Text=="Aplicar vínculo"&&!form.primaryAction.Enabled,
+                "The right action awaits a selection: "+form.primaryAction.Text+" / "+form.primaryAction.Enabled);
+            form.ToggleInventoryOwner(form.ModRows().Single(row=>Equals(row.Tag,registered.Id)));
+            var escape=Message.Create(form.grid.Handle,0x100,(IntPtr)Keys.Escape,IntPtr.Zero);
+            check(form.ProcessCmdKey(ref escape,Keys.Escape),"Escape is handled by the picker.");
             for(int tries=0;tries<30&&form.associationChoice!=null;tries++)await System.Threading.Tasks.Task.Delay(15);
-            check(!form.pickingInventoryOwner&&form.associationChoice==null&&store.Load().Groups.Count==0,
-                "Cancel leaves the inventory unchanged and restores the table.");
+            check(!form.pickingInventoryOwner&&form.associationChoice==null&&store.Load().Attachments.Count==0&&
+                form.marked.SetEquals(new[]{other.Id}),"Escape cancels the link and restores the original selection.");
+            form.marked.Clear();
             int linksConfirmed=0;
             form.testManualInventoryLink=(source,owner)=>{linksConfirmed++;return owner==registered.Name;};
             form.PickInventoryOwner(remaining);
@@ -138,22 +250,60 @@ internal sealed partial class GeneralModWindow {
                 new MouseEventArgs(MouseButtons.Left,1,10,10,0));
             typeof(DataGridView).GetMethod("OnCellMouseClick",BindingFlags.Instance|BindingFlags.NonPublic)
                 .Invoke(form.grid,new object[]{click});
-            for(int tries=0;tries<30&&linksConfirmed==0;tries++)await System.Threading.Tasks.Task.Delay(15);
-            check(linksConfirmed==1&&store.Load().Groups.Single().CatalogId==registered.Id&&
-                form.DisplayedInventory().Any(file=>file.Kind=="associated"&&file.ModId==registered.Id&&file.Path==main),
-                "Clicking a registered mod opens one confirmation and saves its associated files.");
-            form.UpdateInventoryLinks(links=>links.Groups.RemoveAll(group=>group.CatalogId==registered.Id));
+            form.ToggleInventoryOwner(form.ModRows().Single(row=>Equals(row.Tag,other.Id)));
+            check(form.primaryAction.Enabled&&store.Load().Attachments.Count==0,"Selections stay pending until Apply.");
+            form.primaryAction.PerformClick();
+            for(int tries=0;tries<60&&store.Load().Attachments.Count==0;tries++)await System.Threading.Tasks.Task.Delay(15);
+            check(linksConfirmed==0&&store.Load().Attachments.Count==1&&store.Load().Attachments[0].Owners.Length==2&&
+                form.DisplayedInventory().Count(file=>file.Kind=="associated"&&file.Path==main)==2&&
+                !form.VisibleGameInventory().Any(file=>file.Path==main),"Apply attaches the files to both mods and clears the loose row.");
+            form.UpdateInventoryLinks(links=>links.Attachments.Clear());
             registeredRow=form.ModRows().Single(row=>Equals(row.Tag,registered.Id));
             form.inventoryDragKey=key;
             var direct=at(registeredRow);
             direct=new DragEventArgs(new DataObject(InventoryDragFormat,key),0,direct.X,direct.Y,DragDropEffects.Move,DragDropEffects.None);
             typeof(Control).GetMethod("OnDragDrop",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(form.grid,new object[]{direct});
             form.inventoryDragKey=null;
-            for(int tries=0;tries<30&&linksConfirmed<2;tries++)await System.Threading.Tasks.Task.Delay(15);
-            check(linksConfirmed==2&&store.Load().Groups.Single().Paths.SequenceEqual(new[]{main}),"Dropping on a registered mod uses the same confirmation and association.");
-            form.UpdateInventoryLinks(links=>links.Groups.RemoveAll(group=>group.CatalogId==registered.Id));
+            for(int tries=0;tries<60&&store.Load().Attachments.Count==0;tries++)await System.Threading.Tasks.Task.Delay(15);
+            check(linksConfirmed==1&&store.Load().Attachments.Count==1&&store.Load().Attachments[0].Path==main,"Dropping on a registered mod uses the same association storage.");
+            form.UpdateInventoryLinks(links=>links.Attachments.Clear());
             check(state.SnapshotReceipts.Count==0&&state.CyberpunkImports.Count==0&&
                 paths.Select(path=>Safe.Hash(Safe.In(game,path))).SequenceEqual(hashes),"Grouping leaves installed content and all ownership records untouched.");
+
+            var knownFile=form.VisibleGameInventory().FirstOrDefault(file=>file.Path==main);
+            check(knownFile!=null,"The raw inventory row returns after removing the local attachment.");
+            knownFile.ProvenOwner=registered.Id;
+            form.DrawRows();
+            var knownRow=form.grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(row=>Object.ReferenceEquals(row.Tag,knownFile));
+            check(knownRow!=null,"The verified file has its own inventory row.");
+            bool showedChoices=false;
+            using(var choose=new Timer{Interval=35}){
+                choose.Tick+=(s,e)=>{
+                    var dialog=Application.OpenForms.OfType<GeneralDialog>().SingleOrDefault(item=>item.Text=="Definir origem");
+                    if(dialog==null)return;
+                    choose.Stop();
+                    var buttons=AllControls(dialog).OfType<Button>().ToArray();
+                    showedChoices=buttons.Any(button=>button.Text=="Vínculo manual");
+                    buttons.Single(button=>button.Text=="Vínculo automático").PerformClick();
+                };
+                choose.Start();form.OpenRowEditor(knownRow);
+            }
+            for(int tries=0;tries<60&&store.Load().Attachments.Count==0;tries++)await System.Threading.Tasks.Task.Delay(15);
+            check(showedChoices&&store.Load().Attachments.Count==1&&store.Load().Attachments[0].Owners.SequenceEqual(new[]{registered.Id}),
+                "Double-click on verified inventory offers manual or automatic linking and reuses a confirmed parent.");
+            string managed=Safe.In(game,main),modifiedAttachment=Safe.In(game,input),untouched=Safe.In(game,third);
+            form.UpdateInventoryLinks(links=>{
+                links.Attachments.Single().Owners=new[]{registered.Id,other.Id};
+                links.Attachments.Add(new InventoryAttachment{Path=input,Hash=Safe.Hash(modifiedAttachment),Owners=new[]{other.Id}});
+            });
+            File.WriteAllText(modifiedAttachment,"user edit");
+            form.RemoveInventoryAttachments(game,new HashSet<string>(StringComparer.Ordinal){registered.Id});
+            check(File.Exists(managed)&&store.Load().Attachments.Single(file=>file.Path==main).Owners.SequenceEqual(new[]{other.Id}),
+                "Uninstall of one owner preserves its shared attachment.");
+            form.RemoveInventoryAttachments(game,new HashSet<string>(StringComparer.Ordinal){other.Id});
+            check(!File.Exists(managed)&&File.ReadAllText(modifiedAttachment)=="user edit"&&File.Exists(untouched)&&store.Load().Attachments.Count==0,
+                "Uninstall of the last owner removes the verified attachment and preserves edits and unrelated files.");
+            File.WriteAllText(managed,"contents");File.WriteAllText(modifiedAttachment,"contents");
 
             const string nightFolder="red4ext/plugins/NightCoop/";
             const string nightDll=nightFolder+"NightCoop.dll", nightLog=nightFolder+"logs/nightcoop.log",
@@ -189,6 +339,23 @@ internal sealed partial class GeneralModWindow {
             await form.Scan();
             check(form.VisibleGameInventory().Any(file=>file.Path==legacyFile&&file.ProvenOwner==legacy.Id),
                 "A verified file without a mod in this project stays outside the catalog.");
+            var outside=form.grid.Rows.Cast<DataGridViewRow>().Single(row=>row.Tag is P2PSyncDifference&&
+                ((P2PSyncDifference)row.Tag).Path==legacyFile);
+            bool manualOnly=false;
+            using(var timer=new Timer{Interval=35}){
+                timer.Tick+=(s,e)=>{
+                    var dialog=Application.OpenForms.OfType<GeneralDialog>().SingleOrDefault(item=>item.Text=="Definir origem");
+                    if(dialog==null)return;
+                    timer.Stop();
+                    var buttons=AllControls(dialog).OfType<Button>().ToArray();
+                    manualOnly=buttons.Any(button=>button.Text=="Associar a um mod")&&
+                        buttons.All(button=>button.Text!="Vínculo automático");
+                    dialog.Close();
+                };
+                timer.Start();form.OpenRowEditor(outside);
+            }
+            check(manualOnly&&state.List.Mods.Count==2&&store.Load().Attachments.Count==0,
+                "A verified origin without an existing parent offers linking without creating a catalog entry.");
             string registeredKey=Key(registered,registered.Variants[0]);
             state.CyberpunkImports.Add(registeredKey,legacy.Id);
             await form.Scan();
@@ -259,14 +426,14 @@ internal sealed partial class GeneralModWindow {
             registered.DetectedPaths.Add(legacyFile);
             await form.Scan();
             check(form.DisplayedInventory().Any(file=>file.Path==generatedFile&&file.Kind=="associated"&&file.ModId==registered.Id)&&
-                !form.DetectedModGroups().Any(group=>group.Any(file=>file.Path==legacyFile||file.Path==generatedFile)),
+                !form.VisibleGameInventory().Any(file=>file.Path==legacyFile||file.Path==generatedFile),
                 "Registering a verified path links its local companion on the next scan.");
             registered.DetectedPaths.Remove(legacyFile);
             catalog.Packages.Remove(legacy);
             string legacyArchive=Safe.In(root,"legacy-origin.zip");
             using(var zip=ZipFile.Open(legacyArchive,ZipArchiveMode.Create))WriteZipEntry(zip,legacyFile,"verified");
             await form.Scan();
-            check(form.DetectedModGroups().Any(group=>group.Any(file=>file.Path==legacyFile&&file.VerifiedZip=="legacy-origin.zip")),
+            check(form.VisibleGameInventory().Any(file=>file.Path==legacyFile&&file.VerifiedZip=="legacy-origin.zip"),
                 "The local scan offers packages verified by the original ZIP even without a receipt.");
             registered.DetectedPaths.Add(legacyFile);
             await form.Scan();
@@ -360,6 +527,7 @@ internal sealed partial class GeneralModWindow {
                 };
                 timer.Start();
                 form.HandleSection((SectionRow)inventoryHeading.Tag);
+                await Until(()=>!timer.Enabled);
             }
             if(dialogError!=null)throw dialogError;
             using(var font=GeneralStyle.Font(11,true)){
@@ -378,8 +546,8 @@ internal sealed partial class GeneralModWindow {
             form.grid.CurrentCell=rowForVilla.Cells["Name"];
             menu.Show(form,new Point(20,20));
             check(menu.Items.Cast<ToolStripItem>().Where(item=>item.Available).Select(item=>item.Text)
-                .SequenceEqual(new[]{"Detalhes","Cadastrar mod detectado…","Abrir local no Mod Loader","Abrir local no Explorador"}),
-                "The inventory context menu exposes registration, details and both location actions directly.");
+                .SequenceEqual(new[]{"Categorizar","Detalhes","Abrir local no Mod Loader","Abrir local no Explorador","Definir origem…"}),
+                "The inventory context menu opens one editor, the focused origin dialog and both location actions.");
             menu.Close();
             using(var local=new GeneralInventoryTree(game,form.DisplayedInventory(),found[exact].Path)){
                 var list=(ListBox)local.Controls.Find("InventoryFileTree",true).Single();
@@ -390,6 +558,115 @@ internal sealed partial class GeneralModWindow {
             await form.Scan();
             check(form.VisibleGameInventory().Single(file=>file.Path==exact).VerifiedZip==null,
                 "Changing the installed bytes removes the confirmed label on the next scan.");
+
+            var misplaced=DetectedEntryForTest("Uncategorized component",third);
+            state.List.Mods.Add(misplaced);
+            form.ActivePreset.ModIds.Add(misplaced.Id);
+            form.UpdateInventoryLinks(links=>links.Attachments.Add(new InventoryAttachment{
+                Path=third,Hash=hashes[2],Owners=new[]{misplaced.Id,other.Id}}));
+            form.ApplyDetectedEntryLink(misplaced,new[]{registered});
+            check(!form.state.List.Mods.Any(mod=>mod.Id==misplaced.Id)&&
+                !form.ActivePreset.ModIds.Contains(misplaced.Id)&&
+                store.Load().Attachments.Single(file=>file.Path==third).Owners.SequenceEqual(new[]{other.Id,registered.Id})&&
+                Safe.Hash(Safe.In(game,third))==hashes[2],
+                "Merging a mistaken catalog row preserves the files, their hashes and their other existing owners.");
+
+            const string originalPath="r6/scripts/source-fixture/core.reds",editedPath="r6/scripts/source-edited/core.reds",
+                configPath="r6/scripts/source-fixture/settings.txt";
+            string originalArchive=Safe.In(root,"retained-source.zip"),editedArchive=Safe.In(root,"edited-source.zip");
+            using(var zip=ZipFile.Open(originalArchive,ZipArchiveMode.Create))WriteZipEntry(zip,originalPath,"stable edition");
+            using(var zip=ZipFile.Open(editedArchive,ZipArchiveMode.Create))WriteZipEntry(zip,editedPath,"stable edition");
+            var originalImport=ImportItem(originalArchive);var editedImport=ImportItem(editedArchive);
+            form.Cyberpunk(game).InstallImported(originalImport,_=>{});
+            form.Cyberpunk(game).InstallImported(editedImport,_=>{});
+            File.WriteAllText(Safe.In(game,editedPath),"changed after installation");
+            File.WriteAllText(Safe.In(game,configPath),"local config");
+            var capsule=DetectedEntryForTest("Detected source");
+            var edited=DetectedEntryForTest("Edited source",editedPath);
+            var stable=NewEntry("Published source",localUrl);
+            stable.Category="Fixture category";
+            form.state.List.Categories.Add(stable.Category);
+            form.ActivePreset.Categories.Add(stable.Category);
+            var stableEdited=NewEntry("Published edited source",knownUrl);
+            var peer=new GeneralModState{Destination=game,List=new GeneralModList{Mods=new List<GeneralModEntry>{stable,stableEdited}}};
+            peer.CyberpunkImports[P2PPack.Slot(stable,stable.Variants[0],0)]=LocalModPackage.RoutedId(originalImport.Sha256,stable.Variants[0].InstallRoutes);
+            peer.CyberpunkImports[P2PPack.Slot(stableEdited,stableEdited.Variants[0],0)]=LocalModPackage.RoutedId(editedImport.Sha256,stableEdited.Variants[0].InstallRoutes);
+            form.testUpdateContexts=()=>new[]{new GeneralUpdateOwnershipContext{Data=Safe.In(root,"peer"),State=peer}};
+            form.state.List.Mods.AddRange(new[]{capsule,edited});
+            form.ActivePreset.ModIds.AddRange(new[]{capsule.Id,edited.Id});
+            form.UpdateInventoryLinks(links=>{
+                links.Attachments.Add(new InventoryAttachment{Path=originalPath,Hash=Safe.Hash(Safe.In(game,originalPath)),Owners=new[]{capsule.Id}});
+                links.Attachments.Add(new InventoryAttachment{Path=configPath,Owners=new[]{capsule.Id}});
+            });
+            await form.Scan();
+            var restored=form.state.List.Mods.Single(mod=>mod.Id==capsule.Id);
+            var persisted=new GeneralModLibrary(Safe.In(appData,"lista.json")).Load();
+            check(restored.Variants.Single().Sources.SequenceEqual(new[]{localUrl})&&restored.Category==stable.Category&&
+                form.statuses[form.MakeWork(restored).Key]=="Instalado"&&form.ActivePreset.ModIds.Contains(capsule.Id)&&
+                !form.state.List.Mods.Any(mod=>mod.Id==stable.Id)&&
+                persisted.List.Mods.Single(mod=>mod.Id==capsule.Id).Variants[0].Sources[0]==localUrl&&
+                store.Load().Attachments.Single(file=>file.Path==configPath).Owners.SequenceEqual(new[]{capsule.Id}),
+                "An intact peer receipt restores the original update source on the existing row, without duplicating it or changing local associations.");
+            check(IsLocalInventoryEntry(form.state.List.Mods.Single(mod=>mod.Id==edited.Id))&&
+                File.ReadAllText(Safe.In(game,editedPath))=="changed after installation",
+                "An edited package cannot acquire a peer source from matching paths alone.");
+
+            const string looseRoot="bin/x64/plugins/cyber_engine_tweaks/mods/local-category-test/";
+            string[] looseFiles={looseRoot+"init.lua",looseRoot+"lib.lua"};
+            Directory.CreateDirectory(Safe.In(game,looseRoot+"sub"));
+            foreach(string path in looseFiles)File.WriteAllText(Safe.In(game,path),"local content");
+            await form.Scan();
+            var loose=form.grid.Rows.Cast<DataGridViewRow>().Single(row=>row.Tag is P2PSyncDifference&&
+                looseFiles.Contains(((P2PSyncDifference)row.Tag).Path));
+            form.grid.CurrentCell=loose.Cells["Name"];
+            menu.Show(form,new Point(20,20));
+            var categories=menu.Items.OfType<ToolStripMenuItem>().Single(item=>item.Name=="CategorizeMods");
+            check(categories.Available&&categories.Enabled&&categories.HasDropDownItems,
+                "An unidentified row exposes its category submenu before the first hover.");
+            categories.ShowDropDown();
+            categories.DropDown.Items.Cast<ToolStripItem>().Single(item=>item.Text==stable.Category).PerformClick();
+            menu.Close();
+            var categorized=form.state.List.Mods.Single(mod=>mod.DetectedPaths.Contains(looseFiles[0]));
+            check(categorized.Category==stable.Category&&form.ActivePreset.ModIds.Contains(categorized.Id)&&
+                new HashSet<string>(categorized.DetectedPaths,InventoryPaths).SetEquals(looseFiles)&&
+                !form.VisibleGameInventory().Any(file=>looseFiles.Contains(file.Path))&&
+                form.statuses[form.MakeWork(categorized).Key]==GeneralStatusPresentation.DetectedFiles,
+                "Categorizing a detected row registers its files together in the active preset.");
+            form.SaveProjectEdits();
+            await form.Scan();
+            check(form.library.Load().List.Mods.Single(mod=>mod.Id==categorized.Id).Category==stable.Category&&
+                !form.VisibleGameInventory().Any(file=>looseFiles.Contains(file.Path))&&
+                looseFiles.All(path=>File.ReadAllText(Safe.In(game,path))=="local content"),
+                "The category survives save and rescan and the local files are untouched.");
+
+            const string reused="r6/scripts/reused-attachment/feature.reds";
+            string reusedFile=Safe.In(game,reused);
+            Directory.CreateDirectory(Path.GetDirectoryName(reusedFile));
+            File.WriteAllText(reusedFile,"first");
+            await form.Scan();
+            var existingAttachment=form.VisibleGameInventory().Single(file=>file.Path==reused);
+            var firstOwner=form.state.List.Mods.Single(mod=>mod.Id==registered.Id);
+            await form.SaveInventoryAttachments(new[]{existingAttachment},new[]{firstOwner});
+            await form.Scan();
+            check(form.DisplayedInventory().Any(file=>file.Path==reused&&file.Kind=="associated"&&file.ModId==firstOwner.Id),
+                "Unchanged content remains linked after a rescan.");
+            var timestamp=File.GetLastWriteTimeUtc(reusedFile);
+            File.WriteAllText(reusedFile,"other");
+            File.SetLastWriteTimeUtc(reusedFile,timestamp);
+            await form.Scan();
+            check(form.VisibleGameInventory().Any(file=>file.Path==reused)&&
+                !form.DisplayedInventory().Any(file=>file.Path==reused&&file.ModId==firstOwner.Id)&&
+                store.Load().Attachments.Single(file=>file.Path==reused).Hash!=Safe.Hash(reusedFile),
+                "Replacing an attachment at the same path and size surfaces it again without silently moving its old proof.");
+            var shared=new HashSet<string>(InventoryPaths);
+            var candidates=form.InventoryUpdateFiles(form.MakeWork(firstOwner),game,form.ReadUpdateContexts(game),shared);
+            check(shared.Contains(reused)&&candidates.All(file=>file.Path!=reused)&&File.ReadAllText(reusedFile)=="other",
+                "An update treats the replacement as protected instead of importing it from an old attachment.");
+            var newOwner=form.state.List.Mods.Single(mod=>mod.Id==other.Id);
+            await form.SaveInventoryAttachments(new[]{form.VisibleGameInventory().Single(file=>file.Path==reused)},new[]{newOwner});
+            check(form.DisplayedInventory().Any(file=>file.Path==reused&&file.ModId==newOwner.Id)&&
+                store.Load().Attachments.Single(file=>file.Path==reused).Hash==Safe.Hash(reusedFile),
+                "An explicit new link takes effect immediately with the current content proof.");
         });
     }
 }

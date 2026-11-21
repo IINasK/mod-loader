@@ -101,6 +101,11 @@ public sealed partial class GeneralModInstaller {
         foreach(string path in Directory.GetFiles(records,"*.json")){
             var record=ReadRecord(path,true);if(record==null)continue;
             foreach(var file in record.Files)file.Owned=false;
+            if(record.Upgrade!=null){
+                record.Upgrade.PreviousImport=record.Upgrade.PreviousSnapshot=record.Upgrade.PreviousFixed=null;
+                record.Upgrade.PreviousPresetFingerprint=record.Upgrade.ExpectedPresetFingerprint=null;record.Upgrade.RetiredKeys.Clear();
+                record.Upgrade.PreviousReceiptIds.Clear();record.Upgrade.RelatedReceipts.Clear();record.Upgrade.PredecessorsRetired=record.Upgrade.Reconciled=true;
+            }
             Safe.WriteJson(target.RecordPath(record.Key),record);
         }
     }

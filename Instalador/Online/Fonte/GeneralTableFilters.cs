@@ -76,10 +76,11 @@ internal sealed partial class GeneralModWindow {
         if(value=="Instalando"||value=="Installing")return "installing";
         if(value=="Instalado"||value=="Installed")return "installed";
         if(value=="Atualizar"||value=="Update"||value==UpdateAvailableStatus||value=="Update available")return "update";
+        if(value=="Revisar"||value=="Review"||value==GeneralStatusPresentation.ReviewUpdate)return "review-update";
         if(value=="Outra versão escolhida"||value=="Other version selected")return "other-choice";
 
         if(value=="Desabilitado"||value=="Disabled")return "disabled";
-        if(value==GeneralStatusPresentation.ChooseDependency||value=="Choose version")return "dependency-version";
+        if(value==GeneralStatusPresentation.ChooseDependency||value=="Choose file"||value=="Choose version"||value=="Escolher versão")return "dependency-version";
         if(value=="Encontrado no jogo"||value=="Found in game")return "game-inventory";
         if(value==GeneralStatusPresentation.DetectedFiles||value=="Files detected")return "detected-files";
         return "error";
@@ -157,9 +158,18 @@ internal sealed partial class GeneralModWindow {
         return mods.OrderBy(mod=>reverseOrder?-StatusRank(mod):StatusRank(mod))
             .ThenBy(mod=>ModDisplayName(mod),names);
     }
-    void ShowColumnFilter(int index){
-        string column=grid.Columns[index].Name;
-        if(!IsFilterColumn(column))return;
+    bool PopupProjectIsCurrent(GeneralModState openedState,GeneralModList openedList,string presetId){
+        return !IsDisposed&&!exitApproved&&associationChoice==null&&Object.ReferenceEquals(state,openedState)&&
+            Object.ReferenceEquals(state.List,openedList)&&state.SelectedPreset==presetId;
+    }
+
+    async void ShowColumnFilter(int index){
+        var openedGrid=grid;
+        string column=openedGrid.Columns[index].Name;
+        if(!IsFilterColumn(column)||GeneralDialog.FocusOpen<GeneralColumnFilterDialog>(this,column))return;
+        var openedState=state;
+        var openedList=state.List;
+        string presetId=state.SelectedPreset;
         string uncat=UncatName();
         var values=new List<string>();
         string title;
@@ -192,6 +202,7 @@ internal sealed partial class GeneralModWindow {
                     T("Falha","Failed")}.ToList();
                 if(statuses.Values.Contains(UpdateAvailableStatus)||modUpdates.Any(HasSourceUpdate))
                     values.Add(GeneralStatusPresentation.Label(UpdateAvailableStatus));
+                if(CountVersions().Review>0)values.Add(GeneralStatusPresentation.Label(GeneralStatusPresentation.ReviewUpdate));
                 if(gameInventory.Any(file=>file.Kind=="found"))values.Add(GameInventoryStatus);
                 foreach(var status in new[]{GeneralStatusPresentation.DetectedFiles,GeneralStatusPresentation.NexusManual,GeneralStatusPresentation.NexusAmbiguous})
                     if(statuses.Values.Contains(status))values.Add(GeneralStatusPresentation.Label(status));
@@ -206,19 +217,22 @@ internal sealed partial class GeneralModWindow {
         IEnumerable<string> selected=current==null?null:column=="Status"
             ?values.Where(value=>current.Any(item=>StatusFilterKey(item)==StatusFilterKey(value)))
             :current.Select(value=>column=="Name"&&value==""?uncat:value);
-        using(var dialog=new GeneralColumnFilterDialog(title,values,selected,nameFilter,column=="Name",sorts,column!="Size")){
-            dialog.AnchorBelow(grid,grid.GetCellDisplayRectangle(index,-1,true),false);
-            if(dialog.ShowDialog(this)!=DialogResult.OK)return;
-            var picked=dialog.ResultValues;
-            if(column=="Name"){
-                categoryFilters=picked.Count==values.Count?null:new HashSet<string>(picked.Select(value=>value==uncat?"":value));
-                nameFilter=dialog.SearchText??"";
-            }else if(column=="Group")groupFilters=picked.Count==values.Count?null:picked;
-            else if(column=="Variant")variantFilters=picked.Count==values.Count?null:picked;
-            else if(column=="Status")statusFilters=picked.Count==values.Count?null:picked;
-            if(dialog.ReverseOrder.HasValue){orderColumn=column;reverseOrder=dialog.ReverseOrder.Value;}
-            RedrawFromTop();
-        }
+        try{
+            using(var dialog=new GeneralColumnFilterDialog(title,values,selected,nameFilter,column=="Name",sorts,column!="Size")){
+                dialog.AnchorBelow(openedGrid,openedGrid.GetCellDisplayRectangle(index,-1,true),false);
+                if(await dialog.ShowModelessAsync(this,column)!=DialogResult.OK||
+                    !PopupProjectIsCurrent(openedState,openedList,presetId)||!Object.ReferenceEquals(grid,openedGrid))return;
+                var picked=dialog.ResultValues;
+                if(column=="Name"){
+                    categoryFilters=picked.Count==values.Count?null:new HashSet<string>(picked.Select(value=>value==uncat?"":value));
+                    nameFilter=dialog.SearchText??"";
+                }else if(column=="Group")groupFilters=picked.Count==values.Count?null:picked;
+                else if(column=="Variant")variantFilters=picked.Count==values.Count?null:picked;
+                else if(column=="Status")statusFilters=picked.Count==values.Count?null:picked;
+                if(dialog.ReverseOrder.HasValue){orderColumn=column;reverseOrder=dialog.ReverseOrder.Value;}
+                RedrawFromTop();
+            }
+        }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
     }
     void UpdateTableTitle(){
         if(tableName==null)return;
@@ -234,27 +248,42 @@ internal sealed partial class GeneralModWindow {
         if(name.Length==0||name.Length>120||name.Any(Char.IsControl)){tableName.Text=selected.Name;return;}
         selected.Name=name;Persist();CapturePresetDraft();RebuildPresets();
     }
-    void ShowPresetSettings(){
-        if(working||scanning)return;
-        using(var menu=new GeneralPresetActionsDialog(ActivePreset==null?T("Preset","Preset"):ActivePreset.Name)){
-            menu.AnchorTo(presetSettings);if(menu.ShowDialog(this)!=DialogResult.OK)return;SavePresetSelection(menu.ActionId=="new");
-        }
+    async void ShowPresetSettings(){
+        if(working||scanning||associationChoice!=null||GeneralDialog.FocusOpen<GeneralPresetActionsDialog>(this))return;
+        var openedState=state;
+        var openedList=state.List;
+        string presetId=state.SelectedPreset;
+        try{
+            using(var menu=new GeneralPresetActionsDialog(ActivePreset==null?T("Preset","Preset"):ActivePreset.Name)){
+                menu.AnchorTo(presetSettings);
+                if(await menu.ShowModelessAsync(this)==DialogResult.OK&&PopupProjectIsCurrent(openedState,openedList,presetId))
+                    SavePresetSelection(menu.ActionId=="new");
+            }
+        }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
     }
-    void SavePresetSelection(bool create){
-        if(working||scanning)return;
+
+    async void SavePresetSelection(bool create){
+        const string popup="save-preset";
+        if(working||scanning||associationChoice!=null||GeneralDialog.FocusOpen<GeneralNameDialog>(this,popup))return;
+        var openedState=state;
+        var openedList=state.List;
+        string presetId=state.SelectedPreset;
         var selected=ActivePreset;if(selected==null)create=true;
-        using(var name=new GeneralNameDialog(T(create?"Novo preset":"Atualizar preset",create?"New preset":"Update preset"),create?"":selected.Name)){
-            if(name.ShowDialog(this)!=DialogResult.OK)return;
-            var ids=PresetCheckedIds();
-            if(create)selected=new GeneralModPreset{Id="preset-"+Guid.NewGuid().ToString("N")};
-            else if(GeneralDialog.Message(this,T("Substituir os itens deste preset pelos mods marcados?","Replace this preset's items with the checked mods?"),T("Atualizar preset","Update preset"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-            BeginProjectEdit();
-            if(create)state.List.Presets.Add(selected);
-            selected.Name=name.ResultName;selected.ModIds=ids;state.SelectedPreset=selected.Id;
-            FinishProjectEdit();
-            if(projectDraft!=null)SaveProjectEdits();
-            CapturePresetDraft();RebuildPresets();
-        }
+        try{
+            using(var name=new GeneralNameDialog(T(create?"Novo preset":"Atualizar preset",create?"New preset":"Update preset"),create?"":selected.Name)){
+                if(await name.ShowModelessAsync(this,popup)!=DialogResult.OK||working||scanning||
+                    !PopupProjectIsCurrent(openedState,openedList,presetId)||!Object.ReferenceEquals(selected,ActivePreset))return;
+                var ids=PresetCheckedIds();
+                if(create)selected=new GeneralModPreset{Id="preset-"+Guid.NewGuid().ToString("N")};
+                else if(GeneralDialog.Message(this,T("Substituir os itens deste preset pelos mods marcados?","Replace this preset's items with the checked mods?"),T("Atualizar preset","Update preset"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
+                BeginProjectEdit();
+                if(create)state.List.Presets.Add(selected);
+                selected.Name=name.ResultName;selected.ModIds=ids;state.SelectedPreset=selected.Id;
+                FinishProjectEdit();
+                if(projectDraft!=null)SaveProjectEdits();
+                CapturePresetDraft();RebuildPresets();
+            }
+        }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
     }
     void ClearPreset(){
         if(working||scanning)return;

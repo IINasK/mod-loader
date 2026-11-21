@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 
 public sealed partial class FixedInstaller {
-    public string DeactivateMany(IEnumerable<string> chosen,Action<string> report,int failAfter=-1,bool keepBackup=true) {
+    public string DeactivateMany(IEnumerable<string> chosen,Action<string> report,int failAfter=-1,bool keepBackup=true,Func<string,bool> preserveAttached=null) {
         if(chosen==null)throw new ArgumentNullException("chosen");
         var ids=new HashSet<string>(chosen,StringComparer.Ordinal);
         if(ids.Count==0)throw new IOException("Marque os mods que deseja remover.");
@@ -39,7 +39,7 @@ public sealed partial class FixedInstaller {
                     .SelectMany(NightCityDensity.KnownFiles).Select(file=>file.Path),StringComparer.OrdinalIgnoreCase);
                 foreach(var file in deletion){
                     Closed();
-                    if(protectedPaths.Contains(file.Path))continue;
+                    if(protectedPaths.Contains(file.Path)||preserveAttached!=null&&preserveAttached(file.Path))continue;
                     string target=Safe.In(game,file.Path);Safe.NoLinks(target);
                     if(!File.Exists(target))continue;
                     report(GeneralStyle.T("Desinstalando · ","Uninstalling · ")+file.Path);

@@ -7,9 +7,11 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
+internal enum P2PVerificationDecision { Stop, Skip, SkipRemaining }
+
 internal sealed class P2PVerificationIssue {
     internal readonly string ModName, Message;
-    internal readonly TaskCompletionSource<bool> Decision=new TaskCompletionSource<bool>();
+    internal readonly TaskCompletionSource<P2PVerificationDecision> Decision=new TaskCompletionSource<P2PVerificationDecision>();
     internal P2PVerificationIssue(string modName,string message){ModName=modName;Message=message;}
 }
 
@@ -75,15 +77,15 @@ internal sealed partial class P2PService {
                     Action<int,int,string> scan=(done,total,item)=>session.SyncProgress=item==null?null:new P2PSyncProgress{Done=done,Total=total,Item=item};
                     var manifest=InstalledSnapshot.Inspect(ExportState(state,session.ExportPreset,session.SelectedMods,session.ExportAllPresets),
                         session.SelectedMods,catalog,appData,includeConfigs,true,checkpoint,
-                        (id,name,message)=>ReviewSnapshotProblem(session,id,name,message),scan);
+                        (id,name,message)=>ReviewSnapshotProblem(session,id,name,message),scan,includeUpdatePreferences:true);
                     IncludePortableOutputs(session,state.Destination,manifest,checkpoint);
                     if(manifest.Schema==3)InstalledSnapshot.Validate(manifest,catalog);
-                    InstalledSnapshot.Write(part,state.Destination,manifest,report,checkpoint,progress);
+                    InstalledSnapshot.Write(part,state.Destination,manifest,report,checkpoint,progress,catalog);
                 }else {
                     if(full&&includeConfigs)InstalledSnapshot.AddFullPackConfigurations(plan,state,catalog,appData,checkpoint);
                     IncludePortableOutputs(session,state.Destination,plan,checkpoint);
                     if(plan.Schema==3)InstalledSnapshot.Validate(plan,catalog);
-                    InstalledSnapshot.Write(part,state.Destination,plan,report,checkpoint,progress);
+                    InstalledSnapshot.Write(part,state.Destination,plan,report,checkpoint,progress,catalog);
                 }
                 checkpoint();
                 string hash=SnapshotVerification.Hash(part,checkpoint);
@@ -101,35 +103,47 @@ internal sealed partial class P2PService {
                 var ready=new ReadyPack{Hash=session.PayloadHash,Size=session.Size};
                 ready.Tag=ReadyTag(session.Hash,session.Id,ready.Hash,ready.Size);
                 Safe.WriteJson(Safe.In(Folder(session),"ready.json"),ready);
-                lock(startGate)Engine.Request("POST","db/scan?folder="+session.Id,null);
                 session.Error=null;session.Stage=null;Save();
+                // The ready descriptor is durable. A large ZIP can take longer to index
+                // than the local API deadline, and the transport watcher still picks it up.
+                ScanSyncFolder(session.Id);
                 OnlineDiagnostics.Record("p2p.pack.ready",null,"Pacote preparado para envio.",
                     new{Id=DiagnosticId(session.Id),Bytes=session.Size,Milliseconds=elapsed.ElapsedMilliseconds});
             }
         }catch(Exception ex){session.Stage=null;if(!session.Discarded){session.Error=ex.Message;Save();}throw;}
         finally{session.SyncProgress=null;}
     }
-    bool ReviewSnapshotProblem(P2PSession session,string modId,string name,string message){
+    internal bool ReviewSnapshotProblem(P2PSession session,string modId,string name,string message){
         if(session.SkippedVerificationMods!=null&&session.SkippedVerificationMods.Contains(modId,StringComparer.Ordinal))return true;
+        if(session.SkipVerificationProblems)return StoreVerificationSkip(session,modId,message,true);
         var issue=new P2PVerificationIssue(name,message);
-        Notify();
         session.VerificationIssue=issue;
+        Notify();
         try{
             while(!issue.Decision.Task.Wait(100)){
                 if(disposed||session.Discarded||session.Completed)throw new OperationCanceledException();
             }
-            lock(session){
-                if(disposed||session.Discarded||session.Completed)throw new OperationCanceledException();
-                bool skip=issue.Decision.Task.Result;
-                OnlineDiagnostics.Record(skip?"p2p.verify.skipped":"p2p.verify.failed",modId,message);
-                if(skip){
-                    var previous=session.SkippedVerificationMods;
-                    session.SkippedVerificationMods=(previous??new string[0]).Concat(new[]{modId}).ToArray();
-                    try{Save();}catch{session.SkippedVerificationMods=previous;throw;}
-                }
-                return skip;
-            }
+            var answer=issue.Decision.Task.Result;
+            if(answer!=P2PVerificationDecision.Stop)
+                return StoreVerificationSkip(session,modId,message,answer==P2PVerificationDecision.SkipRemaining);
+            if(disposed||session.Discarded||session.Completed)throw new OperationCanceledException();
+            OnlineDiagnostics.Record("p2p.verify.failed",modId,message);
+            return false;
         }finally{session.VerificationIssue=null;}
+    }
+
+    bool StoreVerificationSkip(P2PSession session,string modId,string message,bool skipRemaining){
+        lock(session){
+            if(disposed||session.Discarded||session.Completed)throw new OperationCanceledException();
+            var previous=session.SkippedVerificationMods;
+            bool previouslySkipping=session.SkipVerificationProblems;
+            session.SkippedVerificationMods=(previous??new string[0]).Concat(new[]{modId}).ToArray();
+            session.SkipVerificationProblems=skipRemaining;
+            try{Save();}
+            catch{session.SkippedVerificationMods=previous;session.SkipVerificationProblems=previouslySkipping;throw;}
+            OnlineDiagnostics.Record("p2p.verify.skipped",modId,message);
+            return true;
+        }
     }
     internal static GeneralModState ExportState(GeneralModState state,string presetId,string[] ids,bool exportAllPresets=false){
         if(presetId==null&&!exportAllPresets)return state;

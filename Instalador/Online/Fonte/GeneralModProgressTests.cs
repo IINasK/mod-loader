@@ -8,8 +8,8 @@ internal sealed partial class GeneralModWindow {
         using(var form=new GeneralModWindow(catalog,new DownloadCache(Path.Combine(data,"cache")),data,state)){
             string status=form.Status(form.MakeWork(state.List.Mods.Single()),state.Destination);
             var pending=new List<Work>();
-            var downloads=form.PlanSelected(new List<Work>{form.MakeWork(state.List.Mods.Single())},state.Destination,pending);
-            return GeneralStatusPresentation.Kind(status)=="installed"&&pending.Count==0&&downloads.Count==0;
+            form.PlanSelected(new List<Work>{form.MakeWork(state.List.Mods.Single())},state.Destination,pending);
+            return GeneralStatusPresentation.Kind(status)=="installed"&&pending.Count==0;
         }
     }
 

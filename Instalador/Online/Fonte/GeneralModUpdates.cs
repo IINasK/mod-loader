@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 // Metadata is advisory. It never authorizes installation, ownership or a hash change.
 internal sealed class NexusUpdateResult {
     internal string State,Version,Url,SourceVersion;
+    internal string[] ReviewArchives;
     internal static NexusUpdateResult Unknown(string state){return new NexusUpdateResult{State=state};}
 }
 
@@ -76,17 +77,72 @@ internal sealed class NexusUpdateSession {
         if(!active())return NexusUpdateResult.Unknown("cancelled");
         if(!HasCredential)return NexusUpdateResult.Unknown("connect");
         if(link.File<=0)return NexusUpdateResult.Unknown("choose-file");
+        var result=await Page(link).ConfigureAwait(false);
+        if(!active())return NexusUpdateResult.Unknown("cancelled");
+        return result.Failure==null?Evaluate(result.Files,link):NexusUpdateResult.Unknown(result.Failure);
+    }
+    Task<Response> Page(GeneralNexusLink link){
         Task<Response> page;
         string id=link.Game+"/"+link.Mod;
         lock(pages){
             if(!pages.TryGetValue(id,out page)){
-                if(pages.Count>=256)return NexusUpdateResult.Unknown("budget");
+                if(pages.Count>=256)return Task.FromResult(new Response{Failure="budget"});
                 pages[id]=page=Read(link);
             }
         }
-        var result=await page.ConfigureAwait(false);
-        if(!active())return NexusUpdateResult.Unknown("cancelled");
-        return result.Failure==null?Evaluate(result.Files,link):NexusUpdateResult.Unknown(result.Failure);
+        return page;
+    }
+
+    internal sealed class DependencyFiles {
+        internal FileInfoItem[] Choices=new FileInfoItem[0];
+        internal FileInfoItem Automatic;
+        internal string Failure;
+    }
+    internal async Task<DependencyFiles> DependencyChoices(GeneralNexusLink link,int pinned,
+        GeneralNexusRequirement[][] required,Func<bool> active){
+        if(!active())return new DependencyFiles{Failure="cancelled"};
+        if(!HasCredential)return new DependencyFiles{Failure="connect"};
+        var result=await Page(link).ConfigureAwait(false);
+        if(!active()||result.Failure!=null)return new DependencyFiles{Failure=result.Failure??"cancelled"};
+        var published=result.Files.files.Where(file=>file.category_id>=1&&file.category_id<=3&&
+            !String.IsNullOrWhiteSpace(file.file_name)&&file.file_name.Length<=300&&!file.file_name.Any(Char.IsControl)&&
+            GeneralNexusUpdatePackage.ValidFilename(file.file_name)&&(pinned<=0||file.file_id==pinned)).ToArray();
+        var choices=new DependencyFiles{Choices=published};
+        if(required.Length==0){
+            // The published archive list already excludes archived and removed editions.
+            // A patch or an optional archive alone cannot stand in for an unpinned main file.
+            if(published.Length==1&&(pinned>0||published[0].category_id==1))choices.Automatic=published[0];
+            return choices;
+        }
+        // Follow the publisher's replacement edges from each required minimum and stop at its maximum.
+        var successors=result.Files.file_updates.ToLookup(edge=>edge.old_file_id,edge=>edge.new_file_id);
+        HashSet<int> compatible=null;
+        foreach(var alternatives in required){
+            var union=new HashSet<int>();
+            foreach(var range in alternatives){
+                var visited=new HashSet<int>();
+                int current=range.MinFile;
+                bool reachedMaximum=range.MaxFile==0,ambiguous=false;
+                while(current>0){
+                    if(!visited.Add(current)){ambiguous=true;break;}
+                    if(current==range.MaxFile){reachedMaximum=true;break;}
+                    var next=successors[current].Distinct().Take(2).ToArray();
+                    if(next.Length>1){ambiguous=true;break;}
+                    current=next.Length==1?next[0]:0;
+                }
+                if(ambiguous||!reachedMaximum)union.Add(range.MinFile);
+                else union.UnionWith(visited);
+                if(range.MaxFile>0)union.Add(range.MaxFile);
+            }
+            if(compatible==null)compatible=union;else compatible.IntersectWith(union);
+        }
+        var proven=published.Where(file=>compatible.Contains(file.file_id)).ToArray();
+        var availableIds=new HashSet<int>(proven.Select(file=>file.file_id));
+        var newest=proven.Where(file=>!successors[file.file_id].Any(availableIds.Contains)).ToArray();
+        choices.Choices=newest.Length>0?newest:proven;
+        if(choices.Choices.Length==1)choices.Automatic=choices.Choices[0];
+        if(choices.Choices.Length==0)choices.Failure="no-compatible-file";
+        return choices;
     }
     async Task<Response> Read(GeneralNexusLink link){
         await budget.WaitAsync().ConfigureAwait(false);
@@ -151,7 +207,7 @@ internal sealed class NexusUpdateSession {
         }catch(ArgumentException){return NexusUpdateResult.Unknown("unavailable");}catch(InvalidOperationException){return NexusUpdateResult.Unknown("unavailable");}
     }
     public sealed class FilesResponse {public FileInfoItem[] files {get;set;}public FileUpdate[] file_updates {get;set;}}
-    public sealed class FileInfoItem {public int file_id {get;set;}public int category_id {get;set;}public string version {get;set;}}
+    public sealed class FileInfoItem {public int file_id {get;set;}public int category_id {get;set;}public string version {get;set;}public string file_name {get;set;}}
     public sealed class FileUpdate {public int old_file_id {get;set;}public int new_file_id {get;set;}}
 }
 
@@ -166,23 +222,15 @@ internal sealed class GithubModUpdateSession {
         this.fetch=fetch??GeneralUpdateChecker.ReadGithubRelease;
     }
 
-    static Match Download(string source){
-        Uri link;
-        if(!Uri.TryCreate(source,UriKind.Absolute,out link)||link.Scheme!="https"||link.Host!="github.com"||
-            !link.IsDefaultPort||!String.IsNullOrEmpty(link.UserInfo)||link.Query.Length!=0||link.Fragment.Length!=0)return null;
-        var match=Regex.Match(link.AbsolutePath,@"\A/(?<repo>[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100})/releases/download/(?<tag>[A-Za-z0-9][A-Za-z0-9_.-]{0,119})/[^/]+\z");
-        return match.Success?match:null;
-    }
-
-    internal static bool Supports(string source){return Download(source)!=null;}
+    internal static bool Supports(string source){return GeneralGithubLink.Parse(source)!=null;}
 
     internal async Task<NexusUpdateResult> Check(string source,Func<bool> active){
-        var match=Download(source);
-        if(match==null)return NexusUpdateResult.Unknown("no-source");
+        var link=GeneralGithubLink.Parse(source);
+        if(link==null)return NexusUpdateResult.Unknown("no-source");
         if(!active())return NexusUpdateResult.Unknown("cancelled");
-        string repository=match.Groups["repo"].Value;
-        string tag=match.Groups["tag"].Value;
-        if(ModVersionNumbers.Compare(tag,tag)==null)return NexusUpdateResult.Unknown("ambiguous");
+        string repository=link.Repository;
+        string tag=link.Tag;
+        if(tag!=null&&ModVersionNumbers.Compare(tag,tag)==null)return NexusUpdateResult.Unknown("ambiguous");
         Lookup lookup;
         lock(releases){
             var now=DateTime.UtcNow;
@@ -196,10 +244,16 @@ internal sealed class GithubModUpdateSession {
         var release=await lookup.Result.ConfigureAwait(false);
         if(!active())return NexusUpdateResult.Unknown("cancelled");
         if(release==null)return NexusUpdateResult.Unknown("unavailable");
+        if(tag==null)return new NexusUpdateResult{State="choose-file",Version=release.tag_name,Url=link.Page};
         int? newer=ModVersionNumbers.Compare(release.tag_name,tag);
         if(!newer.HasValue||newer.Value<0)return NexusUpdateResult.Unknown("ambiguous");
-        return new NexusUpdateResult{State=newer.Value>0?"update":"current",Version=release.tag_name,
-            SourceVersion=tag,Url="https://github.com/"+repository+"/releases/tag/"+Uri.EscapeDataString(release.tag_name)};
+        string successor=GeneralGithubUpdatePackage.Successor(link,release);
+        var review=newer>0&&successor==null?GeneralGithubUpdatePackage.ReleaseAssets(repository,release)
+            .Where(asset=>GeneralGithubUpdatePackage.Digest(asset)!=null)
+            .Select(asset=>GeneralGithubLink.Parse(asset.browser_download_url).Url).Distinct(StringComparer.Ordinal).ToArray():null;
+        return new NexusUpdateResult{State=newer.Value>0?"update":"current",Version=release.tag_name,ReviewArchives=review,
+            SourceVersion=tag,Url=successor??
+                "https://github.com/"+repository+"/releases/tag/"+Uri.EscapeDataString(release.tag_name)};
     }
 
     async Task<GeneralUpdateChecker.Release> Read(string repository){

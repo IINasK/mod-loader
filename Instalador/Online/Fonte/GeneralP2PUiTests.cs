@@ -7,6 +7,31 @@ using System.Reflection;
 using System.Windows.Forms;
 
 internal static class GeneralP2PUiTests {
+    static void CheckConnectionPrompt(string root,string theme,string locale,Action<bool,string> check){
+        const string pack="Com DLC Phantom Liberty";
+        using(var prompt=GeneralP2PDialog.CreateConnectionPrompt(null,pack)){
+            prompt.StartPosition=FormStartPosition.Manual;prompt.Location=new Point(-30000,-30000);prompt.Show();
+            Application.DoEvents();
+            var accept=prompt.Content.Controls.Find("p2p-accept-request",true).Single();
+            var decline=prompt.Content.Controls.Find("p2p-decline-request",true).Single();
+            var message=(RichTextBox)prompt.Content.Controls.Find("MessageText",true).Single();
+            string explanation=locale=="en"?"Your friend wants to receive this pack.":"Seu amigo quer receber este pacote.";
+            var end=message.GetPositionFromCharIndex(message.TextLength);
+            check(accept.Size==decline.Size&&accept.Top==decline.Top&&accept.Right<decline.Left&&
+                Inside(accept,prompt.Content)&&Inside(decline,prompt.Content),
+                "As ações do pedido têm a mesma área, recuo e alinhamento em "+theme+"/"+locale);
+            check(message.Text.Contains(explanation)&&message.Text.IndexOf('\n')>=pack.Length&&
+                end.Y+message.Font.Height<=message.ClientSize.Height,
+                "O nome e a mensagem do pedido aparecem completos em "+theme+"/"+locale);
+            if(theme=="dark"&&locale=="pt"){
+                using(var image=new Bitmap(prompt.Width,prompt.Height)){
+                    prompt.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));
+                    image.Save(Path.Combine(root,"connection-request.png"));
+                }
+            }
+        }
+    }
+
     internal static int Run(string parent){
         string root=OnlineTests.NestedRoot(parent,"p2p-ui-");Directory.CreateDirectory(root);var checks=new List<string>();
         Action<bool,string> check=(ok,text)=>{if(!ok)throw new IOException(text);checks.Add(text);};
@@ -23,6 +48,7 @@ internal static class GeneralP2PUiTests {
             using(var service=new P2PService(Path.Combine(root,"private"),Path.Combine(root,"transport"),true)){
                 foreach(string theme in new[]{"light","light-red","dark","black"})foreach(string locale in new[]{"pt","en"}){
                     GeneralStyle.UseTheme(theme);GeneralStyle.Language=locale;GeneralStyle.AnimationsEnabled=false;
+                    CheckConnectionPrompt(root,theme,locale,check);
                     using(var dialog=new GeneralP2PDialog(service,state,catalog,false,()=>System.Threading.Tasks.Task.FromResult(foundGames))){
                         dialog.ShowInTaskbar=false;dialog.StartPosition=FormStartPosition.Manual;dialog.Location=new Point(-30000,-30000);dialog.Show();
                         // The test supplies the transfer status explicitly.

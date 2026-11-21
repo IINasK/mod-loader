@@ -1,17 +1,23 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
 using System.Windows.Forms;
 
 internal sealed partial class GeneralProjectHome {
-    void EditSavedProject(GeneralProject project,HomeProjectCard card){
-        var current=store.Load(project);
-        using(var dialog=new GeneralProjectCreationDialog(project.Name,null,current.Destination,
-            System.IO.File.Exists(store.CoverPath(project))?store.CoverPath(project):null,editing:true)){
-            using(var preview=card.CopyCover())if(!dialog.HasCover&&preview!=null)dialog.ShowCoverPreview(preview);
-            if(dialog.ShowDialog(this)!=DialogResult.OK)return;
-            store.Edit(project,dialog.ResultName,dialog.SaveCover);
-        }
+    async void EditSavedProject(GeneralProject project,HomeProjectCard card){
+        if(GeneralDialog.FocusOpen<GeneralProjectCreationDialog>(this,project.Id))return;
+        try{
+            var current=store.Load(project);
+            using(var dialog=new GeneralProjectCreationDialog(project.Name,null,current.Destination,
+                System.IO.File.Exists(store.CoverPath(project))?store.CoverPath(project):null,editing:true)){
+                using(var preview=card.CopyCover())if(!dialog.HasCover&&preview!=null)dialog.ShowCoverPreview(preview);
+                if(await dialog.ShowModelessAsync(this,project.Id)!=DialogResult.OK||IsDisposed||exitApproved||
+                    !store.Read().Projects.Any(item=>item.Id==project.Id))return;
+                store.Edit(project,dialog.ResultName,dialog.SaveCover);
+                if(Visible)Build();
+            }
+        }catch(Exception ex){if(!IsDisposed)ReportHomeError(ex);}
     }
 
     internal sealed partial class HomeProjectCard {
@@ -64,9 +70,9 @@ internal sealed partial class GeneralProjectHome {
             if(RemoveButton==null)return;
             int dpi=DeviceDpi,size=44*dpi/96,inset=5*dpi/96;
             RemoveButton.SetBounds(inset,inset,size,size);
-            int art=Math.Min(Width*3/2,Height-CaptionHeight(dpi));
+            int art=ArtworkHeight;
             int line=Math.Max(Font.Height+2*dpi/96,25*dpi/96);
-            int titleWidth=Math.Max(1,Width-48*dpi/96);
+            int titleWidth=CaptionWidth(dpi);
             int titleHeight=TextRenderer.MeasureText(Text,Font).Width>titleWidth?line*2:line;
             EditButton.SetBounds(Width-size,art+5*dpi/96+(titleHeight-size)/2,size,size);
         }

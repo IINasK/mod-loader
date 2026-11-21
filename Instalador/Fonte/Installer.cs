@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -47,11 +47,33 @@ public static class Safe {
         }
     }
     public static void WriteJson(string file, object value) {
-        NoLinks(file); Directory.CreateDirectory(System.IO.Path.GetDirectoryName(file));
-        string tmp=file+"."+Guid.NewGuid().ToString("N")+".tmp";
-        using (var s=new FileStream(tmp,FileMode.CreateNew,FileAccess.Write,FileShare.None))
-        using (var w=new StreamWriter(s,new UTF8Encoding(false))) { w.Write(Json.Serialize(value)); w.Flush(); s.Flush(true); }
-        if(File.Exists(file)) File.Replace(tmp,file,null); else File.Move(tmp,file);
+        WriteJson(file,value,false);
+    }
+    internal static bool TryWriteSharedJson(string file,object value) {
+        return WriteJson(file,value,true);
+    }
+    static bool WriteJson(string file,object value,bool allowReader){
+        NoLinks(file);
+        string directory=System.IO.Path.GetDirectoryName(file);
+        Directory.CreateDirectory(directory);
+        string tmp=System.IO.Path.Combine(directory,Guid.NewGuid().ToString("N")+".tmp");
+        bool created=false;
+        try {
+            using(var stream=new FileStream(tmp,FileMode.CreateNew,FileAccess.Write,FileShare.None)){
+                created=true;
+                using(var writer=new StreamWriter(stream,new UTF8Encoding(false))){
+                    writer.Write(Json.Serialize(value));writer.Flush();stream.Flush(true);
+                }
+            }
+            if(File.Exists(file))File.Replace(tmp,file,null);else File.Move(tmp,file);
+            return true;
+        }catch(IOException ex){
+            int code=ex.HResult&0xffff;
+            if(!allowReader||code!=32&&code!=33&&code!=1175)throw;
+            return false;
+        }finally{
+            if(created)try{File.Delete(tmp);}catch(IOException){}catch(UnauthorizedAccessException){}
+        }
     }
     public static void CopyAtomic(string source,string destination,string expectedHash) {
         NoLinks(source); NoLinks(destination); Directory.CreateDirectory(System.IO.Path.GetDirectoryName(destination));

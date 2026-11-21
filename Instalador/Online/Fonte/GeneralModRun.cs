@@ -13,13 +13,22 @@ internal sealed partial class GeneralModWindow {
         internal GeneralModEntry Entry;
         internal GeneralModVariant Variant;
         internal bool Ended,Applied,SwitchAlternatives,DependencyQueue,SaveVariant,ReviewReplacement,UpdateRequested,RecognizedUpdate;
+        internal GeneralModInstaller.UpgradeInfo SharedInstallation;
         internal HashSet<string> DropConflicts;
-        internal bool BackupUpdate;
-        internal GeneralModInstaller.CommittedUpgrade SharedInstallation;
+
         internal string DropDensity, BodyChoice, ScanError, DiagnosticStage, DiagnosticVersion;
+        internal string UpdateTarget,UpdatePhase;
+        internal int? UpdatePercent;
+        internal bool NoGithubMatch,ManualAttentionPlayed;
+        internal bool PendingDownload,BackupUpdate,ReviewSelectedPackage;
+        internal string[] PendingFixedDependencies;
+        internal UpdateBatch Batch;
+        internal Task<GeneralSourceUpdatePackage> Prepared;
+        internal bool BrowserOpened,HaveDownload;
+        internal string AutoUpdateDirectory;
         internal double Fraction;
         internal string Key { get{return GeneralModWindow.Key(Entry,Variant);} }
-        internal bool Local { get{return Variant.CyberpunkId==null&&Variant.Sources.All(GeneralModDownload.IsArchivePath);} }
+        internal bool Local { get{return Variant.CyberpunkId==null&&Variant.Sources.All(GeneralModDownload.IsLocalSource);} }
         internal string Receipt(int index){return Key+"/"+index+"/"+Variant.Sources[index];}
     }
     readonly List<Work> normal=new List<Work>(),priority=new List<Work>();
@@ -62,13 +71,19 @@ internal sealed partial class GeneralModWindow {
     }
     string LocalSource(Work work,int index){
         string source=work.Variant.Sources[index],resolved;
-        return GeneralModDownload.IsArchivePath(source)?source:
+        return GeneralModDownload.IsLocalSource(source)?source:
             P2PPack.TrySlot(state.ResolvedDownloads,work.Entry,work.Variant,index,out resolved)?resolved:null;
     }
     static string ExistingReceipt(GeneralModInstaller engine,Work work,int index){
         string key=work.Receipt(index);
         string legacy=P2PPack.LegacySlot(work.Entry,work.Variant,index);
         return legacy!=null&&!engine.HasSnapshotRecord(key)&&engine.HasSnapshotRecord(legacy)?legacy:key;
+    }
+    static string GenericSourceStatus(GeneralModInstaller engine,string key,string source,Func<string,string> hash,List<GeneralInstallRoute> routes){
+        bool folder=GeneralModFolderSource.IsSource(source);
+        string status=engine.Status(key,folder?null:source,hash,routes);
+        if(folder&&Directory.Exists(source)&&status==GeneralModInstaller.Installed&&!GeneralModFolderSource.Matches(source,engine.ReadPackageRecord(key),hash))return "Versão diferente";
+        return status;
     }
     static ModImportItem ImportItem(string source){
         string hash=Safe.Hash(source);
@@ -83,7 +98,23 @@ internal sealed partial class GeneralModWindow {
     }
     List<Work> Marked(){return ModRows().Where(r=>marked.Contains((string)r.Tag)).Select(r=>MakeWork(state.List.Mods.Single(m=>m.Id==(string)r.Tag))).ToList();}
     void Stage(Work work,string phase){if(testMode&&testStage!=null)testStage(work.Key,phase);}
-    void RequestSkip(){if(loadingPreset){CancelPresetLoad();return;}var work=scanning?scanCurrent:priorityCurrent??current;if(work!=null)skipRequests.Add(work);}
+    void RequestSkip(){
+        if(loadingPreset){CancelPresetLoad();return;}
+        var work=scanning?scanCurrent:priorityCurrent??current;
+        if(work==null)return;
+        skipRequests.Add(work);
+        if(work.Batch!=null){
+            work.Batch.Cancelled=true;
+            if(work.Batch==updateSummary)UpdateFooterAction();
+            foreach(var queued in normal.Concat(priority).Where(item=>item.Batch==work.Batch).ToArray()){
+                normal.Remove(queued);priority.Remove(queued);operationTotal--;
+                RowStatus(queued,queued.UpdateRequested?UpdateAvailableStatus:"Pulado");
+            }
+            currentProgress.CaptionLink=null;
+            work.UpdatePhase=T("Cancelando…","Cancelling…");work.UpdatePercent=null;
+            RowStatus(work,"Verificando");
+        }
+    }
     void CheckSkip(Work work){if(skipRequests.Contains(work))throw new OperationCanceledException();}
     void UpdateFlow(Work work,string status,int? percent=null){
         if(work!=null){
@@ -103,8 +134,9 @@ internal sealed partial class GeneralModWindow {
             currentProgress.Caption=work.Entry.Name+" · "+GeneralStatusPresentation.Label(GeneralStatusPresentation.OtherChoice);
             currentProgress.Value=0;
             currentProgress.Indeterminate=false;
-        }else currentProgress.Caption=work.Entry.Name+" · "+(status==GeneralStatusPresentation.DetectedFiles
-            ?GeneralStatusPresentation.Label(status):GeneralStyle.Status(status));
+        }else currentProgress.Caption=currentProgress.CaptionLink!=null&&work.UpdatePhase!=null?work.UpdatePhase:
+            work.Entry.Name+" · "+(work.UpdatePhase??(status==GeneralStatusPresentation.DetectedFiles
+            ?GeneralStatusPresentation.Label(status):GeneralStyle.Status(status)));
         currentProgress.Invalidate();
     }
     string Root(){
@@ -114,14 +146,18 @@ internal sealed partial class GeneralModWindow {
         return root;
     }
     void RowStatus(Work work,string status,int? pct=null,string message=null){
+        if(status=="Instalado"||status=="Falhou"||status=="Pulado"||status=="Parcial/pulado"||status==UpdateAvailableStatus)
+            work.UpdatePhase=null;
         string previous;statuses.TryGetValue(work.Key,out previous);
-        statuses[work.Key]=status;
+        bool updating=work.UpdateRequested||work.UpdateTarget!=null;
+        string badge=updating&&IsUpdateInProgress(status)?UpdateAvailableStatus:status;
+        statuses[work.Key]=badge;
         if(work.DiagnosticStage!=null&&status!="Falhou"&&work.DiagnosticStage!=status){
             work.DiagnosticStage=status;
             OnlineDiagnostics.Record("general.install.stage",work.Entry.Id,"Etapa da fila de instalação.",new{Stage=status,Variant=work.Variant.Id});
         }
         if(message!=null)statusDetails[work.Key]=message;else statusDetails.Remove(work.Key);
-        if((coverageFilter!=null||statusFilters!=null||orderColumn=="Status"||work.Entry.AlternativeGroup!=null||work.Entry.Variants.Count>1)&&previous!=status)DrawRows();
+        if((coverageFilter!=null||statusFilters!=null||orderColumn=="Status"||work.Entry.AlternativeGroup!=null||work.Entry.Variants.Count>1)&&previous!=badge)DrawRows();
         if(pct.HasValue)progress[work.Key]=pct.Value;else progress.Remove(work.Key);
         var visible=grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(r=>Equals(r.Tag,work.Entry.Id));
         var listed=state.List.Mods.FirstOrDefault(m=>m.Id==work.Entry.Id);
@@ -133,6 +169,13 @@ internal sealed partial class GeneralModWindow {
         }
 
         if(working||scanning)UpdateFlow(work,status,pct);
+    }
+    static bool IsUpdateInProgress(string stage){
+        switch(stage){
+            case "Na fila": case "Verificando": case "Baixando": case "Conferindo download":
+            case "Aguardando download": case "Aguardando arquivo": return true;
+            default:return false;
+        }
     }
     string ListStatus(GeneralModEntry mod){
 
@@ -164,8 +207,11 @@ internal sealed partial class GeneralModWindow {
             return T("Arquivos do corpo encontrados no jogo. Falta o registro de instalação usado na exportação.",
                 "Body files found in the game. The installation record used for export is missing.");
         if(status==GeneralStatusPresentation.DetectedFiles)
-            return T("A lista registra os caminhos vistos na verificação. O pacote completo ainda não foi conferido.",
-                "The list records paths seen during scanning. The complete package is still unverified.");
+            return T("Arquivos encontrados no jogo. Ainda falta conferir o pacote completo.",
+                "Files found in the game. The complete package still needs to be verified.");
+        if(status==GeneralStatusPresentation.ChooseDependency)
+            return T("O preset pede esta dependência. Clique em Escolher arquivo para consultar os pacotes publicados.",
+                "The preset requires this dependency. Choose file checks its published archives.");
         if(status==GeneralStatusPresentation.OtherChoice)return GeneralStatusPresentation.Label(status);
         string message;return statusDetails.TryGetValue(key,out message)?message:GeneralStyle.Status(status??"Não conferido");
     }
@@ -184,18 +230,19 @@ internal sealed partial class GeneralModWindow {
         internal readonly Lazy<InstalledSnapshotInstaller.StatusScan> Snapshots;
         internal readonly Lazy<GeneralModInstaller> Generic;
         internal readonly Lazy<HashSet<string>> Imports, Disabled;
+        internal readonly Dictionary<string,string[]> VerifiedImportPaths=new Dictionary<string,string[]>(StringComparer.Ordinal);
         internal readonly Lazy<ILookup<long,string>> DownloadNames;
         internal readonly Lazy<ILookup<string,SharedInstalledUpdate>> SharedUpdates;
         internal int HashCount {get{return hashes.Count;}}
         internal ScanReads(GeneralModWindow window,string root){
             this.root=root;
-            SharedUpdates=new Lazy<ILookup<string,SharedInstalledUpdate>>(()=>window.ReadSharedInstalledUpdates(root));
             Snapshots=new Lazy<InstalledSnapshotInstaller.StatusScan>(()=>new InstalledSnapshotInstaller.StatusScan(window.Snapshot(root),Hash));
+            SharedUpdates=new Lazy<ILookup<string,SharedInstalledUpdate>>(()=>window.ReadSharedInstalledUpdates(root));
             Generic=new Lazy<GeneralModInstaller>(()=>window.Generic(root));
             Exists=!String.IsNullOrEmpty(root)&&Directory.Exists(root);
             Cyberpunk=IsCyberpunk(root);
             PhantomLiberty=Cyberpunk&&GameEdition.HasPL(root);
-            Imports=new Lazy<HashSet<string>>(()=>window.Cyberpunk(root).InstalledImports(Hash));
+            Imports=new Lazy<HashSet<string>>(()=>window.Cyberpunk(root).InstalledImports(Hash,VerifiedImportPaths));
             Disabled=new Lazy<HashSet<string>>(()=>new HashSet<string>(window.DisabledAt(root).Read().Keys,StringComparer.Ordinal));
             DownloadNames=new Lazy<ILookup<long,string>>(()=>LocalDownloadNames(window.state.DownloadFolder));
         }
@@ -292,12 +339,15 @@ internal sealed partial class GeneralModWindow {
             if(cyberpunk){
                 var installed=reads==null?Cyberpunk(root).InstalledImports():reads.Imports.Value;
                 results=Enumerable.Range(0,work.Variant.Sources.Count).Select(i=>{
+                    var engine=reads==null?Generic(root):reads.Generic.Value;
+                    string key=ExistingReceipt(engine,work,i);
+                    if(engine.HasSnapshotRecord(key))return GenericSourceStatus(engine,key,LocalSource(work,i),hash??(Func<string,string>)Safe.Hash,work.Variant.InstallRoutes);
                     return installed.Contains(CyberpunkImportId(work,i,hash))?GeneralModInstaller.Installed:GeneralModInstaller.Missing;
                 }).ToList();
             }else{
                 var engine=reads==null?Generic(root):reads.Generic.Value;
                 results=Enumerable.Range(0,work.Variant.Sources.Count)
-                    .Select(i=>engine.Status(ExistingReceipt(engine,work,i),LocalSource(work,i),hash??(Func<string,string>)Safe.Hash,work.Variant.InstallRoutes)).ToList();
+                    .Select(i=>GenericSourceStatus(engine,ExistingReceipt(engine,work,i),LocalSource(work,i),hash??(Func<string,string>)Safe.Hash,work.Variant.InstallRoutes)).ToList();
             }
             if(results.All(r=>r==GeneralModInstaller.Installed))return "Instalado";
             if(results.Contains("Versão diferente"))return "Versão diferente";
@@ -320,7 +370,8 @@ internal sealed partial class GeneralModWindow {
         if(exists&&includeNexus&&MatchesNexusInstallation(work,root))
             return GeneralStatusPresentation.NexusManual;
         if(work.Variant.Sources.Any(s=>GeneralModDownload.IsArchivePath(s)&&!File.Exists(s)))return "Arquivo não encontrado";
-        if(work.Variant.Sources.Count>0&&Enumerable.Range(0,work.Variant.Sources.Count).All(index=>File.Exists(LocalSource(work,index))))
+        if(work.Variant.Sources.Any(s=>GeneralModFolderSource.IsSource(s)&&!Directory.Exists(s)))return "Arquivo não encontrado";
+        if(work.Variant.Sources.Count>0&&Enumerable.Range(0,work.Variant.Sources.Count).All(index=>File.Exists(LocalSource(work,index))||GeneralModFolderSource.IsSource(LocalSource(work,index))&&Directory.Exists(LocalSource(work,index))))
             return "Pronto para instalar";
         if(cyberpunk&&work.Variant.Id==work.Entry.DefaultVariant&&work.Entry.DetectedPaths.Any(path=>File.Exists(Safe.In(root,path))))
             return GeneralStatusPresentation.DetectedFiles;
@@ -340,9 +391,11 @@ internal sealed partial class GeneralModWindow {
         });
     }
 
-    async Task Scan(ProjectVerification audit=null,int? workerLimit=null){
+    async Task Scan(ProjectVerification audit=null){
         if(working||scanning)return;
+        updateSummary=null;UpdatePackCoverage();
         if(String.IsNullOrWhiteSpace(state.Destination)){
+            FinishStartupLoading();
             RefreshPrimaryAction();
             RefreshStorageSize();
             await RefreshModVersions(fresh:audit!=null);
@@ -361,6 +414,7 @@ internal sealed partial class GeneralModWindow {
             Object.ReferenceEquals(state,scannedState)&&state.Destination==root);
         try{
             var elapsed=Stopwatch.StartNew();
+            await RecoverSourceUpdates(root);
             var reads=new ScanReads(this,root);
             await RecoverModOutputs(root,reads);
             if(IsDisposed||exitApproved)return;
@@ -370,23 +424,30 @@ internal sealed partial class GeneralModWindow {
             if(lookup.HasNexusCredential)lookup.Prefetch(works.SelectMany(work=>work.Variant.Sources));
             if(audit!=null)audit.Reads=reads;
             var zipLabels=reads.Exists?new Dictionary<string,InventoryZipLabel>(InventoryLinks.ZipLabels,InventoryPaths):null;
-            var inventory=reads.Exists?Task.Run(()=>TryReadGameInventory(root,reads,zipLabels)):null;
-            int workers=workerLimit??Math.Max(1,Math.Min(4,Environment.ProcessorCount/2));
+            var attachments=reads.Exists?InventoryLinks.Attachments.Where(file=>file.Hash!=null).ToArray():new InventoryAttachment[0];
+            var inventory=reads.Exists?Task.Run(()=>{
+                var files=TryReadGameInventory(root,reads,zipLabels);
+                var changed=new HashSet<string>(attachments.Where(file=>!MatchesInventoryAttachment(root,file,reads.Hash))
+                    .Select(file=>file.Path),InventoryPaths);
+                return Tuple.Create(files,changed);
+            }):null;
+            int workers=SnapshotVerification.Workers;
             var visibleRows=ModRows().ToDictionary(row=>(string)row.Tag);
             var pending=new Queue<Task<string>>();
             Func<Work,Task<string>> verify=work=>Task.Run(async()=>{
+                string status=ScanInstalledStatus(work,root,reads);
                 if(audit!=null)await audit.ReadSources(work);
-                return ScanInstalledStatus(work,root,reads);
+                return status;
             });
             int scheduled=0;
             while(scheduled<Math.Min(works.Count,workers))pending.Enqueue(verify(works[scheduled++]));
-            totalProgress.Segments=null;
+            long nextCoverageRefresh=elapsed.ElapsedMilliseconds+150;
             for(int i=0;i<works.Count;i++){
                 var work=works[i];
                 scanCurrent=work;
                 if(!loadingPreset) {
-                    currentProgress.Caption=work.Entry.Name+" · "+T("Verificando","Checking");
-                    currentProgress.Value=0;currentProgress.Indeterminate=true;currentProgress.NotApplicable=false;
+                    currentProgress.Caption=work.Entry.Name+" · "+T("Verificando","Checking")+" · "+i+"/"+works.Count;
+                    currentProgress.Value=100*i/works.Count;currentProgress.Indeterminate=false;currentProgress.NotApplicable=false;
                 }
                 Stage(work,"scan.begin");
                 string found=await pending.Dequeue();
@@ -407,18 +468,22 @@ internal sealed partial class GeneralModWindow {
                     grid.InvalidateCell(row.Cells["Status"]);
                 }
                 operationFinished++;work.Ended=true;Stage(work,"scan.end");
-                totalProgress.Caption=T("Mods verificados: ","Mods checked: ")+operationFinished+" / "+operationTotal;
-                totalProgress.Value=100*operationFinished/operationTotal;
+                if(elapsed.ElapsedMilliseconds>=nextCoverageRefresh){
+                    UpdatePackCoverage();
+                    nextCoverageRefresh=elapsed.ElapsedMilliseconds+150;
+                }
                 if(operationFinished%8==0)await Task.Yield();
             }
             if(works.Count>0&&!loadingPreset){
-                var last=works[works.Count-1];currentProgress.Indeterminate=false;
-                ShowWorkCaption(last,statuses[last.Key]);
-                currentProgress.Value=statuses[last.Key]=="Instalado"?100:0;
+                currentProgress.Indeterminate=false;
+                currentProgress.Caption=T("Verificação local","Local scan")+" · "+operationFinished+"/"+operationTotal;
+                currentProgress.Value=100;
             }
             OnlineDiagnostics.Record("general.scan.complete",null,"Varredura da lista concluída.",
                 new{Mods=works.Count,Workers=workers,UniqueHashes=reads.HashCount,ImportsRead=reads.Imports.IsValueCreated,ElapsedMs=elapsed.ElapsedMilliseconds});
-            var foundFiles=inventory==null?null:await inventory;
+            var inventoryResult=inventory==null?null:await inventory;
+            var foundFiles=inventoryResult==null?null:inventoryResult.Item1;
+            changedInventoryAttachments=inventoryResult==null?new HashSet<string>(InventoryPaths):inventoryResult.Item2;
             gameInventory=foundFiles??new List<P2PSyncDifference>();
             if(foundFiles!=null)await ReconcileModOutputs(root,foundFiles);
             foreach(var active in gameInventory.Where(file=>file.Kind=="verified-variant")){
@@ -442,14 +507,24 @@ internal sealed partial class GeneralModWindow {
                 statusDetails.Remove(work.Key);
                 ReportScanError(work);
             }
+            verifiedInventoryImports=reads.VerifiedImportPaths;
+            verifiedInventoryRoot=root;
+            FinishStartupLoading();
             await ScanNexusPreviews(works,root,reads);
+            var requiredPages=audit==null?null:new HashSet<string>(audit.Checked.Where(work=>ActivePreset==null||
+                ActivePreset.ModIds.Contains(work.Entry.Id)).SelectMany(work=>audit.Requirements(work,false))
+                .SelectMany(group=>group).Select(target=>target.Source.Url),StringComparer.Ordinal);
+            if(reads.Exists&&ReconcileDependencySuggestions(works,audit==null?null:(Func<string,GeneralSourceInfo>)audit.PublishedPage,requiredPages)){
+                if(audit!=null)audit.Checked.RemoveAll(work=>!works.Contains(work));
+                Persist();
+            }
 
             if(audit!=null){
-                audit.InventoryUnavailable=reads.Cyberpunk&&foundFiles==null;
                 if(audit.MetadataChanged>0)Persist();
             }
-            var versions=RefreshModVersions(lookup:lookup);
-            if(lookup.HasNexusCredential&&!versions.IsCompleted){
+            UpdatePackCoverage();
+            var versions=RefreshModVersions(lookup:lookup,readHash:reads.Hash);
+            if((audit!=null||lookup.HasNexusCredential)&&!versions.IsCompleted){
 
                 await versions;
             }
@@ -458,7 +533,7 @@ internal sealed partial class GeneralModWindow {
             cancelledVersionScan=true;
             OnlineDiagnostics.Failure("general.scan.failed",ex,"Conferir os arquivos instalados e atualizar a situação dos mods.");
             throw;
-        }finally{scanCurrent=null;scanning=false;if(!IsDisposed)Busy(false);}
+        }finally{scanCurrent=null;scanning=false;if(!IsDisposed){FinishStartupLoading();Busy(false);}}
     }
     async Task ScanNexusPreviews(List<Work> works,string root,ScanReads reads) {
         if(IsDisposed||!reads.Exists||!NexusPreviewsAvailable)return;
@@ -496,20 +571,19 @@ internal sealed partial class GeneralModWindow {
             }
             var jobs=SelectedUpdates();
             if(jobs.Count==0){
-                var mods=SelectedUpdateMods();
-                if(mods.Length>0){
-                    await OpenUpdateLinks(mods);
+                var reviews=SelectedSourceReviews();
+                if(reviews.Length>0){
+                    await ReviewSourceUpdates(reviews);
                     return;
                 }
             }
             if(jobs.Count==0&&NeedsPresetLoad){
-                int presetWorkers=ChooseSwitchWorkers();
-                if(presetWorkers>0)await LoadPreset(presetWorkers);
+                await LoadPreset();
                 return;
             }
             var command=jobs.Count>0?ModAction.Update:ClassifyJobs(SelectedJobs(),out jobs);
             if(command==ModAction.None)return;
-            if(command==ModAction.ChooseDependency){await EditMod(jobs[0].Entry);return;}
+            if(command==ModAction.ChooseDependency){await ChooseDependencyFile(jobs[0]);return;}
             if(command==ModAction.Disable||command==ModAction.Enable){
                 await ToggleMods(jobs,Root(),command==ModAction.Enable);
                 return;
@@ -532,31 +606,39 @@ internal sealed partial class GeneralModWindow {
                     T("Desabilitar a versão ativa depois de preparar a substituta?","Disable the active version after the replacement is ready?"),
                     T("Mudar versão","Change version"),MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
             }
-            int workers=1;
             if(command==ModAction.Update){
-                foreach(var work in jobs)work.UpdateRequested=true;
-                workers=ReadSwitchPerformance().Workers(Environment.ProcessorCount);
-            }else if(command==ModAction.Change){
-                workers=ChooseSwitchWorkers();
-                if(workers==0)return;
+                var batch=new UpdateBatch();
+                foreach(var work in jobs){work.UpdateRequested=true;work.Batch=batch;}
             }
-            await PlanAndConfirmJobs(jobs,root,command,workers);
+            await PlanAndConfirmJobs(jobs,root,command);
         }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
     }
 
-    async Task PlanAndConfirmJobs(List<Work> jobs,string root,ModAction command,int workers,bool manual=false){
+    async Task PlanAndConfirmJobs(List<Work> jobs,string root,ModAction command,bool manualUpdate=false){
         OnlineDiagnostics.Record("general.install.plan.begin",null,"Conferindo a seleção e suas dependências.",
             new{Action=command.ToString(),Count=jobs.Count,Mods=jobs.Select(work=>work.Entry.Id).ToArray()});
+        var updateBatch=jobs.Select(work=>work.Batch).FirstOrDefault(batch=>batch!=null);
         jobs=WithLinkedDependencies(jobs);
+        if(updateBatch!=null)foreach(var work in jobs)work.Batch=updateBatch;
         var pending=new List<Work>();
-        List<string> downloads;
         scanning=true;Busy(true);next.Visible=false;
-        try{downloads=await Task.Run(()=>PlanSelected(jobs,root,pending,workers));}
+        try{await Task.Run(()=>PlanSelected(jobs,root,pending));}
         finally{scanning=false;Busy(false);}
         if(IsDisposed)return;
         OnlineDiagnostics.Record("general.install.plan.complete",null,"Conferência da seleção concluída.",
             new{Total=jobs.Count,Pending=pending.Count});
-        if(pending.Count>0)await ConfirmAndEnqueue(pending,root,downloads,false,manual);
+        if(pending.Count>0)await ConfirmAndEnqueue(pending,root,false,manualUpdate);
+    }
+
+    string ScanInstalledStatus(Work work,string root,ScanReads reads){
+        string status;
+        try{status=Status(work,root,reads,false);}
+        catch(Exception ex){work.ScanError=ex.Message;status="Não verificável";}
+        if(!VersionInstalled(status)&&status!=GeneralStatusPresentation.Disabled&&status!="Requer Phantom Liberty"&&status!="Requer Cyberpunk 2077"&&
+            (work.SharedInstallation=VerifySharedInstalledUpdate(work,reads))!=null){
+            work.ScanError=null;status="Instalado";
+        }
+        return status;
     }
 
     static List<Work> ChooseAlternatives(List<Work> jobs,Func<IReadOnlyList<GeneralModEntry>,string> choose){
@@ -603,14 +685,16 @@ internal sealed partial class GeneralModWindow {
         return ordered;
     }
 
-    List<string> PlanSelected(List<Work> selected,string root,List<Work> pending,int workers=1){
+    void PlanSelected(List<Work> selected,string root,List<Work> pending){
         var reads=new ScanReads(this,root);
-        var known=new Dictionary<string,FixedMod>();
-        var downloads=new List<string>();
-        var checkedStatuses=workers>1?GeneralPresetDeployment.CheckPackages(selected,work=>Status(work,root,reads),null,workers:workers):null;
+        var unresolvedByWork=new Dictionary<Work,List<FixedMod>>();
+        var checkedStatuses=GeneralPresetDeployment.CheckPackages(selected,work=>work.UpdateTarget==null?Status(work,root,reads):null,null);
         for(int position=0;position<selected.Count;position++){
             var work=selected[position];
-            string status=checkedStatuses==null?Status(work,root,reads):checkedStatuses[position];
+            work.PendingDownload=false;
+            work.PendingFixedDependencies=null;
+            if(work.UpdateTarget!=null){pending.Add(work);work.PendingDownload=true;continue;}
+            string status=checkedStatuses[position];
             if(IsSharedBodySwitch(work,status)){pending.Add(work);continue;}
             if(status==GeneralStatusPresentation.Disabled){
                 if(work.SwitchAlternatives||work.DependencyQueue)pending.Add(work);
@@ -620,8 +704,8 @@ internal sealed partial class GeneralModWindow {
                 if(GeneralStatusPresentation.Kind(status)=="installed"||status==GeneralStatusPresentation.ManualBody||
                     status==GeneralStatusPresentation.NexusManual)continue;
                 pending.Add(work);
-                if(work.Variant.Sources.Select((source,index)=>GeneralModDownload.IsWebSource(source)&&!File.Exists(LocalSource(work,index))).Any(missing=>missing))
-                    downloads.Add(work.Entry.Name+" — "+work.Variant.Name);
+                work.PendingDownload=work.Variant.Sources.Select((source,index)=>
+                    GeneralModDownload.IsWebSource(source)&&!File.Exists(LocalSource(work,index))).Any(missing=>missing);
                 continue;
             }
             if(!work.ReviewReplacement&&SnapshotInstalled(work,root))continue;
@@ -650,12 +734,15 @@ internal sealed partial class GeneralModWindow {
             }
             if(!blocked&&unresolved.Count==0)continue;
             pending.Add(work);
-            if(!blocked)foreach(var mod in unresolved)
-                known[mod.Id+"/"+String.Join("/",mod.Assets.Select(asset=>asset.Sha256))]=mod;
+            if(!blocked){
+                unresolvedByWork[work]=unresolved;
+                work.PendingFixedDependencies=unresolved.Where(mod=>mod.Id!=recipe.Id).Select(mod=>mod.Id).ToArray();
+            }
         }
-        var missingAssets=MissingArchiveHashes(known.Values.SelectMany(mod=>mod.Assets));
-        downloads.AddRange(known.Values.Where(mod=>mod.Assets.Any(asset=>missingAssets.Contains(asset.Sha256))).Select(mod=>mod.Name));
-        return downloads;
+        var missingAssets=MissingArchiveHashes(unresolvedByWork.Values.SelectMany(mods=>mods).SelectMany(mod=>mod.Assets));
+        foreach(var entry in unresolvedByWork)
+            entry.Key.PendingDownload=entry.Value.Any(mod=>mod.Assets.Any(asset=>missingAssets.Contains(asset.Sha256)));
+
     }
 
     HashSet<string> MissingArchiveHashes(IEnumerable<FixedAsset> assets){
@@ -690,31 +777,38 @@ internal sealed partial class GeneralModWindow {
         return reads==null?InstalledSnapshot.MatchesBodyReceipt(Snapshot(root),work.Entry,work.Variant,receipt):
             reads.Snapshots.Value.Matches(receipt,work.Entry,work.Variant);
     }
-    async Task ConfirmAndEnqueue(List<Work> jobs,string root,IReadOnlyList<string> downloads,bool urgent,bool manual=false){
-        if(!urgent&&jobs.Any(work=>work.UpdateRequested)){
-            var choices=jobs.Select(work=>{
-                var required=new HashSet<string>(work.Variant.RequiredMods,StringComparer.Ordinal);
-                if(work.Variant.CyberpunkId!=null)
-                    required.UnionWith(FixedData.Expand(catalog,new[]{work.Variant.CyberpunkId}).Select(mod=>mod.Id));
-                var indices=Enumerable.Range(0,jobs.Count).Where(index=>jobs[index]!=work&&
-                    (required.Contains(jobs[index].Entry.Id)||required.Contains(jobs[index].Variant.CyberpunkId))).ToArray();
-                return new GeneralUpdateConfirmation.Choice(work.Entry.Name,downloads.Contains(work.Entry.Name)||
-                    downloads.Contains(work.Entry.Name+" — "+work.Variant.Name),indices);
-            }).ToArray();
-            var entries=jobs.Select(work=>work.Entry).ToArray();
-            var deferrable=Enumerable.Range(0,jobs.Count).Where(index=>jobs[index].UpdateRequested).ToArray();
-            var decision=await ConfirmModUpdates(choices,entries,manual?null:deferrable,offerBackup:true);
-            if(decision==null)return;
-            jobs=decision.Item1.Select(index=>jobs[index]).ToList();
-            foreach(var work in jobs)work.BackupUpdate=work.UpdateRequested&&decision.Item2;
-        }else if(!urgent){
-            using(var dialog=new GeneralInstallConfirmation(root,jobs.Count,downloads)){
-                if(dialog.ShowDialog(this)!=DialogResult.OK){
+    async Task ConfirmAndEnqueue(List<Work> jobs,string root,bool urgent,bool manualUpdate=false){
+        if(!urgent){
+            if(GeneralDialog.FocusOpen<GeneralInstallConfirmation>(this))return;
+            string presetId=state.SelectedPreset;
+            var choices=jobs.Select(work=>new GeneralInstallConfirmation.Choice(work.Entry.Name,work.PendingDownload,
+                Enumerable.Range(0,jobs.Count).Where(index=>jobs[index]!=work&&
+                    (work.Variant.RequiredMods.Contains(jobs[index].Entry.Id)||jobs[index].Variant.CyberpunkId!=null&&
+                        work.PendingFixedDependencies!=null&&work.PendingFixedDependencies.Contains(jobs[index].Variant.CyberpunkId))).ToArray())).ToArray();
+            var updateIndices=Enumerable.Range(0,jobs.Count).Where(index=>jobs[index].UpdateRequested).ToArray();
+            using(var dialog=new GeneralInstallConfirmation(choices,updateIndices.Length>0,manualUpdate?null:updateIndices)){
+                var answer=await dialog.ShowModelessAsync(this);
+                if(answer!=DialogResult.OK&&answer!=DialogResult.Ignore){
                     OnlineDiagnostics.Record("general.install.cancelled",null,"Instalação cancelada.",new{Count=jobs.Count});
                     return;
                 }
+                if(IsDisposed||exitApproved||working||scanning||associationChoice!=null||
+                    presetId!=state.SelectedPreset||!InventoryPaths.Equals(root,state.Destination)||
+                    jobs.Any(work=>!state.List.Mods.Contains(work.Entry)))return;
+                jobs=dialog.SelectedIndices.Select(index=>jobs[index]).ToList();
+                if(answer==DialogResult.Ignore){
+                    var previous=state.ManualUpdateMods;
+                    state.ManualUpdateMods=previous.Concat(jobs.Where(work=>work.UpdateRequested)
+                        .Select(work=>work.Entry.Id)).Distinct(StringComparer.Ordinal).ToList();
+                    try{Persist();}
+                    catch{state.ManualUpdateMods=previous;throw;}
+                    DrawRows();
+                    return;
+                }
+                foreach(var work in jobs)work.BackupUpdate=work.UpdateRequested&&dialog.CreateBackup;
             }
         }
+        if(jobs.Count==0)return;
         if(IsCyberpunk(root)&&jobs.Any(work=>GeneralModLibrary.IsHystBody(work.Entry.Id)))
             jobs.RemoveAll(work=>work.Variant.CyberpunkId==GeneralModLibrary.VanillaFeetId);
         if(jobs.Any(work=>work.Entry.Id=="hyst-ebb-rb"))
@@ -740,9 +834,7 @@ internal sealed partial class GeneralModWindow {
                 T("Carregue o preset selecionado para continuar a instalação de ","Load the selected preset to continue installing ")+entry.Name+".",
                 T("Carregar preset","Load preset"),MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2,
                 yesLabel:T("Carregar preset","Load preset"),noLabel:T("Cancelar","Cancel"))!=DialogResult.Yes)return;
-            int workers=ChooseSwitchWorkers();
-            if(workers<=0)return;
-            await LoadPreset(workers);
+            await LoadPreset();
             if(IsDisposed||exitApproved||NeedsPresetLoad||state.SelectedPreset!=presetId||!state.List.Mods.Contains(entry))return;
         }
         if(GeneralModLibrary.NeedsDependencyVersion(entry,Selected(entry)))return;
@@ -754,14 +846,22 @@ internal sealed partial class GeneralModWindow {
         string root=Root();
         var requested=IsBigBody(entry)?BigBodyVersions(new[]{entry},GameEdition.HasPL(root))
             .First(work=>work.BodyChoice==(bodyChoice??ActiveBodyChoice(entry))):MakeWork(entry);
-        await ConfirmAndEnqueue(WithLinkedDependencies(new List<Work>{requested}),root,new string[0],true);
+        await ConfirmAndEnqueue(WithLinkedDependencies(new List<Work>{requested}),root,true);
     }
 
     async void Enqueue(IEnumerable<Work> jobs,bool urgent){
         if(scanning)return;
         string root;try{root=Root();}catch(Exception ex){ShowError(ex);return;}
-        if(!working){operationTotal=0;operationFinished=0;skipRequests.Clear();suppressQueueErrors=false;}
-        foreach(var work in jobs){
+        var requested=jobs.ToArray();
+        if(!working){
+            operationTotal=0;operationFinished=0;skipRequests.Clear();suppressQueueErrors=false;
+            updateSummary=requested.Select(work=>work.Batch).FirstOrDefault(batch=>batch!=null);
+            if(updateSummary!=null){
+                updateSummary.Total=requested.Count(work=>work.UpdateRequested);
+                GeneralNexusGithubMirror.ExpireLookups(data);
+            }
+        }
+        foreach(var work in requested){
             if((current!=null&&current.Entry.Id==work.Entry.Id)||(priorityCurrent!=null&&priorityCurrent.Entry.Id==work.Entry.Id)||priority.Any(w=>w.Entry.Id==work.Entry.Id))continue;
             var existing=normal.FirstOrDefault(w=>w.Entry.Id==work.Entry.Id);
             if(existing!=null){if(!urgent)continue;normal.Remove(existing);}else operationTotal++;
@@ -774,12 +874,12 @@ internal sealed partial class GeneralModWindow {
                 var list=priority.Count>0?priority:normal;
                 current=list[0];list.RemoveAt(0);
                 Busy(true);
-                await RunWork(current,root,false);
-                current=null;
+                try{await RunWork(current,root,false);}
+                finally{current=null;}
             }
         }finally{
             working=false;
-            if(!IsDisposed){Busy(false);SetWait(false,false);}
+            if(!IsDisposed){Busy(false);SetWait(false,false);UpdatePackCoverage();}
         }
         if(!IsDisposed)await RefreshModVersions();
     }
@@ -796,6 +896,7 @@ internal sealed partial class GeneralModWindow {
                 Expected="Instalar e verificar a variante selecionada."
             });
             if(presetProtected.Contains(work.Entry.Id)&&!work.ReviewReplacement)throw new IOException(T("Os arquivos do mod divergem do registro; a instalação local foi preservada. Use Verificar para revisar a substituição.","Mod files differ from the record; the local installation was preserved. Use Verify to review replacement."));
+            if(work.UpdateTarget!=null){completed=await InstallQueuedUpdate(work,root);return;}
             if(GeneralModLibrary.NeedsDependencyVersion(work.Entry,work.Variant)){
                 RowStatus(work,GeneralStatusPresentation.ChooseDependency);
                 return;
@@ -803,7 +904,7 @@ internal sealed partial class GeneralModWindow {
             RowStatus(work,"Verificando",null,work.Entry.Name+T(": verificando arquivos…",": checking files…"));
             if(work.Variant.InstallRoutes.Count>0){
 
-                try{GeneralInstallRoutes.CheckFolders(root,work.Variant.InstallRoutes);}
+                try{GeneralInstallRoutes.CheckFolders(root,work.Variant.InstallRoutes,allowNewGameSubfolders:true);}
                 catch(DirectoryNotFoundException ex){RowStatus(work,"Pulado",null,work.Entry.Name+": "+ex.Message);return;}
             }
             if(!work.ReviewReplacement&&SnapshotInstalled(work,root)){await TrackPresetInstall(work,root);RememberInstalledVariant(work);RowStatus(work,"Instalado",100);return;}
@@ -899,16 +1000,17 @@ internal sealed partial class GeneralModWindow {
         }
         catch(OperationCanceledException){
             OnlineDiagnostics.Record("general.install.skipped",work.Entry.Id,"Item pulado. A fila continua.",new{Variant=work.Variant.Id,Stage=work.DiagnosticStage});
-            RowStatus(work,work.Applied?"Parcial/pulado":"Pulado",null,work.Entry.Name+T(": pulado. A fila continua.",": skipped. The queue continues."));
+            RowStatus(work,work.Applied?"Parcial/pulado":work.UpdateRequested||work.UpdateTarget!=null?UpdateAvailableStatus:"Pulado",null,work.Entry.Name+T(": pulado. A fila continua.",": skipped. The queue continues."));
         }
         catch(Exception ex){
-            string message=work.Entry.Name+": "+ex.Message;
+            bool finalizing=ex is ModUpdateFinalizationException;
+            string message=finalizing?ex.Message:work.Entry.Name+": "+ex.Message;
             RowStatus(work,"Falhou",null,message);
             OnlineDiagnostics.Failure("general.install.failed",ex,"Instalar e verificar a variante selecionada.",
                 work.Entry.Id,work.Entry.Name,work.Variant.Id,work.DiagnosticVersion,work.DiagnosticStage);
             if(!interrupt&&!suppressQueueErrors){
                 if(testMode){if(testFailurePrompt!=null)suppressQueueErrors=testFailurePrompt(message);}
-                else GeneralDialog.Message(this,message,T("Falha na instalação","Installation failed"),MessageBoxButtons.OK,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button1,value=>suppressQueueErrors=value,T("Ocultar os próximos avisos desta instalação","Hide further warnings for this installation"));
+                else GeneralDialog.Message(this,message,finalizing?T("Concluir atualização","Finish update"):T("Falha na instalação","Installation failed"),MessageBoxButtons.OK,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button1,value=>suppressQueueErrors=value,T("Ocultar os próximos avisos desta instalação","Hide further warnings for this installation"));
             }
         }
         finally{
@@ -920,6 +1022,8 @@ internal sealed partial class GeneralModWindow {
                     RowStatus(old,status);
                 }
             }
+            if(work.AutoUpdateDirectory!=null)CleanUpdateDownload(work);
+            if(completed&&work.Applied&&work.UpdateRequested&&work.Batch!=null)work.Batch.Completed++;
             RefreshStorageSize();work.Ended=true;operationFinished++;UpdateFlow(null,"");skipRequests.Remove(work);Stage(work,"work.end");
         }
     }
@@ -1187,7 +1291,7 @@ internal sealed partial class GeneralModWindow {
             string source=work.Variant.Sources[index];
             string path=LocalSource(work,index);
             if(GeneralModDownload.IsWebSource(source)&&!File.Exists(path))path=await AwaitAttachment(work,source,root);
-            if(!File.Exists(path))throw new IOException(T("Arquivo da nova versão não encontrado.","New version file not found."));
+            if(!File.Exists(path)&&!(GeneralModFolderSource.IsSource(path)&&Directory.Exists(path)))throw new IOException(T("Arquivo ou pasta da nova versão não encontrado.","New version file or folder not found."));
             Safe.NoLinks(path);
             paths[index]=path;
         }
@@ -1197,34 +1301,64 @@ internal sealed partial class GeneralModWindow {
     async Task InstallGeneral(Work work,string root,string[] prepared=null){
         EnsureGameClosed(root);
         bool cyberpunk=IsCyberpunk(root);
-        var engine=cyberpunk?null:Generic(root);
+        var engine=Generic(root);
         if(cyberpunk)FixedData.ValidateGame(root,new FixedMod[0],catalog.GameFileVersion);
         for(int i=0;i<work.Variant.Sources.Count;i++){
             CheckSkip(work);
             string source=work.Variant.Sources[i],receipt=work.Receipt(i);
+            bool recordedGeneric=engine.HasSnapshotRecord(receipt);
             string candidate=LocalSource(work,i);
-            if(engine!=null&&await Task.Run(()=>engine.Status(receipt,null,Safe.Hash,work.Variant.InstallRoutes))==GeneralModInstaller.Installed&&(candidate==null||!File.Exists(candidate)||await Task.Run(()=>engine.SourceMatches(candidate,receipt))))continue;
-            if(cyberpunk){
+            bool sourceExists=File.Exists(candidate)||GeneralModFolderSource.IsSource(candidate)&&Directory.Exists(candidate);
+            if((!cyberpunk||recordedGeneric)&&await Task.Run(()=>engine.Status(receipt,null,Safe.Hash,work.Variant.InstallRoutes))==GeneralModInstaller.Installed&&
+                (!sourceExists||await Task.Run(()=>GeneralModFolderSource.IsSource(candidate)?GeneralModFolderSource.Matches(candidate,engine.ReadPackageRecord(receipt),Safe.Hash):engine.SourceMatches(candidate,receipt))))continue;
+            if(cyberpunk&&!recordedGeneric){
                 int index=i;
                 if(await Task.Run(()=>Cyberpunk(root).InstalledImports().Contains(CyberpunkImportId(work,index))))continue;
             }
             bool web=GeneralModDownload.IsWebSource(source);
             string actual=prepared==null?LocalSource(work,i):prepared[i];
+            string verifiedSourceHash=null;
+            GeneralSourceInfo packageInfo=null;
+            bool discoverNexus=GeneralNexusLink.Parse(source)!=null&&!File.Exists(actual)&&(!testMode||testUpdatePackage!=null);
+            if(web&&!recordedGeneric&&(GeneralGithubLink.Parse(source)!=null||discoverNexus)) {
+                GeneralSourceUpdatePackage package=null;
+                try{package=await ReadSourceUpdatePackage(source,()=>!IsDisposed&&!exitApproved&&!skipRequests.Contains(work));}
+                catch(SourcePackageException ex){if(ex.State!="unverified"&&ex.State!="unavailable"&&ex.State!="connect"&&ex.State!="authentication"&&ex.State!="rate-limit")throw;}
+                if(package!=null) {
+                    var verified=File.Exists(actual)?await package.Verify(actual,()=>!IsDisposed&&!exitApproved&&!skipRequests.Contains(work)):
+                        await AwaitVerifiedUpdate(work,package,root);
+                    actual=verified.Path;verifiedSourceHash=verified.Sha256;packageInfo=verified.Info;
+                }
+            }
             if(web&&(actual==null||!File.Exists(actual)))actual=await AwaitAttachment(work,source,root);
+            if(recordedGeneric&&engine.ReadUpdateRecord(receipt)!=null) {
+                var package=await ReadSourceUpdatePackage(source);
+                var verified=await package.Verify(actual,()=>!IsDisposed&&!exitApproved&&!skipRequests.Contains(work));
+                verifiedSourceHash=verified.Sha256;
+                packageInfo=verified.Info;
+            }
             source=actual;
-            if(!File.Exists(source))throw new IOException(T("Arquivo não encontrado: ","File not found: ")+source+T(". Dê dois cliques no mod para corrigir a fonte.",". Double-click the mod to update its source."));
+            bool folderSource=GeneralModFolderSource.IsSource(source);
+            if(folderSource&&(GeneralModFolderSource.Contains(source,root)||GeneralModFolderSource.Contains(root,source)))
+                throw new IOException(T("Escolha a pasta original do mod fora da pasta de instalação.","Choose the mod's original folder outside the installation folder."));
+            if(!File.Exists(source)&&!(folderSource&&Directory.Exists(source)))throw new IOException(T("Arquivo ou pasta não encontrado: ","File or folder not found: ")+source+T(". Dê dois cliques no mod para corrigir a fonte.",". Double-click the mod to update its source."));
             CheckSkip(work);
-            RowStatus(work,"Instalando",(int)(i*99.0/work.Variant.Sources.Count),work.Entry.Name+": "+Path.GetFileName(source));
+            RowStatus(work,"Instalando",(int)(i*99.0/work.Variant.Sources.Count),work.Entry.Name+": "+Path.GetFileName(source.TrimEnd('\\','/')));
             string installSource=source;
             string localId=null;
             Stage(work,"install.begin");
             await Task.Run(()=>{
                 EnsureGameClosed(root);
-                if(cyberpunk){var item=ImportItem(installSource);Cyberpunk(root).InstallImported(item,IgnoreInstallProgress,ChooseVersion,work.Variant.InstallRoutes);localId=LocalModPackage.RoutedId(item.Sha256,work.Variant.InstallRoutes);}
-                else engine.Install(installSource,receipt,IgnoreInstallProgress,difference=>{difference.Name=work.Entry.Name;return ChooseVersion(difference);},work.Variant.InstallRoutes);
+                using(var folderPackage=folderSource?GeneralModFolderSource.Prepare(installSource,data,()=>CheckSkip(work)):null){
+                    string packagePath=folderPackage==null?installSource:folderPackage.Path;
+                    if(cyberpunk&&!recordedGeneric){var item=ImportItem(packagePath);if(verifiedSourceHash!=null&&item.Sha256!=verifiedSourceHash)throw new IOException(T("O arquivo mudou após a conferência da origem.","The archive changed after source verification."));if(folderSource)item.Name=work.Entry.Name;Cyberpunk(root).InstallImported(item,IgnoreInstallProgress,ChooseVersion,work.Variant.InstallRoutes);localId=LocalModPackage.RoutedId(item.Sha256,work.Variant.InstallRoutes);}
+                    else engine.Install(packagePath,receipt,IgnoreInstallProgress,difference=>{difference.Name=work.Entry.Name;return ChooseVersion(difference);},work.Variant.InstallRoutes,verifiedSourceHash);
+                }
             });
             work.Applied=true;Stage(work,"install.end");
             if(web)state.ResolvedDownloads[receipt]=source;
+            if(packageInfo!=null)work.Variant.SourceInfo[work.Variant.Sources[i]]=packageInfo.SavedCopy();
+            else if(GeneralGithubLink.Parse(work.Variant.Sources[i])!=null)work.Variant.SourceInfo.Remove(work.Variant.Sources[i]);
             if(localId!=null)state.CyberpunkImports[receipt]=localId;
             if(web||localId!=null)Persist();
         }
@@ -1275,7 +1409,7 @@ internal sealed partial class GeneralModWindow {
             finally{priorityCurrent=null;NeedUnknownFile=couldAttach;if(current!=null)UpdateFlow(current,statuses.ContainsKey(current.Key)?statuses[current.Key]:"Aguardando download");}
         }
     }
-    void SetWait(bool value,bool needsFile){waiting=value;NeedUnknownFile=value&&needsFile;next.Visible=working||scanning;next.Enabled=working||scanning;}
+    void SetWait(bool value,bool needsFile){waiting=value;NeedUnknownFile=value&&needsFile;UpdateOperationButton();}
     static void IgnoreInstallProgress(string message){}
     void EnsureGameClosed(string root){
         if(testMode||!IsCyberpunk(root))return;
@@ -1288,13 +1422,14 @@ internal sealed partial class GeneralModWindow {
             if(!marked.Contains(id)||presetProtected.Contains(id))continue;
             var mod=state.List.Mods.Single(item=>item.Id==id);
             string status=ListStatus(mod);
-            if(GeneralStatusPresentation.Kind(status)=="installed"||status==GeneralStatusPresentation.Disabled)yield return id;
+            if(GeneralStatusPresentation.Kind(status)=="installed"||status==GeneralStatusPresentation.Disabled||
+                InventoryLinks.Attachments.Any(file=>file.Hash!=null&&file.Owners.Contains(id)))yield return id;
         }
     }
     bool uninstalling;
     async Task Uninstall(){
         if(projectDraft!=null&&!ConfirmProjectNavigation())return;
-        if(working||scanning)return;
+        if(working||scanning||associationChoice!=null)return;
         try{
             var checkedIds=new HashSet<string>(UninstallSelection(),StringComparer.Ordinal);
             var jobs=state.List.Mods.Where(mod=>checkedIds.Contains(mod.Id)).Select(MakeWork).ToList();
@@ -1314,12 +1449,13 @@ internal sealed partial class GeneralModWindow {
                     var store=DisabledAt(root);
                     var disabled=new HashSet<string>(store.Read().Keys,StringComparer.Ordinal);
                     foreach(var work in jobs.Where(work=>disabled.Contains(PresetRecipeKey(work))))disabled.Add(work.Key);
-                    string notes=RemoveManagedWorks(jobs,root,disabled,ReportUninstall);
+                    string notes=RemoveManagedWorks(jobs,root,disabled,ReportUninstall,removeAttachments:true);
                     ReportUninstall(T("Limpando registros da instalação…","Cleaning installation records…"));
                     store.Discard(jobs.Select(work=>PresetStoredKey(work,root)));
                     if(state.AppliedPreset!=null)new GeneralPresetDeployment(root,data,()=>EnsureGameClosed(root)).RecordRemoval(jobs.Select(work=>PresetRecipeKey(work)));
                     return notes;
                 });
+                inventoryLinks=null;
                 Persist();
                 OnlineDiagnostics.Record("general.uninstall.complete",null,"Desinstalação processada.",new{Count=jobs.Count,Result=result});
             }finally{uninstalling=working=false;currentProgress.Indeterminate=false;Busy(false);}

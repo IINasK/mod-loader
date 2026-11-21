@@ -694,8 +694,11 @@ static class OnlineProgram {
         if(args.Length==2&&args[0]=="--self-test-verification"){SnapshotVerificationTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-human"){GeneralModHumanFlowTests.Run(args[1]);return 0;}
         if(args.Length==3&&args[0]=="--self-test-generic-crash"){GeneralModHumanFlowTests.RunCrashChild(args[1],args[2]);return 0;}
+        if(args.Length==3&&args[0]=="--self-test-mod-update-crash"){GeneralModUpdateInstallerTests.CrashWorker(args[1],args[2]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-provenance"){ProvenanceMaintenanceTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-mod-updates"){GeneralModUpdatesTests.Run(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--self-test-update-batch"){GeneralGithubPackageTests.Run(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--self-test-source-updates"){GeneralNexusUpdatePackageTests.Run(args[1]);GeneralModUpdateInstallerTests.Run(args[1]);GeneralModUpgradeReceiptTests.Run(args[1]);GeneralModWindow.RunOwnershipResolverTests(args[1]);GeneralModWindow.RunSourceUpdateTests(args[1]);GeneralModWindow.RunSharedUpdateTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-p2p"){GeneralP2PTests.Run(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-snapshot"){InstalledSnapshotTests.Run(args[1]);InstalledSnapshotInstallerTests.Run(args[1],true);return 0;}
         if(args.Length==3&&args[0]=="--self-test-snapshot-network"){InstalledSnapshotP2PTests.RunNetwork(args[1],args[2]);return 0;}
@@ -707,9 +710,13 @@ static class OnlineProgram {
         if(args.Length==3&&args[0]=="--verify-local-sources"){OnlineTests.VerifySources(c,args[1],args[2]);return 0;}
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
         if(args.Length==2&&args[0]=="--self-test-mod-updates-ui"){GeneralModWindow.RunModUpdateUiTests(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--self-test-version-progress"){GeneralModWindow.RunVersionProgressTests(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--self-test-table-surface"){GeneralModWindow.RunTableSurfaceTests(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--self-test-organization"){GeneralModWindow.RunOrganizationTests(args[1]);return 0;}
         if(args.Length==3&&args[0]=="--self-test-archivexl-update"){GeneralModWindow.RunArchiveXLUpdateTest(args[1],args[2]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-human-ui"){GeneralModWindow.RunHumanCloseTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-diagnostics"){OnlineDiagnosticsTests.Run(args[1]);return 0;}
+        if(args.Length==2&&args[0]=="--self-test-project-verification"){GeneralModWindow.RunVerificationFlowTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-inventory-links"){GeneralModWindow.RunInventoryLinkTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-nexus-preview"){GeneralModWindow.RunNexusPreviewTests(args[1]);return 0;}
         if(args.Length==2&&args[0]=="--self-test-general"){GeneralModWindow.RunGeneralTests(args[1]);return 0;}

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -177,6 +177,7 @@ internal static class InstalledSnapshotTests {
         refuse(()=>InstalledSnapshot.Inspect(fixedState,new[]{addon.Id,independent.Id},fixedCatalog,fixedData,true,true,skipProblem:(id,name,error)=>false),
             "Recusar a opção de pular mantém a verificação bloqueada.");
         RunFixedRouteTests(root,check,refuse);
+        RunCatalogUpdateTransfer(root,check,refuse);
         RunDensityTests(root);
         Safe.WriteJson(Path.Combine(root,"resultado-snapshot.json"),new{Passed=true,Checks=checks.Count,Tests=checks,RealGameTouched=false,OriginalArchivesRequired=false,NetworkUsed=false});
         return checks.Count;
@@ -257,7 +258,70 @@ internal static class InstalledSnapshotTests {
                 engine.Status(receipt,dependent.Id+"/default")==GeneralModInstaller.Installed&&
                 GeneralInstallRoutes.Same(engine.ReadManifest(receipt).Project.Mods.Single(mod=>mod.Id==routed.Id).Variants.Single().InstallRoutes,next),
                 "Muda os destinos verificados e atualiza o mesmo recibo e a definição do projeto recebido.");
+            string staleOwner=unrelated.Id+"/default";
+            engine.Remove(receipt,new[]{staleOwner},null,forgetOnly:true);
+            var staleState=new GeneralModState{Destination=receiver,List=GeneralModLibrary.Seed(catalog,new ModImportItem[0])};
+            staleState.SnapshotReceipts[staleOwner]=receipt;
+            var recovered=InstalledSnapshot.Inspect(staleState,new[]{unrelated.Id},catalog,receiverData,false);
+            check(recovered.List.Mods.Single().Id==unrelated.Id&&recovered.Files.Single().Sha256==unrelated.Files[0].Sha256,
+                "Um recibo inativo não impede o reenvio de uma instalação que confere com a versão oficial.");
+            Write(receiver,unrelated.Files[0].Path,"different version");
+            refuse(()=>InstalledSnapshot.Inspect(staleState,new[]{unrelated.Id},catalog,receiverData,false),
+                "Ignorar o vínculo inativo nunca libera arquivos que divergem do catálogo.");
+            const string customSource="https://example.org/newer";
+            var custom=State(receiver,customSource);
+            WriteGenericRecord(receiver,receiverData,"fixture/default/0/"+customSource,new[]{unrelated.Files[0].Path});
+            bool reservedReported=false;
+            var partial=InstalledSnapshot.Inspect(custom,new[]{"fixture"},catalog,receiverData,false,true,
+                skipProblem:(id,name,detail)=>reservedReported=detail.Contains("destino reservado pelo catálogo oficial"));
+            check(reservedReported&&partial.List.Mods.Count==0&&partial.Files.Count==0,
+                "O bloqueio de destino oficial é mostrado durante a conferência do mod e permite pulá-lo com segurança.");
         }finally{GeneralInstallRoutes.FixtureAppData=null;}
+    }
+
+    static void RunCatalogUpdateTransfer(string root,Action<bool,string> check,Action<Action,string> refuse){
+        string source=Safe.In(root,"uh"),data=Safe.In(root,"ud"),target=Safe.In(root,"ur");
+        const string library="red4ext/plugins/FixtureLib/fixture.dll";
+        const string dataFile="red4ext/plugins/FixtureLib/data/table.dat";
+        const string runtime="bin/x64/plugins/cyber_engine_tweaks/mods/FixtureCustom/profiles.lua";
+        const string settings="bin/x64/plugins/cyber_engine_tweaks/mods/FixtureCustom/profiles/Personal.json";
+        var old=Fixed("FixtureLib",library,"old",new string[0]);
+        old.Files.Add(Fixed(old.Id,dataFile,"pinned data",new string[0]).Files.Single());
+        var dependent=Fixed("FixtureAddon","r6/scripts/FixtureAddon.reds","dependent",new[]{old.Id});
+        var catalog=new FixedCatalog{Schema=1,Id="fixture-updates",GameVersion="2.5",GameFileVersion="2.5.0.0",
+            Packages=new List<FixedMod>{old,dependent},Defaults=new List<FixedDefault>()};
+        Write(source,"bin/x64/Cyberpunk2077.exe","fixture only");
+        Write(target,"bin/x64/Cyberpunk2077.exe","fixture only");
+        Write(target,".fixture-only","test");
+        Write(source,library,"updated");Write(source,dataFile,"pinned data");
+        Write(source,dependent.Files[0].Path,"dependent");Write(source,runtime,"return {}");
+        var state=new GeneralModState{Destination=source,List=GeneralModLibrary.Seed(catalog,new ModImportItem[0])};
+        var upgrade=state.List.Mods.First(mod=>mod.Id==old.Id).Variants.Single();
+        upgrade.CyberpunkId=null;
+        const string current="https://github.com/fixture/fixture/releases/download/v2/FixtureLib.zip";
+        upgrade.Sources=new List<string>{current};
+        WriteGenericRecord(source,data,old.Id+"/default/0/"+current,new[]{library,dataFile});
+        var custom=State(source,"https://example.org/custom.zip").List.Mods.Single();
+        state.List.Mods.Add(custom);
+        WriteGenericRecord(source,data,"fixture/default/0/"+custom.Variants.Single().Sources[0],new[]{runtime});
+        var ids=new[]{old.Id,dependent.Id,custom.Id};
+        string output=Safe.In(root,"upgrade.zip");
+        var manifest=InstalledSnapshot.Create(output,state,ids,catalog,data,false,null,true);
+        var installer=new InstalledSnapshotInstaller(target,Safe.In(root,"urd"),catalog,true);
+        string receipt=installer.Install(output,Safe.Hash(output),null);
+        check(manifest.List.Mods.Count==3&&ids.All(id=>installer.Status(receipt,id+"/default")==GeneralModInstaller.Installed)&&
+            File.ReadAllText(Safe.In(target,library))=="updated",
+            "O catálogo confere a versão atualizada pelo recibo e mantém seu dependente no envio para uma pasta limpa.");
+        var redirected=Copy(manifest);
+        foreach(var list in new[]{redirected.List,redirected.Project})
+            list.Mods.Single(mod=>mod.Id==old.Id).Variants.Single().Sources[0]="https://github.com/unrelated/fixture/releases/download/v2/FixtureLib.zip";
+        refuse(()=>InstalledSnapshot.Validate(redirected,catalog),"Uma fonte de outro repositório não herda destinos reservados.");
+        var dat=Copy(manifest);
+        dat.Files.Single(file=>file.Path==dataFile).Sha256=new string('b',64);
+        refuse(()=>InstalledSnapshot.Validate(dat,catalog),"Dados binários de destino protegido exigem os bytes fixados pelo catálogo.");
+        var privateProfile=Copy(manifest);
+        privateProfile.Files.Single(file=>file.Path==runtime).Path=settings;
+        refuse(()=>InstalledSnapshot.Validate(privateProfile,catalog),"O script de perfis é portátil, mas o perfil local continua protegido.");
     }
 
     internal static int RunDensityTests(string parent){

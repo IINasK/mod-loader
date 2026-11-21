@@ -25,13 +25,13 @@ internal sealed partial class GeneralModWindow {
 
     sealed class ProjectVerification {
         readonly bool online;
+        readonly System.Threading.SemaphoreSlim remoteReads=new System.Threading.SemaphoreSlim(4);
         readonly ConcurrentDictionary<string,Lazy<Task<GeneralSourceInfo>>> pages=new ConcurrentDictionary<string,Lazy<Task<GeneralSourceInfo>>>();
         readonly ConcurrentDictionary<string,Lazy<Task<List<GeneralNexusRequirement[]>>>> requirements=
             new ConcurrentDictionary<string,Lazy<Task<List<GeneralNexusRequirement[]>>>>();
         internal readonly List<Work> Checked=new List<Work>();
         internal readonly List<Work> Divergent=new List<Work>();
         internal ScanReads Reads;
-        internal bool InventoryUnavailable;
         internal int MetadataChanged,UnavailableMetadata,UnavailableRequirements;
 
         internal ProjectVerification(bool online) { this.online=online; }
@@ -39,8 +39,10 @@ internal sealed partial class GeneralModWindow {
             return work.Variant.Sources.Select(GeneralNexusLink.Parse).Where(link=>link!=null);
         }
         static string Page(GeneralNexusLink link) { return new GeneralNexusLink{Game=link.Game,Mod=link.Mod}.Url; }
-        static async Task<TResult> Lookup<TResult>(Func<Task<TResult>> read) where TResult:class {
+        async Task<TResult> Lookup<TResult>(Func<Task<TResult>> read) where TResult:class {
+            await remoteReads.WaitAsync();
             try{return await read();}catch(Exception){return null;}
+            finally{remoteReads.Release();}
         }
         internal async Task ReadSources(Work work) {
             if(!online)return;
@@ -74,17 +76,30 @@ internal sealed partial class GeneralModWindow {
             }
             if(count!=work.Entry.Tags.Count||adult!=work.Entry.Nsfw)MetadataChanged++;
         }
-        internal IEnumerable<GeneralNexusRequirement[]> Requirements(Work work) {
+        internal GeneralSourceInfo PublishedPage(string page){
+            Lazy<Task<GeneralSourceInfo>> request;
+            return pages.TryGetValue(page,out request)?request.Value.Result:null;
+        }
+        internal Dictionary<string,List<GeneralNexusRequirement[]>> PublishedRequirements(){
+            return requirements.Where(pair=>pair.Value.IsValueCreated&&pair.Value.Value.Status==TaskStatus.RanToCompletion&&pair.Value.Value.Result!=null)
+                .ToDictionary(pair=>pair.Key,pair=>pair.Value.Value.Result,StringComparer.Ordinal);
+        }
+        internal IEnumerable<GeneralNexusRequirement[]> Requirements(Work work,bool countUnavailable=true) {
             foreach(var link in Sources(work)){
                 Lazy<Task<List<GeneralNexusRequirement[]>>> request;
                 var result=requirements.TryGetValue(link.Url,out request)?request.Value.Result:null;
-                if(result==null){UnavailableRequirements++;continue;}
+                if(result==null){if(countUnavailable)UnavailableRequirements++;continue;}
                 foreach(var item in result)yield return item;
             }
         }
     }
 
-    void ShowProjectDetails(){
+    static KeyValuePair<string,string> VerificationLine(string heading,string value){
+        return new KeyValuePair<string,string>(heading,value);
+    }
+
+    async void ShowProjectDetails(){
+        if(GeneralDialog.FocusOpen<GeneralDependencyReview>(this,"project-details"))return;
         var issues=new List<GeneralDependencyIssue>();
         if(!String.IsNullOrWhiteSpace(state.Destination)&&Directory.Exists(state.Destination)){
             var deployed=new GeneralPresetDeployment(Root(),data).Read();
@@ -94,14 +109,15 @@ internal sealed partial class GeneralModWindow {
                     Requirement=T("Preset","Preset"),Status=separator>0?issue.Substring(separator+1).TrimStart():issue});
             }
         }
-        using(var dialog=new GeneralDependencyReview(ModVersionSummary(),issues,0,launch,
-            DisplayedInventory().Where(file=>file.Kind=="found").ToArray(),title:T("Detalhes do projeto","Project details")))
-            dialog.ShowDialog(this);
+        using(var dialog=new GeneralDependencyReview(ModVersionSummary(),issues,launch,
+            title:T("Detalhes do projeto","Project details")))
+            await dialog.ShowModelessAsync(this,"project-details");
     }
 
     bool verifyingProject;
 
     async Task VerifyProject() {
+        if(GeneralDialog.FocusOpen<GeneralDependencyReview>(this,"verify"))return;
         if(working||scanning||verifyingProject||associationChoice!=null||exitApproved)return;
         verifyingProject=true;
         try {
@@ -115,18 +131,18 @@ internal sealed partial class GeneralModWindow {
             if(IsDisposed)return;
             var install=new Dictionary<string,Work>(StringComparer.Ordinal);
             var issues=ReviewDependencies(audit,install);
-            var summary=String.Format(T("Arquivos locais · {0} mods conferidos","Local files · {0} mods checked"),audit.Checked.Count)+
-                "\r\n"+ModVersionSummary();
-            if(audit.MetadataChanged>0||audit.UnavailableMetadata>0)
-                summary+="\r\n"+String.Format(T("Tags do Nexus · {0} mods atualizados · {1} consultas indisponíveis",
-                    "Nexus tags · {0} mods updated · {1} queries unavailable"),audit.MetadataChanged,audit.UnavailableMetadata);
+            var summary=new List<KeyValuePair<string,string>>{
+                VerificationLine(T("Arquivos locais","Local files"),String.Format(T("{0} mods conferidos","{0} mods checked"),audit.Checked.Count))
+            };
+            summary.AddRange(ModVersionSummary());
+            if(audit.UnavailableMetadata>0)
+                summary.Add(VerificationLine(T("Tags do Nexus","Nexus tags"),
+                    String.Format(T("{0} consultas indisponíveis","{0} queries unavailable"),audit.UnavailableMetadata)));
             if(audit.UnavailableRequirements>0)
-                summary+="\r\n"+(GeneralNexusInfo.HasTestKey
-                    ?String.Format(T("Dependências do Nexus · {0} consultas sem resposta","Nexus dependencies · {0} unanswered queries"),audit.UnavailableRequirements)
-                    :T("Dependências do Nexus · conecte sua conta para consultar","Nexus dependencies · connect your account to check"));
-            if(audit.InventoryUnavailable)
-                summary+="\r\n"+T("Não foi possível ler os arquivos não vinculados.","Could not read unlinked files.");
-            string verifyRoot=Root();
+                summary.Add(VerificationLine(T("Dependências do Nexus","Nexus dependencies"),GeneralNexusInfo.HasTestKey
+                    ?String.Format(T("{0} consultas sem resposta","{0} unanswered queries"),audit.UnavailableRequirements)
+                    :T("Conecte sua conta para consultar","Connect your account to check")));
+            string verifyRoot=Root(),verifyPreset=state.SelectedPreset;
             var repairs=new Dictionary<GeneralDependencyIssue,Work>();
             foreach(var work in audit.Divergent.Where(CanReviewReplacement)){
                 var recipe=Recipe(work);
@@ -134,37 +150,48 @@ internal sealed partial class GeneralModWindow {
                 if(scan.State!="Diferente/alterado"&&!presetProtected.Contains(work.Entry.Id))continue;
                 if(scan.State!="Diferente/alterado"&&scan.State!="Parcial")continue;
                 var issue=new GeneralDependencyIssue{Mod=work.Entry.Name,Requirement=recipe.Version,
-                    Status=T("Arquivos divergentes","Files differ"),CanRepair=true};
+                    Status=T("Arquivos divergentes","Files differ"),CanRepair=true,Category=work.Entry.Category};
                 issues.Add(issue);repairs.Add(issue,work);
             }
             if(IsDisposed)return;
 
             Work repair=null;
-            using(var dialog=new GeneralDependencyReview(summary,issues,install.Count,launch,DisplayedInventory().Where(file=>file.Kind=="found").ToArray(),
-                AddReviewedDependency,repairs.Count==0?null:(Action<GeneralDependencyIssue>)(issue=>repair=repairs[issue]))){
-                if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+            var pendingDependencies=new List<Work>();
+            Action<GeneralNexusRequirement> add=target=>{
+                if(IsDisposed||exitApproved||working||scanning||state.SelectedPreset!=verifyPreset||
+                    !InventoryPaths.Equals(state.Destination,verifyRoot))
+                    throw new IOException(T("O preset mudou. Abra uma nova verificação para adicionar a dependência.",
+                        "The preset changed. Run verification again to add the dependency."));
+                AddReviewedDependency(target);
+            };
+            using(var dialog=new GeneralDependencyReview(summary,issues,launch,add,
+                repairs.Count==0?null:(Action<GeneralDependencyIssue>)(issue=>repair=repairs[issue]),
+                categories:PresetCategories(),uncategorized:UncatName(),viewInstalled:ViewInstalledDependency)){
+                if(await dialog.ShowModelessAsync(this,"verify")!=DialogResult.OK||IsDisposed||exitApproved||
+                    working||scanning||state.SelectedPreset!=verifyPreset||!InventoryPaths.Equals(state.Destination,verifyRoot))return;
+                pendingDependencies.AddRange(dialog.SelectedInstallKeys.Select(key=>install[key]));
             }
             if(repair!=null){
                 repair.ReviewReplacement=true;
-                if(String.Equals(verifyRoot,Root(),StringComparison.OrdinalIgnoreCase))Enqueue(new[]{repair},false);
+                if(state.List.Mods.Contains(repair.Entry)&&MakeWork(repair.Entry).Key==repair.Key&&
+                    String.Equals(verifyRoot,Root(),StringComparison.OrdinalIgnoreCase))Enqueue(new[]{repair},false);
                 return;
             }
             string root=Root();
-            var selected=ChooseAlternatives(install.Values.ToList(),entries=>{
+            var selected=ChooseAlternatives(pendingDependencies,entries=>{
                 using(var dialog=new GeneralModAlternativeDialog(entries))
                     return dialog.ShowDialog(this)==DialogResult.OK?dialog.SelectedId:null;
             });
             if(selected==null||selected.Count==0)return;
             selected=WithLinkedDependencies(selected);
             var pending=new List<Work>();
-            List<string> downloads;
             scanning=true;Busy(true);
-            try{downloads=await Task.Run(()=>PlanSelected(selected,root,pending));}
+            try{await Task.Run(()=>PlanSelected(selected,root,pending));}
             finally{scanning=false;Busy(false);}
             if(IsDisposed)return;
             if(pending.Count>0){
                 foreach(var work in pending)work.DependencyQueue=true;
-                await ConfirmAndEnqueue(pending,root,downloads,false);
+                await ConfirmAndEnqueue(pending,root,false);
             }
         }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
         finally{
@@ -216,6 +243,25 @@ internal sealed partial class GeneralModWindow {
         var exact=new HashSet<string>(detectedOwners.Select(group=>group.Key),InventoryPaths);
         var extras=new List<P2PSyncDifference>();
         var registeredNames=new Dictionary<string,string>(names,StringComparer.Ordinal);
+        var shared=ReadSharedInventoryEvidence(destination,reads);
+        var sharedPaths=new HashSet<string>(InventoryPaths);
+        foreach(var evidence in shared){
+            string owner=evidence.Work.Entry.Id;
+            foreach(var file in evidence.Match.Receipt.Files.Where(file=>!GeneralInstallRoutes.External(file.Path))){
+                registered.Add(new ModFileAnchor{Owner=owner,Path=file.Path,Hash=file.Sha256,LocalReceipt=true});
+                recorded.Add(new ModFileAnchor{Owner=names[owner]+" · "+evidence.Match.Receipt.Upgrade.Version,
+                    Path=file.Path,Hash=file.Sha256,LocalReceipt=true});
+                exact.Add(file.Path);
+                sharedPaths.Add(file.Path);
+            }
+        }
+        foreach(var group in shared.SelectMany(item=>item.Match.Receipt.Files
+            .Where(file=>!GeneralInstallRoutes.External(file.Path)).Select(file=>new{file.Path,Owner=item.Work.Entry.Id}))
+            .GroupBy(file=>file.Path,InventoryPaths)){
+            var owners=group.Select(file=>file.Owner).Distinct(StringComparer.Ordinal).Take(2).ToArray();
+            if(owners.Length==1)extras.Add(new P2PSyncDifference{Kind="associated",Path=group.Key,
+                Mod=names[owners[0]],ModId=owners[0],ProvenOwner=owners[0]});
+        }
         if(cyberpunk){
             var engine=Cyberpunk(destination);
             var fixedOwners=state.List.Mods.SelectMany(mod=>mod.Variants.Where(variant=>variant.CyberpunkId!=null)
@@ -246,6 +292,7 @@ internal sealed partial class GeneralModWindow {
             exact.UnionWith(registered.Where(file=>names.ContainsKey(file.Owner)).Select(file=>file.Path));
             foreach(var file in engine.ReadUnlistedModFiles(exact.Where(path=>!detectedOwners.Contains(path)),data,
                 reads==null?null:(Func<string,string>)reads.Hash,true)){
+                if(sharedPaths.Contains(file.Path))continue;
                 if(file.ProvenOwner!=null){
                     string owner=file.ProvenOwner;
                     var candidates=fixedOwners[owner].Concat(imports[owner].SelectMany(lookup)).Concat(detectedOwners[file.Path])
@@ -314,7 +361,9 @@ internal sealed partial class GeneralModWindow {
             !observedScopes.Contains(scope(item.Key))))
             extras.Add(new P2PSyncDifference{Kind="associated",Mod=names[pair.Value],ModId=pair.Value,Path=pair.Key,LocalInModFolder=true});
         var declarations=state.List.Mods.SelectMany(mod=>(Selected(mod).OutputFolders??new List<string>())
-            .Select(folder=>new KeyValuePair<string,string>(folder,mod.Id)));
+            .Select(folder=>new KeyValuePair<string,string>(folder,mod.Id)))
+            .Concat(shared.SelectMany(item=>(item.Match.Variant.OutputFolders??new List<string>())
+                .Select(folder=>new KeyValuePair<string,string>(folder,item.Work.Entry.Id))));
         var declaredOutputs=InstalledFileOwnership.FindDeclared(destination,declarations,registered,readHash)
             .GroupBy(pair=>pair.Key,InventoryPaths).ToDictionary(group=>group.Key,group=>group.First().Value,InventoryPaths);
         AssociateDeclaredOutputs(extras,declaredOutputs,names);
@@ -428,15 +477,122 @@ internal sealed partial class GeneralModWindow {
         return new HashSet<string>(scopes.Select(group=>group.Key),InventoryPaths);
     }
 
+    void ViewInstalledDependency(string id){
+        var entry=state.List.Mods.FirstOrDefault(mod=>mod.Id==id);
+        if(entry!=null)Edit(entry);
+    }
+
+    bool VerifiedDependencyInstalled(Work work){
+        string status;
+        return statuses.TryGetValue(work.Key,out status)&&GeneralStatusPresentation.Kind(status)=="installed";
+    }
+
+    bool? MatchesDependencyRange(Work work,GeneralNexusRequirement target){
+        string status;
+        if(target.MaxFile>0&&target.MaxFile==target.MinFile||
+            !statuses.TryGetValue(work.Key,out status)||!VersionInstalled(status))return null;
+        string version=VersionInStatus(work.Key,status);
+        var minimum=ModVersionNumbers.Compare(version,target.MinVersion);
+        var maximum=ModVersionNumbers.Compare(version,target.MaxVersion);
+        if(!minimum.HasValue||target.MaxFile>0&&!maximum.HasValue)return null;
+        return minimum.Value>=0&&(target.MaxFile==0||maximum.Value<=0);
+    }
+
+    static string NexusDependencyPage(GeneralNexusLink link){return link.Game+"/"+link.Mod;}
+
+    static string DependencyName(string value){
+        return new string((value??"").Where(Char.IsLetterOrDigit).Select(Char.ToUpperInvariant).ToArray());
+    }
+    static IEnumerable<string> DependencyNames(Work work){
+        yield return DependencyName(work.Entry.Name);
+        foreach(string source in work.Variant.Sources){
+            var repo=GeneralGithubLink.Parse(source);
+            if(repo!=null)yield return DependencyName(repo.Repository.Split('/').Last());
+        }
+    }
+    IEnumerable<string> RegisteredDependencyPages(Work work){
+        foreach(var link in work.Variant.Sources.Select(GeneralNexusLink.Parse).Where(link=>link!=null))
+            yield return NexusDependencyPage(link);
+        var recipe=catalog.Packages.FirstOrDefault(item=>item.Id==(work.Variant.CyberpunkId??work.Entry.Id));
+        if(recipe!=null)foreach(int id in recipe.Assets.Select(asset=>asset.ModId).Concat(new[]{recipe.NexusModId}).Where(id=>id>0))
+            yield return "cyberpunk2077/"+id;
+    }
+    static bool UneditedDependencySuggestion(GeneralModEntry mod,string page,string name,GeneralSourceInfo published){
+        if(mod.DependencySource!=page||mod.Name!=name||mod.DependencyFile!=0||
+            mod.AlternativeGroup!=null||mod.DetectedPaths.Count!=0||mod.NsfwOverride!=null||
+            !String.IsNullOrEmpty(mod.Description)||mod.CompatibilityGroups.Count!=0||
+            mod.Category!=DependencyCategory&&mod.Category!=CoreDependencyCategory||
+            !mod.Tags.Contains("Dependência detectada")||mod.Variants.Count!=1)return false;
+        var variant=mod.Variants[0];
+        if(variant.Id!="default"||mod.DefaultVariant!=variant.Id||variant.Name!="Indefinida"&&variant.Name!="Undefined"||
+            variant.CyberpunkId!=null||variant.DisplayName!=null||variant.Category!=null||!String.IsNullOrEmpty(variant.Description)||
+            variant.NsfwOverride!=null||variant.Tags!=null||variant.NaturalOption!=null||variant.CompatibilityGroups.Count!=0||
+            variant.InstallRoutes.Count!=0||variant.OutputFolders.Count!=0||variant.RequiredMods.Count!=0||
+            variant.Sources.Count!=1||variant.Sources[0]!=page)return false;
+        var tags=published==null?null:published.Tags;
+        return mod.Tags.All(tag=>tag=="Dependência detectada"||tags!=null&&tags.Contains(tag,StringComparer.OrdinalIgnoreCase))&&
+            variant.References.All(reference=>published!=null&&String.Equals(reference,published.Reference,StringComparison.OrdinalIgnoreCase));
+    }
+    bool ReconcileDependencySuggestions(List<Work> works,Func<string,GeneralSourceInfo> metadata,HashSet<string> requiredPages){
+        if(projectDraft!=null||loadingPreset||!works.Any(work=>work.Entry.DependencySource!=null))return false;
+        var installed=works.Where(work=>work.Entry.DependencySource==null&&VerifiedDependencyInstalled(work)).ToArray();
+        var pages=installed.SelectMany(work=>RegisteredDependencyPages(work).Distinct().Select(page=>new{Work=work,Page=page}))
+            .ToLookup(item=>item.Page,item=>item.Work,StringComparer.Ordinal);
+        var names=installed.SelectMany(work=>DependencyNames(work).Distinct().Select(name=>new{Work=work,Name=name}))
+            .ToLookup(item=>item.Name,item=>item.Work,StringComparer.Ordinal);
+        var removed=new HashSet<string>(StringComparer.Ordinal);
+        var configurations=state.List.Mods.Concat(state.List.Presets.SelectMany(preset=>preset.Configurations.Values)).ToArray();
+        var linked=new HashSet<string>(configurations.SelectMany(mod=>mod.Variants).SelectMany(v=>v.WithNaturalOption())
+            .SelectMany(v=>v.RequiredMods).Concat(state.List.Folders.SelectMany(folder=>folder.ModIds))
+            .Concat(InventoryLinks.Attachments.SelectMany(file=>file.Owners))
+            .Concat(InventoryLinks.Groups.Select(group=>group.CatalogId)),StringComparer.Ordinal);
+        if(inventoryLoadError!=null)return false;
+        var generic=Generic(state.Destination);
+        foreach(var work in works.Where(work=>work.Entry.DependencySource!=null)){
+            var suggestion=work.Entry;string url=suggestion.DependencySource;
+            var published=metadata==null?null:metadata(url);
+            if(linked.Contains(suggestion.Id)||!UneditedDependencySuggestion(suggestion,url,suggestion.Name,published)||
+                published!=null&&!String.Equals(published.Name,suggestion.Name,StringComparison.OrdinalIgnoreCase))continue;
+            var presets=state.List.Presets.Where(p=>p.ModIds.Contains(suggestion.Id)).ToArray();
+            if(presets.Any(p=>p.Configurations.ContainsKey(suggestion.Id)&&!UneditedDependencySuggestion(
+                p.Configurations[suggestion.Id],url,suggestion.Name,published)))continue;
+            var candidates=pages[NexusDependencyPage(GeneralNexusLink.Parse(url))].ToArray();
+            // Names only retire an empty automatic suggestion if the live audit
+            // can present the unresolved requirement again for human review.
+            if(candidates.Length==0&&requiredPages!=null&&requiredPages.Contains(url))
+                candidates=names[DependencyName(suggestion.Name)].ToArray();
+            if(candidates.Length!=1||presets.Length==0||presets.Any(p=>!p.ModIds.Contains(candidates[0].Entry.Id)))continue;
+            string prefix=suggestion.Id+"/";
+            if(state.CyberpunkImports.Keys.Concat(state.SnapshotReceipts.Keys).Concat(state.ResolvedDownloads.Keys)
+                .Any(key=>key.StartsWith(prefix,StringComparison.Ordinal))||generic.HasSnapshotRecord(work.Receipt(0))||
+                presetProtected.Contains(suggestion.Id))continue;
+            removed.Add(suggestion.Id);
+            GeneralPresetProfiles.Remove(state,suggestion.Id,true);
+            statuses.Remove(work.Key);statusDetails.Remove(work.Key);progress.Remove(work.Key);marked.Remove(suggestion.Id);
+        }
+        works.RemoveAll(work=>removed.Contains(work.Entry.Id));
+        return removed.Count>0;
+    }
+
     List<GeneralDependencyIssue> ReviewDependencies(ProjectVerification audit,Dictionary<string,Work> install) {
         var preset=ActivePreset;
         var entries=state.List.Mods.Select(MakeWork).ToList();
         var members=preset==null?null:new HashSet<string>(preset.ModIds,StringComparer.Ordinal);
-        var recipes=entries.Where(work=>work.Variant.CyberpunkId!=null)
-            .ToLookup(work=>work.Variant.CyberpunkId,StringComparer.Ordinal);
+        var catalogIds=new HashSet<string>(catalog.Packages.Select(recipe=>recipe.Id),StringComparer.Ordinal);
+        var recipes=entries.Select(work=>new{Work=work,Id=work.Variant.CyberpunkId??work.Entry.Id})
+            .Where(item=>catalogIds.Contains(item.Id)).ToLookup(item=>item.Id,item=>item.Work,StringComparer.Ordinal);
+        var nexusRecipes=catalog.Packages.SelectMany(recipe=>recipe.Assets.Where(asset=>asset.ModId>0).Select(asset=>asset.ModId)
+            .Concat(new[]{recipe.NexusModId}).Where(id=>id>0).Distinct().Select(id=>new{Recipe=recipe.Id,Page="cyberpunk2077/"+id}))
+            .ToLookup(item=>item.Page,item=>item.Recipe,StringComparer.Ordinal);
         var sources=entries.SelectMany(work=>work.Variant.Sources.Select(GeneralNexusLink.Parse)
             .Where(link=>link!=null).Select(link=>new{Work=work,Link=link}))
-            .ToLookup(item=>item.Link.Game+"/"+item.Link.Mod,StringComparer.Ordinal);
+            .ToLookup(item=>NexusDependencyPage(item.Link),StringComparer.Ordinal);
+        var installedNames=entries.Where(VerifiedDependencyInstalled).SelectMany(work=>DependencyNames(work).Distinct()
+            .Select(name=>new{Work=work,Name=name})).ToLookup(item=>item.Name,item=>item.Work,StringComparer.Ordinal);
+        Func<Work,bool> inPreset=work=>members==null||members.Contains(work.Entry.Id);
+        Func<string,IEnumerable<Work>> related=page=>sources[page].Select(item=>item.Work)
+            .Concat(nexusRecipes[page].SelectMany(id=>recipes[id])).Distinct();
+        publishedRequirements=audit.PublishedRequirements();
         var issues=new List<GeneralDependencyIssue>();
         bool changed=false;
         foreach(var work in audit.Checked.Where(work=>members==null||members.Contains(work.Entry.Id)).ToArray()){
@@ -444,12 +600,10 @@ internal sealed partial class GeneralModWindow {
                 foreach(var recipe in ExpandWork(work,state.Destination).Where(recipe=>recipe.Id!=work.Variant.CyberpunkId)){
                     var dependency=recipes[recipe.Id].FirstOrDefault(candidate=>members==null||members.Contains(candidate.Entry.Id))
                         ??recipes[recipe.Id].FirstOrDefault();
-                    if(dependency==null){
-                        var existing=state.List.Mods.FirstOrDefault(entry=>entry.Id==recipe.Id&&Selected(entry).CyberpunkId==recipe.Id);
-                        if(existing!=null)dependency=MakeWork(existing);
-                    }
                     bool listed=dependency!=null&&(members==null||members.Contains(dependency.Entry.Id));
-                    bool installed=audit.Reads.Cyberpunk&&audit.Reads.Fixed(recipe).IsCorrect;
+                    string dependencyStatus=null;
+                    bool checkedStatus=dependency!=null&&statuses.TryGetValue(dependency.Key,out dependencyStatus);
+                    bool installed=audit.Reads.Cyberpunk&&(checkedStatus?VersionInstalled(dependencyStatus):audit.Reads.Fixed(recipe).IsCorrect);
                     bool availableEdition=!GameEdition.NeedsPL(recipe)||
                         (audit.Reads.PhantomLiberty&&(preset==null||preset.Id!="no-pl"));
                     if(listed&&installed)continue;
@@ -467,40 +621,43 @@ internal sealed partial class GeneralModWindow {
                         members.Add(dependency.Entry.Id);
                         changed=true;
                     }
-                    string dependencyStatus=null;
-                    if(dependency!=null)statuses.TryGetValue(dependency.Key,out dependencyStatus);
-                    if(!installed&&dependency!=null&&audit.Reads.Cyberpunk&&availableEdition&&dependencyStatus!=GeneralStatusPresentation.Disabled)
-                        install[dependency.Key]=dependency;
+                    bool missing=!installed&&(!checkedStatus||dependencyStatus=="Não instalado"||MissingSourceStatus(dependencyStatus));
+                    string installKey=null;
+                    if(missing&&dependency!=null&&audit.Reads.Cyberpunk&&availableEdition){
+                        installKey=dependency.Key;
+                        install[installKey]=dependency;
+                    }
                     string url=(dependency==null?recipe.Assets.Select(asset=>asset.ModId>0?
                         new GeneralNexusLink{Game="cyberpunk2077",Mod=asset.ModId,File=asset.FileId}.Url:asset.Url):
                         dependency.Variant.Sources).FirstOrDefault(GeneralModDownload.IsWebSource);
                     issues.Add(new GeneralDependencyIssue{Mod=work.Entry.Name,Requirement=recipe.Name,Url=url,
+                        Category=work.Entry.Category,InstallKey=installKey,
                         Status=installed?T("Instalado · fora do preset","Installed · outside preset"):
                             !availableEdition?T("Requer Phantom Liberty","Requires Phantom Liberty"):
                             !audit.Reads.Cyberpunk?T("Destino incompatível","Incompatible destination"):
                             dependencyStatus==GeneralStatusPresentation.Disabled?T("Desabilitada","Disabled"):
-                            T("Falta instalar","Installation missing")});
+                            missing?T("Falta instalar","Installation missing"):GeneralStatusPresentation.Label(dependencyStatus)});
                 }
             }
             foreach(var group in audit.Requirements(work)){
-                bool present=group.Any(target=>sources[target.Source.Game+"/"+target.Source.Mod].Any(item=>{
-                    string status;
-                    return (members==null||members.Contains(item.Work.Entry.Id))&&
-                        (item.Link.File==target.MinFile||target.MaxFile>0&&item.Link.File==target.MaxFile)&&
-                        statuses.TryGetValue(item.Work.Key,out status)&&GeneralStatusPresentation.Kind(status)=="installed";
-                }));
+                bool present=group.Any(target=>{
+                    string page=NexusDependencyPage(target.Source);
+                    return sources[page].Any(item=>inPreset(item.Work)&&VerifiedDependencyInstalled(item.Work)&&
+                        (item.Link.File==target.MinFile||target.MaxFile>0&&item.Link.File==target.MaxFile));
+                });
                 if(present)continue;
                 bool chooseMod=group.Select(item=>item.Source.Url).Distinct().Count()>1;
                 foreach(var target in group.GroupBy(item=>Tuple.Create(item.Source.Url,item.MinFile,item.MaxFile)).Select(items=>items.First())){
-                    var candidates=sources[target.Source.Game+"/"+target.Source.Mod];
-                    var existing=candidates.Select(item=>item.Work.Entry).FirstOrDefault()
-                        ??state.List.Mods.FirstOrDefault(entry=>entry.DependencySource==target.Source.Url||
-                            Selected(entry).Sources.Select(GeneralNexusLink.Parse).Any(link=>link!=null&&
-                                link.Mod==target.Source.Mod&&link.Game==target.Source.Game));
+                    string page=NexusDependencyPage(target.Source);
+                    var candidates=related(page).OrderByDescending(VerifiedDependencyInstalled).ToArray();
+                    var installed=candidates.FirstOrDefault(VerifiedDependencyInstalled);
+                    var sameName=installedNames[DependencyName(target.Name)].Take(2).ToArray();
+                    var possible=installed==null&&sameName.Length==1?sameName[0]:null;
+                    var existing=candidates.Select(candidate=>candidate.Entry).FirstOrDefault()
+                        ??state.List.Mods.FirstOrDefault(entry=>entry.DependencySource==target.Source.Url);
                     bool missing=existing==null;
-                    if(!chooseMod&&missing&&CanAddDependency(preset)){
-                        var entry=CreateDependency(target,preset);
-                        if(group.Length>1)entry.DependencyFile=0;
+                    if(!chooseMod&&missing&&possible==null&&CanAddDependency(preset)){
+                        var entry=CreateDependency(target,preset,group.Length==1);
                         if(members!=null)members.Add(entry.Id);
                         changed=true;
                     }else if(!chooseMod&&!missing&&preset!=null&&!preset.ModIds.Contains(existing.Id)&&preset.ModIds.Count<1000){
@@ -513,14 +670,16 @@ internal sealed partial class GeneralModWindow {
                     string url=target.MaxFile==target.MinFile?
                         new GeneralNexusLink{Game=target.Source.Game,Mod=target.Source.Mod,File=target.MinFile}.Url:
                         target.Source.Url+"?tab=files";
-                    bool foundDifferent=candidates.Any(item=>{
-                        string status;
-                        return statuses.TryGetValue(item.Work.Key,out status)&&GeneralStatusPresentation.Kind(status)=="installed";
-                    });
+                    var local=installed??possible;
+                    bool provenSource=installed!=null&&sources[page].Any(item=>item.Work==installed);
                     issues.Add(new GeneralDependencyIssue{Mod=work.Entry.Name,Requirement=target.Name+" · "+range,Url=url,
-                        Candidate=chooseMod&&missing?target:null,
-                        Status=chooseMod?T("Uma das opções","One of these options"):missing?T("Escolher versão","Choose version"):
-                            foundDifferent?T("Faixa não confirmada","Version range unconfirmed"):T("Verificar arquivo requerido","Check required file")});
+                        Category=work.Entry.Category,InstalledModId=local==null?null:local.Entry.Id,
+                        Candidate=chooseMod&&missing&&possible==null?target:null,
+                        Status=installed!=null?(provenSource&&MatchesDependencyRange(installed,target)==false
+                            ?T("Versão fora da faixa","Version outside the supported range")
+                            :T("Instalado · arquivo a confirmar","Installed · verify archive")):
+                            possible!=null?T("Possível mod instalado · confirmar origem","Possible installed mod · verify source"):
+                            chooseMod?T("Uma das opções","One of these options"):T("Escolher arquivo","Choose archive")});
                 }
             }
         }
@@ -536,12 +695,14 @@ internal sealed partial class GeneralModWindow {
         FinishProjectEdit();DrawRows();
     }
 
-    GeneralModEntry CreateDependency(GeneralNexusRequirement target,GeneralModPreset preset) {
-        var entry=NewEntry(target.Name,target.Source.Url);
+    GeneralModEntry CreateDependency(GeneralNexusRequirement target,GeneralModPreset preset,bool singleRange=true) {
+        int pinned=singleRange&&target.MinFile==target.MaxFile?target.MinFile:0;
+        var source=new GeneralNexusLink{Game=target.Source.Game,Mod=target.Source.Mod,File=pinned};
+        var entry=NewEntry(target.Name,source.Url);
         entry.DependencySource=target.Source.Url;entry.Nsfw=target.Nsfw;
-        entry.DependencyFile=target.MinFile==target.MaxFile?target.MinFile:0;
+        entry.DependencyFile=pinned;
         entry.Tags.Add("Dependência detectada");
-        entry.Variants[0].Name=T("Indefinida","Undefined");
+        entry.Variants[0].Name=pinned==0?T("Indefinida","Undefined"):target.MinVersion??T("Principal","Main");
         AddDependency(entry,preset);
         return entry;
     }
@@ -559,56 +720,59 @@ internal sealed partial class GeneralModWindow {
 }
 
 internal sealed class GeneralDependencyIssue {
-    internal string Mod,Requirement,Status,Url;
+    internal string Mod,Requirement,Status,Url,Category,InstallKey,InstalledModId;
     internal GeneralNexusRequirement Candidate;
     internal bool CanRepair;
 }
 
 internal sealed class GeneralDependencyReview : GeneralDialog {
-    internal GeneralDependencyReview(string summary,IReadOnlyList<GeneralDependencyIssue> issues,int installable,Action<string> open,
-        IReadOnlyList<P2PSyncDifference> inventory=null,Action<GeneralNexusRequirement> add=null,Action<GeneralDependencyIssue> repair=null,string title=null)
+    readonly HashSet<string> selectedInstallKeys=new HashSet<string>(StringComparer.Ordinal);
+    internal IEnumerable<string> SelectedInstallKeys {get{return selectedInstallKeys;}}
+
+    internal GeneralDependencyReview(IEnumerable<KeyValuePair<string,string>> summary,IReadOnlyList<GeneralDependencyIssue> issues,Action<string> open,
+        Action<GeneralNexusRequirement> add=null,Action<GeneralDependencyIssue> repair=null,string title=null,
+        IEnumerable<string> categories=null,string uncategorized=null,Action<string> viewInstalled=null)
         :base(title??GeneralStyle.T("Resultado da verificação","Verification results")) {
-        RequiresDecision=installable>0||add!=null;
-        int lines=summary.Count(character=>character=='\n')+1;
-        if(inventory!=null&&inventory.Count>0){
-            summary+="\r\n"+GeneralStyle.T("Arquivos não vinculados são itens encontrados no jogo sem um mod cadastrado associado.",
-                "Unlinked files are items found in the game without an associated mod in the project.");
-            lines++;
-        }
-        ClientSize=new Size(900,Math.Min(600,250+lines*23+issues.Count*35));
+        selectedInstallKeys.UnionWith(issues.Select(issue=>issue.InstallKey).Where(key=>key!=null));
+        RequiresDecision=selectedInstallKeys.Count>0||issues.Any(issue=>issue.Candidate!=null||issue.CanRepair);
+        var lines=summary.ToArray();
+        ClientSize=new Size(900,Math.Min(600,250+lines.Length*27+issues.Count*35));
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(20,8,20,20)};
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.Controls.Add(new Label{Text=summary,Dock=DockStyle.Top,AutoSize=true,Margin=new Padding(0,0,0,12)},0,0);
-        var table=new GeneralModWindow.ModListGrid{Name="DependencyResults",Dock=DockStyle.Fill,ReadOnly=true,
-            AllowUserToAddRows=false,AllowUserToDeleteRows=false,AllowUserToResizeRows=false,RowHeadersVisible=false,
-            MultiSelect=false,SelectionMode=DataGridViewSelectionMode.FullRowSelect,AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill,
-            ColumnHeadersHeight=36,EnableHeadersVisualStyles=false,BackgroundColor=GeneralStyle.Surface,BorderStyle=BorderStyle.None};
-        foreach(string name in new[]{GeneralStyle.T("Mod","Mod"),GeneralStyle.T("Dependência","Dependency"),GeneralStyle.T("Situação","Status")})
-            table.Columns.Add(new DataGridViewTextBoxColumn{HeaderText=name,SortMode=DataGridViewColumnSortMode.NotSortable});
-        table.DefaultCellStyle=new DataGridViewCellStyle{BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Foreground,
-            SelectionBackColor=GeneralStyle.Selection,SelectionForeColor=GeneralStyle.Foreground,Font=GeneralStyle.Font(11),Padding=new Padding(8,0,8,0)};
-        table.ColumnHeadersDefaultCellStyle=new DataGridViewCellStyle{BackColor=GeneralStyle.Surface,ForeColor=GeneralStyle.Muted,
-            Font=GeneralStyle.Font(11,true),Padding=new Padding(8,0,8,0)};
-        table.RowTemplate.Height=36;
-        foreach(var issue in issues){
-            var row=table.Rows[table.Rows.Add(issue.Mod,issue.Requirement,issue.Status)];
-            row.Tag=issue;
-            foreach(DataGridViewCell cell in row.Cells)cell.ToolTipText=Convert.ToString(cell.Value);
+        if(lines.Length>0){
+            var overview=new TableLayoutPanel{Name="VerificationOverview",Dock=DockStyle.Top,AutoSize=true,
+                ColumnCount=2,RowCount=lines.Length,Margin=new Padding(0,0,0,13)};
+            overview.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            overview.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+            for(int index=0;index<lines.Length;index++){
+                overview.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                overview.Controls.Add(new Label{Text=lines[index].Key,AutoSize=true,Font=GeneralStyle.Font(12,true),
+                    Margin=new Padding(0,2,20,4)},0,index);
+                overview.Controls.Add(new Label{Text=lines[index].Value,AutoSize=true,
+                    Margin=new Padding(0,2,0,4)},1,index);
+            }
+            layout.Controls.Add(overview,0,0);
         }
+        var table=BuildResults(issues,categories,uncategorized);
         var view=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(10),Margin=Padding.Empty};
         if(issues.Count>0)view.Controls.Add(new GeneralScrollView(table));
         else view.Controls.Add(new Label{Text=GeneralStyle.T("Nenhuma pendência local apontada pela verificação.","No local issues reported by the check."),Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleCenter});
         layout.Controls.Add(view,0,1);
         var commands=GeneralTableDialogLayout.Commands();
         var done=GeneralStyle.Button(GeneralStyle.T("Fechar","Close"),()=>Complete(DialogResult.Cancel));
-        var browser=GeneralStyle.Button(GeneralStyle.T("Abrir página","Open page"),()=>{
+        var browser=GeneralStyle.Button(GeneralStyle.T("Ver arquivo publicado","View published archive"),()=>{
             var issue=table.CurrentRow==null?null:table.CurrentRow.Tag as GeneralDependencyIssue;
             if(issue==null||!GeneralModDownload.IsWebSource(issue.Url))return;
             try{open(issue.Url);}catch(Exception ex){Message(this,ex.Message,Text);}
         });
         browser.Name="OpenDependencyPage";
+        var installedMod=GeneralStyle.Button(GeneralStyle.T("Ver mod instalado","View installed mod"),()=>{
+            var issue=table.CurrentRow==null?null:table.CurrentRow.Tag as GeneralDependencyIssue;
+            if(issue!=null&&issue.InstalledModId!=null&&viewInstalled!=null)viewInstalled(issue.InstalledModId);
+        });
+        installedMod.Name="ViewInstalledDependency";
         Button addChoice=null;
         addChoice=GeneralStyle.Button(GeneralStyle.T("Adicionar opção","Add option"),()=>{
             var issue=table.CurrentRow==null?null:table.CurrentRow.Tag as GeneralDependencyIssue;
@@ -621,31 +785,101 @@ internal sealed class GeneralDependencyReview : GeneralDialog {
             repair(issue);Complete(DialogResult.OK);
         });
         repairButton.Name="ReviewModReplacement";
-        browser.Enabled=addChoice.Enabled=repairButton.Enabled=false;
+        browser.Enabled=addChoice.Enabled=repairButton.Enabled=installedMod.Enabled=false;
         table.CurrentCellChanged+=(s,e)=>{
             var issue=table.CurrentRow==null?null:table.CurrentRow.Tag as GeneralDependencyIssue;
             browser.Enabled=issue!=null&&GeneralModDownload.IsWebSource(issue.Url);
             addChoice.Enabled=issue!=null&&issue.Candidate!=null;
+            installedMod.Enabled=issue!=null&&issue.InstalledModId!=null;
             if(repair!=null)repairButton.Enabled=issue!=null&&issue.CanRepair;
         };
         commands.Controls.Add(done);
         browser.Visible=issues.Any(issue=>GeneralModDownload.IsWebSource(issue.Url));
         commands.Controls.Add(browser);
+        if(viewInstalled!=null&&issues.Any(issue=>issue.InstalledModId!=null))commands.Controls.Add(installedMod);
+        else installedMod.Dispose();
         if(repair!=null)commands.Controls.Add(repairButton);else repairButton.Dispose();
         if(add!=null&&issues.Any(issue=>issue.Candidate!=null))commands.Controls.Add(addChoice);
-        if(inventory!=null&&inventory.Count>0){
-            var outside=GeneralStyle.Button(GeneralStyle.T("Ver arquivos não vinculados","View unlinked files")+" ("+inventory.Count+")",()=>{
-                using(var dialog=new GeneralSyncDifferencesDialog(inventory,true))dialog.ShowDialog(this);
-            });
-            outside.Name="ShowUnlistedInventory";
-            commands.Controls.Add(outside);
-        }
-        if(installable>0){
-            var install=GeneralStyle.Button(GeneralStyle.T("Instalar do catálogo","Install from catalog")+" ("+installable+")",()=>Complete(DialogResult.OK),true);
+        if(selectedInstallKeys.Count>0){
+            var install=GeneralStyle.Button("",()=>Complete(DialogResult.OK),true);
             install.Name="InstallCatalogDependencies";
-            commands.Controls.Add(install);
+            Action refresh=()=>{
+                install.Text=GeneralStyle.T("Instalar dependências","Install dependencies")+" ("+selectedInstallKeys.Count+")";
+                install.Enabled=selectedInstallKeys.Count>0;
+            };
+            table.CellContentClick+=(s,e)=>{if(e.ColumnIndex==0&&e.RowIndex>=0)ToggleInstall(table,e.RowIndex,refresh);};
+            table.KeyDown+=(s,e)=>{
+                if(e.KeyCode!=Keys.Space||table.CurrentRow==null)return;
+                ToggleInstall(table,table.CurrentRow.Index,refresh);
+                e.SuppressKeyPress=true;
+            };
+            refresh();commands.Controls.Add(install);
         }
         layout.Controls.Add(commands,0,2);
         Content.Controls.Add(layout);CancelButton=done;GeneralStyle.Apply(this,GeneralStyle.Dark);
+    }
+
+    GeneralModWindow.ModListGrid BuildResults(IReadOnlyList<GeneralDependencyIssue> issues,IEnumerable<string> categories,string uncategorized){
+        var table=GeneralTableDialogLayout.ReadOnlyTable("DependencyResults",GeneralStyle.T("Pendências","Issues"));
+        table.Columns.Add(new DataGridViewCheckBoxColumn{Name="Mark",HeaderText="",Width=44,SortMode=DataGridViewColumnSortMode.NotSortable});
+        foreach(string title in new[]{GeneralStyle.T("Mod","Mod"),GeneralStyle.T("Dependência","Dependency"),GeneralStyle.T("Situação","Status")})
+            table.Columns.Add(new DataGridViewTextBoxColumn{HeaderText=title,AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill,
+                SortMode=DataGridViewColumnSortMode.NotSortable});
+        var groups=issues.ToLookup(issue=>issue.Category??"");
+        var order=new[]{""}.Concat(categories??Enumerable.Empty<string>()).Concat(groups.Select(group=>group.Key)).Distinct();
+        var headingFont=GeneralStyle.Font(13,true);
+        table.Disposed+=(s,e)=>headingFont.Dispose();
+        foreach(string category in order.Where(category=>groups.Contains(category))){
+            if(categories!=null){
+                var heading=table.Rows[table.Rows.Add()];
+                heading.Tag=category.Length==0?(uncategorized??GeneralStyle.T("Sem categoria","Uncategorized")):category;
+                heading.Height=46;
+            }
+            foreach(var issue in groups[category]){
+                var row=table.Rows[table.Rows.Add(issue.InstallKey!=null,issue.Mod,issue.Requirement,issue.Status)];
+                row.Tag=issue;
+                foreach(DataGridViewCell cell in row.Cells.Cast<DataGridViewCell>().Skip(1))
+                    cell.ToolTipText=Convert.ToString(cell.Value);
+            }
+        }
+        table.RowPrePaint+=(s,e)=>{
+            string heading=table.Rows[e.RowIndex].Tag as string;
+            if(heading==null)return;
+            e.Handled=true;
+            using(var fill=new SolidBrush(GeneralStyle.Surface))e.Graphics.FillRectangle(fill,e.RowBounds);
+            var bounds=e.RowBounds;bounds.X+=16;bounds.Width-=16;
+            TextRenderer.DrawText(e.Graphics,heading,headingFont,bounds,GeneralStyle.Foreground,
+                TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.NoPrefix);
+        };
+        table.CellPainting+=(s,e)=>{
+            if(e.RowIndex<0||e.ColumnIndex!=0)return;
+            var issue=table.Rows[e.RowIndex].Tag as GeneralDependencyIssue;
+            if(issue!=null&&issue.InstallKey!=null)return;
+            e.PaintBackground(e.ClipBounds,true);
+            e.Handled=true;
+        };
+        table.CellMouseEnter+=(s,e)=>{
+            if(e.RowIndex<0||!(table.Rows[e.RowIndex].Tag is GeneralDependencyIssue))return;
+            table.Rows[e.RowIndex].DefaultCellStyle.BackColor=GeneralStyle.Selection;
+            table.Cursor=Cursors.Hand;
+        };
+        table.CellMouseLeave+=(s,e)=>{
+            if(e.RowIndex<0)return;
+            table.Rows[e.RowIndex].DefaultCellStyle.BackColor=GeneralStyle.Surface;
+            table.Cursor=Cursors.Default;
+        };
+        return table;
+    }
+
+    void ToggleInstall(DataGridView table,int row,Action refresh){
+        var issue=table.Rows[row].Tag as GeneralDependencyIssue;
+        if(issue==null||issue.InstallKey==null)return;
+        bool marked=selectedInstallKeys.Add(issue.InstallKey);
+        if(!marked)selectedInstallKeys.Remove(issue.InstallKey);
+        foreach(DataGridViewRow item in table.Rows){
+            var candidate=item.Tag as GeneralDependencyIssue;
+            if(candidate!=null&&candidate.InstallKey==issue.InstallKey)item.Cells[0].Value=marked;
+        }
+        refresh();
     }
 }

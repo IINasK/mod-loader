@@ -60,6 +60,7 @@ public sealed class GeneralModVariant {
     public List<string> OutputFolders = new List<string>();
     public List<string> CompatibilityGroups = new List<string>();
     public List<string> Sources = new List<string>();
+    public List<string> References = new List<string>();
     public Dictionary<string,GeneralSourceInfo> SourceInfo = new Dictionary<string,GeneralSourceInfo>();
 
     internal List<string> PreviousCatalogSources;
@@ -168,7 +169,7 @@ public sealed class GeneralModLibrary {
     }
     static object ExportVariant(GeneralModVariant variant) {
         return new {
-            variant.Id, variant.Name, variant.Sources, variant.SourceInfo, variant.CompatibilityGroups, variant.RequiredMods, variant.InstallRoutes,
+            variant.Id, variant.Name, variant.Sources, variant.References, variant.SourceInfo, variant.CompatibilityGroups, variant.RequiredMods, variant.InstallRoutes,
             variant.DisplayName, variant.Category, variant.Description, variant.Tags, variant.Nsfw, variant.NsfwOverride,
             NaturalOption = variant.NaturalOption == null ? null : ExportVariant(variant.NaturalOption)
         };
@@ -399,14 +400,21 @@ public sealed class GeneralModLibrary {
     public static string ValidateSource(string source) {
         string value = RequiredText(source, 4096, "Fonte do mod");
         if(GeneralModDownload.IsInstalledSource(value))return value;
+        if(GeneralModFolderSource.IsSource(value)||Directory.Exists(value))return GeneralModFolderSource.Normalize(value);
         if (GeneralModDownload.IsArchivePath(value)) return Path.GetFullPath(value);
         if (!GeneralModDownload.IsWebSource(value))
-            throw new IOException("Use o caminho completo de um ZIP, RAR ou 7z, ou um link HTTPS público.");
+            throw new IOException("Use uma pasta local de mod, o caminho completo de um ZIP, RAR ou 7z, ou um link HTTPS público.");
         var uri = new Uri(value);
         if (uri.Fragment.Length != 0) throw new IOException("Use o endereço público sem o trecho depois de #.");
         if (uri.Query.Length != 0 && !IsPublicNexusQuery(uri))
             throw new IOException("Use o link público sem parâmetros de sessão, assinatura ou outros dados privados.");
         return uri.AbsoluteUri;
+    }
+
+    internal static bool ValidReference(string url){
+        if(!GeneralModDownload.IsWebSource(url))return false;
+        var uri=new Uri(url);
+        return uri.Fragment.Length==0&&(uri.Query.Length==0||IsPublicNexusQuery(uri)||GeneralGithubLink.Parse(url)!=null);
     }
 
     internal static void NormalizeSources(GeneralModVariant variant){
@@ -457,8 +465,20 @@ public sealed class GeneralModLibrary {
             mod.Name = RequiredText(mod.Name, 300, "Nome do mod");
             mod.Description = OptionalDescription(mod.Description);
             if(!trustRecipes||mod.DetectedPaths==null)mod.DetectedPaths=new List<string>();
-            if(mod.DetectedPaths.Count>2000||mod.DetectedPaths.Any(path=>!FixedInstaller.InventoryRegistrationPath(path)))
-                throw new IOException("Caminhos detectados inválidos em "+mod.Name+".");
+            if(mod.DetectedPaths.Count>2000)throw new IOException(GeneralStyle.T(
+                "O cadastro de "+mod.Name+" excede o limite de arquivos detectados pelo scanner. Atualize o Loader e execute Verificar (F5).",
+                mod.Name+" exceeds the scanner's detected-file limit. Update Loader and run Verify (F5)."));
+            foreach(string path in mod.DetectedPaths){
+                bool valid=false;
+                try{valid=FixedInstaller.InventoryRegistrationPath(path);}catch(IOException){}catch(ArgumentException){}
+                if(!valid){
+                    string displayed=String.IsNullOrWhiteSpace(path)?GeneralStyle.T("(vazio)","(empty)"):
+                        String.Concat(path.Where(value=>!Char.IsControl(value)).Take(240));
+                    throw new IOException(GeneralStyle.T(
+                        "O cadastro de "+mod.Name+" não foi salvo.\nCaminho recusado pelo scanner: "+displayed+"\nAtualize o Loader e execute Verificar (F5).",
+                        mod.Name+" was not saved.\nPath rejected by the scanner: "+displayed+"\nUpdate Loader and run Verify (F5)."));
+                }
+            }
             mod.DetectedPaths=mod.DetectedPaths.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if(mod.DependencyFile<0||mod.DependencyFile>0&&mod.DependencySource==null)
                 throw new IOException("Versão da dependência inválida.");
@@ -558,8 +578,12 @@ public sealed class GeneralModLibrary {
         if(variant.RequiredMods.Count>32||variant.RequiredMods.Any(id=>!ValidId(id)||id==mod.Id)||
             variant.RequiredMods.Distinct(StringComparer.Ordinal).Count()!=variant.RequiredMods.Count)
             throw new IOException("Vínculos de dependência inválidos em "+mod.Name+".");
+        if(variant.References==null)variant.References=new List<string>();
+        if(variant.References.Count>32||variant.References.Any(url=>!ValidReference(url)))
+            throw new IOException(GeneralStyle.T("Use um link HTTPS válido em cada referência.","Enter a valid HTTPS URL for each reference."));
+        variant.References=variant.References.Distinct(StringComparer.Ordinal).ToList();
         if(variant.SourceInfo==null)variant.SourceInfo=new Dictionary<string,GeneralSourceInfo>();
-        if(variant.SourceInfo.Count>32||variant.SourceInfo.Any(pair=>!variant.Sources.Contains(pair.Key)||pair.Value==null||pair.Value.Bytes<0||pair.Value.Bytes>128L*1024*1024*1024||String.IsNullOrWhiteSpace(pair.Value.Name)||pair.Value.Name.Length>300||pair.Value.Name.Any(Char.IsControl)||(pair.Value.FileName??"").Length>300||(pair.Value.FileName??"").Any(Char.IsControl)||!ValidSourceVersion(pair.Value.Version)||!ValidSourceVersion(pair.Value.ModVersion)))throw new IOException("Metadados de arquivo inválidos.");
+        if(variant.SourceInfo.Count>32||variant.SourceInfo.Any(pair=>!variant.Sources.Contains(pair.Key)||pair.Value==null||pair.Value.Bytes<0||pair.Value.Bytes>128L*1024*1024*1024||String.IsNullOrWhiteSpace(pair.Value.Name)||pair.Value.Name.Length>300||pair.Value.Name.Any(Char.IsControl)||(pair.Value.FileName??"").Length>300||(pair.Value.FileName??"").Any(Char.IsControl)||!ValidSourceVersion(pair.Value.Version)||!ValidSourceVersion(pair.Value.ModVersion)||!GeneralGithubUpdatePackage.ValidSourceInfo(pair.Key,pair.Value)))throw new IOException("Metadados de arquivo inválidos.");
         NormalizeSources(variant);
     }
 

@@ -29,9 +29,10 @@ internal sealed class GeneralInventoryTree : GeneralDialog {
     readonly GeneralScrollView scroll;
     readonly Button reveal;
     Entry Selected {get{return list.SelectedItem as Entry;}}
+    internal P2PSyncDifference OriginFile {get;private set;}
     protected override bool AnimateAppearance {get{return false;}}
 
-    internal GeneralInventoryTree(string root,IEnumerable<P2PSyncDifference> files,string selectedPath=null)
+    internal GeneralInventoryTree(string root,IEnumerable<P2PSyncDifference> files,string selectedPath=null,Func<P2PSyncDifference,bool> canSetOrigin=null)
         :base(T("Arquivos de mods no jogo","Mod files in the game")){
         this.root=root;
         tree=BuildTree(files,T("Pasta do jogo","Game folder"));
@@ -59,6 +60,19 @@ internal sealed class GeneralInventoryTree : GeneralDialog {
         Content.Controls.Add(layout);
         CancelButton=close;
 
+        if(canSetOrigin!=null){
+            var menu=GeneralMenuRenderer.Create();
+            GeneralMenuRenderer.Add(menu,T("Definir origem…","Set origin…"),()=>{
+                OriginFile=Selected==null?null:Selected.File;
+                if(canSetOrigin(OriginFile))Complete(DialogResult.Retry);
+            });
+            menu.Opening+=(s,e)=>e.Cancel=!canSetOrigin(Selected==null?null:Selected.File);
+            list.ContextMenuStrip=menu;
+            list.MouseDown+=(s,e)=>{
+                if(e.Button==MouseButtons.Right)list.SelectedIndex=list.IndexFromPoint(e.Location);
+            };
+            Disposed+=(s,e)=>menu.Dispose();
+        }
         list.DrawItem+=DrawEntry;
         list.SelectedIndexChanged+=(s,e)=>ShowSelection();
         list.MouseDown+=(s,e)=>{

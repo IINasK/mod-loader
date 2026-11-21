@@ -126,8 +126,16 @@ internal static class GeneralInstallRoutes {
             .Select(route => DirectoryFor(game,route.Destination,true)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
-    internal static void CheckFolders(string game, IEnumerable<GeneralInstallRoute> routes) {
-        foreach (var route in routes) DirectoryFor(game, route.Destination, true);
+    internal static void CheckFolders(string game, IEnumerable<GeneralInstallRoute> routes,bool allowNewGameSubfolders=false) {
+        foreach (var route in routes) {
+            bool internalRoute=route.Destination=="%GAME%"||route.Destination.StartsWith("%GAME%/",StringComparison.Ordinal);
+            if(!allowNewGameSubfolders||!internalRoute){DirectoryFor(game,route.Destination,true);continue;}
+            Safe.NoLinks(DirectoryFor(game,"%GAME%",true));
+            string target=DirectoryFor(game,route.Destination,false);
+            Safe.NoLinks(target);
+            for(string path=target;!Directory.Exists(path);path=Path.GetDirectoryName(path))
+                if(File.Exists(path))throw new IOException(GeneralStyle.T("Um arquivo ocupa a pasta de destino: ","A file occupies the destination folder: ")+route.Destination);
+        }
     }
 
     internal static string Map(string path, IEnumerable<GeneralInstallRoute> routes, string defaultPath = null) {

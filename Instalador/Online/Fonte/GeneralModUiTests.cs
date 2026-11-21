@@ -92,8 +92,8 @@ internal sealed partial class GeneralModWindow {
                 verifyButton.Text==""&&((GeneralButton)verifyButton).Bare&&((GeneralButton)verifyButton).IconKind=="refresh"&&
                 !AllControls(form).OfType<GeneralButton>().Any(button=>button!=verifyButton&&button.IconKind=="refresh"),
                 "Verificar fica à direita do título Mod Loader, mantendo um único botão de recarga.");
-            check(form.grid.Columns["Group"].Visible&&form.grid.AllowUserToResizeColumns,
-                "Grupos ocupam a linha do nome e as divisórias do cabeçalho permitem ajustar a largura.");
+            check(!form.grid.Columns["Group"].Visible&&form.grid.AllowUserToResizeColumns,
+                "A coluna Grupo fica fora da tabela e as divisórias do cabeçalho permitem ajustar a largura.");
             int initialStatusWidth=form.grid.Columns["Status"].Width;
             form.grid.Columns["Status"].Width=initialStatusWidth+28;
             check(form.grid.Columns["Status"].Width==initialStatusWidth+28,"A coluna aceita a largura ajustada pelo usuário.");
@@ -140,7 +140,7 @@ internal sealed partial class GeneralModWindow {
             form.ClientSize=new Size(1440,900);form.PerformLayout();Application.DoEvents();CaptureUi(form,Path.Combine(root,"claro-1440.png"));
             using(var menu=new GeneralActionsMenu()){
                 menu.StartPosition=FormStartPosition.Manual;menu.Location=new Point(-30000,-30000);menu.Show(form);Application.DoEvents();
-                check(AllControls(menu).OfType<Button>().Where(button=>button.Name!="").Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"details","export","import","new","open","options","save-menu","share"}),"Menu reúne listas, captura manual, compartilhar e opções em uma coluna.");
+                check(AllControls(menu.Content).OfType<Button>().Where(button=>button.Name!="").Select(button=>button.Name).OrderBy(name=>name).SequenceEqual(new[]{"details","export","import","new","open","options","save-menu","share"}),"Menu reúne projetos, listas, detalhes, compartilhamento e opções em uma coluna.");
                 CaptureUi(menu,Path.Combine(root,"menu-principal.png"));menu.Close();
                 check(!menu.Visible,"Menu fecha sem alterar a lista.");
             }
@@ -151,7 +151,7 @@ internal sealed partial class GeneralModWindow {
                 var name=(TextBox)typeof(GeneralModEditor).GetField("modName",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(editor);
                 var sources=(TextBox)typeof(GeneralModEditor).GetField("sources",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(editor);
                 name.Text="Exemplo válido";sources.Text=archive;
-                check(!button.Enabled,"O campo de link recusa novos caminhos locais digitados.");
+                check(button.Enabled,"O campo de origem aceita referências locais de pacotes genéricos.");
                 sources.Text="https://www.nexusmods.com/cyberpunk2077/mods/13556?tab=files&file_id=1";
                 check(button.Enabled,"Instalar habilita com nome e link do Nexus válidos.");
                 var copySource=AllControls(editor).OfType<Button>().Single(item=>item.Name=="CopyDownloadSource");
@@ -183,16 +183,16 @@ internal sealed partial class GeneralModWindow {
                 Source=new GeneralNexusLink{Game="cyberpunk2077",Mod=8000},MinFile=123},form.ActivePreset);
             form.DrawRows();
             var dependencyRow=form.ModRows().Single(row=>Equals(row.Tag,dependency.Id));
-            check(Equals(dependencyRow.Cells["Status"].Value,"Escolher versão")&&Equals(dependencyRow.Cells["Size"].Value,"")&&
+            check(Equals(dependencyRow.Cells["Status"].Value,"Escolher arquivo")&&Equals(dependencyRow.Cells["Size"].Value,"")&&
                 !dependencyRow.Cells["Name"].Style.ForeColor.IsEmpty&&form.ModRows().Last()==dependencyRow,
                 "Dependência sem arquivo aparece em laranja no fim, com status específico e espaço em branco.");
-            form.statusFilters=new HashSet<string>{"Escolher versão"};
+            form.statusFilters=new HashSet<string>{"Escolher arquivo"};
             check(form.VisibleMods().Single()==dependency,"O filtro de situação encontra dependências sem versão.");
             form.statusFilters=null;
             form.grid.CurrentCell=dependencyRow.Cells["Name"];
             form.SelectTableRow(dependencyRow,Keys.None,false);
             form.RefreshPrimaryAction();
-            check(form.primaryAction.Text=="Escolher versão","A dependência indefinida abre o editor em vez de baixar.");
+            check(form.primaryAction.Text=="Escolher arquivo","A dependência indefinida oferece a escolha do arquivo.");
             dependency.Variants[0].Sources[0]="https://www.nexusmods.com/cyberpunk2077/mods/9000?tab=files&file_id=123";
             check(GeneralModLibrary.NeedsDependencyVersion(dependency,dependency.Variants[0]),"Arquivo de outro mod não resolve a dependência.");
             dependency.Variants[0].Sources[0]="https://www.nexusmods.com/cyberpunk2077/mods/8000?tab=files&file_id=123";
@@ -513,7 +513,8 @@ internal sealed partial class GeneralModWindow {
         var second=choose("second");
         check(form.Selected(mod).Id==first.Variant.Id&&File.ReadAllText(target)=="one","Escolher a linha preserva os arquivos ativos.");
         var pending=new List<Work>();
-        check(form.PlanSelected(new List<Work>{second},game,pending).Count==0&&pending.SequenceEqual(new[]{second}),
+        form.PlanSelected(new List<Work>{second},game,pending);
+        check(!second.PendingDownload&&pending.SequenceEqual(new[]{second}),
             "A atualização usa o download local e enfileira a versão escolhida.");
         await form.RunWork(second,game,false);
         var store=form.DisabledAt(game);

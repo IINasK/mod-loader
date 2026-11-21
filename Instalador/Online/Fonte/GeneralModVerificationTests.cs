@@ -22,7 +22,7 @@ internal sealed partial class GeneralModWindow {
             Packages=new List<FixedMod>{owner,dependency}
         };
         var state=new GeneralModState{
-            List=GeneralModLibrary.Seed(catalog,new ModImportItem[0]),DownloadFolder=downloads,Language="pt"
+            List=GeneralModLibrary.Seed(catalog,new ModImportItem[0]),DownloadFolder=downloads,Language="pt",Theme="dark"
         };
         string installedPath=Safe.In(game,owner.Files.Single().Path);
         string dependencyPath=Safe.In(game,dependency.Files.Single().Path);
@@ -50,6 +50,29 @@ internal sealed partial class GeneralModWindow {
                 var message=Message.Create(form.Handle,0x0100,(IntPtr)Keys.F5,IntPtr.Zero);
                 return form.ProcessCmdKey(ref message,Keys.F5);
             };
+            form.startupLoading=true;
+            form.BuildInterface();
+            if(!form.startupSkeleton.Visible||form.mainLayout.Visible||form.modTableScroll.Visible||
+                form.startupSkeleton.Bounds!=form.ClientRectangle||form.startupSkeleton.TabStop)
+                throw new IOException("O esqueleto deve preencher o projeto e deixar os controles fora da navegação.");
+            CaptureUi(form,Safe.In(root,"startup-skeleton.png"));
+            var skeleton=form.startupSkeleton;
+            using(var frame=new System.Drawing.Bitmap(skeleton.Width,skeleton.Height))
+            using(var graphics=System.Drawing.Graphics.FromImage(frame))
+            using(var paint=new PaintEventArgs(graphics,skeleton.ClientRectangle)){
+                int dpi=skeleton.DeviceDpi;
+                int mark=132*dpi/96,top=45*dpi/96;
+                long atMark=(long)(mark+skeleton.Width/6)*1450/(skeleton.Width+skeleton.Width/3);
+                skeleton.PaintFrame(paint,null);
+                var resting=frame.GetPixel(mark,top);
+                skeleton.PaintFrame(paint,atMark);
+                if(frame.GetPixel(mark,top)==resting)
+                    throw new IOException("O brilho deve avançar pelo cabeçalho quando há animação.");
+                skeleton.PaintFrame(paint,atMark+600);
+                if(frame.GetPixel(mark,top)!=resting)
+                    throw new IOException("O brilho deve devolver a cor original depois de passar.");
+                frame.Save(Safe.In(root,"startup-skeleton-next.png"));
+            }
             bool sawLocalScan=false;
             form.testStage=(key,phase)=>{
                 if(phase!="scan.begin")return;
@@ -57,6 +80,9 @@ internal sealed partial class GeneralModWindow {
                 if(form.verifyAction.Visible)throw new IOException("Recarregar deve sumir no scan automático.");
             };
             await form.Scan();
+            if(form.startupSkeleton.Visible||!form.mainLayout.Visible||!form.modTableScroll.Visible||form.startupLoading)
+                throw new IOException("O fim da conferência local deve exibir o projeto e ocultar o esqueleto.");
+            CaptureUi(form,Safe.In(root,"startup-project-ready.png"));
             if(!sawLocalScan||!form.verifyAction.Visible||!form.verifyAction.Enabled)
                 throw new IOException("Recarregar deve voltar ao fim do scan automático.");
             var checkedMods=new HashSet<string>();
@@ -76,34 +102,40 @@ internal sealed partial class GeneralModWindow {
             using(var timer=new Timer{Interval=40}){
                 timer.Tick+=(s,e)=>{
                     var review=Application.OpenForms.OfType<GeneralDependencyReview>().FirstOrDefault(item=>item.Visible);
-                    var inventory=Application.OpenForms.OfType<GeneralSyncDifferencesDialog>().FirstOrDefault(item=>item.Visible);
                     var confirmation=Application.OpenForms.OfType<GeneralInstallConfirmation>().FirstOrDefault(item=>item.Visible);
                     try{
                         if(DateTime.UtcNow>=deadline)throw new IOException("A revisão não avançou até a etapa "+step+".");
                         if(step==0&&review!=null){
+                            if(review.Modal||!form.Enabled||!GeneralDialog.FocusOpen<GeneralDependencyReview>(form,"verify"))
+                                throw new IOException("O relatório fica aberto sem bloquear o projeto e a mesma janela recebe o foco.");
+                            form.ShowProjectDetails();form.ShowProjectDetails();
+                            var other=form.OwnedForms.OfType<GeneralDependencyReview>().Where(item=>item.Visible&&item!=review).ToArray();
+                            if(other.Length!=1||other[0].Modal||!form.Enabled)
+                                throw new IOException("Dois relatórios diferentes podem ficar abertos, uma janela por função.");
+                            other[0].Close();
                             var rows=AllControls(review).OfType<DataGridView>().Single(grid=>grid.Name=="DependencyResults");
-                            if(rows.Rows.Count!=1||!Equals(rows.Rows[0].Cells[0].Value,owner.Name)||
-                                !Equals(rows.Rows[0].Cells[1].Value,dependency.Name))
-                                throw new IOException("A revisão deve mostrar a dependência ausente e o mod que precisa dela.");
+                            var row=rows.Rows.Cast<DataGridViewRow>().Single(item=>item.Tag is GeneralDependencyIssue);
+                            if(!Equals(row.Cells[1].Value,owner.Name)||!Equals(row.Cells[2].Value,dependency.Name)||
+                                rows.CellBorderStyle!=DataGridViewCellBorderStyle.None||!Equals(row.Cells[0].Value,true))
+                                throw new IOException("A revisão deve mostrar a dependência ausente e o mod que precisa dela, com seleção à esquerda.");
                             rows.CurrentCell=null;
-                            rows.CurrentCell=rows.Rows[0].Cells[0];
+                            rows.CurrentCell=row.Cells[1];
                             AllControls(review).OfType<Button>().Single(button=>button.Name=="OpenDependencyPage").PerformClick();
                             if(!opened.SequenceEqual(new[]{"https://www.nexusmods.com/cyberpunk2077/mods/400?tab=files&file_id=502"}))
                                 throw new IOException("A revisão deve abrir somente a página oficial do arquivo fixado.");
-                            step=1;
-                            AllControls(review).OfType<Button>().Single(button=>button.Name=="ShowUnlistedInventory").PerformClick();
-                            if(dialogFailure!=null)return;
-                            if(step!=2)throw new IOException("O relatório de arquivos fora da lista não abriu.");
-                            AllControls(review).OfType<Button>().Single(button=>button.Name=="InstallCatalogDependencies").PerformClick();
-                        }else if(step==1&&inventory!=null){
-                            var rows=AllControls(inventory).OfType<DataGridView>().Single(grid=>grid.Name=="SyncDifferenceFiles");
-                            if(rows.Rows.Count!=1||!Equals(rows.Rows[0].Cells[2].Value,extraPath))
-                                throw new IOException("O relatório precisa mostrar o arquivo externo pelo caminho encontrado no jogo.");
+                            if(AllControls(review).Any(control=>control.Name=="ShowUnlistedInventory"))
+                                throw new IOException("Itens fora do catálogo pertencem à tabela principal, fora do relatório de pendências.");
+                            var installButton=AllControls(review).OfType<Button>().Single(button=>button.Name=="InstallCatalogDependencies");
+                            var toggle=typeof(DataGridView).GetMethod("OnCellContentClick",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic);
+                            toggle.Invoke(rows,new object[]{new DataGridViewCellEventArgs(0,row.Index)});
+                            if(installButton.Enabled||!Equals(row.Cells[0].Value,false))
+                                throw new IOException("Desmarcar a dependência desativa a ação de instalar.");
+                            toggle.Invoke(rows,new object[]{new DataGridViewCellEventArgs(0,row.Index)});
                             step=2;
-                            ((Button)inventory.CancelButton).PerformClick();
+                            installButton.PerformClick();
                         }else if(step==2&&confirmation!=null){
-                            var rows=AllControls(confirmation).OfType<DataGridView>().Single(grid=>grid.Name=="PendingDownloads");
-                            if(rows.Rows.Count!=1||!Convert.ToString(rows.Rows[0].Cells[0].Value).Contains(dependency.Name))
+                            var rows=AllControls(confirmation).OfType<DataGridView>().Single(grid=>grid.Name=="InstallChoices");
+                            if(rows.Rows.Count!=1||!Equals(rows.Rows[0].Cells[1].Value,dependency.Name)||!Equals(rows.Rows[0].Cells[0].Value,true))
                                 throw new IOException("A confirmação deve incluir somente a dependência oferecida.");
                             step=3;
                             timer.Stop();
@@ -142,7 +174,7 @@ internal sealed partial class GeneralModWindow {
                     timer.Stop();
                     try{
                         var rows=AllControls(review).OfType<DataGridView>().Single(grid=>grid.Name=="DependencyResults");
-                        var repair=rows.Rows.Cast<DataGridViewRow>().Single(row=>((GeneralDependencyIssue)row.Tag).CanRepair);
+                        var repair=rows.Rows.Cast<DataGridViewRow>().Single(row=>row.Tag is GeneralDependencyIssue&&((GeneralDependencyIssue)row.Tag).CanRepair);
                         rows.CurrentCell=repair.Cells[0];
                         AllControls(review).OfType<Button>().Single(button=>button.Name=="ReviewModReplacement").PerformClick();
                     }catch(Exception ex){dialogFailure=ex;review.Close();}
@@ -175,20 +207,15 @@ internal sealed partial class GeneralModWindow {
             Directory.CreateDirectory(Path.GetDirectoryName(relatedPath));
             File.WriteAllText(relatedPath,"manual script");
             await form.Scan();
-            if(!form.detectedModsReview.Visible||form.DetectedModGroups().Length!=1||form.state.List.Mods.Any(mod=>mod.Name=="Mod detectado"))
-                throw new IOException("O scan deve oferecer a revisão sem alterar a lista.");
+            var detectedRows=form.grid.Rows.Cast<DataGridViewRow>().Where(row=>row.Visible&&row.Tag is P2PSyncDifference).ToArray();
+            var selectedRow=detectedRows.SingleOrDefault(row=>InventoryPaths.Equals(((P2PSyncDifference)row.Tag).Path,extraPath));
+            if(detectedRows.Length!=2||selectedRow==null||form.state.List.Mods.Any(mod=>mod.Name=="Mod detectado")||
+                AllControls(form).Any(control=>control.Name=="ReviewDetectedMods"))
+                throw new IOException("O scan deve exibir o item na tabela, sem cadastrar nem repetir o atalho no resumo. Linhas: "+detectedRows.Length+"; inventário: "+String.Join(", ",form.gameInventory.Select(item=>item.Kind+" "+item.Path)));
             using(var timer=new Timer{Interval=40}){
                 timer.Tick+=(s,e)=>{
                     var editor=Application.OpenForms.OfType<GeneralModEditor>().FirstOrDefault(item=>item.Visible);
-                    if(editor==null){
-                        var review=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(item=>item.Visible&&
-                            AllControls(item).Any(control=>control.Name=="DetectedMods"));
-                        if(review==null)return;
-                        var table=AllControls(review).OfType<DataGridView>().Single();
-                        table.CurrentCell=table.Rows[0].Cells[0];
-                        AllControls(review).OfType<Button>().Single(button=>button.Name=="RegisterDetectedMod").PerformClick();
-                        return;
-                    }
+                    if(editor==null)return;
                     timer.Stop();
                     try{
                         var save=(Button)editor.AcceptButton;
@@ -202,29 +229,77 @@ internal sealed partial class GeneralModWindow {
                     }catch(Exception ex){dialogFailure=ex;editor.Complete(DialogResult.Cancel);}
                 };
                 timer.Start();
-                form.ReviewDetectedMods();
-                await Until(()=>!form.scanning&&!timer.Enabled);
+                form.OpenRowEditor(selectedRow);
+                await Until(()=>!timer.Enabled&&(dialogFailure!=null||!form.scanning&&form.state.List.Mods.Any(mod=>mod.Name=="Mod detectado")));
             }
             if(dialogFailure!=null)throw dialogFailure;
             var adopted=form.library.Load().List.Mods.Single(mod=>mod.Name=="Mod detectado");
             var adoptedWork=form.MakeWork(form.state.List.Mods.Single(mod=>mod.Id==adopted.Id));
-            if(!new HashSet<string>(adopted.DetectedPaths).SetEquals(new[]{extraPath,related})||
+            if(!new HashSet<string>(adopted.DetectedPaths).SetEquals(new[]{extraPath})||
                 form.Status(adoptedWork,game)!=GeneralStatusPresentation.DetectedFiles||
-                form.VisibleGameInventory().Any()||form.detectedModsReview.Visible||form.state.SnapshotReceipts.ContainsKey(adoptedWork.Key)||
+                !form.VisibleGameInventory().Select(file=>file.Path).SequenceEqual(new[]{related})||form.state.SnapshotReceipts.ContainsKey(adoptedWork.Key)||
                 File.ReadAllText(manualPath)!="manual"||File.ReadAllText(relatedPath)!="manual script")
-                throw new IOException("Incluir o item deve registrar pistas de múltiplas pastas sem assumir instalação ou mexer nos arquivos.");
+                throw new IOException("Incluir o item deve registrar apenas os arquivos do grupo escolhido sem assumir instalação ou mexer nos arquivos.");
 
-            using(var review=new GeneralDependencyReview("Teste",new[]{
-                new GeneralDependencyIssue{Mod="Mod",Requirement="Arquivo",Url="file:///C:/test.zip"}
-            },0,opened.Add)){
+            string viewed=null;
+            using(var review=new GeneralDependencyReview(new[]{VerificationLine("Teste","Verificação")},new[]{
+                new GeneralDependencyIssue{Mod="Mod",Requirement="Arquivo",Url="file:///C:/test.zip",InstalledModId=owner.Id}
+            },opened.Add,viewInstalled:id=>viewed=id)){
                 review.Show(form);
                 var rows=AllControls(review).OfType<DataGridView>().Single(grid=>grid.Name=="DependencyResults");
-                rows.CurrentCell=rows.Rows[0].Cells[0];
+                rows.CurrentCell=null;
+                rows.CurrentCell=rows.Rows[0].Cells[1];
+                AllControls(review).OfType<Button>().Single(button=>button.Name=="ViewInstalledDependency").PerformClick();
+                if(viewed!=owner.Id)throw new IOException("A revisão deve abrir os detalhes do mod instalado conhecido.");
                 var browser=AllControls(review).OfType<Button>().Single(button=>button.Name=="OpenDependencyPage");
                 browser.PerformClick();
                 if(browser.Enabled||opened.Count!=1)
                     throw new IOException("O relatório não pode abrir uma referência de arquivo local como página.");
             }
+
+            var updated=state.List.Mods.Single(mod=>mod.Id==dependency.Id);
+            var variant=updated.Variants.Single();
+            variant.CyberpunkId=null;
+            variant.Sources=new List<string>{"https://github.com/example/fixture/releases/download/v2.0/fixture.zip"};
+            string updatedZip=TestZip(root,"dependency-v2.zip",dependency.Files.Single().Path,"new verified version");
+            var current=form.MakeWork(updated);
+            form.Generic(game).Install(updatedZip,current.Receipt(0),null);
+            var audit=new ProjectVerification(false);
+            await form.Scan(audit);
+            var offered=new Dictionary<string,Work>();
+            if(form.ReviewDependencies(audit,offered).Any(issue=>issue.Requirement==dependency.Name)||offered.Count!=0)
+                throw new IOException("A verificação precisa aceitar a versão ligada a um recibo atualizado, mesmo quando o hash do catálogo antigo for diferente.");
+            var candidatePage=new GeneralNexusLink{Game="cyberpunk2077",Mod=9000};
+            var request=new GeneralNexusRequirement{Name=updated.Name,Source=candidatePage,MinFile=34,MaxFile=0};
+            var proposed=form.CreateDependency(request,form.ActivePreset);
+            proposed.Tags.Add("API tag");
+            var proposedConfig=GeneralPresetProfiles.Copy(proposed);
+            form.ActivePreset.Configurations[proposed.Id]=proposedConfig;
+            var metadata=new GeneralSourceInfo{Name=updated.Name,Tags=new[]{"API tag"},NexusChecked=true};
+            Func<HashSet<string>,bool> reconcile=required=>form.ReconcileDependencySuggestions(
+                form.state.List.Mods.Select(form.MakeWork).ToList(),page=>metadata,required);
+            var liveRequirement=new HashSet<string>{candidatePage.Url};
+            if(reconcile(null))throw new IOException("Um nome semelhante sem exigência online para revisar precisa ficar intacto.");
+            proposedConfig.Description="My manual note";
+            if(reconcile(liveRequirement))throw new IOException("Uma personalização de preset deve preservar a sugestão.");
+            proposedConfig.Description=null;
+            proposed.Variants[0].RequiredMods.Add(owner.Id);
+            if(reconcile(liveRequirement))throw new IOException("Uma dependência própria deve preservar o cadastro.");
+            proposed.Variants[0].RequiredMods.Clear();
+            proposed.Tags.Add("Handpicked");
+            if(reconcile(liveRequirement))throw new IOException("Tags não atribuíveis à API devem ser preservadas.");
+            proposed.Tags.Remove("Handpicked");
+            if(!reconcile(liveRequirement)||state.List.Mods.Any(mod=>mod.Id==proposed.Id)||
+                form.ActivePreset.ModIds.Contains(proposed.Id)||!form.ActivePreset.ModIds.Contains(updated.Id)||
+                File.ReadAllText(dependencyPath)!="new verified version")
+                throw new IOException("Uma sugestão automática repetida deve sair da fila sem substituir o mod instalado.");
+
+            File.WriteAllText(dependencyPath,"changed after installation");
+            audit=new ProjectVerification(false);
+            await form.Scan(audit);
+            var altered=form.ReviewDependencies(audit,offered).SingleOrDefault(issue=>issue.Requirement==dependency.Name);
+            if(altered==null||altered.Status==T("Falta instalar","Installation missing")||offered.Count!=0)
+                throw new IOException("Dependência alterada precisa aparecer para revisão, sem reinstalação em fila.");
         });
     }
 

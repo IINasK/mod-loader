@@ -85,6 +85,9 @@ internal static class P2PPack {
                 }
             }else for(int index=0;index<variant.Sources.Count;index++){
                 string source=variant.Sources[index],local;
+                if(GeneralModFolderSource.IsSource(source))throw new IOException(mod.Name+": "+GeneralStyle.T(
+                    "instale a pasta e compartilhe os arquivos instalados pelo envio atual do Mod Loader.",
+                    "install the folder and share its installed files using the current Mod Loader sharing flow."));
                 if(GeneralModDownload.IsArchivePath(source))local=source;
                 else if(!TrySlot(state.ResolvedDownloads,mod,variant,index,out local))local=null;
                 if(local==null||!File.Exists(local)){
@@ -101,13 +104,13 @@ internal static class P2PPack {
         Safe.WriteJson(Safe.In(folder,"pack.json"),manifest);return manifest;
         }catch{try{DeleteSnapshot(folder);}catch(Exception){}throw;}
     }
-    internal static void DeleteSnapshot(string folder){
+    internal static void DeleteSnapshot(string folder,int retries=30){
         Safe.NoLinks(folder);if(!Directory.Exists(folder))return;
         var todo=new Stack<string>();todo.Push(folder);
         while(todo.Count>0){string path=todo.Pop();Safe.NoLinks(path);foreach(string file in Directory.GetFiles(path))Safe.NoLinks(file);foreach(string dir in Directory.GetDirectories(path))todo.Push(dir);}
         for(int attempt=0;;attempt++){
             try{Directory.Delete(folder,true);break;}
-            catch(IOException){if(attempt>=30)throw;Thread.Sleep(100);Safe.NoLinks(folder);if(!Directory.Exists(folder))break;}
+            catch(IOException){if(attempt>=retries)throw;Thread.Sleep(100);Safe.NoLinks(folder);if(!Directory.Exists(folder))break;}
         }
     }
     internal static P2PManifest Read(string folder,string expectedHash){

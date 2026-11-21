@@ -103,6 +103,15 @@ internal sealed class GeneralPresetDeployment {
             state.Active.RemoveAll(p=>p.ModId==package.ModId);state.Active.Add(package);Safe.WriteJson(stateFile,state);return true;
         }
     }
+    internal bool RebindUpdatedFingerprint(string preset,string previous,string next) {
+        if(previous==null)return false;
+        if(!FixedData.HashValid(previous)||!FixedData.HashValid(next))throw new IOException("Identidade de preset inválida na atualização.");
+        using(Lock()) {
+            var state=Read();
+            if(state.Preset!=preset||state.Fingerprint!=previous)return false;
+            state.Fingerprint=next;Safe.WriteJson(stateFile,state);return true;
+        }
+    }
     internal bool AdoptReceived(string preset,string fingerprint) {
         using(Lock()) {
             if(RecoveryPending)return false;
@@ -147,7 +156,6 @@ internal sealed class GeneralPresetDeployment {
         storage.Enable(journal.Outgoing.Select(p=>p.StorageKey));
         Safe.WriteJson(stateFile,journal.Before);File.Delete(journalFile);
     }
-    internal static int VerificationWorkers {get{return Math.Max(1,Math.Min(8,Environment.ProcessorCount/2));}}
     internal static TResult[] CheckPackages<TPackage,TResult>(IList<TPackage> packages,Func<TPackage,TResult> verify,Action<int,int> progress,CancellationToken cancellation=default(CancellationToken),int workers=0) {
         cancellation.ThrowIfCancellationRequested();
         var results=new TResult[packages.Count];
@@ -156,7 +164,7 @@ internal sealed class GeneralPresetDeployment {
         var progressLock=new object();
         int completed=0;
         if(progress!=null)progress(0,packages.Count);
-        var options=new ParallelOptions{MaxDegreeOfParallelism=workers>0?workers:VerificationWorkers,CancellationToken=cancellation};
+        var options=new ParallelOptions{MaxDegreeOfParallelism=workers>0?workers:SnapshotVerification.Workers,CancellationToken=cancellation};
         try {
             Parallel.For(0,packages.Count,options,index=>{
                 results[index]=verify(packages[index]);

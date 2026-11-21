@@ -48,6 +48,7 @@ internal sealed partial class GeneralModWindow {
                                 var actions=home.OwnedForms.OfType<GeneralActionsMenu>().Single();
                                 closeSharing.Start();
                                 ((Button)actions.Controls.Find("share",true).Single()).PerformClick();
+                                await Until(()=>!closeSharing.Enabled);
                                 check(openedSharing&&store.Read().Projects.Count==0,"Home abre o mesmo compartilhamento para receber antes de existir um projeto.");
                             }
                             var create=(Button)home.Controls.Find("NewProject",true).Single();var import=(Button)home.Controls.Find("ImportProject",true).Single();
@@ -57,7 +58,8 @@ internal sealed partial class GeneralModWindow {
                             check(create.Height==44&&import.Height==44,"Ações principais da Home têm a altura compacta de 44px.");
                             check(store.Read().Theme=="light-red"&&GeneralStyle.RedTheme&&!GeneralStyle.Dark,"Nova biblioteca usa tema claro vermelho por padrão.");
                             var actualOpen=home.OpenRequested;GeneralProject opened=null;string openedPreset=null;int openCalls=0;home.OpenRequested=(project,preset)=>{opened=project;openedPreset=preset;openCalls++;};
-                            CompleteProjectCreation("Meu jogo",root,Path.Combine(covers,"cyberpunk2077.jpg"),()=>create.PerformClick());
+                            await CompleteProjectCreation("Meu jogo",root,Path.Combine(covers,"cyberpunk2077.jpg"),()=>create.PerformClick());
+                            await Until(()=>opened!=null);
                             check(opened!=null&&opened.Name=="Meu jogo"&&store.Load(opened).List.Mods.Count==0&&store.Load(opened).List.Categories.Count==0,"Criar pela Home salva e abre projeto vazio sem sugestões de Cyberpunk.");
                             var blank=opened;
                             check(File.Exists(store.CoverPath(blank))&&store.Load(blank).Destination==root,"Criar salva a capa local e a pasta escolhida antes de abrir o projeto.");
@@ -76,12 +78,23 @@ internal sealed partial class GeneralModWindow {
                             ClickReadyWithoutRename(home,check);
                             check(opened!=null&&opened.Id!=blank.Id&&opened.TemplateId=="cyberpunk-2077"&&opened.Name=="Cyberpunk 2077"&&catalogMatches(store.Load(opened).List)&&store.Load(blank).List.Mods.Count==0,"Pacote pronto abre com identidade fixa e preserva os projetos personalizados.");
                             check(store.Load(opened).Destination==null,"Fixture do pacote pronto não descobre nem altera o jogo real.");
-                            var builtIn=opened;var configured=store.Load(builtIn);var first=configured.List.Mods.First();configured.ChosenVariants[first.Id]=first.DefaultVariant;
+                            var builtIn=opened;var configured=store.Load(builtIn);configured.Destination=root;var first=configured.List.Mods.First();configured.ChosenVariants[first.Id]=first.DefaultVariant;
                             new GeneralModLibrary(Path.Combine(store.DataPath(builtIn),"lista.json")).Save(configured);
                             string configuredHash=Safe.Hash(Path.Combine(store.DataPath(builtIn),"lista.json"));
                             ClickReadyWithoutRename(home,check);
                             check(opened.Id==builtIn.Id&&store.Read().Projects.Count==2&&configuredHash==Safe.Hash(Path.Combine(store.DataPath(builtIn),"lista.json")),"Reabrir projeto pronto reutiliza estado e preferências sem duplicar ou sobrescrever.");
                             check(HomeCards(home,"SavedProjects").Length==1,"Projeto padrão não é duplicado na lista de projetos personalizados.");
+                            var legacyCopy=store.Duplicate(builtIn,builtIn.Name+" · Minha versão",catalog);
+                            string legacyPath=Safe.In(store.DataPath(legacyCopy),"lista.json");
+                            home.Build();
+                            check(HomeCards(home,"SavedProjects").Length==1&&File.Exists(legacyPath),
+                                "A cópia automática antiga fica fora da galeria por padrão, com os dados preservados.");
+                            ((Button)home.Controls.Find("HomeMenu",true).Single()).PerformClick();
+                            var copies=home.OwnedForms.OfType<GeneralActionsMenu>().Single();
+                            ((Button)copies.Controls.Find("template-copies",true).Single()).PerformClick();
+                            check(HomeCards(home,"SavedProjects").Any(card=>card.Project.Id==legacyCopy.Id),
+                                "O menu da Home revela a cópia antiga sem esconder os projetos personalizados.");
+                            store.Delete(legacyCopy);home.Build();
                             foreach(string theme in new[]{"light-red","light","dark","black"})foreach(string language in new[]{"pt","en"}){
                                 store.SavePreferences(theme,language,root);home.Build();home.ClientSize=new Size(900,680);home.PerformLayout();await Task.Delay(40);
                                 var newButton=home.Controls.Find("NewProject",true).Single();var importButton=home.Controls.Find("ImportProject",true).Single();var grid=home.Controls.Find("ProjectCards",true).Single();
@@ -99,6 +112,7 @@ internal sealed partial class GeneralModWindow {
                                 ((Button)home.Controls.Find("HomeMenu",true).Single()).PerformClick();
                                 var actions=home.OwnedForms.OfType<GeneralActionsMenu>().Single();
                                 timer.Start();((Button)actions.Controls.Find("options",true).Single()).PerformClick();
+                                await Until(()=>!timer.Enabled);
                             }
                             check(store.Read().Theme=="light-red","Salvar opções da Home preserva o tema vermelho.");
                             var disposable=store.Create("Projeto descartável",new GeneralModList(),"light-red","pt");
@@ -349,8 +363,9 @@ internal sealed partial class GeneralModWindow {
             var dependencies=EditorField<FlowLayoutPanel>(editor,"dependencyChips");
             var title=EditorField<TableLayoutPanel>(editor,"groupTitle");
             check(picker.Items.Cast<string>().SequenceEqual(new[]{"EBB + RB","EBBP + RB","EBBN + RB"})&&title.Visible&&
-                EditorField<TextBox>(editor,"groupName").Text=="Big Body"&&((TableLayoutPanel)title.Parent).GetRow(title)<((TableLayoutPanel)title.Parent).GetRow(picker.Parent),
-                "O título Big Body aparece acima do seletor, com as três escolhas da gaveta.");
+                EditorField<TextBox>(editor,"groupName").Text=="Big Body"&&!picker.Visible&&picker.Parent==null&&
+                title.RectangleToScreen(title.ClientRectangle).Bottom<source.RectangleToScreen(source.ClientRectangle).Top,
+                "O título Big Body precede a fonte; as três escolhas legadas são preservadas sem o campo Versão.");
             check(title.Controls.Count==1&&EditorField<GeneralButton>(editor,"nsfw").BareInk==GeneralStyle.Danger,
                 "O título do grupo fica sem selo no editor e a marcação permanece no nome do mod.");
             check(source.Text==current.Variant.Sources[0],"EBB apresenta o link do próprio perfil.");
@@ -398,8 +413,8 @@ internal sealed partial class GeneralModWindow {
             alternatives:form.state.List.Mods,groupList:form.state.List,fixedChoices:true)){
             editor.Show(form);
             var picker=EditorField<GeneralPicker>(editor,"variants");
-            check(picker.AccessibleName==T("Versão","Version")+" *"&&picker.AddChoiceLabel==T("Adicionar nova versão","Add new version"),
-                "O seletor usa um rótulo genérico e oferece nova versão.");
+            check(!picker.Visible&&picker.Parent==null&&picker.AddChoice!=null,
+                "O modelo legado de variantes continua disponível para o ensaio de migração, sem seletor visível.");
             picker.AddChoice();
             picker.Text="Quarta variante";
             EditorField<TextBox>(editor,"modName").Text="Mod alternativo";
@@ -432,7 +447,7 @@ internal sealed partial class GeneralModWindow {
         int prompts=0;GeneralDialog previous=null;Exception failure=null;
         using(var timer=new Timer{Interval=50}){
             timer.Tick+=(s,e)=>{
-                var dialog=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(item=>item is GeneralProjectDeleteChoice||item is GeneralProjectDeleteReview);
+                var dialog=Application.OpenForms.OfType<GeneralDialog>().FirstOrDefault(item=>item.Visible&&(item is GeneralProjectDeleteChoice||item is GeneralProjectDeleteReview));
                 if(dialog==null||Object.ReferenceEquals(dialog,previous))return;previous=dialog;
                 try{
                     check(prompts<responses.Length,"A ação não abre confirmações extras.");
@@ -441,14 +456,14 @@ internal sealed partial class GeneralModWindow {
                     CaptureUi(dialog,Path.Combine(root,"delete-confirm-"+prompts+".png"));var answer=responses[prompts++];
                     if(dialog is GeneralProjectDeleteChoice)AllControls(dialog).OfType<RadioButton>().Single(item=>item.Name==(removeMods?"DeleteMods":"DeleteAppOnly")).Checked=true;
                     if(answer==DialogResult.Cancel)dialog.Close();else AllControls(dialog).OfType<Button>().Single(button=>button.Name==(dialog is GeneralProjectDeleteChoice?(answer==DialogResult.Yes?"ContinueDelete":"CancelDelete"):(answer==DialogResult.Yes?"ConfirmProjectDelete":"CancelProjectDelete"))).PerformClick();
-                }catch(Exception ex){failure=ex;timer.Stop();dialog.DialogResult=DialogResult.Cancel;}
+                }catch(Exception ex){failure=ex;timer.Stop();dialog.Complete(DialogResult.Cancel);}
             };
             foreach(var card in HomeCards(home,"SavedProjects"))card.SetPointerOver(true);
             timer.Start();click();var limit=DateTime.UtcNow.AddSeconds(20);while(home.DeletingProject&&DateTime.UtcNow<limit)await Task.Delay(25);if(home.DeletingProject)throw new IOException("Exclusão excedeu o tempo do teste.");
         }
         if(failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();return prompts;
     }
-    static void CompleteProjectCreation(string value,string destination,string cover,Action show){
+    static async Task CompleteProjectCreation(string value,string destination,string cover,Action show){
         using(var timer=new Timer{Interval=60}){
             timer.Tick+=(s,e)=>{
                 var dialog=Application.OpenForms.OfType<GeneralProjectCreationDialog>().FirstOrDefault();if(dialog==null)return;
@@ -458,6 +473,7 @@ internal sealed partial class GeneralModWindow {
                 ((Button)dialog.AcceptButton).PerformClick();
             };
             timer.Start();show();
+            await Until(()=>!timer.Enabled);
         }
     }
     static void CompleteProjectName(string value,Action show){

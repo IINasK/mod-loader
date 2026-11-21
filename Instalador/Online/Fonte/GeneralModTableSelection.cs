@@ -10,7 +10,7 @@ internal sealed partial class GeneralModWindow {
     sealed class FolderRow {
         internal GeneralModFolder Folder;
         internal string[] Members;
-        internal string Size;
+        internal string Size,Category;
     }
 
     readonly HashSet<string> collapsedFolders=new HashSet<string>(StringComparer.Ordinal);
@@ -217,7 +217,7 @@ internal sealed partial class GeneralModWindow {
             }
             bool folded=collapsedFolders.Contains(folder.Id);
             var row=grid.Rows[grid.Rows.Add()];
-            var group=new FolderRow{Folder=folder,Members=members.Select(member=>member.Id).ToArray()};
+            var group=new FolderRow{Folder=folder,Category=mod.Category,Members=members.Select(member=>member.Id).ToArray()};
             row.Tag=group;
             row.Cells["Name"].Value=folder.Name;
             SetFolderSpace(row,group);
@@ -242,22 +242,51 @@ internal sealed partial class GeneralModWindow {
         if(parent!=null)grid.CurrentCell=parent.Cells["Name"];
     }
 
-    void EditModFolder(GeneralModFolder folder){
-        if(working||scanning||associationChoice!=null)return;
-        var ids=TableSelectionIds().Where(marked.Contains).ToList();
-        if(folder==null&&ids.Count<2)return;
-        using(var name=new GeneralNameDialog(folder==null?T("Criar pasta","Create folder"):T("Renomear pasta","Rename folder"),
-            folder==null?"":folder.Name,fieldLabel:T("Nome da pasta","Folder name"),chooseSelectionMode:folder==null)){
-            if(name.ShowDialog(this)!=DialogResult.OK)return;
-            BeginProjectEdit();
-            if(folder==null){
-                var moving=new HashSet<string>(ids,StringComparer.Ordinal);
-                foreach(var previous in state.List.Folders)previous.ModIds.RemoveAll(moving.Contains);
-                state.List.Folders.Add(new GeneralModFolder{Id="folder-"+Guid.NewGuid().ToString("N"),Name=name.ResultName,
-                    ModIds=ids,SingleSelection=name.SingleSelection});
-            }else folder.Name=name.ResultName;
-            FinishProjectEdit();DrawRows();
-        }
+    async void EditModFolder(GeneralModFolder folder,IEnumerable<string> selected=null,string targetId=null){
+        const string popup="mod-folder";
+        if(working||scanning||associationChoice!=null||GeneralDialog.FocusOpen<GeneralNameDialog>(this,popup))return;
+        var openedState=state;
+        var openedList=state.List;
+        string presetId=state.SelectedPreset;
+        var ids=(selected??TableSelectionIds().Where(marked.Contains)).Distinct(StringComparer.Ordinal).ToList();
+        var target=targetId==null?null:openedList.Mods.FirstOrDefault(mod=>mod.Id==targetId);
+        if(folder==null&&(ids.Count<2||targetId!=null&&target==null))return;
+        string targetCategory=target==null?null:target.Category;
+        string initialName=folder!=null?folder.Name:target==null?"":String.Concat(target.Name.Take(120));
+        Func<string,string> findFolder=id=>openedList.Folders.Where(item=>item.ModIds.Contains(id)).Select(item=>item.Id).FirstOrDefault();
+        var previousFolders=ids.Select(findFolder).ToArray();
+        try{
+            using(var name=new GeneralNameDialog(folder==null?T("Criar pasta","Create folder"):T("Renomear pasta","Rename folder"),
+                initialName,fieldLabel:T("Nome da pasta","Folder name"),chooseSelectionMode:folder==null)){
+                if(await name.ShowModelessAsync(this,popup)!=DialogResult.OK||working||scanning||
+                    !PopupProjectIsCurrent(openedState,openedList,presetId))return;
+                if(folder==null){
+                    if(!previousFolders.SequenceEqual(ids.Select(findFolder))||
+                        !ids.All(id=>openedList.Mods.Any(mod=>mod.Id==id)))return;
+                    var created=new GeneralModFolder{Id="folder-"+Guid.NewGuid().ToString("N"),Name=name.ResultName,
+                        ModIds=ids,SingleSelection=name.SingleSelection};
+                    if(target!=null){
+                        var liveTarget=openedList.Mods.SingleOrDefault(mod=>mod.Id==targetId);
+                        if(liveTarget==null||liveTarget.Category!=targetCategory)return;
+                        MoveRegisteredMods(ids.Where(id=>id!=targetId),targetId,true,targetCategory,newFolder:created);
+                        return;
+                    }
+                    BeginProjectEdit();
+                    AddModFolder(created);
+                }else{
+                    if(!openedList.Folders.Contains(folder)||folder.Name!=initialName)return;
+                    BeginProjectEdit();
+                    folder.Name=name.ResultName;
+                }
+                FinishProjectEdit();DrawRows();
+            }
+        }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
+    }
+
+    void AddModFolder(GeneralModFolder folder){
+        var members=new HashSet<string>(folder.ModIds,StringComparer.Ordinal);
+        foreach(var previous in state.List.Folders)previous.ModIds.RemoveAll(members.Contains);
+        state.List.Folders.Add(folder);
     }
 
     void DissolveModFolder(GeneralModFolder folder){

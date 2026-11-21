@@ -55,15 +55,31 @@ internal sealed class GeneralScrollView : Panel {
     int[] visibleGridRows;
     const DataGridViewElementStates VisibleRows=DataGridViewElementStates.Visible;
     [ThreadStatic] static MiddleScrollFilter middleScroll;
-    bool queued,refreshing,wheelActivated;
+    bool queued,refreshing,wheelActivated,nativeFramePending;
+    int richTextHeight;
     internal Control Content {get{return content;}}
     internal GeneralScrollBar Bar {get{return bar;}}
     [DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr handle,int message,IntPtr first,IntPtr second);
+    [DllImport("user32.dll",EntryPoint="SendMessageW")]static extern IntPtr SendPoint(IntPtr handle,int message,IntPtr first,ref Point second);
+    [DllImport("user32.dll",EntryPoint="GetWindowLongW")]static extern int WindowStyle(IntPtr handle,int index);
+    [DllImport("user32.dll")]static extern bool ShowScrollBar(IntPtr handle,int bar,bool visible);
+    [DllImport("user32.dll")]static extern bool SetWindowPos(IntPtr handle,IntPtr after,int x,int y,int width,int height,int flags);
+    const int NativeScrollStyles=0x00200000|0x00100000;
     internal GeneralScrollView(Control content,bool panelContent=false,bool reserveBarSpace=false,bool fitPanelContent=false){
         this.panelContent=panelContent;this.reserveBarSpace=reserveBarSpace;this.fitPanelContent=fitPanelContent;
         this.content=content;Dock=DockStyle.Fill;Margin=Padding.Empty;Padding=Padding.Empty;BackColor=GeneralStyle.Surface;
         content.Dock=DockStyle.None;content.Margin=Padding.Empty;viewport.Controls.Add(content);Controls.Add(viewport);Controls.Add(bar);
-        var text=content as TextBox;if(text!=null&&text.Multiline){text.ScrollBars=ScrollBars.None;text.WordWrap=true;}
+        var text=content as TextBoxBase;
+        if(text!=null&&text.Multiline){
+            text.WordWrap=true;
+            var plain=text as TextBox;if(plain!=null)plain.ScrollBars=ScrollBars.None;
+            var rich=text as RichTextBox;
+            if(rich!=null){
+                rich.ScrollBars=RichTextBoxScrollBars.None;
+                rich.ContentsResized+=(s,e)=>{if(richTextHeight!=e.NewRectangle.Height){richTextHeight=Math.Max(0,e.NewRectangle.Height);Queue();}};
+                rich.VScroll+=(s,e)=>Queue();
+            }
+        }
         var grid=content as DataGridView;
         if(grid!=null){
             grid.ScrollBars=ScrollBars.None;
@@ -108,13 +124,20 @@ internal sealed class GeneralScrollView : Panel {
         return index>=0?index:Math.Max(0,~index-1);
     }
 
-    void Attach(){if(!content.IsHandleCreated)return;if(events!=null)events.ReleaseHandle();events=new NativeEvents(this,content.Handle);Queue();}
+    void Attach(){if(!content.IsHandleCreated)return;if(events!=null)events.ReleaseHandle();events=new NativeEvents(this,content.Handle);nativeFramePending=NativeScrollContent;HideNativeScrollBars();Queue();}
+    bool NativeScrollContent {get{return content is ListBox||content is TextBoxBase;}}
+    void HideNativeScrollBars(){
+        if(NativeScrollContent&&content.IsHandleCreated&&!content.IsDisposed&&(WindowStyle(content.Handle,-16)&NativeScrollStyles)!=0)
+            ShowScrollBar(content.Handle,3,false);
+    }
     void Queue(){if(queued||IsDisposed||Disposing||!IsHandleCreated)return;queued=true;BeginInvoke((Action)(()=>{queued=false;if(!IsDisposed&&!Disposing&&IsHandleCreated)RefreshScroll();}));}
     internal void RefreshScroll(){
         if(refreshing||IsDisposed||!content.IsHandleCreated)return;refreshing=true;
         try{
             int total=0,page=1,value=0;
-            var grid=content as DataGridView;var list=content as ListBox;var text=content as TextBox;
+            HideNativeScrollBars();
+            if(nativeFramePending){nativeFramePending=false;SetWindowPos(content.Handle,IntPtr.Zero,0,0,0,0,0x0037);}
+            var grid=content as DataGridView;var list=content as ListBox;var text=content as TextBoxBase;var rich=text as RichTextBox;
             if(panelContent){
                 total=content.MinimumSize.Height;
                 if(fitPanelContent){
@@ -145,17 +168,26 @@ internal sealed class GeneralScrollView : Panel {
                 }
             }
             else if(list!=null){total=list.Items.Count;page=Math.Max(1,viewport.ClientSize.Height/Math.Max(1,list.ItemHeight));value=list.TopIndex;}
+            else if(rich!=null&&rich.Multiline){
+                // RichEdit lays out variable font sizes in pixels. Its measured
+                // document height keeps formatted paragraphs and the last line
+                // reachable without estimating every line from the base font.
+                SendMessage(rich.Handle,0x0441,IntPtr.Zero,IntPtr.Zero);
+                Point position=Point.Empty;SendPoint(rich.Handle,0x04dd,IntPtr.Zero,ref position);
+                total=Math.Max(richTextHeight,rich.ClientSize.Height);page=Math.Max(1,rich.ClientSize.Height);value=Math.Max(0,position.Y);
+                bar.WheelUnit=Math.Max(1,rich.Font.Height);
+            }
             else if(text!=null&&text.Multiline){total=(int)SendMessage(text.Handle,0x00ba,IntPtr.Zero,IntPtr.Zero);page=Math.Max(1,text.ClientSize.Height/Math.Max(1,text.Font.Height));value=(int)SendMessage(text.Handle,0x00ce,IntPtr.Zero,IntPtr.Zero);}
             bar.Configure(total,page,value);bool visible=total>page;if(bar.Visible!=visible){bar.Visible=visible;PerformLayout();}
-            int nativeWidth=list==null?0:Math.Max(0,list.Width-list.ClientSize.Width);
-            int width=reserveBarSpace?ClientSize.Width-bar.Width:viewport.ClientSize.Width+nativeWidth;
+            if(rich!=null&&value!=bar.Value){Point position=new Point(0,bar.Value);SendPoint(rich.Handle,0x04de,IntPtr.Zero,ref position);}
+            int width=reserveBarSpace?ClientSize.Width-bar.Width:viewport.ClientSize.Width;
             var bounds=new Rectangle(0,panelContent?-Math.Min(value,Math.Max(0,total-page)):0,Math.Max(1,width),Math.Max(1,panelContent?Math.Max(total,page):viewport.ClientSize.Height));
             if(content.Bounds!=bounds)content.Bounds=bounds;
         }finally{refreshing=false;}
     }
     internal void ScrollTo(int value){
         if(content.IsDisposed)return;
-        var grid=content as DataGridView;var list=content as ListBox;var text=content as TextBox;
+        var grid=content as DataGridView;var list=content as ListBox;var text=content as TextBoxBase;var rich=text as RichTextBox;
         if(panelContent){
             if(queued||bar.Limit==0)RefreshScroll();
             bar.SyncPosition(value);
@@ -172,6 +204,7 @@ internal sealed class GeneralScrollView : Panel {
             return;
         }
         if(list!=null&&list.Items.Count>0)list.TopIndex=Math.Min(value,list.Items.Count-1);
+        else if(rich!=null){Point position=new Point(0,Math.Max(0,Math.Min(value,bar.Limit)));SendPoint(rich.Handle,0x04de,IntPtr.Zero,ref position);}
         else if(text!=null){int current=(int)SendMessage(text.Handle,0x00ce,IntPtr.Zero,IntPtr.Zero);SendMessage(text.Handle,0x00b6,IntPtr.Zero,(IntPtr)(value-current));}
         RefreshScroll();
     }
@@ -288,9 +321,18 @@ internal sealed class GeneralScrollView : Panel {
         public void Dispose(){Stop();timer.Dispose();}
     }
     sealed class NativeEvents : NativeWindow {
+        [StructLayout(LayoutKind.Sequential)]struct StyleChange {internal int Before,After;}
         readonly GeneralScrollView view;
         internal NativeEvents(GeneralScrollView view,IntPtr handle){this.view=view;AssignHandle(handle);}
         protected override void WndProc(ref Message message){
+            if(message.Msg==0x007c&&message.WParam==(IntPtr)(-16)&&message.LParam!=IntPtr.Zero&&view.NativeScrollContent){
+                // ListBox restores WS_VSCROLL when items or bounds change. Keep
+                // its native scrolling model, while the shared bar is the sole
+                // visible scrollbar; no overflow-width or cover panel is needed.
+                var styles=(StyleChange)Marshal.PtrToStructure(message.LParam,typeof(StyleChange));
+                if((styles.After&NativeScrollStyles)!=0){view.nativeFramePending=true;view.Queue();}
+                styles.After&=~NativeScrollStyles;Marshal.StructureToPtr(styles,message.LParam,false);
+            }
             if(message.Msg==0x020a){
                 int delta=(short)((long)message.WParam>>16);
                 if(view.RouteWheel(delta)||view.bar.Limit>0){message.Result=IntPtr.Zero;return;}

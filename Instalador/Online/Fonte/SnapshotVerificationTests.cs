@@ -36,7 +36,7 @@ internal static class SnapshotVerificationTests {
             lock(gate){active++;maximum=Math.Max(maximum,active);}Thread.Sleep(5);
             lock(gate){active--;}return index;
         });
-        check(maximum<=SnapshotVerification.Workers&&maximum>=1,"Verificação limita concorrência e preserva processadores para interface.");
+        check(maximum<=SnapshotVerification.Workers&&maximum>=1,"Verificação limita concorrência aos processadores disponíveis.");
         int calls=0;bool canceled=false;
         var cancelWatch=Stopwatch.StartNew();
         try{SnapshotVerification.Hash(paths[0],()=>{if(++calls==3)throw new OperationCanceledException();});}

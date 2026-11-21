@@ -10,13 +10,36 @@ using System.Text.RegularExpressions;
 internal sealed class InventoryLinkGroup {
     public string Id,Name,Source,CatalogId;
     public List<string> Paths=new List<string>();
+    public List<InventoryLinkMember> Linked=new List<InventoryLinkMember>();
+
+    internal void RemovePaths(HashSet<string> paths){
+        Paths.RemoveAll(paths.Contains);
+        foreach(var part in Linked)part.Paths.RemoveAll(paths.Contains);
+        Linked.RemoveAll(part=>part.Paths.Count==0);
+        if(Paths.Count>0&&Linked.Sum(part=>part.Paths.Count)==Paths.Count){
+            var primary=Linked[0];
+            Name=primary.Name;Source=primary.Source;
+            Linked.RemoveAt(0);
+        }
+    }
+}
+
+internal sealed class InventoryLinkMember {
+    public string Name,Source;
+    public List<string> Paths=new List<string>();
 }
 
 internal sealed class InventoryZipLabel {
     public string Name, Hash, Archive;
 }
 
+internal sealed class InventoryAttachment {
+    public string Path,Hash;
+    public string[] Owners;
+}
+
 internal sealed class InventoryLinkData {
+    public List<InventoryAttachment> Attachments=new List<InventoryAttachment>();
     public Dictionary<string,InventoryZipLabel> ZipLabels=new Dictionary<string,InventoryZipLabel>(StringComparer.OrdinalIgnoreCase);
     public List<InventoryLinkGroup> Groups=new List<InventoryLinkGroup>();
     public List<string> Ignored=new List<string>();
@@ -70,13 +93,32 @@ internal sealed class InventoryLinkStore {
                 label.Name.Any(Char.IsControl)||!FixedData.HashValid(label.Hash)||
                 String.IsNullOrWhiteSpace(label.Archive)||label.Archive.Length>255||label.Archive.Any(Char.IsControl))throw Invalid();
         }
+        if(links.Attachments==null||links.Attachments.Count>5000)throw Invalid();
+        var attached=new HashSet<string>(Paths);
+        foreach(var item in links.Attachments){
+            if(item==null||String.IsNullOrEmpty(item.Path)||item.Path.Length>300||item.Path.IndexOf('\\')>=0||
+                !attached.Add(item.Path)||GeneralInstallRoutes.External(item.Path)||
+                item.Hash!=null&&(!FixedData.HashValid(item.Hash)||!CanManageAttachment(item.Path))||
+                item.Owners==null||item.Owners.Length==0||
+                item.Owners.Any(id=>String.IsNullOrWhiteSpace(id)||id.Length>120||id.Any(Char.IsControl))||
+                item.Owners.Distinct(StringComparer.Ordinal).Count()!=item.Owners.Length)throw Invalid();
+            Safe.In(Path.GetTempPath(),item.Path);
+        }
         var ids=new HashSet<string>(StringComparer.Ordinal);
         var owned=new HashSet<string>(Paths);
         foreach(var group in links.Groups) {
             Guid id;
             if(group==null||!Guid.TryParseExact(group.Id,"N",out id)||!ids.Add(group.Id)||
                 String.IsNullOrWhiteSpace(group.Name)||group.Name.Length>300||group.Paths==null||group.Paths.Count==0||
-                group.Source!=null&&GeneralNexusLink.Parse(group.Source)==null)throw Invalid();
+                group.Source!=null&&GeneralNexusLink.Parse(group.Source)==null||group.Linked==null||group.Linked.Count>=group.Paths.Count)throw Invalid();
+            var paths=new HashSet<string>(group.Paths,Paths);
+            var parts=new HashSet<string>(Paths);
+            foreach(var member in group.Linked){
+                if(member==null||String.IsNullOrWhiteSpace(member.Name)||member.Name.Length>300||
+                    member.Source!=null&&GeneralNexusLink.Parse(member.Source)==null||member.Paths==null||member.Paths.Count==0||
+                    member.Paths.Any(file=>!paths.Contains(file)||!parts.Add(file)))throw Invalid();
+            }
+            if(parts.Count>=paths.Count)throw Invalid();
             foreach(string file in group.Paths){
                 if(String.IsNullOrWhiteSpace(file)||file.Length>300||!owned.Add(file)||owned.Count>5000)throw Invalid();
                 Safe.In(Path.GetTempPath(),file);
@@ -86,7 +128,15 @@ internal sealed class InventoryLinkStore {
 
     internal static HashSet<string> DiscoverZips(string root,IEnumerable<string> folders,IEnumerable<string> candidates,
         Dictionary<string,InventoryZipLabel> labels,Func<string,string> readHash) {
-        var remaining=new HashSet<string>(candidates.Where(path=>!labels.ContainsKey(path)),Paths);
+        var remaining=new HashSet<string>(candidates,Paths);
+        foreach(var pair in labels.ToArray()){
+            // A saved match is evidence about the previous contents at this path.
+            if(!remaining.Contains(pair.Key)||!MatchesZipLabel(root,pair.Key,pair.Value,readHash)){
+                labels.Remove(pair.Key);
+                continue;
+            }
+            remaining.Remove(pair.Key);
+        }
         var ambiguous=new HashSet<string>(Paths);
         if(remaining.Count==0)return ambiguous;
         var discovered=new Dictionary<string,InventoryZipLabel>(Paths);
@@ -111,6 +161,14 @@ internal sealed class InventoryLinkStore {
         }
         foreach(var item in discovered.Where(item=>!ambiguous.Contains(item.Key)))labels.Add(item.Key,item.Value);
         return ambiguous;
+    }
+
+    static bool MatchesZipLabel(string root,string path,InventoryZipLabel label,Func<string,string> readHash){
+        try{
+            string target=GeneralInstallRoutes.Resolve(root,path);
+            Safe.NoLinks(target);
+            return File.Exists(target)&&(readHash??Safe.Hash)(target)==label.Hash;
+        }catch(IOException){return false;}catch(UnauthorizedAccessException){return false;}
     }
 
     internal static Dictionary<string,InventoryZipLabel> MatchZip(string root,string zipPath,string name,bool cyberpunk,
@@ -146,23 +204,58 @@ internal sealed class InventoryLinkStore {
 
     static IOException Invalid(){return new IOException("Agrupamentos locais inválidos.");}
 
-    internal static string Key(P2PSyncDifference file){return file.InventoryGroupId??(file.ProvenOwner==null?"raw:"+(file.Mod??file.Path):"owner:"+file.ProvenOwner);}
+    internal static bool CanManageAttachment(string path){
+        return !InstalledFileOwnership.PrivateState(path)&&InstalledSnapshot.SafeGenericPath(path)&&
+            !path.Split('/').Any(part=>part.StartsWith(".mod-loader",StringComparison.OrdinalIgnoreCase))&&
+            !path.EndsWith(".exe",StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static string Key(P2PSyncDifference file){
+        if(file.InventoryGroupId!=null)return file.InventoryGroupId;
+        if(file.ProvenOwner!=null)return "owner:"+file.ProvenOwner;
+        string folder=file.Path==null?null:FixedInstaller.ModFolder(file.Path);
+        return folder==null?"raw:"+file.Path:"raw-folder:"+folder;
+    }
 
     internal static IEnumerable<P2PSyncDifference> View(IEnumerable<P2PSyncDifference> inventory,InventoryLinkData links,
-        IEnumerable<GeneralModEntry> entries) {
+        IEnumerable<GeneralModEntry> entries,ISet<string> changedAttachments=null) {
         var mods=entries.ToDictionary(mod=>mod.Id,StringComparer.Ordinal);
         var adopted=new HashSet<string>(mods.Values.SelectMany(mod=>mod.DetectedPaths),Paths);
         var byPath=links.Groups.Where(group=>group.CatalogId==null||mods.ContainsKey(group.CatalogId))
             .SelectMany(group=>group.Paths.Select(file=>new{Path=file,Group=group}))
             .ToDictionary(item=>item.Path,item=>item.Group,Paths);
+        var manual=links.Attachments.ToDictionary(item=>item.Path,Paths);
         foreach(var file in inventory){
-            if(file.Kind!="found"||file.VerifiedZip!=null||file.ProvenOwner!=null||file.LocalInModFolder){yield return file;continue;}
-            if(adopted.Contains(file.Path))continue;
+            InventoryAttachment attachment;
+            if((file.Kind=="found"||file.Kind=="unlinked"||file.Kind=="associated")&&manual.TryGetValue(file.Path,out attachment)&&
+                (changedAttachments==null||!changedAttachments.Contains(file.Path))){
+                var owners=attachment.Owners.Where(mods.ContainsKey).ToArray();
+                if(owners.Length>0){
+                    foreach(string owner in owners)yield return new P2PSyncDifference{Kind="associated",Path=file.Path,
+                        Mod=mods[owner].Name,ModId=owner,VerifiedZip=file.VerifiedZip,ProvenOwner=file.ProvenOwner,
+                        LocalInModFolder=file.LocalInModFolder,PreexistingOutput=file.PreexistingOutput,GeneratedOutput=file.GeneratedOutput};
+                    continue;
+                }
+            }
+            if(file.Kind!="found"||file.LocalInModFolder){yield return file;continue;}
+            if(file.VerifiedZip==null&&file.ProvenOwner==null&&adopted.Contains(file.Path))continue;
             InventoryLinkGroup group;
-            if(!byPath.TryGetValue(file.Path,out group)){yield return file;continue;}
+            if(!byPath.TryGetValue(file.Path,out group)||!GroupMatchesVerifiedOwner(group,file.ProvenOwner,mods)){
+                yield return file;
+                continue;
+            }
             yield return new P2PSyncDifference{Kind=group.CatalogId==null?"found":"associated",Path=file.Path,
-                Mod=group.CatalogId==null?group.Name:mods[group.CatalogId].Name,ModId=group.CatalogId,InventoryGroupId=group.Id};
+                Mod=group.CatalogId==null?group.Name:mods[group.CatalogId].Name,ModId=group.CatalogId,InventoryGroupId=group.Id,
+                VerifiedZip=file.VerifiedZip,ProvenOwner=file.ProvenOwner,VerifiedBytes=file.VerifiedBytes};
         }
+    }
+
+    static bool GroupMatchesVerifiedOwner(InventoryLinkGroup group,string owner,Dictionary<string,GeneralModEntry> mods){
+        if(owner==null)return true;
+        // A ZIP can identify an archive without proving a distinct catalog owner.
+        // Keep the saved group in that case, while letting stronger ownership evidence win.
+        return group.CatalogId!=null&&(group.CatalogId==owner||
+            mods[group.CatalogId].Variants.Any(variant=>variant.CyberpunkId==owner));
     }
 
     internal static InventoryLinkGroup Combine(InventoryLinkData links,string targetId,string targetName,string catalogId,
@@ -174,11 +267,11 @@ internal sealed class InventoryLinkStore {
         var groupId=target==null?Guid.NewGuid().ToString("N"):target.Id;
         string link=source??(target==null?null:target.Source);
         foreach(var previous in links.Groups.ToArray()){
-            previous.Paths.RemoveAll(files.Contains);
-            if(previous.Paths.Count==0)links.Groups.Remove(previous);
+            if(previous!=target)previous.RemovePaths(files);
+            if(previous==target||previous.Paths.Count==0)links.Groups.Remove(previous);
         }
         var merged=new InventoryLinkGroup{Id=groupId,Name=targetName,CatalogId=catalogId,Source=link,
-            Paths=files.OrderBy(file=>file,Paths).ToList()};
+            Paths=files.OrderBy(file=>file,Paths).ToList(),Linked=target==null?new List<InventoryLinkMember>():target.Linked};
         links.Groups.Add(merged);
         return merged;
     }

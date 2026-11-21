@@ -48,6 +48,7 @@ internal sealed class GeneralArchivePreview {
 
     internal static GeneralArchivePreview Load(string source,string localArchive,IEnumerable<string> catalogPaths,
         bool cyberpunk,Func<GeneralNexusLink,NexusFilePreview[]> read=null) {
+        if(GeneralModFolderSource.IsSource(source))return new GeneralArchivePreview(GeneralArchivePreviewOrigin.Local,GeneralModFolderSource.PreviewPaths(source));
         if(GeneralModDownload.IsArchivePath(source)&&File.Exists(source))return ReadLocal(source);
 
         var known=catalogPaths==null?new string[0]:catalogPaths.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();

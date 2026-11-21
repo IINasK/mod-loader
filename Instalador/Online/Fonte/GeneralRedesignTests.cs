@@ -59,7 +59,7 @@ internal sealed partial class GeneralModWindow {
         GeneralStyle.UseTheme("light");GeneralStyle.Language="pt";
         Safe.WriteJson(Path.Combine(root,"resultado-project-search.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});
     }
-    static void CheckTableSelection(GeneralModWindow form,string root,GeneralModEntry first,GeneralModEntry second,
+    static async Task CheckTableSelection(GeneralModWindow form,string root,GeneralModEntry first,GeneralModEntry second,
         GeneralModEntry third,Action<bool,string> check){
         var grid=form.grid;
         Func<GeneralModEntry,DataGridViewRow> row=entry=>form.ModRows().Single(item=>Equals(item.Tag,entry.Id));
@@ -112,7 +112,7 @@ internal sealed partial class GeneralModWindow {
         firstVariant.SourceInfo[firstVariant.Sources[0]]=new GeneralSourceInfo{Name="Tamanho cadastrado",Bytes=2400};
         using(var chooser=new Timer{Interval=60}){
             chooser.Tick+=(s,e)=>{
-                var dialog=Application.OpenForms.OfType<GeneralNameDialog>().FirstOrDefault();
+                var dialog=form.OwnedForms.OfType<GeneralNameDialog>().FirstOrDefault(item=>item.Visible);
                 if(dialog==null)return;
                 chooser.Stop();
                 AllControls(dialog).OfType<TextBox>().Single(box=>box.Name=="NameInput").Text="Pasta de teste";
@@ -120,6 +120,7 @@ internal sealed partial class GeneralModWindow {
                 ((Button)dialog.AcceptButton).PerformClick();
             };
             chooser.Start();create.PerformClick();
+            await Until(()=>!chooser.Enabled&&form.state.List.Folders.Count==1);
         }
         var folder=form.state.List.Folders.Single();
         check(folder.SingleSelection&&form.marked.Count==1,"O modo escolhido na criação limita a pasta a uma seleção.");
@@ -174,7 +175,7 @@ internal sealed partial class GeneralModWindow {
         var state=new GeneralModState{List=list,SelectedPreset="kit",Destination=root,DownloadFolder=root};
         var checks=new List<string>();Action<bool,string> check=(yes,message)=>{if(!yes)throw new IOException(message);checks.Add(message);};
         TestForm(FixedData.Load(),state,Path.Combine(root,"state"),root,async form=>{
-            CheckTableSelection(form,root,first,second,third,check);
+            await CheckTableSelection(form,root,first,second,third,check);
             check(form.tableName.Text=="Kit original"&&!form.tableName.ReadOnly,"Título integrado usa o nome do preset ativo.");
             form.tableName.Text="Kit renomeado";form.SaveTableTitle();check(list.Presets[0].Name=="Kit renomeado"&&form.preset.SelectedItem.ToString()=="Kit renomeado","Renomear a tabela atualiza e persiste o preset.");
             first=form.state.List.Mods.Single(mod=>mod.Id==first.Id);
@@ -191,16 +192,25 @@ internal sealed partial class GeneralModWindow {
             form.ResetColumnFilters();form.DrawRows();check(form.VisibleMods().Count==3,"Limpar filtros restaura todos os itens do preset.");
             form.measuredMods[first.Id]=50;
             form.measuredMods[second.Id]=900;
+            bool modelessFilter=false;
             using(var timer=new Timer{Interval=40}){
                 timer.Tick+=(s,e)=>{
-                    var filter=Application.OpenForms.OfType<GeneralColumnFilterDialog>().FirstOrDefault();
-                    if(filter==null)return;
+                    var filters=form.OwnedForms.OfType<GeneralColumnFilterDialog>().Where(item=>item.Visible).ToArray();
+                    var sort=filters.FirstOrDefault(item=>AllControls(item).Any(control=>control.Name=="DefaultOrder"));
+                    if(sort==null)return;
                     timer.Stop();
-                    AllControls(filter).OfType<Button>().Single(button=>button.Name=="DefaultOrder").PerformClick();
+                    modelessFilter=form.Enabled&&filters.Length==2&&filters.All(item=>!item.Modal);
+                    foreach(var filter in filters.Where(item=>item!=sort))filter.Complete(DialogResult.Cancel);
+                    AllControls(sort).OfType<Button>().Single(button=>button.Name=="DefaultOrder").PerformClick();
                 };
                 timer.Start();
-                form.ShowColumnFilter(form.grid.Columns["Size"].Index);
+                int column=form.grid.Columns["Size"].Index;
+                form.ShowColumnFilter(column);
+                form.ShowColumnFilter(column);
+                form.ShowColumnFilter(form.grid.Columns["Name"].Index);
+                await Until(()=>!timer.Enabled&&form.orderColumn=="Size");
             }
+            check(modelessFilter,"O filtro deixa a janela do projeto disponível e reutiliza a janela da mesma coluna.");
             check(form.ModRows().Select(row=>(string)row.Tag).SequenceEqual(new[]{second.Id,first.Id,third.Id})&&
                 !form.grid.Rows.Cast<DataGridViewRow>().Any(row=>row.Tag is SectionRow),
                 "Ordenar por espaço cruza as categorias e deixa itens sem medição no fim.");
@@ -302,8 +312,8 @@ internal sealed partial class GeneralModWindow {
             form.statuses[Key(second,form.Selected(second))]="Instalado";
             form.DrawRows();
             var badges=form.ModRows().Where(row=>Equals(row.Tag,first.Id)||Equals(row.Tag,second.Id)).Select(row=>row.Cells["Group"]).ToArray();
-            check(form.grid.Columns["Group"].Visible&&badges.Length==2&&badges.All(cell=>cell.Value==null),
-                "O cabeçalho de grupos volta sem converter vínculos antigos em gavetas.");
+            check(!form.grid.Columns["Group"].Visible&&badges.Length==2&&badges.All(cell=>cell.Value==null),
+                "A coluna Grupo fica oculta sem converter vínculos antigos em gavetas.");
             check(form.totalProgress.Caption.EndsWith("1 / 2")&&form.counts.Text.Contains("Instalados: 1"),"Duas alternativas instaladas contam como uma escolha, com outro mod pendente.");
 
             form.statuses[Key(first,form.Selected(first))]="Não instalado";
@@ -351,8 +361,8 @@ internal sealed partial class GeneralModWindow {
             CaptureUi(form,Path.Combine(root,"tabela-clara.png"));
             using(var menu=new GeneralActionsMenu()){
                 menu.StartPosition=FormStartPosition.Manual;menu.Location=new Point(-30000,-30000);menu.Show(form);Application.DoEvents();
-                check(menu.Width==350&&AllControls(menu).OfType<Button>().Count(button=>button.Name!="")==8&&
-                    AllControls(menu).OfType<Button>().Any(button=>button.Name=="save-menu"),"Menu agrupa navegação e ferramentas.");
+                check(menu.Width==350&&AllControls(menu.Content).OfType<Button>().Count(button=>button.Name!="")==8&&
+                    AllControls(menu.Content).OfType<Button>().Any(button=>button.Name=="save-menu"),"Menu agrupa navegação e ferramentas.");
                 CaptureUi(menu,Path.Combine(root,"menu-unico.png"));menu.Close();
             }
             using(var editor=new GeneralCategoryDetails("Principal","",false,true)){
@@ -371,7 +381,9 @@ internal sealed partial class GeneralModWindow {
                     GeneralStyle.PaintCard(graphics,bitmap.Size);
                     check(bitmap.GetPixel(0,0).ToArgb()==Color.Magenta.ToArgb(),"Máscara revela o fundo no canto: "+dark);
                     check(bitmap.GetPixel(150,90).ToArgb()==GeneralStyle.Surface.ToArgb(),"Pintura limpa a superfície central: "+dark);
-                    check(bitmap.GetPixel(150,0).ToArgb()==GeneralStyle.Line.ToArgb(),"Contorno coincide com o recorte da janela: "+dark);
+                    check(bitmap.GetPixel(150,0).ToArgb()==GeneralStyle.Surface.ToArgb()&&
+                        bitmap.GetPixel(150,GeneralStyle.RoundedFaceInset+1).ToArgb()==GeneralStyle.Line.ToArgb(),
+                        "O contorno completo fica recuado do recorte nativo para preservar a suavização: "+dark);
                 }
             }
             GeneralStyle.Dark=false;

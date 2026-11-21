@@ -6,12 +6,16 @@ using System.Windows.Forms;
 internal sealed class GeneralActionsMenu : GeneralDialog {
     internal string ActionId {get;private set;}
 
-    internal GeneralActionsMenu(bool builtIn=false,bool home=false,bool saveMenu=false,bool savePresetItems=false,bool hasTemplateCopies=false,bool showTemplateCopies=false){
-        Text=saveMenu?GeneralStyle.T("Salvar projeto","Save project"):GeneralStyle.T("Menu","Menu");
+    internal GeneralActionsMenu(bool builtIn=false,bool home=false,bool saveMenu=false,bool savePresetItems=false,bool cacheMenu=false,bool hasTemplateCopies=false,bool showTemplateCopies=false){
+        Text=cacheMenu?GeneralStyle.T("Cache do projeto","Project cache"):
+            saveMenu?GeneralStyle.T("Salvar projeto","Save project"):GeneralStyle.T("Menu","Menu");
         ShowCloseButton(false);
         var body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,Padding=new Padding(14,6,14,14),Margin=Padding.Empty};
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));Content.Controls.Add(body);
-        if(saveMenu){
+        if(cacheMenu){
+            Add(body,"open-cache","Abrir pasta do cache","Open cache folder","folder");
+            Add(body,"p2p-temp","Temporários P2P","P2P temporary files","share");
+        }else if(saveMenu){
             Add(body,"save-project","Salvar","Save","save");
             Add(body,"save-increment","Salvar incremento","Save revision","copy");
             Add(body,"clone","Duplicar projeto","Duplicate project","copy");
@@ -30,6 +34,10 @@ internal sealed class GeneralActionsMenu : GeneralDialog {
                 }
                 Section(body,"ToolsSection","Ferramentas","Tools");
             }else if(hasTemplateCopies){
+                Add(body,"template-copies",showTemplateCopies?"Ocultar cópias do pacote":"Mostrar cópias do pacote",
+                    showTemplateCopies?"Hide pack copies":"Show pack copies","copy");
+            }
+            if(home&&hasTemplateCopies){
                 Add(body,"template-copies",showTemplateCopies?"Ocultar cópias do pacote":"Mostrar cópias do pacote",
                     showTemplateCopies?"Hide pack copies":"Show pack copies","copy");
             }

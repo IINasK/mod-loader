@@ -294,9 +294,9 @@ internal sealed partial class GeneralModWindow {
                 var terrain=EditorField<FlowLayoutPanel>(editor,"tagChips").Controls.OfType<Button>().Single(button=>button.Text=="Terrain ×");
                 check(terrain.Top==add.Top&&terrain.Right<add.Left&&terrain.Height==add.Height&&add.Right<=add.Parent.ClientSize.Width,
                     "At narrow width Add follows the final tag with the same height and no clipping: "+terrain.Bounds+" / "+add.Bounds);
-                check(input.RectangleToScreen(input.ClientRectangle).Top<field.RectangleToScreen(field.ClientRectangle).Top&&
+                check(!picker.Visible&&
                     !AllControls(editor).OfType<Button>().Any(button=>new[]{"Adicionar link","Remover fonte","Adicionar arquivo local"}.Contains(button.Text)),
-                    "The source selector precedes the Nexus link and the legacy source actions are gone.");
+                    "The deprecated version selector and legacy source actions are absent from the editor.");
                 CaptureUi(editor,Path.Combine(root,"compact-editor-tags.png"));
                 add.PerformClick();await Task.Delay(40);
                 var inline=EditorField<TextBox>(editor,"tags");
@@ -307,8 +307,8 @@ internal sealed partial class GeneralModWindow {
                 typeof(TextBox).GetMethod("OnKeyDown",BindingFlags.Instance|BindingFlags.NonPublic)
                     .Invoke(inline,new object[]{new KeyEventArgs(Keys.Escape)});
 
-                check(input.Visible&&input.Text=="Preferida"&&picker.Items.Cast<string>().SequenceEqual(new[]{"Preferida","Original","Terceira"}),
-                    "A legacy default moves first and remains the selected editable name.");
+                check(!input.Visible&&input.Text=="Preferida"&&picker.Items.Cast<string>().SequenceEqual(new[]{"Preferida","Original","Terceira"}),
+                    "Hiding the selector preserves the selected legacy default and all variant definitions.");
                 var destinations=EditorField<GeneralArchiveDestinations>(editor,"archiveDestinations");
                 var routes=(TextBox)destinations.Controls.Find("ArchiveCurrentDestination",true).Single();
                 var browse=AllControls(destinations).OfType<Button>().Single(button=>button.Text=="Escolher pasta");
@@ -332,6 +332,15 @@ internal sealed partial class GeneralModWindow {
                 check(nsfw.BareInk==GeneralStyle.Line,"Clicking again restores the gray marker.");
                 var description=EditorField<TextBox>(editor,"description");
                 var grip=AllControls(editor).Single(control=>control.Name=="DescriptionResizeGrip");
+                using(var gripImage=new Bitmap(grip.Width,grip.Height)) {
+                    grip.DrawToBitmap(gripImage,new Rectangle(Point.Empty,grip.Size));
+                    var ink=new List<Point>();
+                    for(int y=0;y<gripImage.Height;y++)for(int x=0;x<gripImage.Width;x++)
+                        if(gripImage.GetPixel(x,y).ToArgb()==(grip.Focused?GeneralStyle.Accent:GeneralStyle.Muted).ToArgb())ink.Add(new Point(x,y));
+                    check(ink.Count>0&&grip.Parent.ClientSize.Width-grip.Left-ink.Max(point=>point.X)==
+                        grip.Parent.ClientSize.Height-grip.Top-ink.Max(point=>point.Y),
+                        "The visible resize-grip strokes have equal right and bottom clearance.");
+                }
                 var descriptionView=(GeneralScrollView)description.Parent.Parent;
                 description.Text=String.Join(Environment.NewLine,Enumerable.Repeat("Long description",24));
                 descriptionView.RefreshScroll();
@@ -346,53 +355,14 @@ internal sealed partial class GeneralModWindow {
                 CaptureUi(editor,Path.Combine(root,"editor-themed-controls.png"));
                 TestDescriptionWheel(editor,description,descriptionView,check);
                 TestArchiveTreeWheel(editor,destinations,check);
-                input.Text="Preferida editada";
-                picker.Toggle();
-                var popup=picker.OpenPopup;
-                var view=(GeneralScrollView)popup.Items.OfType<ToolStripControlHost>().Single().Control;
-                var list=(ListBox)view.Content;
-                check(list.Items.Cast<string>().SequenceEqual(new[]{"Preferida editada (padrão)","Original","Terceira","Adicionar nova versão"}),
-                    "The version popup shows the default first and Add last.");
-                check(!view.Bar.Visible||view.Bar.Left>=list.Width,"The scrollbar cannot cover the trash hit area.");
-                using(var bitmap=new Bitmap(popup.Width,popup.Height)){
-                    popup.DrawToBitmap(bitmap,new Rectangle(0,0,bitmap.Width,bitmap.Height));
-                    bitmap.Save(Path.Combine(root,"compact-editor-versions.png"));
-                }
-                Point top=new Point(65,list.GetItemRectangle(0).Top+20);
-                Point bottom=new Point(65,list.GetItemRectangle(2).Top+20);
-                VersionMouse(list,"OnMouseDown",bottom);
-                VersionMouse(list,"OnMouseMove",top);
-                VersionMouse(list,"OnMouseUp",top);
-                check(picker.Items.Cast<string>().SequenceEqual(new[]{"Preferida editada","Original","Terceira"}),
-                    "Dragging does not change the order of download versions.");
-                Point trash=new Point(list.ClientSize.Width-20,list.GetItemRectangle(2).Top+20);
-                VersionMouse(list,"OnMouseClick",trash);
-                check(!popup.Visible,"Delete closes its popup before the editor refreshes.");
-                await Until(()=>picker.Items.Count==2);
-                check(picker.Items.Cast<string>().SequenceEqual(new[]{"Preferida editada","Original"}),
-                    "The row trash removes only that version.");
-                picker.Toggle();popup=picker.OpenPopup;
-                list=AllControls(popup.Items.OfType<ToolStripControlHost>().Single().Control).OfType<ListBox>().Single();
-                Point addVersion=new Point(65,list.GetItemRectangle(list.Items.Count-1).Top+20);
-                VersionMouse(list,"OnMouseClick",addVersion);
-                check(!popup.Visible&&picker.Items.Count==2,"Add closes the dropdown synchronously and defers the editor update.");
-                await Until(()=>picker.Items.Count==3);
-                check(input.Text=="Nova versão"&&input.SelectionLength==input.Text.Length,"Add opens a new version with its name selected for editing.");
-                input.Text="Quarta";
                 EditorField<TextBox>(editor,"modName").Text="Novo arquivo";
-                field.Text=source.Replace("/34305?","/4591?");
-                check(EditorField<Button>(editor,"save").Enabled,"A newly added version can use a different Nexus mod.");
                 field.Text="https://example.com/mod.zip";
-                check(!EditorField<Button>(editor,"save").Enabled,"A new external link is rejected.");
-                field.Text=source.Replace("169285","169288");
-                check(EditorField<Button>(editor,"save").Enabled,"A file version of the same Nexus mod is allowed.");
-                picker.SelectedIndex=0;
-                check(input.Text=="Preferida editada"&&field.Text==preferred.Sources[0],
-                    "Selecting another version keeps both inline names and both URLs intact.");
+                check(EditorField<Button>(editor,"save").Enabled,"A generic external source is supported without requiring Nexus identity.");
+                field.Text=preferred.Sources[0];
                 EditorField<Button>(editor,"save").PerformClick();
                 check(editor.Result.DefaultVariant==preferred.Id&&editor.SelectedVariant==preferred.Id&&editor.Result.NsfwOverride==false&&
-                    editor.Result.Variants.Select(version=>version.Name).SequenceEqual(new[]{"Preferida editada","Original","Quarta"}),
-                    "The first version is saved as default and an explicitly selected version stays selected.");
+                    editor.Result.Variants.Select(version=>version.Name).SequenceEqual(new[]{"Preferida","Original","Terceira"}),
+                    "Saving without the deprecated selector preserves the default, selection and all original variants.");
             }
             string[] archivePaths=new[]{"plugins/one.dll","plugins/data/two.txt"}
                 .Concat(Enumerable.Range(0,30).Select(index=>"plugins/file"+index+".txt")).ToArray();

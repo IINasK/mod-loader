@@ -33,12 +33,16 @@ internal sealed class P2PSession {
     public long PreparationBytes,PreparationTotal;
     public string PayloadHash;
     public string[] SelectedMods, SkippedVerificationMods;
+    public bool SkipVerificationProblems;
     public P2POutputSelection[] GeneratedConfigSelection;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile P2PVerificationIssue VerificationIssue;
     [System.Web.Script.Serialization.ScriptIgnore] public GeneralModList ReviewedProject;
     [System.Web.Script.Serialization.ScriptIgnore] public int ChoiceNotified;
     [System.Web.Script.Serialization.ScriptIgnore] public volatile bool NexusReviewing;
     public bool Sender, Paused, AutoInstall, Completed, ListImported, HistoryDismissed;
+    public bool TransportReleased, InstallArtifactsCleaned, CleanupPending;
+    public string CleanupError;
+    [System.Web.Script.Serialization.ScriptIgnore] public DateTime NextCleanupUtc;
     public override string ToString(){return GeneralStyle.T(Sender?"Enviando · ":"Recebendo · ",Sender?"Sending · ":"Receiving · ")+Name;}
 }
 internal sealed class P2PTransferStatus {
@@ -67,6 +71,7 @@ internal sealed partial class P2PService : IDisposable {
     internal Func<P2PSession,bool> RegisterProject;
     internal Func<string[],bool> ApproveUserFolders;
     internal Func<ModVersionDifference,bool> ChooseVersion;
+    internal Func<int,bool?> ChooseUpdates;
     internal Func<P2PSession,Task<bool>> ConfirmConnection;
     internal Action<GeneralModList> ReviewReceived;
     internal Action<bool> Notice;
@@ -112,6 +117,7 @@ internal sealed partial class P2PService : IDisposable {
             }
         }
         RefreshSessions();
+        CleanupCompletedTransfers();
     }
     static void Validate(P2PSession s){
         if(s==null||!Regex.IsMatch(s.Id??"","\\Aml-[a-f0-9]{32}\\z")||!P2PPack.HashValid(s.Hash)||String.IsNullOrWhiteSpace(s.Name)||s.Name.Length>300||s.Name.Any(Char.IsControl)||(s.Peer!=null&&!P2PInvite.DeviceValid(s.Peer)))throw new IOException("Registro de compartilhamento inválido.");
@@ -137,6 +143,7 @@ internal sealed partial class P2PService : IDisposable {
     }
     internal string PrivateFolder(P2PSession s){Validate(s);return Safe.In(Root,"received");}
     internal void Start(Action<string> report,string testExe=null,string excludeFolder=null){
+        if(!System.Threading.Monitor.IsEntered(startGate))CleanupCompletedTransfers();
         lock(startGate)StartCore(report,testExe,excludeFolder);
     }
     void StartCore(Action<string> report,string testExe,string excludeFolder){
@@ -197,10 +204,11 @@ internal sealed partial class P2PService : IDisposable {
             catch{Sessions.Insert(index,session);throw;}
         }
     }
-    internal void EnableInstalledReceive(FixedCatalog catalog,string appData,bool fixture=false){installedCatalog=catalog;installedData=appData;installedFixture=fixture;}
+    internal void EnableInstalledReceive(FixedCatalog catalog,string appData,bool fixture=false){installedCatalog=catalog;installedData=appData;installedFixture=fixture;CleanupCompletedTransfers();}
     void Pump(){
         if(disposed||Interlocked.Exchange(ref pumping,1)!=0)return;
         try{
+            CleanupCompletedTransfers();
             try{DetectAcceptances();}catch(Exception ex){OnlineDiagnostics.Record("p2p.accept.waiting",null,ex.GetType().Name);}
             try{ObserveConnectionDiagnostics(DateTime.UtcNow);}catch(Exception ex){OnlineDiagnostics.Record("p2p.diagnostic.observe",null,ex.GetType().Name);}
             var transfers=installedSessions;
@@ -224,7 +232,7 @@ internal sealed partial class P2PService : IDisposable {
         Directory.CreateDirectory(folder);string zip=Safe.In(folder,"pack.zip");
         string preparation=Safe.In(Root,"creating.json");Safe.WriteJson(preparation,new{Id=s.Id});
         try{
-            var manifest=InstalledSnapshot.Create(zip,state,ids,catalog,appData,includeConfigs,report,true);
+            var manifest=InstalledSnapshot.Create(zip,state,ids,catalog,appData,includeConfigs,report,true,includeUpdatePreferences:true);
             s.Name=manifest.Name;s.Hash=Safe.Hash(zip);s.Size=new FileInfo(zip).Length;
             Engine.ConfigureFolder(s.Id,folder,s.Name,true);AddSession(s);return s;
         }catch{Sessions.Remove(s);try{Engine.RemoveFolder(s.Id);}catch(Exception){}try{P2PPack.DeleteSnapshot(folder);}catch(Exception){}throw;}
@@ -272,7 +280,6 @@ internal sealed partial class P2PService : IDisposable {
         }
         if(s.Lifecycle&&!s.Sender&&(s.Phase!=null||s.CompareBeforePack&&(s.SyncMode!=0||HasSyncPreview(s))))PublishNotice(s);
         if(!s.Sender&&s.Stage!=null)return;
-        if(s.Paused||s.Held||s.RecoveryPending||s.Discarded||!s.Completed&&s.Error!=null)return;
         if(s.Completed){
             if(!Directory.Exists(Folder(s)))return;
             if(!s.Sender){
@@ -280,9 +287,11 @@ internal sealed partial class P2PService : IDisposable {
                 var remote=Engine.Get("db/completion?folder="+s.Id+"&device="+s.Peer);
                 // Keep advertising the received index until the sender acknowledges delivery by unsharing.
                 if(!remote.ContainsKey("remoteState")||Convert.ToString(remote["remoteState"])!="notSharing")return;
+                s.TransportReleased=true;Save();
             }
-            CleanupTransport(s);s.Error=null;Save();return;
+            TryCleanupCompletedTransfer(s);return;
         }
+        if(s.Paused||s.Held||s.RecoveryPending||s.Discarded||s.Error!=null)return;
         if(s.Sender){
             if(s.Deferred&&!DeferredPrepared(s)){
                 if(s.Peer!=null)StartDeferredPreparation(s,()=>RecipientReady(s,s.Peer));
@@ -292,7 +301,7 @@ internal sealed partial class P2PService : IDisposable {
             var completion=Engine.Get("db/completion?folder="+s.Id+"&device="+s.Peer);
             if(!completion.ContainsKey("remoteState")||Convert.ToString(completion["remoteState"])!="valid"||!completion.ContainsKey("globalBytes")||Convert.ToInt64(completion["globalBytes"])<s.Size||Convert.ToDouble(completion["completion"])<100||Convert.ToInt64(completion["needBytes"])!=0)return;
             // Unshare first: deleting the sender's temporary ZIP must not delete the receiver's copy.
-            Engine.RemoveFolder(s.Id);s.Completed=true;Save();CleanupTransport(s);return;
+            Engine.RemoveFolder(s.Id);s.Completed=true;s.TransportReleased=true;Save();TryCleanupCompletedTransfer(s);return;
         }
         if(!s.AutoInstall||installedCatalog==null||installedData==null||s.Stage!=null)return;
         if(s.CompareBeforePack&&!HasSyncChoice(s)){
@@ -304,10 +313,11 @@ internal sealed partial class P2PService : IDisposable {
         if(!File.Exists(zip)||new FileInfo(zip).Length!=s.Size)return;
         StartInstall(s,zip);
     }
-    void CleanupTransport(P2PSession s){
+    void CleanupTransport(P2PSession s,bool retry=true){
         lock(startGate){
         Engine.RemoveFolder(s.Id);
         CloseHostDecision(s);
+        if(!retry){P2PPack.DeleteSnapshot(Folder(s),0);return;}
         try{P2PPack.DeleteSnapshot(Folder(s));}
         catch(IOException){
             if(SnapshotSessions().Any(other=>other.Id!=s.Id&&!other.Completed&&!other.Discarded&&!other.Paused))throw;
@@ -520,5 +530,5 @@ internal sealed partial class P2PService : IDisposable {
         // Only this session's transport snapshot is removed; private imports, originals and installations remain.
         }
     }
-    public void Dispose(){disposed=true;if(pump!=null){pump.Dispose();pump=null;}Engine.Dispose();}
+    public void Dispose(){disposed=true;var cleanup=Interlocked.Exchange(ref cleanupRetry,null);if(cleanup!=null)cleanup.Dispose();if(pump!=null){pump.Dispose();pump=null;}Engine.Dispose();}
 }

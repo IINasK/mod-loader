@@ -7,7 +7,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-internal sealed class GeneralP2PDialog : GeneralDialog {
+internal sealed class GeneralP2PDialog : GeneralDialog, IGeneralModMessageContext {
+    IEnumerable<string> IGeneralModMessageContext.ModMessageNames {get{return GeneralMessageText.NamesIn(state);}}
     const int Inset=24,Gap=16,LabelHeight=24,LinkHeight=56,ControlHeight=44;
     const int TargetHeight=LabelHeight+ControlHeight+Gap;
     readonly P2PService service;
@@ -65,21 +66,7 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
                 var owner=promptOwner();
                 if(owner==null||owner.IsDisposed||session.Discarded||session.Completed){decision.TrySetResult(false);return;}
                 try{
-                    using(var dialog=new GeneralDialog(T("Conexão solicitada","Connection requested"))){
-                        dialog.ClientSize=new Size(560,210);
-                        var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(24,12,24,16)};
-                        layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-                        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-                        layout.Controls.Add(new Label{Dock=DockStyle.Fill,Text=session.Name+"\r\n\r\n"+
-                            T("Seu amigo quer receber este pacote.","Your friend wants to receive this pack.")},0,0);
-                        var actions=GeneralTableDialogLayout.Commands();
-                        var decline=GeneralStyle.Button(T("Recusar","Decline"),()=>dialog.Complete(DialogResult.No));
-                        var accept=GeneralStyle.Button(T("Aceitar","Accept"),()=>dialog.Complete(DialogResult.Yes),true);
-                        decline.Name="p2p-decline-request";accept.Name="p2p-accept-request";
-                        actions.Controls.Add(decline);actions.Controls.Add(accept);
-                        layout.Controls.Add(actions,0,1);dialog.Content.Controls.Add(layout);
-                        dialog.CancelButton=decline;
-                        GeneralStyle.Apply(dialog,GeneralStyle.Dark);
+                    using(var dialog=CreateConnectionPrompt(owner,session.Name)){
                         service.Notify();
                         decision.TrySetResult(dialog.ShowDialog(owner)==DialogResult.Yes);
                     }
@@ -92,13 +79,32 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         return decision.Task;
     }
 
+    internal static GeneralDialog CreateConnectionPrompt(Control owner,string packName){
+        var dialog=GeneralDialog.CreateMessage(owner,
+            packName+"\r\n\r\n"+T("Seu amigo quer receber este pacote.","Your friend wants to receive this pack."),
+            T("Conexão solicitada","Connection requested"),MessageBoxButtons.YesNo,signal:false,
+            yesLabel:T("Aceitar","Accept"),noLabel:T("Recusar","Decline"),modNames:new[]{packName});
+        var accept=(Button)dialog.AcceptButton;
+        var decline=(Button)dialog.CancelButton;
+        accept.Name="p2p-accept-request";decline.Name="p2p-decline-request";
+        int width=Math.Max(accept.PreferredSize.Width,decline.PreferredSize.Width);
+        accept.MinimumSize=decline.MinimumSize=new Size(width,44);
+        dialog.AcceptButton=decline;
+        return dialog;
+    }
+
     internal GeneralP2PDialog(P2PService service,GeneralModState state,FixedCatalog catalog,bool autoStart=true,Func<Task<List<string>>> findCyberpunk=null):base(T("Modpack e compartilhamento","Modpack and sharing")){
         this.service=service;this.state=state;this.autoStart=autoStart;this.catalog=catalog;
         this.findCyberpunk=findCyberpunk??(()=>Task.Run(()=>Discovery.Find()));
         var previousChoice=service.ChooseVersion;
+        var previousUpdates=service.ChooseUpdates;
+        Func<int,bool?> updateChoice=count=>GeneralReceivedUpdateDialog.Ask(this,count);
         Func<ModVersionDifference,bool> versionChoice=difference=>GeneralVersionChoiceDialog.Ask(this,difference);
-        service.ChooseVersion=versionChoice;
-        Disposed+=(s,e)=>{if(Object.ReferenceEquals(service.ChooseVersion,versionChoice))service.ChooseVersion=previousChoice;};
+        service.ChooseVersion=versionChoice;service.ChooseUpdates=updateChoice;
+        Disposed+=(s,e)=>{
+            if(Object.ReferenceEquals(service.ChooseVersion,versionChoice))service.ChooseVersion=previousChoice;
+            if(Object.ReferenceEquals(service.ChooseUpdates,updateChoice))service.ChooseUpdates=previousUpdates;
+        };
         Name="p2p-dialog";Content.Margin=Padding.Empty;
         ClientSize=new Size(Math.Min(720,Screen.FromPoint(Cursor.Position).WorkingArea.Width-28),420);
         cardScroll=new GeneralScrollView(cardStack,true,reserveBarSpace:true){Name="p2p-cards"};
@@ -251,8 +257,9 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         }catch(System.Runtime.InteropServices.ExternalException ex){Failed(ex);}
         return true;
     }
-    void ShowDiagnostics(){
-        using(var dialog=new GeneralP2PDiagnosticDialog(service))dialog.ShowDialog(this);
+    async void ShowDiagnostics(){
+        if(GeneralDialog.FocusOpen<GeneralP2PDiagnosticDialog>(this))return;
+        using(var dialog=new GeneralP2PDiagnosticDialog(service))await dialog.ShowModelessAsync(this);
     }
     void CopyDiagnostic(P2PSession session){
         var report=service.GetConnectionDiagnostic(session.Id);
@@ -485,10 +492,11 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
 
     async void ShowSyncDifferences(P2PSession session) {
         try {
+            if(GeneralDialog.FocusOpen<GeneralSyncDifferencesDialog>(this,session.Id))return;
             var differences = await Task.Run(() => service.ReadSyncDifferences(session));
-            if (IsDisposed || !Visible || session.HistoryDismissed) return;
+            if (IsDisposed || !Visible || session.HistoryDismissed||GeneralDialog.FocusOpen<GeneralSyncDifferencesDialog>(this,session.Id)) return;
             using (var dialog = new GeneralSyncDifferencesDialog(differences))
-                dialog.ShowDialog(this);
+                await dialog.ShowModelessAsync(this,session.Id);
         } catch (Exception ex) { if (!IsDisposed) Failed(ex); }
     }
     void Retry(P2PSession session){Run(async()=>{
@@ -536,10 +544,16 @@ internal sealed class GeneralP2PDialog : GeneralDialog {
         if(issue==null)return;
         reviewingVerification=true;
         try{
-            var answer=GeneralDialog.Message(this,T("Erro ao verificar o mod ","Error verifying mod ")+issue.ModName+"\n\n"+issue.Message+"\n\n"+
-                T("Deseja pular este mod e continuar? Mods que dependem dele também ficarão fora.","Skip this mod and continue? Mods that depend on it will also be left out."),
-                T("Conferência dos mods","Mod verification"),MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2,signal:false);
-            issue.Decision.TrySetResult(answer==DialogResult.Yes);
+            bool skipRemaining=false;
+            var answer=GeneralDialog.Message(this,issue.ModName+"\r\n"+issue.Message+"\r\n\r\n"+
+                T("Este mod e os que dependem dele ficarão fora se você continuar.",
+                    "This mod and any dependents will be left out if you continue."),
+                T("Conferência dos mods","Mod verification"),MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2,
+                remember:value=>skipRemaining=value,rememberLabel:T("Pular também os próximos mods com falha neste envio",
+                    "Also skip remaining mods that fail in this transfer"),yesLabel:T("Pular mod","Skip mod"),
+                noLabel:T("Parar conferência","Stop verification"),signal:false,modNames:new[]{issue.ModName});
+            issue.Decision.TrySetResult(answer!=DialogResult.Yes?P2PVerificationDecision.Stop:
+                skipRemaining?P2PVerificationDecision.SkipRemaining:P2PVerificationDecision.Skip);
         }finally{reviewingVerification=false;}
     }
     async Task Poll(){
@@ -917,7 +931,7 @@ internal sealed partial class GeneralModWindow {
         var saved=projectStore.Load(received);
         GeneralModLibrary.RestoreKnownMappings(saved.List,seed);
         state.List=saved.List;state.Destination=saved.Destination;state.SelectedPreset=saved.SelectedPreset;
-        state.BodyChoice=saved.BodyChoice;state.ReceivedPreset=saved.ReceivedPreset;
+        state.BodyChoice=saved.BodyChoice;state.ReceivedPreset=saved.ReceivedPreset;state.ManualUpdateMods=saved.ManualUpdateMods;
         state.ChosenVariants=saved.ChosenVariants;state.ResolvedDownloads=saved.ResolvedDownloads;
         state.CyberpunkImports=saved.CyberpunkImports;state.SnapshotReceipts=saved.SnapshotReceipts;
         marked.Clear();statuses.Clear();statusDetails.Clear();progress.Clear();
@@ -933,6 +947,7 @@ internal sealed partial class GeneralModWindow {
                     p2p.EnableInstalledReceive(catalog,data);
                     p2p.ConfirmConnection=session=>GeneralP2PDialog.AskConnection(this,()=>SharingPromptOwner,p2p,session);
                     p2p.ChooseVersion=difference=>GeneralVersionChoiceDialog.Ask(SharingPromptOwner,difference);
+                    p2p.ChooseUpdates=count=>GeneralReceivedUpdateDialog.Ask(SharingPromptOwner,count);
                     p2p.ApproveUserFolders=folders=>GeneralP2PDialog.AskUserFolders(this,()=>SharingPromptOwner,folders);
                 }
                 p2p.SetPreparationState(CommittedProject());
@@ -970,15 +985,17 @@ internal sealed partial class GeneralModWindow {
     }
 
     async void ShowP2P(){
-        if(working||scanning||!ConfirmProjectNavigation())return;
+        if(GeneralDialog.FocusOpen<GeneralP2PDialog>(this)||working||scanning||!ConfirmProjectNavigation())return;
         try{
             PrepareP2P();
             using(var dialog=new GeneralP2PDialog(p2p,state,catalog)){
                 DialogResult result;
                 sharingDialog=dialog;
-                try{result=dialog.ShowDialog(this);}
+                try{result=await dialog.ShowModelessAsync(this);}
                 finally{sharingDialog=null;}
-                if(result!=DialogResult.OK||dialog.ReceivedList==null)return;
+                if(IsDisposed||exitApproved||result!=DialogResult.OK||dialog.ReceivedList==null)return;
+                if(working||scanning)throw new IOException(T("O recebimento foi preservado. Aguarde a operação atual e reabra o compartilhamento.",
+                    "The transfer was preserved. Wait for the current operation and reopen sharing."));
                 if(!await ReplaceList(dialog.ReceivedList,true,dialog.InstalledReceiptId,dialog.InstalledDestination))return;
                 if(dialog.InstalledReceiptId!=null)p2p.MarkImported(dialog.InstalledReceiptId);
                 if(dialog.InstallAfterReceive){foreach(var mod in state.List.Mods)marked.Add(mod.Id);DrawRows();StartSelected();}

@@ -49,7 +49,7 @@ public sealed partial class InstalledSnapshotInstaller {
         records = Safe.In(this.appData, "Snapshots/" + Fingerprint(this.destination.ToUpperInvariant()));
     }
 
-    public string Install(string zipPath, string expectedHash, Action<string> report, int failAfter = -1, Func<ModVersionDifference,bool> chooseVersion = null, Action<string> transaction = null, Action checkpoint = null, Action<P2PInstallProgress> progress = null, bool allowReuse = false, Func<string[],bool> approveUserFolders = null) {
+    public string Install(string zipPath, string expectedHash, Action<string> report, int failAfter = -1, Func<ModVersionDifference,bool> chooseVersion = null, Action<string> transaction = null, Action checkpoint = null, Action<P2PInstallProgress> progress = null, bool allowReuse = false, Func<string[],bool> approveUserFolders = null,Func<int,bool?> chooseUpdates=null) {
         // The archive is leased throughout verification and copying; no archive is kept in the receipt store.
         zipPath = Path.GetFullPath(zipPath); Safe.NoLinks(zipPath);
         using (var source = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
@@ -75,7 +75,8 @@ public sealed partial class InstalledSnapshotInstaller {
                 }
                 var complete=receipts.FirstOrDefault(r=>r.Status=="installed"&&r.ActiveOwners.Count==WorkKeys(manifest).Count()&&SameManifest(r.Manifest,manifest)&&r.Files.All(Matches));
                 if(complete!=null){CleanStage(Safe.In(destination,".mod-loader-snapshot-"+complete.Id));return complete.Id;}
-                var approvals=ConfirmVersions(manifest,chooseVersion,receipts,skippedDestinations);
+                var skipBackup=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var approvals=ConfirmVersions(manifest,chooseVersion,receipts,skippedDestinations,chooseUpdates,skipBackup);
                 var groups=manifest.Files.GroupBy(f=>f.Path,StringComparer.OrdinalIgnoreCase).ToArray();
                 CheckDistinctTargets(groups.Select(group=>group.Key));
                 CheckSpace(manifest);
@@ -112,7 +113,8 @@ public sealed partial class InstalledSnapshotInstaller {
                             } else if(change.Expected!=null) {
                                 // Approved replacements retain a verified backup in addition to the transaction rollback file.
                                 change.Owned=true;
-                                Backup(Target(change.Path),BackupPath(receipt,change.Path),change.Expected);
+                                if(skipBackup.Contains(change.Path))change.Before=null;
+                                else Backup(Target(change.Path),BackupPath(receipt,change.Path),change.Expected);
                             }
                             prepared[index]=change;
                             lock(prepareProgress) {
@@ -161,7 +163,7 @@ public sealed partial class InstalledSnapshotInstaller {
         if(file.ReuseLocal) {
             if(before!=file.Sha256||new FileInfo(target).Length!=file.Size)
                 throw new IOException(GeneralStyle.T("Arquivo local mudou após a comparação. Peça um novo convite: ","A local file changed after comparison. Ask for a new invitation: ")+file.Path);
-            using(var input=File.OpenRead(target))InstalledSnapshot.ValidateCustomData(manifest,file,input);
+            using(var input=File.OpenRead(target))InstalledSnapshot.ValidateCustomData(manifest,file,input,catalog);
             after=before;
         } else if(file.Kind=="file") {
             ZipArchiveEntry entry=zip.GetEntry("files/"+file.Sha256);
@@ -255,7 +257,7 @@ public sealed partial class InstalledSnapshotInstaller {
     }
 
     Dictionary<string,string> ConfirmVersions(InstalledSnapshotManifest manifest,Func<ModVersionDifference,bool> choose,
-        List<Receipt> receipts,List<string> skippedMods){
+        List<Receipt> receipts,List<string> skippedMods,Func<int,bool?> chooseUpdates,HashSet<string> skipBackup){
         var ids=new HashSet<string>(manifest.List.Mods.Select(m=>m.Id),StringComparer.Ordinal);
         var paths=new HashSet<string>(manifest.Files.Where(f=>f.Kind=="file").Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
         var obsolete=receipts.Where(r=>r.Status=="installed").SelectMany(r=>r.Manifest.Files
@@ -289,7 +291,19 @@ public sealed partial class InstalledSnapshotInstaller {
             if(hash==null||hash==f.Sha256)return false;
             expected.Add(f.Path,hash);return true;
         }).ToList();
-        foreach(var group in changed.GroupBy(f=>String.Join(", ",manifest.List.Mods.Where(m=>f.Owners.Any(owner=>owner.StartsWith(m.Id+"/",StringComparison.Ordinal))).Select(m=>m.Name)))){
+        var approvedUpdates=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if(chooseUpdates!=null&&manifest.Schema>=2&&changed.Count>0){
+            var eligible=RecognizedOutdatedMods(manifest,receipts,changed,expected,skipped);
+            if(eligible.Count>0){
+                bool? backup=chooseUpdates(eligible.Count);
+                if(!backup.HasValue)skipped.UnionWith(eligible);
+                else foreach(var file in changed.Where(file=>file.Owners.All(owner=>eligible.Contains(owner.Split('/')[0])))){
+                    approvedUpdates.Add(file.Path);
+                    if(!backup.Value)skipBackup.Add(file.Path);
+                }
+            }
+        }
+        foreach(var group in changed.Where(file=>!approvedUpdates.Contains(file.Path)).GroupBy(f=>String.Join(", ",manifest.List.Mods.Where(m=>f.Owners.Any(owner=>owner.StartsWith(m.Id+"/",StringComparison.Ordinal))).Select(m=>m.Name)))){
             var files=group.ToList();var known=catalog.Packages.FirstOrDefault(m=>m.Files.Any(f=>files.Any(p=>p.Path.Equals(f.Path,StringComparison.OrdinalIgnoreCase))));
             var affected=new HashSet<string>(files.SelectMany(file=>file.Owners).Select(owner=>owner.Split('/')[0]),StringComparer.Ordinal);
             if(affected.All(skipped.Contains))continue;
@@ -301,6 +315,77 @@ public sealed partial class InstalledSnapshotInstaller {
         }
         skippedMods.AddRange(InstalledSnapshot.SkipMods(manifest,catalog,skipped));
         return expected;
+    }
+
+    HashSet<string> RecognizedOutdatedMods(InstalledSnapshotManifest incoming,List<Receipt> receipts,
+        List<InstalledSnapshotFile> changed,Dictionary<string,string> hashes,HashSet<string> skipped){
+        var incomingPaths=new HashSet<string>(incoming.Files.Select(file=>file.Path),StringComparer.OrdinalIgnoreCase);
+        var conflicts=changed.SelectMany(file=>file.Owners.Select(owner=>new{Id=owner.Split('/')[0],File=file}))
+            .ToLookup(entry=>entry.Id,entry=>entry.File,StringComparer.Ordinal);
+        var installed=receipts.Where(receipt=>receipt.Status=="installed").SelectMany(receipt=>receipt.Manifest.List.Mods
+            .Where(mod=>receipt.ActiveOwners.Contains(InstalledSnapshot.Owner(mod,mod.Variants.Single())))
+            .Select(mod=>new{Receipt=receipt,Mod=mod})).ToLookup(row=>row.Mod.Id,StringComparer.Ordinal);
+        GeneralModState local=null;
+        try{local=new GeneralModLibrary(Safe.In(appData,"lista.json")).LoadForInspection(true);}
+        catch(IOException){}catch(UnauthorizedAccessException){}catch(ArgumentException){}catch(InvalidOperationException){}
+        var engine=new GeneralModInstaller(destination,Safe.In(appData,"Instalacoes"));
+        var eligible=new HashSet<string>(StringComparer.Ordinal);
+        foreach(var mod in incoming.List.Mods){
+            var files=conflicts[mod.Id].ToArray();
+            if(skipped.Contains(mod.Id)||files.Length==0||files.Any(file=>IsImmutable(file.Path)))continue;
+            var next=mod.Variants.Single();
+            var recipe=catalog.Packages.FirstOrDefault(item=>item.Id==next.CyberpunkId&&item.PreviousRelease!=null);
+            if(recipe!=null&&ModVersionNumbers.Compare(recipe.Version,recipe.PreviousRelease.Version)>0&&
+                files.All(file=>recipe.Files.Any(known=>String.Equals(known.Path,file.Path,StringComparison.OrdinalIgnoreCase)&&
+                    known.Sha256==file.Sha256&&known.PreviousSha256==hashes[file.Path]))){
+                eligible.Add(mod.Id);continue;
+            }
+            if(installed[mod.Id].Any(row=>{
+                var previous=row.Mod.Variants.Single();
+                string owner=InstalledSnapshot.Owner(row.Mod,previous);
+                var previousPaths=new HashSet<string>(row.Receipt.Manifest.Files.Where(file=>file.Kind=="file"&&file.Owners.Contains(owner)).Select(file=>file.Path),StringComparer.OrdinalIgnoreCase);
+                return IsVersionUpgrade(previous,next)&&files.All(file=>previousPaths.Contains(file.Path)&&
+                    row.Receipt.Files.Any(old=>old.Applied&&!old.Reverted&&String.Equals(old.Path,file.Path,StringComparison.OrdinalIgnoreCase)&&old.After==hashes[file.Path]));
+            })){
+                eligible.Add(mod.Id);continue;
+            }
+            var oldMod=local==null?null:local.List.Mods.FirstOrDefault(entry=>entry.Id==mod.Id);
+            var oldVariant=oldMod==null?null:oldMod.Variants.FirstOrDefault(option=>option.Id==next.Id);
+            if(oldVariant==null||!IsVersionUpgrade(oldVariant,next))continue;
+            GeneralModInstaller.Record record;
+            try{record=engine.ReadPackageRecord(P2PPack.Slot(oldMod,oldVariant,0));}
+            catch(IOException){continue;}catch(UnauthorizedAccessException){continue;}
+            if(record!=null&&record.Files.All(file=>incomingPaths.Contains(file.Path)||!File.Exists(Target(file.Path)))&&
+                files.All(file=>record.Files.Any(old=>old.Owned&&String.Equals(old.Path,file.Path,StringComparison.OrdinalIgnoreCase)&&old.Sha256==hashes[file.Path])))
+                eligible.Add(mod.Id);
+        }
+        // A shared path is eligible only if every affected mod has proof of an older version.
+        bool reduced;
+        do{
+            int count=eligible.Count;
+            foreach(var file in changed){
+                var owners=file.Owners.Select(owner=>owner.Split('/')[0]).ToArray();
+                if(owners.Any(owner=>!eligible.Contains(owner)))eligible.ExceptWith(owners);
+            }
+            reduced=eligible.Count!=count;
+        }while(reduced);
+        return eligible;
+    }
+
+    static bool IsVersionUpgrade(GeneralModVariant previous,GeneralModVariant next){
+        if(previous.Id!=next.Id||previous.Sources.Count!=1||next.Sources.Count!=1)return false;
+        string from=previous.Sources[0],to=next.Sources[0];
+        if(from==to)return false;
+        var oldNexus=GeneralNexusLink.Parse(from);var newNexus=GeneralNexusLink.Parse(to);
+        var oldGithub=GeneralGithubLink.Parse(from);var newGithub=GeneralGithubLink.Parse(to);
+        if(oldNexus!=null&&newNexus!=null&&oldNexus.Game==newNexus.Game&&oldNexus.Mod==newNexus.Mod&&
+            oldNexus.File>0&&newNexus.File>0){
+            GeneralSourceInfo before,after;
+            return previous.SourceInfo.TryGetValue(from,out before)&&next.SourceInfo.TryGetValue(to,out after)&&
+                before.NexusChecked&&after.NexusChecked&&ModVersionNumbers.Compare(after.Version,before.Version)>0;
+        }
+        return GeneralGithubLink.SameRepository(oldGithub,newGithub)&&oldGithub.Asset!=null&&newGithub.Asset!=null&&
+            GeneralGithubUpdatePackage.SameAssetLine(oldGithub,newGithub)&&ModVersionNumbers.Compare(newGithub.Tag,oldGithub.Tag)>0;
     }
 
     internal IEnumerable<SnapshotOutputScope> ReadOutputScopes(){
@@ -320,6 +405,19 @@ public sealed partial class InstalledSnapshotInstaller {
         var receipt = Read(receiptId);
         if (receipt == null || receipt.Status != "installed" || !receipt.ActiveOwners.Contains(workKey))
             throw new IOException("O mod não tem recibo de snapshot instalado nesta pasta.");
+        return ReadInstalledFiles(receipt,workKey,includeConfigs,configsOnly,checkpoint);
+    }
+
+    internal List<InstalledSnapshotFile> ReadMatchingInstalledFiles(string receiptId,GeneralModEntry mod,GeneralModVariant variant,
+        bool includeConfigs=true,bool configsOnly=false,Action checkpoint=null){
+        var receipt=Read(receiptId);
+        string owner=InstalledSnapshot.Owner(mod,variant);
+        if(receipt==null||receipt.Status!="installed"||!receipt.ActiveOwners.Contains(owner)||
+            !InstalledSnapshot.MatchesReceiptVariant(receipt.Manifest,mod,variant))return null;
+        return ReadInstalledFiles(receipt,owner,includeConfigs,configsOnly,checkpoint);
+    }
+
+    List<InstalledSnapshotFile> ReadInstalledFiles(Receipt receipt,string workKey,bool includeConfigs,bool configsOnly,Action checkpoint) {
         var files = receipt.Manifest.Files.Where(f => !f.Generated&&f.Owners.Contains(workKey)&&
             (f.Kind=="file"?!configsOnly:includeConfigs)).ToList();
         return SnapshotVerification.Map(files,(file,poll)=>{
@@ -482,7 +580,7 @@ public sealed partial class InstalledSnapshotInstaller {
             var recipe = InstalledSnapshot.FixedRecipe(localCatalog, variant);
             var current = GeneralInstallRoutes.FixedPaths(localCatalog, recipe, before);
             var next = GeneralInstallRoutes.FixedPaths(localCatalog, recipe, after);
-            GeneralInstallRoutes.CheckFolders(destination, after);
+            GeneralInstallRoutes.CheckFolders(destination, after,allowNewGameSubfolders:true);
             var existing = new HashSet<string>(receipts.Where(other => other.Id != receiptId && other.Status == "installed")
                 .SelectMany(other => other.Manifest.Files.Where(file => file.Owners.Any(other.ActiveOwners.Contains)))
                 .Select(file => Target(file.Path)), StringComparer.OrdinalIgnoreCase);
@@ -546,7 +644,7 @@ public sealed partial class InstalledSnapshotInstaller {
         internal string Source, Target, Path, Hash;
     }
 
-    public string Remove(string receiptId, IEnumerable<string> workKeys, Action<string> report, bool forgetOnly=false, Func<string,bool> preserveExternal=null) {
+    public string Remove(string receiptId, IEnumerable<string> workKeys, Action<string> report, bool forgetOnly=false, Func<string,bool> preserveExternal=null,Func<string,bool> preserveAttached=null) {
         var initial = Read(receiptId);
         if (initial == null) return "Nenhum snapshot instalado para remover.";
         using (AcquireLock(initial.Manifest.Game)) {
@@ -574,7 +672,7 @@ public sealed partial class InstalledSnapshotInstaller {
                 var owners = pathOwners[change.Path].SelectMany(keys=>keys).Distinct().ToList();
                 if (!owners.Any(removing.Contains)) continue;
                 if (owners.Any(remaining.Contains) || receipt.Manifest.Game == "cyberpunk2077" && IsImmutable(change.Path)
-                    || otherFiles[change.Path].Any(other=>other.After==change.After)) {
+                    || otherFiles[change.Path].Any(other=>other.After==change.After)||preserveAttached!=null&&preserveAttached(change.Path)) {
                     preserved++; continue;
                 }
                 if (!change.Owned || change.Reverted || !change.Applied || !Matches(change) || GeneralInstallRoutes.External(change.Path)&&preserveExternal!=null&&preserveExternal(change.Path)) { preserved++; continue; }

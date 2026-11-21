@@ -30,7 +30,7 @@ public sealed class DownloadControl:IDisposable {
 }
 
 public sealed partial class NexusClient {
-    public void Download(FixedMod m,FixedAsset a,DownloadCache cache,DownloadControl control,Action<DownloadProgress> progress) {
+    public void Download(FixedMod m,FixedAsset a,DownloadCache cache,DownloadControl control,Action<DownloadProgress> progress,Action<string> validateBeforeCommit=null,bool preserveFileName=false) {
         if(control==null)throw new ArgumentNullException("control");
         if(progress==null)throw new ArgumentNullException("progress");
         long bytes=0;
@@ -38,7 +38,7 @@ public sealed partial class NexusClient {
         string temp=null;
         try {
             control.Checkpoint(()=>notify("Pausado"));
-            if(cache.Contains(a)){bytes=a.Size;notify("Concluído");return;}
+            if(cache.Contains(a)){if(validateBeforeCommit!=null)validateBeforeCommit(cache.PathFor(a));control.Checkpoint();bytes=a.Size;notify("Concluído");return;}
             notify("Conectando");string url=DownloadUrl(m,a);
             control.Checkpoint(()=>notify("Pausado"));
             temp=cache.DownloadTemporaryPath();
@@ -58,7 +58,7 @@ public sealed partial class NexusClient {
                         Transfer(input,output,a.Size,control,n=>{bytes=n;notify(control.IsPaused?"Pausado":"Baixando");});
                     }
                     control.Checkpoint(()=>notify("Pausado"));notify("Verificando");
-                    CommitDownload(cache,a,temp,control);
+                    CompleteDownload(cache,a,temp,control,validateBeforeCommit,preserveFileName);
                     bytes=a.Size;notify("Concluído");return;
                 }
             }
@@ -88,10 +88,14 @@ public sealed partial class NexusClient {
         control.Checkpoint(()=>report(total));report(total);
     }
 
-    internal static void CommitDownload(DownloadCache cache,FixedAsset asset,string temp,DownloadControl control) {
+    internal static void CompleteDownload(DownloadCache cache,FixedAsset asset,string temp,DownloadControl control,Action<string> validate=null,bool preserveFileName=false){
+        try{control.Checkpoint();if(validate!=null)validate(temp);CommitDownload(cache,asset,temp,control,preserveFileName);}
+        finally{if(File.Exists(temp)){Safe.NoLinks(temp);File.Delete(temp);}}
+    }
+    internal static void CommitDownload(DownloadCache cache,FixedAsset asset,string temp,DownloadControl control,bool preserveFileName=false) {
         Safe.NoLinks(temp);
         if(new FileInfo(temp).Length!=asset.Size||Safe.Hash(temp)!=asset.Sha256)throw new IOException("Download incompleto ou hash diferente. Arquivo recusado.");
-        control.Checkpoint();if(cache.SourcesOnly){cache.KeepOriginalDownload(asset,temp);return;}string dest=cache.PathFor(asset);Safe.NoLinks(dest);
+        control.Checkpoint();if(cache.SourcesOnly){cache.KeepOriginalDownload(asset,temp,preserveFileName);return;}string dest=cache.PathFor(asset);Safe.NoLinks(dest);
         if(cache.Contains(asset))return;
         if(File.Exists(dest))File.Delete(dest);
         File.Move(temp,dest);

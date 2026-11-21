@@ -505,11 +505,12 @@ public sealed partial class FixedInstaller {
             EnsureUndoDependencies(last.Receipt);return UndoReceipt(last.Receipt,last.Path,report);
         }
     }
-    string UndoReceipt(OnlineReceipt r,string ledger,Action<string> report) {
+    string UndoReceipt(OnlineReceipt r,string ledger,Action<string> report,Func<string,bool> preserveAttached=null) {
         if(r.Operation=="density"||r.Operation==EquipmentExOptions.Operation)return UndoDensity(r,ledger,report);
         if(r.Operation=="deactivate"||r.Operation==ExtraResetOperation)return UndoDeactivation(r,ledger,report);
         int preserved=0;r.Status="desfazendo";Save(ledger,r);
         foreach(var f in r.Files.AsEnumerable().Reverse()){
+            if(preserveAttached!=null&&preserveAttached(f.Path)){preserved++;continue;}
             Closed();string p=Safe.In(game,f.Path);if(Directory.Exists(p)){preserved++;continue;}
             string current=File.Exists(p)?Safe.Hash(p):null;
             if(f.Before!=null){

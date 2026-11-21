@@ -13,7 +13,8 @@ public sealed partial class GeneralModInstaller {
     public const string Modified = "Arquivos alterados";
 
     public sealed class Record {
-        public string Key,SourceSha256;
+        public string Key,SourceSha256,TransactionId;
+        public UpgradeInfo Upgrade;
         public List<RecordFile> Files;
         public List<GeneralInstallRoute> InstallRoutes = new List<GeneralInstallRoute>();
     }
@@ -69,7 +70,7 @@ public sealed partial class GeneralModInstaller {
     }
 
     internal bool SourceMatches(string source,string key){var record=ReadRecord(RecordPath(key));return record!=null&&record.SourceSha256!=null&&File.Exists(source)&&Safe.Hash(source)==record.SourceSha256;}
-    public string Install(string source, string key, Action<string> report, Func<ModVersionDifference,bool> chooseVersion = null, List<GeneralInstallRoute> installRoutes = null) {
+    public string Install(string source, string key, Action<string> report, Func<ModVersionDifference,bool> chooseVersion = null, List<GeneralInstallRoute> installRoutes = null, string expectedSourceHash = null) {
         string receipt = RecordPath(key);
         source = Path.GetFullPath(source);
         Safe.NoLinks(source);
@@ -77,13 +78,17 @@ public sealed partial class GeneralModInstaller {
 
         installRoutes=installRoutes??new List<GeneralInstallRoute>();
         GeneralInstallRoutes.Validate(installRoutes);
-        GeneralInstallRoutes.CheckFolders(destination,installRoutes);
+        GeneralInstallRoutes.CheckFolders(destination,installRoutes,allowNewGameSubfolders:true);
         using (AcquireLock()) {
             Record previous = ReadRecord(receipt);
             var previousFiles = previous == null
                 ? new Dictionary<string, RecordFile>(StringComparer.OrdinalIgnoreCase)
                 : previous.Files.ToDictionary(file => file.Path, StringComparer.OrdinalIgnoreCase);
-            var record = new Record { Key = key, SourceSha256=Safe.Hash(source), InstallRoutes=installRoutes, Files = new List<RecordFile>() };
+            var record = new Record { Key = key, SourceSha256=Safe.Hash(source), TransactionId=Guid.NewGuid().ToString("N"), InstallRoutes=installRoutes, Files = new List<RecordFile>() };
+            if(previous!=null&&previous.Key==key&&previous.Upgrade!=null&&record.SourceSha256==previous.Upgrade.PackageSha256)
+                record.Upgrade=Safe.Json.Deserialize<UpgradeInfo>(Safe.Json.Serialize(previous.Upgrade));
+            if(expectedSourceHash!=null&&(!FixedData.HashValid(expectedSourceHash)||record.SourceSha256!=expectedSourceHash))
+                throw new IOException("O pacote mudou depois da confirmação. A instalação foi preservada.");
             var staged = new List<string>();
             var createdDirectories = new List<string>();
             string staging = Safe.In(destination, ".mod-loader-" + Guid.NewGuid().ToString("N"));
@@ -178,7 +183,7 @@ public sealed partial class GeneralModInstaller {
         }
     }
 
-    public string Remove(string key, bool forgetOnly=false, Func<string,bool> activeOwner=null, Func<string,bool> preserveExternal=null) {
+    public string Remove(string key, bool forgetOnly=false, Func<string,bool> activeOwner=null, Func<string,bool> preserveExternal=null,Func<string,bool> preserveAttached=null) {
         string receipt = RecordPath(key);
         using (AcquireLock()) {
             Record record = ReadRecord(receipt);
@@ -196,7 +201,7 @@ public sealed partial class GeneralModInstaller {
             foreach (RecordFile file in forgetOnly ? Enumerable.Empty<RecordFile>() : record.Files) {
                 string target = Target(file.Path);
                 if (!File.Exists(target)) continue;
-                if (!file.Owned || others[file.Path].Any(other=>other.Sha256==file.Sha256) || !Matches(target, file) || GeneralInstallRoutes.External(file.Path)&&preserveExternal!=null&&preserveExternal(file.Path)) {
+                if (!file.Owned || others[file.Path].Any(other=>other.Sha256==file.Sha256) || !Matches(target, file) || preserveAttached!=null&&preserveAttached(file.Path) || GeneralInstallRoutes.External(file.Path)&&preserveExternal!=null&&preserveExternal(file.Path)) {
                     preserved++;
                     continue;
                 }
@@ -248,6 +253,10 @@ public sealed partial class GeneralModInstaller {
         Record record = serializer.Deserialize<Record>(receiptText??(inspection?GeneralProjectStorage.ReadText(path,16000000):File.ReadAllText(path)));
         if (record == null || record.SourceSha256!=null&&!FixedData.HashValid(record.SourceSha256) || record.Files == null || record.Files.Count == 0 || RecordPath(record.Key) != path)
             throw new IOException("Registro de instalação inválido: " + path);
+        Guid transaction;
+        if(record.TransactionId!=null&&!Guid.TryParseExact(record.TransactionId,"N",out transaction))
+            throw new IOException("Identidade da instalação inválida.");
+        if(record.Upgrade!=null)ValidateUpgrade(record.Key,record.Upgrade,record.SourceSha256);
         GeneralInstallRoutes.Validate(record.InstallRoutes);
         foreach (RecordFile file in record.Files) {
             if (file == null || file.Size < 0 || !FixedData.HashValid(file.Sha256)||file.Before!=null&&!FixedData.HashValid(file.Before)) throw new IOException("Registro de arquivo inválido: " + path);

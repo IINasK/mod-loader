@@ -42,6 +42,13 @@ internal sealed partial class GeneralModWindow {
         var visibleState=store.Load(project);
         TestForm(catalog,visibleState,data,root,async form=>{
             form.AttachProject(store,project);form.RefreshStorageSize();await Until(()=>!form.storageReading);form.DrawRows();
+            var cacheLink=form.storageSize.Links.Cast<LinkLabel.Link>().Single(link=>Equals(link.LinkData,data));
+            typeof(LinkLabel).GetMethod("OnLinkClicked",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)
+                .Invoke(form.storageSize,new object[]{new LinkLabelLinkClickedEventArgs(cacheLink)});
+            check(form.menus.Current is GeneralActionsMenu&&AllControls(form.menus.Current).OfType<Button>().Any(button=>button.Name=="p2p-temp")&&
+                !AllControls(form).OfType<LinkLabel>().Any(link=>link.Text=="Temporários P2P"),
+                "P2P temporary files are accessible under Project cache through a single summary link.");
+            form.menus.Close();
             var section=(SectionRow)form.grid.Rows[0].Tag;
             check(section.Size=="≥ 5 B","The category total distinguishes a partial measurement from a complete one.");
             check(form.counts.Text.Contains("Medidos: 3/4"),"Counter reports identified sizes over all visible mod rows: "+form.counts.Text);
@@ -58,6 +65,7 @@ internal sealed partial class GeneralModWindow {
                     var bounds=form.RectangleToClient(form.storageSize.RectangleToScreen(form.storageSize.ClientRectangle));
                     check(bounds.Right<=form.ClientSize.Width&&form.storageSize.Text.Contains("Cache do projeto:"),"Totals and project-cache text fit the window / "+theme+" / "+dimensions);
                     CaptureUi(form,Path.Combine(root,"sizes-"+theme+"-"+dimensions.Width+".png"));
+                    if(theme=="dark"&&dimensions.Width==1240)CheckBusySummary(form,root,check);
                 }
             }
             GeneralStyle.Language="en";form.state.Language="en";form.BuildInterface();form.RefreshStorageSize();await Until(()=>!form.storageReading);check(form.counts.Text.Contains("Measured: 3/4")&&form.storageSize.Text.Contains("Project cache:"),"English uses the same measured ratio and cache semantics.");
@@ -68,6 +76,27 @@ internal sealed partial class GeneralModWindow {
         GeneralStyle.UseTheme("light");GeneralStyle.Language="pt";
         Safe.WriteJson(Path.Combine(root,"resultado-storage-by-mod.json"),new{Passed=true,Tests=tests,GameTouched=false,NetworkUsed=false,FileContentsHashedForMeasurement=false});
     }
+    static void CheckBusySummary(GeneralModWindow form,string root,Action<bool,string> check){
+        form.scanning=true;
+        form.Busy(true);
+        try{
+            CaptureUi(form,Safe.In(root,"summary-during-scan.png"));
+            check(form.storageSize.Enabled,
+                "Summary labels retain normal text rendering during a scan.");
+            var text=form.storageSize.Text;
+            var link=form.storageSize.Links.Cast<LinkLabel.Link>().Single();
+            check(!link.Enabled&&!form.storageSize.TabStop,
+                "Summary links are inactive during a scan without disabling their text control.");
+            form.storageSize.SetSize(form.measuredStorage,false);
+            check(form.storageSize.Text==text&&!form.storageSize.Links[0].Enabled,
+                "Refreshing cache measurements cannot re-enable a busy link.");
+        }finally{
+            form.scanning=false;form.Busy(false);
+        }
+        check(form.storageSize.Links[0].Enabled&&form.storageSize.TabStop,
+            "Summary actions become available again after the scan.");
+    }
+
     static void TestFixedStorage(string root,Action<bool,string> check){
         string target=OnlineTests.Fixture(root,"g");var cache=new DownloadCache(Path.Combine(root,"fc"));var store=new GeneralProjectStore(Path.Combine(root,"fp"));var catalog=new FixedCatalog{Schema=1,Id="fixed-sizes",GameVersion="2.5",GameFileVersion="2.5.0.0",Packages=new List<FixedMod>()};
         foreach(var pair in new[]{new[]{"base","framework"},new[]{"outfit","suit"}}){

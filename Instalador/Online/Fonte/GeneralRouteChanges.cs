@@ -55,7 +55,7 @@ internal sealed partial class GeneralModWindow {
             if(recipe!=null&&recipe.Files.Any(file=>File.Exists(GeneralInstallRoutes.Resolve(root,GeneralInstallRoutes.Map(file.Path,pair.Before.InstallRoutes)))))
                 installed=true;
             if(state.SnapshotReceipts.ContainsKey(key)||
-                !IsCyberpunk(root)&&before.Variant.Sources.Select((source,index)=>before.Receipt(index)).Any(index=>Generic(root).Status(index)!=GeneralModInstaller.Missing))
+                before.Variant.Sources.Select((source,index)=>ExistingReceipt(Generic(root),before,index)).Any(receipt=>Generic(root).HasSnapshotRecord(receipt)))
                 installed=true;
         }
         if(!installed)return false;
@@ -77,7 +77,7 @@ internal sealed partial class GeneralModWindow {
                 if(snapshot!=null)
                     return Snapshot(root).Relocate(snapshot,work.Key,change.Before.InstallRoutes,change.After.InstallRoutes,shared.Contains);
                 using(IsCyberpunk(root)?Cyberpunk(root).LockForRouteChange():null)
-                    return Generic(root).Relocate(work.Receipt(0),change.Before.InstallRoutes,change.After.InstallRoutes,shared.Contains,fixedFiles,LocalSource(work,0));
+                    return Generic(root).Relocate(ExistingReceipt(Generic(root),work,0),change.Before.InstallRoutes,change.After.InstallRoutes,shared.Contains,fixedFiles,LocalSource(work,0));
             });
         }finally{working=false;Busy(false);}
     }
@@ -93,10 +93,13 @@ internal sealed partial class GeneralModWindow {
             add(root,engine.ProjectDeletionFiles(null));
             shared.UnionWith(engine.ProtectedPriorFiles());
         }
-        if(projectStore!=null&&project!=null)foreach(var peer in projectStore.Read().Projects.Where(item=>item.Id!=project.Id)){
-            var other=projectStore.Load(peer);
-            if(!String.Equals(other.Destination,root,StringComparison.OrdinalIgnoreCase))continue;
-            string peerData=projectStore.DataPath(peer);
+        var contexts=ReadUpdateContexts(root);
+        if(contexts.Any(context=>context.State==null))throw new IOException(T(
+            "Não foi possível conferir os projetos que usam esta instalação. Verifique os mods antes de mudar o destino.",
+            "Projects sharing this installation could not be checked. Scan the mods before changing destinations."));
+        foreach(var peer in contexts.Where(context=>!String.Equals(Path.GetFullPath(context.Data).TrimEnd('\\'),Path.GetFullPath(data).TrimEnd('\\'),StringComparison.OrdinalIgnoreCase))){
+            if(!String.Equals(Path.GetFullPath(peer.State.Destination).TrimEnd('\\'),Path.GetFullPath(root).TrimEnd('\\'),StringComparison.OrdinalIgnoreCase))continue;
+            string peerData=peer.Data;
             add(root,new InstalledSnapshotInstaller(root,peerData,catalog).ProjectDeletionFiles());
             add(root,new GeneralModInstaller(root,Path.Combine(peerData,"Instalacoes")).ProjectDeletionFiles());
         }
@@ -116,12 +119,15 @@ public sealed partial class GeneralModInstaller {
                     Sha256 = file.Sha256, Size = file.Size, Owned = true
                 }).ToList() };
             }
-            if (old == null || !old.Files.Any(file => File.Exists(Target(file.Path)))) return false;
+            if (old == null) return false;
+            if(!old.Files.Any(file=>File.Exists(Target(file.Path))))throw new IOException("Os arquivos instalados estão ausentes. Verifique o mod antes de mudar o destino.");
+            if(old.Upgrade!=null&&!old.Upgrade.Reconciled)
+                throw new IOException("Conclua a atualização interrompida antes de mudar o destino.");
             if (!GeneralInstallRoutes.Same(before, old.InstallRoutes))
                 throw new IOException("O destino atual difere do registro de instalação.");
-            GeneralInstallRoutes.CheckFolders(destination, after);
+            GeneralInstallRoutes.CheckFolders(destination, after,allowNewGameSubfolders:true);
             var originalPaths=OriginalPaths(old,package);
-            var next = new Record { Key = key, SourceSha256 = old.SourceSha256, InstallRoutes = after,
+            var next = new Record { Key = key, SourceSha256 = old.SourceSha256, TransactionId = Guid.NewGuid().ToString("N"),Upgrade=old.Upgrade,InstallRoutes = after,
                 Files = old.Files.Select(file => {
                     string original = file.ArchivePath ?? (before.Count==0?file.Path:originalPaths[file.Path]);
                     return new RecordFile { Path = GeneralInstallRoutes.Map(original, after), ArchivePath = original,
@@ -138,7 +144,7 @@ public sealed partial class GeneralModInstaller {
         List<GeneralInstallRoute> routes, DownloadCache cache, Action<string> report) {
         string receipt = RecordPath(key);
         using (AcquireLock()) {
-            GeneralInstallRoutes.CheckFolders(destination, routes);
+            GeneralInstallRoutes.CheckFolders(destination, routes,allowNewGameSubfolders:true);
             var next = new Record { Key = key, InstallRoutes = routes, Files = recipe.Files.Select(file => new RecordFile {
                 ArchivePath = file.Path, Path = paths[file.Path], Sha256 = file.Sha256, Size = file.Size, Owned = true
             }).ToList() };

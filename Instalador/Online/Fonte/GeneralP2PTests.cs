@@ -12,6 +12,33 @@ using System.Xml;
 internal static class GeneralP2PTests {
     static readonly Action<string> Ignore = text => {};
     const string Device = "AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA";
+    static void VerificationSkipScope(string root,Action<bool,string> check){
+        var saved=Path.Combine(root,"verification");
+        var transport=Path.Combine(root,"verification-packs");
+        using(var service=new P2PService(saved,transport,true)){
+            var sessions=Enumerable.Range(0,2).Select(_=>new P2PSession{Id="ml-"+Guid.NewGuid().ToString("N"),
+                Sender=true,Mode="installed-zip",Deferred=true,Name="Fixture",Hash=new string('a',64)}).ToArray();
+            service.Sessions.AddRange(sessions);
+            var first=sessions[0];
+            var pending=System.Threading.Tasks.Task.Run(()=>service.ReviewSnapshotProblem(first,"first","Fixture","Failed"));
+            if(!SpinWait.SpinUntil(()=>first.VerificationIssue!=null,3000))throw new IOException("Missing verification prompt.");
+            first.VerificationIssue.Decision.TrySetResult(P2PVerificationDecision.SkipRemaining);
+            check(pending.GetAwaiter().GetResult()&&first.SkipVerificationProblems&&
+                service.ReviewSnapshotProblem(first,"next","Next fixture","Failed")&&first.VerificationIssue==null&&
+                first.SkippedVerificationMods.SequenceEqual(new[]{"first","next"}),
+                "Pular os próximos exclui e registra cada falha do mesmo envio.");
+            var other=sessions[1];
+            pending=System.Threading.Tasks.Task.Run(()=>service.ReviewSnapshotProblem(other,"next","Next fixture","Failed"));
+            if(!SpinWait.SpinUntil(()=>other.VerificationIssue!=null,3000))throw new IOException("A separate transfer inherited a skip.");
+            other.VerificationIssue.Decision.TrySetResult(P2PVerificationDecision.Stop);
+            check(!pending.GetAwaiter().GetResult()&&other.SkippedVerificationMods==null,
+                "Outro convite ainda pede decisão e pode interromper a conferência.");
+        }
+        using(var reopened=new P2PService(saved,transport,true))
+            check(reopened.Sessions.Count(session=>session.SkipVerificationProblems)==1,
+                "Retomar o mesmo envio mantém a escolha de pular as próximas falhas.");
+    }
+
     internal static void RunHelper(string parent){
         string root=NewRoot(parent,"p2p-helper-");
         string exe=SyncthingEngine.Ensure(root,Ignore);
@@ -26,6 +53,7 @@ internal static class GeneralP2PTests {
         var checks = new List<string>();
         try {
             Action<bool,string> check = (ok,message) => Check(checks,ok,message);
+            VerificationSkipScope(root,check);
             var invite = Invitation();
             var decoded = P2PInvite.Decode(invite.Encode());
             check(decoded.Device == Device && decoded.Folder == invite.Folder && decoded.ManifestHash == invite.ManifestHash && decoded.Name == invite.Name && decoded.Kind == "offer", "Convite válido preserva identidade, pacote e hash.");

@@ -9,7 +9,14 @@ internal sealed partial class GeneralModWindow {
     int storageGeneration;
     readonly Dictionary<string,GeneralSourceInfo> sourceMetadata=new Dictionary<string,GeneralSourceInfo>();
     async Task<GeneralSourceInfo> LookupSourceInfo(string source){
-        var link=GeneralNexusLink.Parse(source);if(link==null)return null;
+        var link=GeneralNexusLink.Parse(source);
+        if(link==null) {
+            var github=GeneralGithubLink.Parse(source);if(github==null)return null;
+            GeneralSourceInfo saved;if(sourceMetadata.TryGetValue(github.Url,out saved))return saved;
+            var received=testMode?null:await GeneralGithubUpdatePackage.ReadSourceInfo(source);
+            if(received!=null){if(sourceMetadata.Count>=128)sourceMetadata.Clear();sourceMetadata[github.Url]=received;}
+            return received;
+        }
         GeneralSourceInfo info;if(sourceMetadata.TryGetValue(link.Url,out info))return info;
         var pinned=link.Game=="cyberpunk2077"&&link.File>0?(
             from mod in catalog.Packages
@@ -17,9 +24,9 @@ internal sealed partial class GeneralModWindow {
             where asset.ModId==link.Mod&&asset.FileId==link.File
             select new GeneralSourceInfo{Name=mod.Name,FileName=asset.Name,Bytes=asset.Size,Version=mod.Version}
         ).FirstOrDefault():null;
-        info=testMode?null:await GeneralNexusInfo.Read(source);
+        info=testMode?null:await GeneralNexusInfo.Read(source,true);
         if(pinned!=null){
-            if(info!=null){pinned.Tags=info.Tags;pinned.Nsfw=info.Nsfw;pinned.ModVersion=info.ModVersion;pinned.NexusChecked=info.NexusChecked;}
+            if(info!=null){pinned.Reference=info.Reference;pinned.Tags=info.Tags;pinned.Nsfw=info.Nsfw;pinned.ModVersion=info.ModVersion;pinned.NexusChecked=info.NexusChecked;}
             info=pinned;
         }
         if(info!=null){if(sourceMetadata.Count>=128)sourceMetadata.Clear();sourceMetadata[link.Url]=info;}
@@ -155,6 +162,7 @@ internal sealed partial class GeneralModWindow {
         }catch(Exception ex){ShowError(ex);}
     }
     protected override bool ProcessCmdKey(ref Message message,Keys keys){
+        if(startupLoading&&(keys==Keys.F5||keys==(Keys.Control|Keys.V)))return true;
         if(associationChoice!=null){
             if(keys==Keys.Escape){associationChoice.TrySetResult(null);return true;}
             if(keys==Keys.Enter&&grid.ContainsFocus){ConfirmAlternative();return true;}

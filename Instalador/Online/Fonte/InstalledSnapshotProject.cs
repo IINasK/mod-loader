@@ -29,11 +29,12 @@ public static partial class InstalledSnapshot {
 
     internal static List<string> SkipMods(InstalledSnapshotManifest manifest,FixedCatalog catalog,HashSet<string> unavailable){
         if(unavailable.Count==0)return new List<string>();
+        var catalogOwnership=manifest.Game=="cyberpunk2077"?new SnapshotCatalogOwnership(catalog):null;
         bool changed;
         do{
             changed=false;
             var availableRecipes=new HashSet<string>(manifest.List.Mods.Where(mod=>!unavailable.Contains(mod.Id))
-                .Select(mod=>mod.Variants.Single().CyberpunkId).Where(id=>id!=null),StringComparer.Ordinal);
+                .Select(mod=>catalogOwnership==null?null:catalogOwnership.RecipeId(mod,mod.Variants.Single())).Where(id=>id!=null),StringComparer.Ordinal);
             foreach(var mod in manifest.List.Mods.Where(mod=>!unavailable.Contains(mod.Id))){
                 var variant=mod.Variants.Single();
                 if(variant.RequiredMods.Any(unavailable.Contains)||variant.CyberpunkId!=null&&
@@ -45,10 +46,15 @@ public static partial class InstalledSnapshot {
         var remaining=new HashSet<string>(manifest.List.Mods.Where(mod=>!unavailable.Contains(mod.Id))
             .Select(mod=>Owner(mod,mod.Variants.Single())),StringComparer.Ordinal);
         manifest.List.Mods.RemoveAll(mod=>unavailable.Contains(mod.Id));
+        if(manifest.ManualUpdateMods!=null){
+            manifest.ManualUpdateMods.RemoveAll(unavailable.Contains);
+            if(manifest.ManualUpdateMods.Count==0)manifest.ManualUpdateMods=null;
+        }
         if(!IncludesBodyChoice(manifest.List,manifest.BodyChoice))manifest.BodyChoice=null;
         foreach(var preset in manifest.List.Presets)preset.ModIds.RemoveAll(unavailable.Contains);GeneralPresetProfiles.Prune(manifest.List);
         foreach(var file in manifest.Files)file.Owners.RemoveAll(owner=>!remaining.Contains(owner));
         manifest.Files.RemoveAll(file=>file.Owners.Count==0);
+        manifest.OutputScopes.RemoveAll(scope=>!remaining.Contains(scope.Owner));
         return skipped;
     }
 
@@ -69,15 +75,16 @@ public static partial class InstalledSnapshot {
                 .All(path=>!File.Exists(path)&&!Directory.Exists(path));
         }
         if(IsCyberpunk(root)&&HasManualHystFiles(mod.Id,root))return false;
+        var engine=new GeneralModInstaller(root,Path.Combine(appData,"Instalacoes"));
         for(int i=0;i<variant.Sources.Count;i++){
             string key=P2PPack.Slot(mod,variant,i);
+            if(engine.HasSnapshotRecord(key))return false;
             if(IsCyberpunk(root)){
                 string id;if(P2PPack.TrySlot(state.CyberpunkImports,mod,variant,i,out id))return false;
                 if(new FixedInstaller(catalog,root).HasSnapshotImportedRecord(mod.Id))return false;
             }else{
-                var engine=new GeneralModInstaller(root,Path.Combine(appData,"Instalacoes"));
                 string legacy=P2PPack.LegacySlot(mod,variant,i);
-                if(engine.HasSnapshotRecord(key)||legacy!=null&&engine.HasSnapshotRecord(legacy))return false;
+                if(legacy!=null&&engine.HasSnapshotRecord(legacy))return false;
             }
         }
         return true;
@@ -125,7 +132,7 @@ public static partial class InstalledSnapshot {
             var expected=installed.Variants.Single();
             var variant=GeneralModLibrary.BodyOption(manifest.BodyChoice,mod,mod.Variants.Single(v=>v.Id==mod.DefaultVariant));
             if(expected.CyberpunkId==NightCityDensity.ModId&&expected.CyberpunkVariant=="legacy-low"&&variant.Id=="legacy-low"&&variant.Sources.SequenceEqual(LegacyDensityVariant(catalog).Sources)){variant.CyberpunkId=expected.CyberpunkId;variant.CyberpunkVariant=expected.CyberpunkVariant;}
-            if(!variant.Sources.SequenceEqual(expected.Sources)||!GeneralInstallRoutes.Same(variant.InstallRoutes,expected.InstallRoutes)||!variant.RequiredMods.SequenceEqual(expected.RequiredMods)||variant.CyberpunkId!=expected.CyberpunkId||variant.CyberpunkVariant!=expected.CyberpunkVariant)throw new IOException("Fontes do projeto divergem do pacote instalado.");
+            if(!variant.Sources.SequenceEqual(expected.Sources)||!GeneralInstallRoutes.Same(variant.InstallRoutes,expected.InstallRoutes)||!variant.RequiredMods.SequenceEqual(expected.RequiredMods)||variant.CyberpunkId!=expected.CyberpunkId||variant.CyberpunkVariant!=expected.CyberpunkVariant)throw new IOException("Fontes do projeto divergem do pacote instalado: "+installed.Name+".");
         }
     }
 }

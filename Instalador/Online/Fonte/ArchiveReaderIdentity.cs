@@ -6,6 +6,6 @@ internal static class ArchiveReaderIdentity {
     internal const long DllSize=1908736;
     internal const string SourceHash="0b6080b8c3e7a579161d2d495224c0e51c467576cb4c7048b0ab485ef44cc22e";
     internal const long SourceSize=1565688;
-    internal const string LicensesHash="4ce4ab44410c51ea1f7560a090f22f1aabbca5b4d775199a77fd9870c8def395";
-    internal const long LicensesSize=33813;
+    internal const string LicensesHash="736259d450ff9e06b1e44909d9aecc70f84427e230da549b5732fbaa7a4dbb8d";
+    internal const long LicensesSize=33822;
 }

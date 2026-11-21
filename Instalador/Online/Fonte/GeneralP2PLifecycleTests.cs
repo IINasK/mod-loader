@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -17,6 +17,7 @@ internal static class GeneralP2PLifecycleTests {
         Directory.CreateDirectory(root);
         var checks=new List<string>();
         try{
+            SharedNotice(root,checks);
             Network(root,helper,checks);
             Rollback(root,checks);
             Safe.WriteJson(Path.Combine(root,"resultado-p2p-lifecycle.json"),new{Passed=true,Tests=checks});
@@ -24,6 +25,24 @@ internal static class GeneralP2PLifecycleTests {
             Safe.WriteJson(Path.Combine(root,"resultado-p2p-lifecycle.json"),new{Passed=false,Tests=checks,Error=ex.ToString()});
             throw;
         }
+    }
+
+    static void SharedNotice(string root,List<string> checks){
+        string path=Safe.In(root,"shared-notice.json");
+        Safe.WriteJson(path,"previous notice");
+        using(var reader=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read)){
+            Check(checks,!Safe.TryWriteSharedJson(path,"new notice")&&File.ReadAllText(path)=="\"previous notice\""&&
+                !Directory.GetFiles(root,"*.tmp").Any(),
+                "A locked P2P notice preserves the previous state and does not leave temporary files.");
+        }
+        Check(checks,Safe.TryWriteSharedJson(path,"new notice")&&File.ReadAllText(path)=="\"new notice\"",
+            "The receiver can publish the new P2P notice after the helper releases the previous file.");
+        string directory=Safe.In(root,new string('x',Math.Max(1,190-root.Length-1)));
+        string receipt=Safe.In(directory,new string('a',32)+".json");
+        Safe.WriteJson(receipt,"received");
+        Safe.WriteJson(receipt,"updated");
+        Check(checks,File.ReadAllText(receipt)=="\"updated\""&&!Directory.GetFiles(directory,"*.tmp").Any(),
+            "A receipt in a deep project folder saves and replaces without expanding its temporary filename.");
     }
 
     internal static void RunEngine(string parent,string helper){
@@ -78,11 +97,12 @@ internal static class GeneralP2PLifecycleTests {
         var source=Source(root,"host","shared.txt","from host");
         string left=Target(root,"left"),right=Target(root,"right"),leftData=Path.Combine(root,"left-data");
         var relay=Source(root,"friend","forwarded.txt","from friend",left,leftData);
-        string thirdTarget=Target(root,"third");
+        string thirdTarget=Target(root,"r");
         File.WriteAllText(Safe.In(left,"mods/shared.txt"),"original");
         source.Item1.List.Presets.Add(new GeneralModPreset{Id="all",Name="Com DLC Phantom Liberty",ModIds=source.Item1.List.Mods.Select(m=>m.Id).ToList()});
         source.Item1.List.Presets.Add(new GeneralModPreset{Id="no-pl",Name="Sem DLC Phantom Liberty",ModIds=source.Item1.List.Mods.Select(m=>m.Id).ToList()});
         source.Item1.SelectedPreset="no-pl";
+        source.Item1.ManualUpdateMods.Add(source.Item1.List.Mods.Single().Id);
         var all=P2PService.ExportState(source.Item1,null,source.Item1.List.Mods.Select(item=>item.Id).ToArray(),true);
         var exported=InstalledSnapshot.Inspect(all,all.List.Mods.Select(mod=>mod.Id),Catalog,source.Item2,false,true);
         Check(checks,all.List.Presets.Count==2&&source.Item1.List.Presets[0].Id=="all"&&
@@ -92,9 +112,9 @@ internal static class GeneralP2PLifecycleTests {
         var host=Service(root,"host-peer",source.Item2,helper);
         var first=Service(root,"first-peer",leftData,helper);
         var second=Service(root,"second-peer",Path.Combine(root,"right-data"),helper);
-        string thirdData=Path.Combine(root,"third-data");
+        string thirdData=Path.Combine(root,"d");
         var third=Service(root,"third-peer",thirdData,helper);
-        var library=new GeneralProjectStore(Path.Combine(root,"lib"));
+        var library=new GeneralProjectStore(Path.Combine(root,"l"));
         third.RegisterProject=session=>{library.CreateReceived(session,thirdData,Catalog);return true;};
         try{
             first.ChooseVersion=_=>{gate.Wait(40000);return false;};
@@ -115,6 +135,8 @@ internal static class GeneralP2PLifecycleTests {
             var projectState=library.Load(project);
             Check(checks,project.Name=="Sem DLC Phantom Liberty"&&projectState.Destination==thirdTarget&&projectState.List.Presets.Single().Id=="no-pl"&&projectState.SnapshotReceipts.Count==1,
                 "The chosen preset and installation receipt automatically create a separate project.");
+            Check(checks,projectState.ManualUpdateMods.SequenceEqual(source.Item1.ManualUpdateMods),
+                "The receiver saves the host's manual update preference from deferred transfers.");
             Check(checks,library.CreateReceived(incomingThird,thirdData,Catalog).Id==project.Id&&library.Read().Projects.Count==1,
                 "Retrying registration does not duplicate the received project.");
             Check(checks,!sent.Completed&&File.Exists(Safe.In(host.Folder(sent),"pack.zip")),
@@ -199,6 +221,7 @@ internal static class GeneralP2PLifecycleTests {
         source.Item1.List.Mods.AddRange(Source(root,"diff","different.txt","host version",source.Item1.Destination,source.Item2).Item1.List.Mods);
         source.Item1.List.Mods.AddRange(Source(root,"miss","missing.txt","missing payload",source.Item1.Destination,source.Item2).Item1.List.Mods);
         var ids=source.Item1.List.Mods.Select(mod=>mod.Id).ToArray();
+        source.Item1.ManualUpdateMods.Add(ids[0]);
         string target=Target(root,"sync-receiver");
         string same=Safe.In(target,"mods/same.txt"),different=Safe.In(target,"mods/different.txt");
         File.WriteAllText(same,"shared contents");
@@ -291,7 +314,12 @@ internal static class GeneralP2PLifecycleTests {
                 Wait(()=>received.Completed&&sent.Completed,"The comparison transfer did not complete. "+sent.Error+" "+received.Error);
                 Check(checks,File.ReadAllText(different)=="host version"&&File.Exists(Safe.In(target,"mods/missing.txt"))&&File.GetLastWriteTimeUtc(same)==stamp&&File.ReadAllText(Safe.In(target,"mods/local-only.txt"))=="keep local",
                     "The receiver installs changes and preserves the existing identical file.");
-                Check(checks,friend.InstalledManifest(received).List.Mods.Count==3,"The installed receipt retains the complete mod list.");
+                var receipt=friend.InstalledManifest(received);
+                Check(checks,receipt.List.Mods.Count==3,"The installed receipt retains the complete mod list.");
+                var destination=new GeneralModState{List=receipt.Project};
+                GeneralProjectStore.BindReceivedVariants(destination,receipt,received.ReceiptId);
+                Check(checks,destination.ManualUpdateMods.SequenceEqual(source.Item1.ManualUpdateMods),
+                    "Both full and differential receives inherit the host's manual update preference, including with file reuse.");
                 if(!full){
                     Wait(()=>received.ReceiptClosed&&sent.Recipients.All(item=>item.ReceiptClosed),
                         "The package receipt did not close before the manual diagnostic.");

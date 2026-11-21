@@ -8,7 +8,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-internal sealed partial class GeneralModWindow : Form {
+internal sealed partial class GeneralModWindow : Form, IGeneralModMessageContext {
+    IEnumerable<string> IGeneralModMessageContext.ModMessageNames {get{
+        return GeneralMessageText.NamesIn(state);
+    }}
     readonly FixedCatalog catalog;
     DownloadCache cache;
     GeneralModLibrary library;
@@ -29,14 +32,16 @@ internal sealed partial class GeneralModWindow : Form {
     Label counts;
     Button next,optionsButton,expandList,projectsButton,homeButton;
     GeneralButton footerAction,verifyAction;
-    enum FooterAction { None, Uninstall, ConnectNexus }
+    enum FooterAction { None, Uninstall, ConnectNexus, CancelUpdate, CancelLink }
     FooterAction selectedFooterAction;
     GeneralStorageLabel storageSize;
     TableLayoutPanel mainLayout,tableTools;
     bool listExpanded;
     int hoveredRow=-1;
     GeneralProgress currentProgress,totalProgress;
-    bool drawing,working,scanning;
+    GeneralModStartupSkeleton startupSkeleton;
+    GeneralScrollView modTableScroll;
+    bool startupLoading,drawing,working,scanning;
 
     readonly ToolTip tips=new ToolTip{UseAnimation=false,UseFading=false};
     readonly GeneralMenuHost menus=new GeneralMenuHost();
@@ -88,19 +93,39 @@ internal sealed partial class GeneralModWindow : Form {
         if(!testMode)this.cache=new DownloadCache(Path.Combine(data,"Cache"),()=>state.DownloadFolder,cache.Root);
         GeneralPresetProfiles.Project(state);
         Text=GeneralAppPaths.WindowTitle;Icon=ModLoaderBrand.AppIcon;ClientSize=new Size(1240,820);MinimumSize=new Size(1000,680);StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
+        DoubleBuffered=true;
+        startupLoading=!testMode;
         BuildInterface();
         FormClosing+=CloseModWindow;
         FormClosed+=(s,e)=>ReleaseProjectSharing();
         Disposed+=(s,e)=>menus.Dispose();
-        Shown+=(s,e)=>RefreshStorageSize();
-        if(fixture==null)Shown+=async(s,e)=>{
-#if !VELOPACK
-            CheckUpdatesOnStartup();
-#endif
+        Shown+=(s,e)=>{RefreshStorageSize();StartUpdateObservation();};
+        if(!testMode){
+            var expires=new Timer{Interval=300000};
+            expires.Tick+=(s,e)=>{if(!UpdateInProgress)Task.Run(()=>GeneralNexusGithubMirror.ExpireLookups(data));};
+            Shown+=(s,e)=>{Task.Run(()=>GeneralNexusGithubMirror.ExpireLookups(data));expires.Start();};
+            Disposed+=(s,e)=>expires.Dispose();
+        }
+        if(!testMode)Shown+=async(s,e)=>{
             try{
-                await RecoverPresetOnOpen();ReadPresetPresentation();await Scan();if(!IsDisposed){AdoptReceivedPreset();}if(!IsDisposed&&!exitApproved)await ResumeP2P();
-            }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
+                startupSkeleton.Refresh();
+#if !VELOPACK
+                CheckUpdatesOnStartup();
+#endif
+                await RecoverPresetOnOpen();
+                if(IsDisposed)return;
+                ReadPresetPresentation();
+                await Scan();
+                if(!IsDisposed)AdoptReceivedPreset();
+                if(!IsDisposed&&!exitApproved)await ResumeP2P();
+            }catch(Exception ex){
+                if(!IsDisposed){FinishStartupLoading();ShowError(ex);}
+            }
         };
+    }
+    protected override void OnHandleCreated(EventArgs e){
+        base.OnHandleCreated(e);
+        GeneralNativeTheme.DisableWindowTransitions(this);
     }
     bool exitApproved,waitingToExit;
 
@@ -110,6 +135,9 @@ internal sealed partial class GeneralModWindow : Form {
     }}
 
     void CloseModWindow(object sender,FormClosingEventArgs e){
+        if(UpdateInProgress&&e.CloseReason==CloseReason.UserClosing){
+            ProjectAction=null;e.Cancel=true;return;
+        }
         if(ProjectAction!=null){
             e.Cancel=working||scanning||!ConfirmProjectNavigation();
             if(e.Cancel)ProjectAction=null;
@@ -157,7 +185,11 @@ internal sealed partial class GeneralModWindow : Form {
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(32,24,32,22),ColumnCount=1,RowCount=8,BackColor=BackColor};
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         for(int i=0;i<8;i++)layout.RowStyles.Add(i==5?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.AutoSize));
+        layout.Visible=!startupLoading;
         Controls.Add(layout);mainLayout=layout;
+        startupSkeleton=new GeneralModStartupSkeleton{Visible=startupLoading};
+        Controls.Add(startupSkeleton);
+        startupSkeleton.BringToFront();
         menus.Close();
         var heading=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=4,Margin=Padding.Empty};
         heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));
@@ -188,25 +220,8 @@ internal sealed partial class GeneralModWindow : Form {
 
         var summary=Flow();summary.Margin=new Padding(0,0,0,12);layout.Controls.Add(summary,0,3);
         counts=new Label{AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=Padding.Empty};summary.Controls.Add(counts);
-        storageSize=new GeneralStorageLabel(cache){Name="ProjectStorage",AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(16,0,0,0)};summary.Controls.Add(storageSize);
+        storageSize=new GeneralStorageLabel(cache,ToggleCacheMenu){Name="ProjectStorage",AutoSize=true,Font=GeneralStyle.Font(10.5f),ForeColor=GeneralStyle.Muted,Margin=new Padding(16,0,0,0)};summary.Controls.Add(storageSize);
         tips.SetToolTip(storageSize,T("Soma dos arquivos de mods identificados, downloads referenciados e dados locais do projeto. O mesmo caminho não é contado duas vezes. Cache contém registros e dados de apoio, sem novas cópias dos mods. Downloads originais entram somente no total.","Sum of identified mod files, referenced downloads and local project data. The same path is counted once. Cache contains records and support data, without new mod copies. Original downloads count only toward total."));
-        var temporary=new LinkLabel{Text=T("Temporários P2P","P2P temporary files"),AutoSize=true,
-            LinkColor=GeneralStyle.Accent,ActiveLinkColor=GeneralStyle.Foreground,Margin=new Padding(16,0,0,0),Font=GeneralStyle.Font(10.5f)};
-        temporary.LinkClicked+=(s,e)=>Guard(()=>{
-            string folder=P2PService.TransferStore;
-            if(p2p!=null){
-                var paths=p2p.SnapshotSessions().Where(session=>!session.Sender&&!session.Discarded).Select(p2p.Folder).Where(Directory.Exists).ToArray();
-                if(paths.Length==1)folder=paths[0];
-            }
-            Safe.NoLinks(folder);
-            if(!Directory.Exists(folder)){
-                GeneralDialog.Message(this,T("Nenhum arquivo temporário P2P disponível.","No P2P temporary files available."),temporary.Text);
-                return;
-            }
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(folder){UseShellExecute=true});
-        });
-        summary.Controls.Add(temporary);
-        AddDetectedModsReview(summary);
         AddUpdateNotice(summary);
         var tableHeading=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Height=52,Margin=Padding.Empty,Padding=new Padding(14,4,4,4),BackColor=GeneralStyle.Surface};
         tableHeading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
@@ -221,7 +236,6 @@ internal sealed partial class GeneralModWindow : Form {
         expandList=IconButton("maximize",T("Expandir lista","Expand list"),()=>SetListExpanded(!listExpanded));((GeneralButton)expandList).Bare=true;expandList.Name="ExpandList";expandList.Margin=Padding.Empty;tableHeading.Controls.Add(expandList,2,0);
         var tableTitle=new Panel{Dock=DockStyle.Fill,Height=64,Margin=Padding.Empty,Padding=new Padding(0,0,0,12),BackColor=GeneralStyle.Surface,Name="PresetHeading"};
         tableTitle.Controls.Add(tableHeading);
-        tableTitle.Paint+=(s,e)=>{using(var pen=new Pen(GeneralStyle.Line))e.Graphics.DrawLine(pen,16,tableTitle.Height-6,tableTitle.Width-17,tableTitle.Height-6);};
         tableTools=new TableLayoutPanel{Name="TableTools",Dock=DockStyle.Fill,AutoSize=true,ColumnCount=1,RowCount=2,Margin=Padding.Empty,BackColor=GeneralStyle.Surface};
         tableTools.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));tableTools.RowStyles.Add(new RowStyle(SizeType.Absolute,64));tableTools.RowStyles.Add(new RowStyle(SizeType.Absolute,62));
         tableTools.Controls.Add(tableTitle,0,0);tableTools.Controls.Add(BuildSearch(),0,1);layout.Controls.Add(tableTools,0,4);
@@ -242,7 +256,7 @@ internal sealed partial class GeneralModWindow : Form {
         grid.Columns.Add(new DataGridViewTextBoxColumn{Name="Progress",Visible=false,ReadOnly=true});
         grid.Columns.Add(new DataGridViewTextBoxColumn{Name="Size",HeaderText=T("Espaço","Space"),MinimumWidth=108,FillWeight=15,AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill,ReadOnly=true,SortMode=DataGridViewColumnSortMode.NotSortable,DefaultCellStyle=new DataGridViewCellStyle{Alignment=DataGridViewContentAlignment.MiddleRight,ForeColor=GeneralStyle.Muted}});
         grid.Columns["Size"].DisplayIndex=2;
-        grid.Columns.Add(new DataGridViewTextBoxColumn{Name="Group",HeaderText=T("Grupo","Group"),Width=92,ReadOnly=true,SortMode=DataGridViewColumnSortMode.NotSortable});
+        grid.Columns.Add(new DataGridViewTextBoxColumn{Name="Group",HeaderText=T("Grupo","Group"),Visible=false,Width=92,ReadOnly=true,SortMode=DataGridViewColumnSortMode.NotSortable});
         grid.Columns["Group"].DisplayIndex=grid.Columns["Status"].DisplayIndex+1;
         grid.Columns.Add(new DataGridViewTextBoxColumn{Name="Origin",HeaderText=T("Origem","Origin"),Width=56,ReadOnly=true,SortMode=DataGridViewColumnSortMode.NotSortable,
             HeaderCell=new DataGridViewColumnHeaderCell{Style=new DataGridViewCellStyle{Alignment=DataGridViewContentAlignment.MiddleCenter,Padding=Padding.Empty}}});
@@ -286,11 +300,14 @@ internal sealed partial class GeneralModWindow : Form {
         grid.CellMouseClick+=(s,e)=>{
             if(organizationDragging||e.Button!=MouseButtons.Left||e.Clicks!=1||e.RowIndex<0||e.ColumnIndex<0)return;
             if(associationChoice!=null){
-                if(pickingInventoryOwner&&grid.Rows[e.RowIndex].Tag is string)
-                    associationChoice.TrySetResult(state.List.Mods.Single(mod=>mod.Id==(string)grid.Rows[e.RowIndex].Tag));
+                if(pickingInventoryOwner)ToggleInventoryOwner(grid.Rows[e.RowIndex]);
                 return;
             }
             var row=grid.Rows[e.RowIndex];
+            if (UpdateHistoryBadgeAt(row, e.ColumnIndex, e.X)) {
+                OpenUpdateHistory(ModFromRow(row));
+                return;
+            }
             var folder=row.Tag as FolderRow;
             if(folder!=null){
                 if(e.ColumnIndex!=grid.Columns["Mark"].Index){
@@ -326,9 +343,13 @@ internal sealed partial class GeneralModWindow : Form {
             if(associationChoice!=null||e.Button!=MouseButtons.Left||e.RowIndex<0||e.ColumnIndex<=0||
                 (Control.ModifierKeys&(Keys.Control|Keys.Shift))!=0)return;
             var row=grid.Rows[e.RowIndex];
-            if(!(row.Tag is FolderRow)&&!(row.Cells["Variant"].Tag is List<Work>))OpenRowEditor(row);
+            if (!UpdateHistoryBadgeAt(row, e.ColumnIndex, e.X) &&
+                !(row.Tag is FolderRow) && !(row.Cells["Variant"].Tag is List<Work>))OpenRowEditor(row);
         };
         grid.KeyDown+=(s,e)=>{
+            if(pickingInventoryOwner&&e.KeyCode==Keys.Space){
+                e.Handled=true;e.SuppressKeyPress=true;ToggleInventoryOwner(grid.CurrentRow);return;
+            }
             if(associationChoice!=null||grid.CurrentRow==null)return;
             var row=grid.CurrentRow;
             if(e.Control&&e.KeyCode==Keys.A){
@@ -353,10 +374,11 @@ internal sealed partial class GeneralModWindow : Form {
             else if(e.KeyCode!=Keys.Enter||!(row.Tag is string)||!ToggleVersions(row))OpenRowEditor(row);
         };
         grid.RowPrePaint+=PaintSection;grid.CellPainting+=PaintName;
-        grid.RowPostPaint+=PaintModRowDivider;
-        grid.Paint+=PaintColumnDividers;
         grid.ColumnWidthChanged+=(s,e)=>grid.Invalidate();
-        grid.SelectionChanged+=(s,e)=>RefreshPrimaryAction();
+        grid.SelectionChanged+=(s,e)=>{
+            RefreshPrimaryAction();
+            foreach(var button in categoryDeleteButtons.Keys)button.Invalidate();
+        };
         grid.CurrentCellChanged+=(s,e)=>RefreshPrimaryAction();
         grid.KeyUp+=(s,e)=>{
             if(associationChoice==null&&(e.KeyCode==Keys.Up||e.KeyCode==Keys.Down||e.KeyCode==Keys.PageUp||e.KeyCode==Keys.PageDown||e.KeyCode==Keys.Home||e.KeyCode==Keys.End)){
@@ -370,15 +392,19 @@ internal sealed partial class GeneralModWindow : Form {
             }
         };
         grid.CellMouseEnter+=(s,e)=>SetHover(e.RowIndex);
-        grid.MouseLeave+=(s,e)=>SetHover(-1);
+        grid.MouseLeave+=(s,e)=>{
+            var point=grid.PointToClient(Control.MousePosition);
+            SetHover(grid.ClientRectangle.Contains(point)?grid.HitTest(point.X,point.Y).RowIndex:-1);
+        };
         grid.DataError+=(s,e)=>{e.ThrowException=false;};
         var menu=GeneralMenuRenderer.Create();
         AddCategorizeMenu(menu);
         var details=GeneralMenuRenderer.Add(menu,T("Detalhes e variantes","Details and variants"),()=>{
             var item=FocusedInventoryFile();
-            if(item!=null)ShowInventoryDetails(item);else OpenRowEditor(grid.CurrentRow);
+            if(item!=null)RegisterDetectedMod(item);else OpenRowEditor(grid.CurrentRow);
         });
-        var registerInventory=GeneralMenuRenderer.Add(menu,T("Cadastrar mod detectado…","Register detected mod…"),()=>RegisterDetectedMod(FocusedInventoryFile()));
+        var history=GeneralMenuRenderer.Add(menu,T("Atualizações recentes","Recent updates"),()=>OpenUpdateHistory(FocusedEntry()));
+        history.Name="RecentModUpdates";
         var openInternal=GeneralMenuRenderer.Add(menu,T("Abrir local no Mod Loader","Open location in Mod Loader"),()=>{
             var item=FocusedInventoryFile();
             if(item!=null)OpenInventoryTree(item.Path);
@@ -393,8 +419,10 @@ internal sealed partial class GeneralModWindow : Form {
             var url=Selected(item).Sources.FirstOrDefault(GeneralModDownload.IsWebSource);
             if(url!=null)GeneralModDownload.OpenSource(url);
         }));
-        var linkOwner=GeneralMenuRenderer.Add(menu,T("Vincular ao mod…","Link to mod…"),()=>PickInventoryOwner(FocusedInventoryFile()));
+        var linkOwner=GeneralMenuRenderer.Add(menu,T("Definir origem…","Set origin…"),()=>ShowInventoryOrigin(FocusedInventoryFile()));
         linkOwner.Name="LinkInventoryOwner";
+        var mergeDetected=GeneralMenuRenderer.Add(menu,T("Vincular a outro mod…","Link to another mod…"),()=>MergeDetectedEntry(FocusedEntry()));
+        mergeDetected.Name="MergeDetectedEntry";
         var makeFolder=GeneralMenuRenderer.Add(menu,T("Criar pasta com selecionados…","Create folder from selection…"),()=>Guard(()=>EditModFolder(null)));
         makeFolder.Name="CreateModFolder";
         var renameFolder=GeneralMenuRenderer.Add(menu,T("Renomear pasta…","Rename folder…"),()=>Guard(()=>{
@@ -408,13 +436,6 @@ internal sealed partial class GeneralModWindow : Form {
         var resumeManagement=GeneralMenuRenderer.Add(menu,T("Retomar gerenciamento…","Resume management…"),()=>Guard(()=>ResumePresetManagement(FocusedEntry())));
         resumeManagement.Name="ResumePresetManagement";
         var removeEntry=GeneralMenuRenderer.Add(menu,T("Tirar da lista","Remove from list"),()=>Guard(RemoveEntry));
-        var showFiles=GeneralMenuRenderer.Add(menu,T("Ver arquivos associados…","View associated files…"),()=>{
-            var mod=FocusedEntry();
-            if(mod==null)return;
-            var files=DisplayedInventory().Where(file=>file.Kind=="associated"&&file.ModId==mod.Id).ToArray();
-            if(files.Length==0)return;
-            using(var dialog=new GeneralSyncDifferencesDialog(files,true))dialog.ShowDialog(this);
-        });
         var separator=new ToolStripSeparator();
         menu.Items.Add(separator);
         var failureDetails=GeneralMenuRenderer.Add(menu,T("Ver erro da instalação","View installation error"),ShowFocusedFailure);
@@ -434,19 +455,19 @@ internal sealed partial class GeneralModWindow : Form {
             manualUpdate.Visible=editFolders&&CanUpdateIndividualMod(focused);
             makeFolder.Visible=editFolders&&(focused!=null||folder!=null)&&TableSelectionIds().Where(marked.Contains).Take(2).Count()==2;
             renameFolder.Visible=dissolveFolder.Visible=editFolders&&folder!=null;
-            details.Visible=inventory||focused!=null;
+            details.Visible=inventory?InventoryRow(InventoryLinkStore.Key(FocusedInventoryFile())).Any(file=>FixedInstaller.InventoryRegistrationPath(file.Path)):focused!=null;
             details.Text=inventory?T("Detalhes","Details"):T("Detalhes e variantes","Details and variants");
             details.Enabled=!inventory||CanEditInventory;
-            registerInventory.Visible=inventory&&FixedInstaller.InventoryRegistrationPath(FocusedInventoryFile().Path);
-            registerInventory.Enabled=CanEditInventory;
+            history.Visible=focused!=null&&UpdateHistoryFor(focused.Id).Length>0;
+            history.Enabled=!scanning;
             openInternal.Visible=openExplorer.Visible=inventory;
-            linkOwner.Visible=inventory&&CanLinkInventoryFile(FocusedInventoryFile());
+            linkOwner.Visible=inventory&&CanSetInventoryOrigin(FocusedInventoryFile());
             linkOwner.Enabled=CanEditInventory;
+            mergeDetected.Visible=!inventory&&CanMergeDetectedEntry(focused);
             openInternal.Enabled=openExplorer.Enabled=CanEditInventory;
             source.Visible=focused!=null;
             resumeManagement.Visible=editFolders&&focused!=null&&presetProtected.Contains(focused.Id);
             removeEntry.Visible=!inventory&&focused!=null&&!IsBigBody(focused);
-            showFiles.Visible=!inventory&&focused!=null&&DisplayedInventory().Any(file=>file.Kind=="associated"&&file.ModId==focused.Id);
             bool maintenance=!inventory&&!working&&!scanning&&IsCyberpunk(state.Destination);
             undo.Visible=clean.Visible=maintenance;
             string status;
@@ -508,7 +529,10 @@ internal sealed partial class GeneralModWindow : Form {
         grid.SizeChanged+=(s,e)=>UpdateCategoryDeleteButtons();
         grid.ColumnWidthChanged+=(s,e)=>UpdateCategoryDeleteButtons();
         grid.ContextMenuStrip=menu;grid.Disposed+=(s,e)=>menu.Dispose();
-        layout.Controls.Add(new GeneralScrollView(grid),0,5);
+        var tableSurface=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};
+        modTableScroll=new GeneralScrollView(grid);
+        tableSurface.Controls.Add(modTableScroll);
+        layout.Controls.Add(tableSurface,0,5);
         grid.ScrollBars=ScrollBars.Horizontal;
         var modGrid=grid;
         bool scrollUpdateQueued=false,showToolsAfterScroll=true;
@@ -537,16 +561,20 @@ internal sealed partial class GeneralModWindow : Form {
         totalProgress=new GeneralProgress{Dock=DockStyle.Fill,Caption=T("Progresso geral","Overall progress"),Margin=new Padding(8,3,0,0)};
         totalProgress.SegmentActivated+=FilterCoverage;
         bars.Controls.Add(currentProgress,1,0);bars.Controls.Add(totalProgress,2,0);layout.Controls.Add(bars,0,6);
-        var bottom=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=false,Height=62,MinimumSize=new Size(0,62),ColumnCount=3,RowCount=1,Margin=Padding.Empty};bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,280));bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,280));bottom.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        var bottom=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=false,Height=62,MinimumSize=new Size(0,62),ColumnCount=3,RowCount=1,Margin=Padding.Empty};bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,234));bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,234));bottom.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         footerAction=(GeneralButton)Command("",async()=>{
             if(selectedFooterAction==FooterAction.Uninstall)await Uninstall();
             else if(selectedFooterAction==FooterAction.ConnectNexus)ConnectNexus();
+            else if(selectedFooterAction==FooterAction.CancelUpdate)RequestSkip();
+            else if(selectedFooterAction==FooterAction.CancelLink&&associationChoice!=null)associationChoice.TrySetResult(null);
         });
         footerAction.Name="FooterContextAction";footerAction.AutoSize=false;footerAction.Size=new Size(226,52);
         footerAction.Font=GeneralStyle.Font(13,true);footerAction.Margin=Padding.Empty;
         var secondary=new FlowLayoutPanel{Dock=DockStyle.Fill,WrapContents=false,Margin=new Padding(0,1,0,0)};
         secondary.Controls.Add(footerAction);bottom.Controls.Add(secondary,0,0);
-        var install=primaryAction=(GeneralButton)Command("",StartSelected);
+        var install=primaryAction=(GeneralButton)Command("",()=>{
+            if(pickingInventoryOwner)ConfirmAlternative();else StartSelected();
+        });
         install.Name="DownloadInstall";install.AutoSize=false;install.Size=footerAction.Size;
         install.Font=footerAction.Font;install.Margin=Padding.Empty;install.Anchor=AnchorStyles.Right;
         var rightActions=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.RightToLeft,WrapContents=false,Margin=new Padding(0,1,0,0)};
@@ -603,7 +631,9 @@ internal sealed partial class GeneralModWindow : Form {
     }
     void EnableDrops(Control target){
         target.AllowDrop=true;
-        DragEventHandler showEffect=(s,e)=>e.Effect=e.Data.GetDataPresent(OrganizationDragFormat)?
+        DragEventHandler showEffect=(s,e)=>e.Effect=startupLoading?DragDropEffects.None:UpdateInProgress?
+            (waiting&&e.Data.GetDataPresent(DataFormats.FileDrop)?DragDropEffects.Copy:DragDropEffects.None):
+            e.Data.GetDataPresent(OrganizationDragFormat)?
             (UpdateOrganizationDrop(target,e)?DragDropEffects.Move:DragDropEffects.None):
             e.Data.GetDataPresent(InventoryDragFormat)?InventoryDropEffect(target,e):
             associationChoice!=null?DragDropEffects.None:e.Data.GetDataPresent(DataFormats.FileDrop)?DragDropEffects.Copy:
@@ -611,7 +641,11 @@ internal sealed partial class GeneralModWindow : Form {
         target.DragEnter+=showEffect;
         if(target==grid)target.DragOver+=showEffect;
         target.DragDrop+=(s,e)=>Guard(()=>{
-            if(associationChoice!=null)return;
+            if(startupLoading||associationChoice!=null)return;
+            if(UpdateInProgress){
+                if(waiting&&e.Data.GetDataPresent(DataFormats.FileDrop))Drop((string[])e.Data.GetData(DataFormats.FileDrop));
+                return;
+            }
             if(e.Data.GetDataPresent(OrganizationDragFormat)){
                 if(UpdateOrganizationDrop(target,e))DropOrganizedMods();
                 return;
@@ -664,7 +698,7 @@ internal sealed partial class GeneralModWindow : Form {
             var recovered=new HashSet<string>(state.RecoveredModIds,StringComparer.Ordinal);
             if(recovered.Count>0)candidates=candidates.Union(state.List.Mods.Where(mod=>recovered.Contains(mod.Id))).ToList();
         }
-        var actionable=versionFilter==VersionFilter.Update
+        var actionable=versionFilter==VersionFilter.Update||versionFilter==VersionFilter.Review
             ?new HashSet<string>(InstallableUpdates().Select(work=>work.Key),StringComparer.Ordinal):null;
         return candidates.Where(mod=>VersionFilterAllows(mod,actionable)&&ColumnAllows(mod)).ToList();
     }
@@ -695,6 +729,9 @@ internal sealed partial class GeneralModWindow : Form {
 
         var inventory=picking?new List<IGrouping<string,P2PSyncDifference>>():
             VisibleGameInventory().GroupBy(InventoryLinkStore.Key,StringComparer.OrdinalIgnoreCase).ToList();
+        bool showInventory=!picking&&(inventory.Count>0||gameInventory.Any(file=>file.Kind=="unlinked")&&
+            coverageFilter==null&&!versionFilter.HasValue&&categoryFilters==null&&variantFilters==null&&groupFilters==null&&
+            statusFilters==null&&searchTerms.Length==0&&String.IsNullOrWhiteSpace(nameFilter));
         bool flat=!picking&&orderColumn!=null;
         var foldersByMod=state.List.Folders.SelectMany(folder=>folder.ModIds.Select(id=>new{Id=id,Folder=folder}))
             .ToDictionary(member=>member.Id,member=>member.Folder,StringComparer.Ordinal);
@@ -717,7 +754,7 @@ internal sealed partial class GeneralModWindow : Form {
                 section.ModIds=members.Select(mod=>mod.Id).ToArray();
                 section.Size=CategorySize(section.ModIds);
                 bool collapsed=CategoryCollapsed(section);
-                if(category==null&&!picking&&inventory.Count>0){
+                if(category==null&&showInventory){
                     AddSection("inventory",T("Mods não identificados","Unidentified mods"),54).Visible=!collapsed;
                     AddUnknownModRows(inventory,collapsed);
                     AddSection("subheading",T("Mods sem categoria","Uncategorized mods"),44).Visible=!collapsed;
@@ -734,7 +771,7 @@ internal sealed partial class GeneralModWindow : Form {
             if(row!=null)grid.CurrentCell=row.Cells["Name"];
         }else if(old==null)grid.ClearSelection();
         if(scroll>=0&&scroll<grid.RowCount)try{grid.FirstDisplayedScrollingRowIndex=scroll;}catch(InvalidOperationException){}
-        drawing=false;UpdateCounts();RefreshVersionFilters();UpdateDetectedModsReview();RebuildCategoryDeleteButtons();
+        drawing=false;UpdateCounts();RefreshVersionFilters();RebuildCategoryDeleteButtons();
     }
     void AddUnknownModRows(List<IGrouping<string,P2PSyncDifference>> inventory,bool collapsed){
         if(inventory.Count>0){
@@ -770,10 +807,11 @@ internal sealed partial class GeneralModWindow : Form {
         var variant=Selected(mod);
         string key=MakeWork(mod).Key,status=ListStatus(mod),raw=InstallationStatus(mod,status);
         int percent;
-        var row=grid.Rows[grid.Rows.Add(marked.Contains(mod.Id),picking?mod.Name:ModDisplayName(mod),
+        bool checkedRow=(pickingInventoryOwner?inventoryOwnerIds:marked).Contains(mod.Id);
+        var row=grid.Rows[grid.Rows.Add(checkedRow,picking?mod.Name:ModDisplayName(mod),
             NexusVariantName(mod),GeneralStatusPresentation.Label(raw),progress.TryGetValue(key,out percent)?(object)percent:null,ModSpace(mod))];
         row.Tag=mod.Id;
-        if(marked.Contains(mod.Id))row.DefaultCellStyle.BackColor=GeneralStyle.Selection;
+        if(checkedRow)row.DefaultCellStyle.BackColor=GeneralStyle.Selection;
         SetModStatusCell(row,mod,key,status,raw);
         row.Cells["Size"].ToolTipText=SpaceTip(mod);
         row.Cells["Name"].ToolTipText=variant.Description??mod.Description;
@@ -789,6 +827,12 @@ internal sealed partial class GeneralModWindow : Form {
         if(collapsed)row.Visible=false;
         else if(mod.Id==previous)grid.CurrentCell=row.Cells["Name"];
         if(!picking)AddVersionRows(mod,row,collapsed);
+        if (!picking && HasPendingUpdateHistory(mod)) {
+            var message=T("Atualizado recentemente · ver histórico e confirmar o teste",
+                "Recently updated · view history and confirm the test");
+            var description=row.Cells["Name"].ToolTipText;
+            row.Cells["Name"].ToolTipText=String.IsNullOrWhiteSpace(description)?message:message+"\r\n"+description;
+        }
     }
 
     DataGridViewRow AddSection(string kind,string category,int height){
@@ -841,7 +885,7 @@ internal sealed partial class GeneralModWindow : Form {
             bool chosen=ActivePreset==null?VersionIsActive(work):IsPresetVersionSelected(work);
             string raw;
             statuses.TryGetValue(work.Key,out raw);
-            bool installed=InstalledVersion(raw)||raw==GeneralStatusPresentation.Disabled;
+            bool installed=VersionInstalled(raw)||raw==GeneralStatusPresentation.Disabled&&!chosen;
             string status=installed?T("Instalado","Installed"):T("Não instalado","Not installed");
             var row=grid.Rows[grid.Rows.Add(null,name,label,status,null,BodyOptionSpace(work))];
             row.Tag=work;
@@ -881,7 +925,7 @@ internal sealed partial class GeneralModWindow : Form {
     string InstallationStatus(GeneralModEntry entry,string status){
         if(ManualUpdatesOnly(entry.Id)&&status==UpdateAvailableStatus)return "Instalado";
         if(!ManualUpdatesOnly(entry.Id)&&VersionInstalled(status)&&versionsByWork[MakeWork(entry).Key].Any(HasSourceUpdate))
-            return UpdateAvailableStatus;
+            return SourceUpdateTarget(MakeWork(entry))==null?GeneralStatusPresentation.ReviewUpdate:UpdateAvailableStatus;
         if(!IsBigBody(entry))return status;
         if(status==GeneralStatusPresentation.OtherChoice)return "Não iniciado";
         if(status!=GeneralStatusPresentation.ManualBody)return status;
@@ -929,8 +973,13 @@ internal sealed partial class GeneralModWindow : Form {
     }
     void UpdateFooterAction(){
         if(footerAction==null||footerAction.IsDisposed)return;
+        if(pickingInventoryOwner){
+            selectedFooterAction=FooterAction.CancelLink;
+            footerAction.SetContextAction(T("Cancelar","Cancel"),false,false,!testMode,true);
+            return;
+        }
         bool available=!working&&!scanning&&associationChoice==null&&!connectingNexus;
-        selectedFooterAction=FooterAction.None;
+        selectedFooterAction=UpdateInProgress?FooterAction.CancelUpdate:FooterAction.None;
         if(available){
             if(UninstallSelection().Any())selectedFooterAction=FooterAction.Uninstall;
             else if(NeedsNexusConnection())selectedFooterAction=FooterAction.ConnectNexus;
@@ -938,7 +987,10 @@ internal sealed partial class GeneralModWindow : Form {
         bool removing=selectedFooterAction==FooterAction.Uninstall;
         string caption=removing?T("Desinstalar","Uninstall"):selectedFooterAction==FooterAction.ConnectNexus?
             T("Conectar ao Nexus","Connect to Nexus"):"";
-        footerAction.SetContextAction(caption,removing,removing,!testMode);
+        if(selectedFooterAction==FooterAction.CancelUpdate)
+            caption=updateSummary.Cancelled?T("Cancelando…","Cancelling…"):T("Cancelar","Cancel");
+        footerAction.SetContextAction(caption,removing,removing,!testMode,
+            selectedFooterAction!=FooterAction.CancelUpdate||!updateSummary.Cancelled);
     }
     void UpdateCounts(){
         if(counts==null)return;var rows=ModRows().ToList();int selected=rows.Count(r=>marked.Contains((string)r.Tag));
@@ -990,8 +1042,9 @@ internal sealed partial class GeneralModWindow : Form {
         if(paintBounds.Width<=0||paintBounds.Height<=0)return;
         var saved=g.Save();
         try{
+            g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.None;
             g.SetClip(paintBounds,System.Drawing.Drawing2D.CombineMode.Intersect);
-            using(var b=new SolidBrush(e.RowIndex==hoveredRow&&section.Kind!="divider"?GeneralStyle.Selection:GeneralStyle.Surface))g.FillRectangle(b,bounds);
+            using(var b=new SolidBrush(section.Kind!="divider"&&(e.RowIndex==hoveredRow||grid.Rows[e.RowIndex].Selected)?GeneralStyle.Selection:GeneralStyle.Surface))g.FillRectangle(b,bounds);
             if(section.Kind=="dropgap"){
                 var target=bounds;target.Inflate(-8,-2);
                 if(target.Width>0&&target.Height>0)
@@ -999,7 +1052,7 @@ internal sealed partial class GeneralModWindow : Form {
                         g.FillPath(brush,shape);
                 return;
             }
-            if(section.Kind=="divider"){using(var p=new Pen(GeneralStyle.SoftLine))g.DrawLine(p,bounds.X+20,bounds.Y+bounds.Height/2,bounds.Right-20,bounds.Y+bounds.Height/2);return;}
+            if(section.Kind=="divider")return;
             string text,description=null;int y=bounds.Y+8;
             bool heading=section.Kind=="heading"||section.Kind=="inventory";
             if(heading){
@@ -1061,41 +1114,6 @@ internal sealed partial class GeneralModWindow : Form {
             }
         }finally{graphics.SmoothingMode=previous;}
     }
-    void PaintColumnDividers(object sender,PaintEventArgs e){
-        int right=CategoryContentRight;
-        int y=grid.ColumnHeadersHeight-1;
-        using(var line=new Pen(GeneralStyle.Line)){
-            e.Graphics.DrawLine(line,0,y,right-1,y);
-            foreach(DataGridViewColumn column in grid.Columns){
-                if(!column.Visible||column.Resizable==DataGridViewTriState.False)continue;
-                var bounds=grid.GetCellDisplayRectangle(column.Index,-1,false);
-                int x=bounds.Right-1;
-                if(bounds.Width>0&&x>0&&x<right-1)e.Graphics.DrawLine(line,x,8,x,y-8);
-            }
-        }
-    }
-
-    void PaintModRowDivider(object sender,DataGridViewRowPostPaintEventArgs e){
-        if(grid.Rows[e.RowIndex].Tag is SectionRow)return;
-        int y=e.RowBounds.Bottom-1;
-        if(y<grid.ColumnHeadersHeight||y>=grid.ClientSize.Height)return;
-        var row=grid.Rows[e.RowIndex];
-        var crossings=new List<int>();
-        var branch=row.Cells["CategoryIndent"].Tag as CategoryBranch?;
-        if(branch.HasValue&&(branch.Value&CategoryBranch.Last)==0)
-            crossings.Add(grid.GetCellDisplayRectangle(grid.Columns["CategoryIndent"].Index,e.RowIndex,false).X+10);
-        FolderIndent folder;
-        if(folderBranches.TryGetValue(row,out folder)&&(folder.Branch&CategoryBranch.Last)==0)
-            crossings.Add(grid.GetCellDisplayRectangle(grid.Columns["Name"].Index,e.RowIndex,false).X+folder.Offset-16);
-        using(var line=new Pen(GeneralStyle.SoftLine)){
-            int start=0,right=CategoryContentRight-1;
-            foreach(int x in crossings.Where(x=>x>0&&x<right).Distinct().OrderBy(x=>x)){
-                e.Graphics.DrawLine(line,start,y,x-1,y);start=x+1;
-            }
-            if(start<=right)e.Graphics.DrawLine(line,start,y,right,y);
-        }
-    }
-
     void PaintName(object sender,DataGridViewCellPaintingEventArgs e){
         if(e.ColumnIndex==grid.Columns["CategoryIndent"].Index){
             e.PaintBackground(e.ClipBounds,true);
@@ -1151,7 +1169,7 @@ internal sealed partial class GeneralModWindow : Form {
 
         }
         if(e.RowIndex==-1&&e.ColumnIndex==0){
-            e.PaintBackground(e.ClipBounds,true);var ids=TableSelectionIds().ToArray();int selected=ids.Count(marked.Contains);
+            e.PaintBackground(e.ClipBounds,true);var ids=TableSelectionIds().ToArray();int selected=ids.Count((pickingInventoryOwner?inventoryOwnerIds:marked).Contains);
             var value=selected==0?System.Windows.Forms.VisualStyles.CheckBoxState.UncheckedNormal:selected==ids.Length?System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal:System.Windows.Forms.VisualStyles.CheckBoxState.MixedNormal;
             CheckBoxRenderer.DrawCheckBox(e.Graphics,new Point(e.CellBounds.Left+16,e.CellBounds.Top+(e.CellBounds.Height-14)/2),value);e.Handled=true;return;
         }
@@ -1161,7 +1179,8 @@ internal sealed partial class GeneralModWindow : Form {
         bool insideFolder=folderBranches.TryGetValue(row,out folderIndent);
         bool adult=Equals(row.Cells["Name"].Tag,true);
         string version=row.Cells["Group"].Tag as string;
-        if(!adult&&version==null&&!insideFolder)return;
+        bool showHistory=ShowsUpdateHistoryBadge(row);
+        if(!adult&&version==null&&!insideFolder&&!showHistory)return;
         string name=Convert.ToString(e.FormattedValue);
         e.PaintBackground(e.ClipBounds,true);
         var box=e.CellBounds;box.Inflate(-10,0);
@@ -1173,6 +1192,18 @@ internal sealed partial class GeneralModWindow : Form {
             PaintGroupIcon(e.Graphics,box.X-10,e.CellBounds.Y+e.CellBounds.Height/2,expandedVersions.Contains(DrawerKey(ModFromRow(row))));
             box.X+=FolderTitleInset-10;box.Width=Math.Max(1,box.Width-FolderTitleInset+10);
             box.Height=box.Height/2+4;
+        }
+        if (showHistory) {
+            int hitWidth=UpdateHistoryBadgeWidth;
+            int size=16*grid.DeviceDpi/96;
+            var icon=new Rectangle(e.CellBounds.Right-(hitWidth+size)/2,
+                e.CellBounds.Top+(e.CellBounds.Height-size)/2,size,size);
+            var clip=e.Graphics.Save();
+            try {
+                e.Graphics.SetClip(e.CellBounds,System.Drawing.Drawing2D.CombineMode.Intersect);
+                LucideIcons.Draw(e.Graphics,"file-text",icon,GeneralStyle.Accent);
+            } finally { e.Graphics.Restore(clip); }
+            box.Width=Math.Max(1,box.Width-hitWidth+10);
         }
         int suffix=adult?52:0;
         int nameWidth=Math.Min(Math.Max(1,box.Width-suffix),TextRenderer.MeasureText(name,e.CellStyle.Font).Width);
@@ -1203,32 +1234,50 @@ internal sealed partial class GeneralModWindow : Form {
             var item=grid.Rows[at];
             var section=item.Tag as SectionRow;if(section!=null&&section.Kind=="divider")continue;
             Color resting=item.Tag is Work?GeneralStyle.DrawerSurface:
-                item.Tag is string&&marked.Contains((string)item.Tag)?GeneralStyle.Selection:GeneralStyle.Surface;
+                item.Tag is string&&(pickingInventoryOwner?inventoryOwnerIds:marked).Contains((string)item.Tag)?GeneralStyle.Selection:GeneralStyle.Surface;
             item.DefaultCellStyle.BackColor=at==hoveredRow?GeneralStyle.Selection:resting;
             grid.InvalidateRow(at);
         }
+        foreach(var pair in categoryDeleteButtons)
+            if(pair.Value.Index==old||pair.Value.Index==row)pair.Key.Invalidate();
         grid.Cursor=row>=0&&row<grid.RowCount?Cursors.Hand:Cursors.Default;
     }
     void PaintStatus(DataGridViewCellPaintingEventArgs e){
         string raw=grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Tag as string;
         string label=GeneralStatusPresentation.Label(raw);
-        string display=Convert.ToString(e.FormattedValue);
-        string version=display.StartsWith(label+" · ",StringComparison.Ordinal)?display.Substring(label.Length+3):null;
-        PaintBadge(e,label,GeneralStatusPresentation.ColorFor(raw),GeneralStatusPresentation.TextColorFor(raw),version);
-    }
-    static void PaintBadge(DataGridViewCellPaintingEventArgs e,string label,Color fill,Color textColor,string version=null){
-        e.PaintBackground(e.ClipBounds,true);e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-        using(var font=GeneralStyle.Font(10.5f)){
-            int available=e.CellBounds.Width-20;
-            int versionWidth=String.IsNullOrEmpty(version)||available<118?0:Math.Min(74,TextRenderer.MeasureText(version,font).Width+5);
-            int width=Math.Min(available-(versionWidth>0?versionWidth+8:0),TextRenderer.MeasureText(label,font).Width+22);
-            var rect=new Rectangle(e.CellBounds.X+10,e.CellBounds.Y+(e.CellBounds.Height-30)/2,Math.Max(20,width),30);
-            using(var round=GeneralStyle.Round(rect,15))using(var brush=new SolidBrush(fill))e.Graphics.FillPath(brush,round);
-            const TextFormatFlags flags=TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.PreserveGraphicsClipping|TextFormatFlags.EndEllipsis;
-            if(rect.Width>22)TextRenderer.DrawText(e.Graphics,label,font,new Rectangle(rect.X+11,rect.Y,rect.Width-22,rect.Height),textColor,flags);
-            if(versionWidth>0)TextRenderer.DrawText(e.Graphics,version,font,
-                new Rectangle(e.CellBounds.Right-10-versionWidth,rect.Y,versionWidth,rect.Height),GeneralStyle.Muted,flags|TextFormatFlags.Right);
+        var active=ActiveUpdateRow((string)grid.Rows[e.RowIndex].Tag);
+        if(active!=null){
+            PaintBadge(e,active.UpdatePhase,GeneralStatusPresentation.ColorFor(raw),GeneralStatusPresentation.TextColorFor(raw),
+                active.UpdatePercent.HasValue?active.UpdatePercent.Value+"%":null);
+            return;
         }
+        string display=Convert.ToString(e.FormattedValue);
+        int line=display.IndexOf('\n');
+        string reason=line<0?null:display.Substring(line+1);
+        if(line>=0)display=display.Substring(0,line);
+        string version=display.StartsWith(label+" · ",StringComparison.Ordinal)?display.Substring(label.Length+3):null;
+        PaintBadge(e,label,GeneralStatusPresentation.ColorFor(raw),GeneralStatusPresentation.TextColorFor(raw),version,reason);
+    }
+    static void PaintBadge(DataGridViewCellPaintingEventArgs e,string label,Color fill,Color textColor,string version=null,string reason=null){
+        e.PaintBackground(e.ClipBounds,true);
+        var saved=e.Graphics.Save();
+        try {
+            e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using(var font=GeneralStyle.Font(10.5f)){
+                int available=e.CellBounds.Width-20;
+                int versionWidth=String.IsNullOrEmpty(version)||available<118?0:Math.Min(74,TextRenderer.MeasureText(version,font).Width+5);
+                int width=Math.Min(available-(versionWidth>0?versionWidth+8:0),TextRenderer.MeasureText(label,font).Width+22);
+                int detailHeight=reason==null?0:TextRenderer.MeasureText(e.Graphics,reason,font,Size.Empty,TextFormatFlags.SingleLine).Height+2;
+                var rect=new Rectangle(e.CellBounds.X+10,e.CellBounds.Y+(e.CellBounds.Height-detailHeight-30)/2,Math.Max(20,width),30);
+                using(var round=GeneralStyle.Round(rect,15))using(var brush=new SolidBrush(fill))e.Graphics.FillPath(brush,round);
+                const TextFormatFlags flags=TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.PreserveGraphicsClipping|TextFormatFlags.EndEllipsis;
+                if(rect.Width>22)TextRenderer.DrawText(e.Graphics,label,font,new Rectangle(rect.X+11,rect.Y,rect.Width-22,rect.Height),textColor,flags);
+                if(reason!=null)TextRenderer.DrawText(e.Graphics,reason,font,
+                    new Rectangle(e.CellBounds.Left+10,e.CellBounds.Bottom-detailHeight-3,Math.Max(1,available),detailHeight),GeneralStyle.Muted,flags);
+                if(versionWidth>0)TextRenderer.DrawText(e.Graphics,version,font,
+                    new Rectangle(e.CellBounds.Right-10-versionWidth,rect.Y,versionWidth,rect.Height),GeneralStyle.Muted,flags|TextFormatFlags.Right);
+            }
+        }finally{e.Graphics.Restore(saved);}
         e.Handled=true;
     }
     void HandleSection(SectionRow section){
@@ -1250,19 +1299,46 @@ internal sealed partial class GeneralModWindow : Form {
             Edit(mod);
         }
         else if(row.Tag is Work)SelectVersion((Work)row.Tag);
-        else if(row.Tag is P2PSyncDifference)RegisterDetectedMod((P2PSyncDifference)row.Tag);
+        else if(row.Tag is P2PSyncDifference){
+            var file=(P2PSyncDifference)row.Tag;
+            if(HasVerifiedInventoryOrigin(file))ShowInventoryOrigin(file);
+            else RegisterDetectedMod(file);
+        }
     }
 
     async void RegisterDetectedMod(P2PSyncDifference item){
         if(item==null||!CanEditInventory||!ConfirmProjectNavigation())return;
+        var entry=DetectedInventoryEntry(item,InventoryRow(InventoryLinkStore.Key(item)));
+        if(entry!=null)await EditMod(entry,true,inventoryGroupId:item.InventoryGroupId);
+    }
+
+    GeneralModEntry DetectedInventoryEntry(P2PSyncDifference item,IEnumerable<P2PSyncDifference> files){
         string name=item.Mod??item.Path;
         var entry=NewEntry(name.Length<=300?name:name.Substring(0,300),null);
-        entry.DetectedPaths=InventoryRow(InventoryLinkStore.Key(item))
-            .Select(file=>file.Path).Where(FixedInstaller.InventoryRegistrationPath).Distinct(InventoryPaths).Take(2000).ToList();
-        if(entry.DetectedPaths.Count==0)return;
+        entry.DetectedPaths=files.Select(file=>file.Path).Where(FixedInstaller.InventoryRegistrationPath)
+            .Distinct(InventoryPaths).Take(2000).ToList();
+        if(entry.DetectedPaths.Count==0)return null;
         var group=InventoryLinks.Groups.FirstOrDefault(value=>value.Id==item.InventoryGroupId);
         entry.Variants[0].Sources.Add(group!=null&&group.Source!=null?group.Source:"installed://"+entry.Id+"/"+entry.DefaultVariant);
-        await EditMod(entry,true);
+        return entry;
+    }
+
+    int UpdateHistoryBadgeWidth {get{return 44*grid.DeviceDpi/96;}}
+
+    bool ShowsUpdateHistoryBadge(DataGridViewRow row) {
+        var id=row.Tag as string;
+        if(associationChoice!=null||id==null)return false;
+        var mod=state.List.Mods.FirstOrDefault(entry=>entry.Id==id);
+        return mod!=null&&HasPendingUpdateHistory(mod);
+    }
+
+    bool UpdateHistoryBadgeAt(DataGridViewRow row,int column,int offset) {
+        var name=grid.Columns["Name"];
+        return column==name.Index&&offset>=name.Width-UpdateHistoryBadgeWidth&&ShowsUpdateHistoryBadge(row);
+    }
+
+    async void OpenUpdateHistory(GeneralModEntry item) {
+        if(item!=null)await EditMod(item,showUpdateHistory:true);
     }
 
     async void Edit(GeneralModEntry item){await EditMod(item);}
@@ -1361,11 +1437,16 @@ internal sealed partial class GeneralModWindow : Form {
         return true;
     }
 
-    async Task EditMod(GeneralModEntry item,bool fromInventory=false,GeneralModVariant initialVariant=null,string bodyChoice=null){
-        if(scanning||associationChoice!=null)return;
+    async Task EditMod(GeneralModEntry item,bool fromInventory=false,GeneralModVariant initialVariant=null,string bodyChoice=null,string inventoryGroupId=null,bool showUpdateHistory=false){
+        string editorKey=inventoryGroupId??(fromInventory?String.Join("\n",item.DetectedPaths):item.Id);
+        Action<GeneralModEditor> revealHistory=showUpdateHistory?
+            (Action<GeneralModEditor>)(open=>open.ScrollToUpdateHistory()):null;
+        if(GeneralDialog.FocusOpen<GeneralModEditor>(this,editorKey,revealHistory)||scanning||associationChoice!=null)return;
         if((current!=null&&current.Entry.Id==item.Id)||(priorityCurrent!=null&&priorityCurrent.Entry.Id==item.Id))return;
         try{
             bool existing=state.List.Mods.Contains(item);var selected=initialVariant??Selected(item);
+            string originalEntry=existing?Safe.Json.Serialize(item):null;
+            string editorPreset=state.SelectedPreset,editorDestination=state.Destination;
             bool editingBody=IsBigBody(item);
             if(working&&(editingBody||BuiltInProject))return;
             var bodyVersions=editingBody?BodyVersionsForPreset():null;
@@ -1374,28 +1455,41 @@ internal sealed partial class GeneralModWindow : Form {
             string info="";
             if(item.DetectedPaths.Count>0)info=T(
                 "Arquivos detectados. Confira o pacote de origem para confirmar o mod completo.",
-                "Detected files. Check the original archive to confirm the complete mod.")+"\r\n"+
-                String.Join("\r\n",item.DetectedPaths.Take(8));
+                "Detected files. Check the original archive to confirm the complete mod.");
+            if(!fromInventory&&item.DetectedPaths.Count>0)info+="\r\n"+String.Join("\r\n",item.DetectedPaths.Take(8));
             var inventory=DisplayedInventory().ToLookup(file=>file.Kind);
             var companions=inventory["associated"].Where(file=>file.ModId==item.Id&&!item.DetectedPaths.Contains(file.Path,InventoryPaths)).ToArray();
             var recorded=new HashSet<string>(inventory["inventory-record"].Select(file=>file.Path),InventoryPaths);
             var seen=new HashSet<string>(InventoryLinks.SeenLocalFiles,StringComparer.Ordinal);
+            var inventoryGroup=fromInventory?InventoryLinks.Groups.FirstOrDefault(group=>group.Id==inventoryGroupId&&group.CatalogId==null):null;
+            string originalInventoryGroup=inventoryGroup==null?null:Safe.Json.Serialize(inventoryGroup);
+            var pendingUnlinks=new List<InventoryLinkMember>();
             using(var dialog=new GeneralModEditor(editorEntry,PresetCategories(),editorSelection,!fromInventory&&(!working||current!=null),
                 info,LookupSourceInfo,working?null:state.List.Mods,state.List,projectDraft:!working,
                 installationFolder:state.Destination,inventoryDraft:fromInventory,
-                                refreshLookup:source=>testMode?LookupSourceInfo(source):GeneralNexusInfo.Read(source),
+                                refreshLookup:source=>testMode?LookupSourceInfo(source):GeneralModSourceMetadata.Read(source),
                 catalogPaths:variant=>{
                     if(String.IsNullOrEmpty(variant.CyberpunkId))
-                        return variant.Sources.Any(GeneralModDownload.IsInstalledSource)?item.DetectedPaths:Enumerable.Empty<string>();
+                        return InstalledEditorPaths(item,variant,editorDestination);
                     return ProfileRecipe(new Work{Entry=item,Variant=variant}).Files.Select(file=>file.Path);
                 }, downloadedSource:(variant,index)=>{
                     if(!editingBody)return LocalSource(new Work{Entry=item,Variant=variant},index);
                                         var work=bodyVersions.FirstOrDefault(choice=>choice.BodyChoice==variant.Id);
                     if(work==null)return null;
                     return LocalSource(work,index);
-                },fixedChoices:editingBody,archivePreview:testMode
+                },fixedChoices:editingBody,associatedFolders:InventoryLinks.Attachments.Where(file=>file.Owners.Contains(item.Id))
+                    .Select(file=>InventoryFolder(file.Path)).Distinct(InventoryPaths),archivePreview:testMode
                     ?(Func<GeneralNexusLink,NexusFilePreview[]>)(link=>testNexusPreviews==null?null:testNexusPreviews(link,()=>!IsDisposed))
                     :nexusScan.PreviewSession(GeneralNexusInfo.ReadFilePreviews),
+                linkedInventory:InventoryGroupMembers(inventoryGroup),
+                linkedLocations:member=>member.Paths.Select(InventoryFolder).Distinct(InventoryPaths),
+                unlinkInventory:member=>{
+                    if(!CanEditInventory||pendingUnlinks.Contains(member))return false;
+                    pendingUnlinks.Add(member);
+                    var paths=new HashSet<string>(member.Paths,InventoryPaths);
+                    item.DetectedPaths.RemoveAll(paths.Contains);
+                    return true;
+                },
                 cyberpunkLayout:IsCyberpunk(state.Destination),backupFile:variant=>{
                     if(!Directory.Exists(state.Destination)||variant==null)return null;
                     var selectedWork=editingBody?bodyVersions.FirstOrDefault(choice=>choice.BodyChoice==variant.Id):null;
@@ -1403,6 +1497,12 @@ internal sealed partial class GeneralModWindow : Form {
                     string key=selectedWork!=null?selectedWork.Key:original==null?null:Key(item,original);
                     return key==null?null:DisabledAt(state.Destination).BackupFile(key);
                 })){
+                if(existing){
+                    dialog.ConfigureUpdateHistory(()=>UpdateHistoryFor(item.Id),CanConfirmUpdateHistory,
+                        id=>{ConfirmUpdateHistory(id);DrawRows();},entry=>History().FindBackup(entry),
+                        UpdateExecutable,ChooseUpdateExecutable);
+                    if(showUpdateHistory)dialog.Shown+=(s,e)=>dialog.ScrollToUpdateHistory();
+                }
                 if(companions.Length>0)
                     dialog.ShowLocalFiles(companions.Select(file=>file.Path),companions
                         .Where(file=>file.LocalInModFolder&&!file.PreexistingOutput&&file.ProvenOwner==null&&!recorded.Contains(file.Path)&&
@@ -1410,28 +1510,63 @@ internal sealed partial class GeneralModWindow : Form {
                         path=>UpdateInventoryLinks(links=>links.MarkLocalFileSeen(InventoryLinkStore.LocalFileKey(item.Id,path)),redraw:false));
                 dialog.ConfigurePresets(state.List.Presets,state.SelectedPreset,item.Id,existing);
                 DialogResult answer;
-                while((answer=dialog.ShowDialog(this))==DialogResult.Retry){
+                while((answer=await dialog.ShowModelessAsync(this,editorKey))==DialogResult.Retry){
+                    if(IsDisposed||exitApproved||working||scanning||associationChoice!=null)return;
                     var linked=await PickAlternative(item.Id,null,true);
                     if(linked!=null)dialog.AddRequiredMod(linked);
                     if(IsDisposed||exitApproved)return;
                 }
-                if(answer!=DialogResult.OK)return;
+                if(answer!=DialogResult.OK||IsDisposed||exitApproved)return;
+                var live=existing?state.List.Mods.FirstOrDefault(mod=>mod.Id==item.Id):null;
+                if(scanning||UpdateInProgress||associationChoice!=null||editorPreset!=state.SelectedPreset||
+                    !InventoryPaths.Equals(editorDestination,state.Destination)||
+                    existing&&(live==null||Safe.Json.Serialize(live)!=originalEntry)||
+                    fromInventory&&state.List.Mods.Any(mod=>mod.DetectedPaths.Intersect(item.DetectedPaths,InventoryPaths).Any())){
+                    ShowError(new IOException(T("O projeto mudou com os detalhes abertos. Abra os detalhes novamente para editar.",
+                        "The project changed while details were open. Reopen them to edit.")));
+                    return;
+                }
+                if(dialog.InventoryLinksOnly){
+                    SaveInventoryUnlinks(inventoryGroupId,originalInventoryGroup,pendingUnlinks);
+                    DrawRows();
+                    return;
+                }
+                if(existing)item=live;
                 if(editingBody){await ApplyBodyEditor(dialog,bodyVersions);return;}
                 bool? scope=existing?PresetEditScope(item):false;if(!scope.HasValue)return;
                 bool? moved=false;
                 if(!moved.HasValue)return;
-                BeginProjectEdit();
                 dialog.Result.AlternativeGroup=item.AlternativeGroup;
                 var editedVariant=dialog.Result.Variants.Single(variant=>variant.Id==dialog.SelectedVariant);
                 bool needsScan=!existing||selected.Id!=editedVariant.Id||
                     !selected.Sources.SequenceEqual(editedVariant.Sources,StringComparer.Ordinal)||
                     !(selected.OutputFolders??new List<string>()).SequenceEqual(editedVariant.OutputFolders??new List<string>(),InventoryPaths)||
                     !GeneralInstallRoutes.Same(selected.InstallRoutes,editedVariant.InstallRoutes);
-                if(existing&&scope.Value)ApplyCategoryName(dialog.CategoryRenameFrom,dialog.Result);
-                ApplyEdited(item,dialog.Result,dialog.SelectedVariant,existing,dialog.NewCategories,finish:false);
-                GeneralPresetProfiles.Edit(state,item,dialog.Result,dialog.SelectedVariant,scope.Value,existing?dialog.ChangedPresetIds:dialog.PresetIds,selected.Id);
-                FinishProjectEdit();DrawRows();
-                if(fromInventory||moved.Value)SaveProjectEdits();
+                Action apply=()=>{
+                    BeginProjectEdit();
+                    if(existing&&scope.Value)ApplyCategoryName(dialog.CategoryRenameFrom,dialog.Result);
+                    ApplyEdited(item,dialog.Result,dialog.SelectedVariant,existing,dialog.NewCategories,finish:false);
+                    GeneralPresetProfiles.Edit(state,item,dialog.Result,dialog.SelectedVariant,scope.Value,existing?dialog.ChangedPresetIds:dialog.PresetIds,selected.Id);
+                    FinishProjectEdit();
+                    if(fromInventory||moved.Value)SaveProjectEdits();
+                };
+                if(pendingUnlinks.Count>0)
+                    SaveInventoryUnlinks(inventoryGroupId,originalInventoryGroup,pendingUnlinks,()=>{
+                        var before=CopyProjectState();
+                        var draft=projectDraft;
+                        var filters=categoryFilters==null?null:new HashSet<string>(categoryFilters,categoryFilters.Comparer);
+                        try{apply();}
+                        catch{
+                            state.List=before.List;
+                            state.ChosenVariants=before.ChosenVariants;
+                            projectDraft=draft;
+                            categoryFilters=filters;
+                            if(p2p!=null)p2p.SetPreparationState(draft??state);
+                            throw;
+                        }
+                    });
+                else apply();
+                DrawRows();
                 if(dialog.InstallRequested){SaveProjectEdits();await ConfirmUrgentInstall(state.List.Mods.Single(m=>m.Id==dialog.Result.Id));}
                 else if(!working&&needsScan)await Scan();
             }
@@ -1593,10 +1728,15 @@ internal sealed partial class GeneralModWindow : Form {
             if (paths.Count == 0) throw new IOException(T("Arraste um arquivo ZIP, RAR ou 7z concluído.", "Drop a completed ZIP, RAR or 7z file."));
             while (scanning && !IsDisposed) await Task.Delay(100);
             if (IsDisposed) return;
+            if(UpdateInProgress){
+                if(waiting&&current!=null&&paths.Count==1)association=paths[0];
+                return;
+            }
 
             foreach (string file in paths) {
                 var target = waiting && priorityCurrent == null ? current : null;
                 if (target != null && association == null) {
+                    if(pendingSourceUpdate!=null||target.Batch!=null&&target.Batch.Manual&&pendingWebSource==target.UpdateTarget){association=file;continue;}
                     var expected = pendingFixedAsset;
                     var web = pendingWebSource;
                     var info = pendingWebInfo;
@@ -1661,14 +1801,27 @@ internal sealed partial class GeneralModWindow : Form {
     }
     async void RequestProjectVerification(){await VerifyProject();}
 
+    void FinishStartupLoading(){
+        if(!startupLoading)return;
+        startupLoading=false;
+        if(IsDisposed||startupSkeleton==null||startupSkeleton.IsDisposed)return;
+        mainLayout.Show();
+        try{DrawRows();}
+        finally{startupSkeleton.Hide();}
+        grid.Enabled=!UpdateInProgress;
+    }
+
     void UpdateVerificationAction(){
         if(verifyAction!=null)verifyAction.Visible=!scanning&&!verifyingProject;
     }
 
-    void Busy(bool value){UpdateVerificationAction();UpdateCategoryDeleteButtons();if(detectedModsReview!=null)detectedModsReview.Enabled=CanEditInventory;if(unlinkedFilesReview!=null)unlinkedFilesReview.Enabled=CanEditInventory;if(primaryAction!=null)primaryAction.ShowActivity=value&&(loadingPreset||working)&&primaryAction.Text.Length>0;foreach(var control in idle)control.Enabled=!value;if(totalProgress!=null)totalProgress.Enabled=!value;UpdateOperationButton();UpdatePresetCommands();UpdateFooterAction();RefreshPrimaryAction();}
+    void Busy(bool value){UpdateVerificationAction();UpdateCategoryDeleteButtons();if(storageSize!=null)storageSize.SetLinksAvailable(!value);if(primaryAction!=null)primaryAction.ShowActivity=value&&(loadingPreset||working)&&primaryAction.Text.Length>0;foreach(var control in idle)control.Enabled=!value;if(totalProgress!=null)totalProgress.Enabled=!value;if(grid!=null)grid.Enabled=!startupLoading&&!UpdateInProgress;UpdateOperationButton();UpdatePresetCommands();UpdateFooterAction();RefreshPrimaryAction();}
     void UpdateOperationButton(){
         if(next==null)return;
-        next.Text=loadingPreset?T("Cancelar troca","Cancel switch"):T("Pular mod","Skip mod");
+        var active=priorityCurrent??current;
+        if(UpdateInProgress){next.Visible=false;next.Enabled=false;return;}
+        next.Text=loadingPreset?T("Cancelar troca","Cancel switch"):active!=null&&active.Batch!=null?
+            T("Cancelar atualização","Cancel update"):T("Pular mod","Skip mod");
         next.Visible=loadingPreset?presetCancellation!=null:!uninstalling&&(working||scanning);
         next.Enabled=loadingPreset?presetCancellation!=null&&!presetCancellation.IsCancellationRequested:!uninstalling&&(working||scanning);
     }

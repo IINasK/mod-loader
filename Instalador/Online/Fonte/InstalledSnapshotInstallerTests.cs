@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -79,9 +79,51 @@ public static class InstalledSnapshotInstallerTests {
         ConfigTransactions(root);
         ResumeTransactions(root,catalog);
         ParallelTransactions(root,catalog);
+        BatchUpdateChoices(root,catalog);
         if(testOfficialProject){
             TestPortableDestinations(root,parent,catalog);
             BuiltInProjectReceive(root,catalog);
+        }
+    }
+    static void BatchUpdateChoices(string root,FixedCatalog catalog){
+        foreach(bool? backup in new bool?[]{true,false,null}){
+            string folder=Directory.CreateDirectory(Safe.In(root,"update-choice-"+(backup.HasValue?backup.Value?"keep":"drop":"decline"))).FullName;
+            string game=Directory.CreateDirectory(Safe.In(folder,"g")).FullName;
+            File.WriteAllText(Safe.In(game,".fixture-only"),"fixture");
+            string data=Safe.In(folder,"d");
+            var engine=new InstalledSnapshotInstaller(game,data,catalog,true);
+            Func<int,string> bundle=version=>{
+                var manifest=new InstalledSnapshotManifest{Schema=2,Name="Versioned fixture",Game="generic"};
+                var entries=new Dictionary<string,byte[]>();
+                foreach(string id in new[]{"first","second"}.Concat(version==2?new[]{"independent"}:new string[0])){
+                    string source="https://github.com/example/"+id+"/releases/download/v"+version+".0/"+id+"-v"+version+".0.zip";
+                    var mod=RoutedEntry(id,source);manifest.List.Mods.Add(mod);
+                    byte[] content=Encoding.UTF8.GetBytes(id+" version "+version);
+                    string hash=InstalledSnapshot.Hash(content);entries[hash]=content;
+                    manifest.Files.Add(new InstalledSnapshotFile{Path="mods/"+id+".txt",Kind="file",Sha256=hash,Size=content.Length,
+                        Owners=new List<string>{InstalledSnapshot.Owner(mod,mod.Variants.Single())}});
+                }
+                manifest.Project=Safe.Json.Deserialize<GeneralModList>(Safe.Json.Serialize(manifest.List));
+                string path=Safe.In(folder,"v"+version+".zip");WritePack(path,manifest,entries);return path;
+            };
+            string first=bundle(1),second=bundle(2);
+            engine.Install(first,Safe.Hash(first),null);
+            int count=0,asks=0;
+            string id2=engine.Install(second,Safe.Hash(second),null,chooseVersion:_=>{asks++;return false;},
+                chooseUpdates:n=>{count=n;return backup;});
+            Check(count==2&&asks==0&&File.Exists(Safe.In(game,"mods/independent.txt")),
+                "O receptor decide uma vez para dois mods com versão anterior comprovada e recebe o mod independente.");
+            if(!backup.HasValue){
+                Check(File.ReadAllText(Safe.In(game,"mods/first.txt"))=="first version 1"&&engine.ReadSkippedDestinations(id2).Length==2,
+                    "Manter atual preserva os dois mods e registra os itens pulados.");
+            }else{
+                Check(File.ReadAllText(Safe.In(game,"mods/first.txt"))=="first version 2",
+                    "Aceitar instala a versão do pacote no destino original.");
+                engine.Remove(id2,new[]{"first/default"},null);
+                string file=Safe.In(game,"mods/first.txt");
+                Check(backup.Value?File.ReadAllText(file)=="first version 1":!File.Exists(file),
+                    "Somente a opção de backup mantém a versão anterior disponível após remover a atualização.");
+            }
         }
     }
     static void HistoricalSnapshot(string root) {
@@ -205,6 +247,7 @@ public static class InstalledSnapshotInstallerTests {
             var dependent=RoutedEntry("dependent",url);
             dependent.Variants[0].RequiredMods.Add(missing.Id);
             state.List.Mods.AddRange(new[]{mixed,missing,plain,dependent});
+            state.ManualUpdateMods.AddRange(new[]{mixed.Id,missing.Id,dependent.Id});
             state.List.Presets.Add(new GeneralModPreset{Id="solo",Name="Solo",ModIds=state.List.Mods.Select(mod=>mod.Id).ToList()});
             var installer=new GeneralModInstaller(sender,Path.Combine(senderData,"Instalacoes"));
             foreach(var mod in state.List.Mods)
@@ -215,7 +258,16 @@ public static class InstalledSnapshotInstallerTests {
             Throws(()=>GeneralInstallRoutes.Parse("%APPDATA%/Microsoft/Windows/Start Menu/Programs/Startup",sender),
                 "Destinos de inicialização do Windows são recusados.");
             string snapshot=Safe.In(root,"portable/pack.zip");
-            var manifest=InstalledSnapshot.Create(snapshot,state,state.List.Mods.Select(mod=>mod.Id),catalog,senderData,false,null);
+            var subset=InstalledSnapshot.Inspect(state,new[]{mixed.Id,plain.Id},catalog,senderData,false,
+                includeUpdatePreferences:true);
+            Check(subset.ManualUpdateMods.SequenceEqual(new[]{mixed.Id}),
+                "A preferência acompanha somente os mods selecionados e incluídos no pacote.");
+            Check(InstalledSnapshot.Inspect(state,new[]{mixed.Id},catalog,senderData,false).ManualUpdateMods==null,
+                "Uma exportação comum dispensa as preferências do P2P.");
+            subset.ManualUpdateMods.Add(missing.Id);
+            Throws(()=>InstalledSnapshot.Validate(subset,catalog),"O manifesto recusa preferências para mods que ficaram fora do pacote.");
+            var manifest=InstalledSnapshot.Create(snapshot,state,state.List.Mods.Select(mod=>mod.Id),catalog,senderData,false,null,
+                includeUpdatePreferences:true);
             string manifestText=Safe.Json.Serialize(manifest);
             Check(manifest.Schema==2&&manifest.ProjectName=="Example Game"&&!manifestText.Contains("sender")&&manifestText.Contains("%APPDATA%"),
                 "O manifesto portável contém o nome do projeto e omite os caminhos locais do remetente.");
@@ -261,6 +313,9 @@ public static class InstalledSnapshotInstallerTests {
                 received.List.Presets[0].Categories.Contains("Não instalados")&&
                 received.List.Mods.Single(mod=>mod.Id=="dependent").Variants[0].RequiredMods.SequenceEqual(new[]{pending.Id}),
                 "O projeto recebido guarda dados, links e regras do mod pulado em uma categoria própria.");
+            Check(receiving.ReadManifest(receipt).ManualUpdateMods.SequenceEqual(new[]{mixed.Id})&&
+                received.ManualUpdateMods.SequenceEqual(new[]{mixed.Id}),
+                "O projeto salva a preferência recebida, e a instalação descarta a preferência dos mods pulados.");
             receiving.Remove(receipt,new[]{"mixed/default"},null);
             Check(!File.Exists(Safe.In(receiver,"Addons/core.txt"))&&!File.Exists(Safe.In(receiverProfile,"ExampleGame/Mods/prefs.txt"))&&
                 File.Exists(Safe.In(receiver,"game/core.txt")),"A remoção confere e alcança os dois destinos registrados.");
@@ -285,11 +340,14 @@ public static class InstalledSnapshotInstallerTests {
         var store=new GeneralProjectStore(Path.Combine(root,"l"));
         var mod=new GeneralModEntry{Id="received",Name="Incoming",DefaultVariant="default",
             Variants=new List<GeneralModVariant>{new GeneralModVariant{Id="default",Name="Default",Sources=new List<string>{"https://example.org/mod.zip"}}}};
-        var list=new GeneralModList{Mods=new List<GeneralModEntry>{mod},Presets=new List<GeneralModPreset>{
-            new GeneralModPreset{Id="all",Name="Com DLC",ModIds=new List<string>{mod.Id}},
+        var previousChoice=RoutedEntry("local-choice","https://example.org/local.zip");
+        var list=new GeneralModList{Mods=new List<GeneralModEntry>{mod,previousChoice},Presets=new List<GeneralModPreset>{
+            new GeneralModPreset{Id="all",Name="Com DLC",ModIds=new List<string>{mod.Id,previousChoice.Id}},
             new GeneralModPreset{Id="no-pl",Name="Sem DLC",ModIds=new List<string>{mod.Id}}}};
         var official=store.Create("Cyberpunk 2077",list,"light","pt",target,GeneralProjectStore.CyberpunkTemplate);
         var state=store.Load(official);
+        state.ManualUpdateMods.Add(previousChoice.Id);
+        new GeneralModLibrary(Safe.In(store.DataPath(official),"lista.json")).Save(state);
         var local=store.Create("Cyberpunk 2077",list,"light","pt",target);
         var partial=P2PService.ExportState(state,"no-pl",new[]{mod.Id});
         var inspected=InstalledSnapshot.Inspect(partial,new[]{mod.Id},catalog,inbox,false,true);
@@ -299,7 +357,7 @@ public static class InstalledSnapshotInstallerTests {
         Check(custom.TemplateId==null,"Um projeto personalizado do mesmo jogo e nome não ganha identidade oficial.");
 
         var manifest=new InstalledSnapshotManifest{Name="Sem DLC",Game="cyberpunk2077",GameFileVersion=catalog.GameFileVersion,
-            TemplateId=inspected.TemplateId,TemplateSubset=true,Project=partial.List};
+            TemplateId=inspected.TemplateId,TemplateSubset=true,Project=partial.List,ManualUpdateMods=new List<string>{mod.Id}};
         var alternate=new GeneralModVariant{Id="alternate",Name="Variant sent",Sources=new List<string>{"https://example.org/alternate.zip"}};
         manifest.Project.Mods.Single().Variants.Add(alternate);
         var reviewedProject=Safe.Json.Deserialize<GeneralModList>(Safe.Json.Serialize(manifest.Project));
@@ -323,6 +381,8 @@ public static class InstalledSnapshotInstallerTests {
             refreshed.SnapshotReceipts[mod.Id+"/alternate"]==receipt&&refreshed.ChosenVariants[mod.Id]=="alternate"&&
             refreshed.List.Mods.Single(item=>item.Id==mod.Id).DefaultVariant=="default",
             "O projeto oficial preserva o outro preset e ativa a variante efetivamente instalada, mesmo quando o padrão da lista é diferente.");
+        Check(refreshed.ManualUpdateMods.SequenceEqual(new[]{previousChoice.Id,mod.Id}),
+            "A preferência do anfitrião é somada àquela que o receptor já tinha para outro mod.");
         var freshStore=new GeneralProjectStore(Path.Combine(root,"n"));
         var first=freshStore.CreateReceived(session,inbox,catalog);
         session.Id="ml-"+Guid.NewGuid().ToString("N");

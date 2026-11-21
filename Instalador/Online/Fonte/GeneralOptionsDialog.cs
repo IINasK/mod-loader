@@ -11,26 +11,23 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
     readonly TextBox folder = new TextBox(), destination=new TextBox();
     readonly bool projectOptions;
     readonly Label error = new Label();
-    readonly SwitchPerformanceField performance;
-    internal SwitchPerformance SwitchSettings {get{return performance.Settings;}}
-
     internal string ThemeValue { get; private set; }
     internal string LanguageValue { get; private set; }
     internal string DownloadFolder { get; private set; }
     internal string Destination { get; private set; }
 
-    internal GeneralOptionsDialog(string theme, string language, string folder, Func<DownloadCache.CleanupPlan> previewCleanup = null,string installationFolder=null,Func<string,FixedInstaller.SaveBackupCleanup> previewSaveBackups=null,SwitchPerformance switchSettings=null)
+    internal GeneralOptionsDialog(string theme, string language, string folder, Func<DownloadCache.CleanupPlan> previewCleanup = null,string installationFolder=null,Func<string,FixedInstaller.SaveBackupCleanup> previewSaveBackups=null)
         : base(T("Opções", "Options")) {
         projectOptions=installationFolder!=null;
         bool showSaveCleanup=previewSaveBackups!=null&&!String.IsNullOrWhiteSpace(installationFolder)&&
             Directory.Exists(Path.Combine(installationFolder,".CoopModsOnline","backups"));
-        ClientSize=new Size(660,projectOptions?650:550);
+        ClientSize=new Size(660,projectOptions?530:430);
         Font=GeneralStyle.Font(12);
         AutoScaleMode=AutoScaleMode.Dpi;
-        var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=9,
+        var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=7,
             Padding=new Padding(24,12,24,20),Margin=Padding.Empty};
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-        for(int row=0;row<9;row++)layout.RowStyles.Add(row==6?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.AutoSize));
+        for(int row=0;row<7;row++)layout.RowStyles.Add(row==4?new RowStyle(SizeType.Percent,100):new RowStyle(SizeType.AutoSize));
         Content.Controls.Add(layout);
         layout.Controls.Add(SectionLabel(T("Aparência","Appearance"),0),0,0);
         var choices=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,RowCount=2,Margin=Padding.Empty};
@@ -66,11 +63,8 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
         }
         layout.Controls.Add(folders,0,3);
 
-        layout.Controls.Add(SectionLabel(T("Conferência","Verification"),16),0,4);
-        performance=new SwitchPerformanceField(switchSettings??new SwitchPerformance()){Margin=Padding.Empty};
-        layout.Controls.Add(performance,0,5);
         error.Dock=DockStyle.Fill;error.Margin=new Padding(0,6,0,0);
-        error.AutoEllipsis=true;error.AccessibleName=T("Aviso","Notice");layout.Controls.Add(error,0,6);
+        error.AutoEllipsis=true;error.AccessibleName=T("Aviso","Notice");layout.Controls.Add(error,0,4);
 
         var maintenance=GeneralTableDialogLayout.Commands();
         maintenance.Name="OptionsMaintenance";
@@ -86,12 +80,12 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
         }
         var report=GeneralStyle.Button(T("Reportar erro","Report a problem"),ShowSessionReport);
         report.Name="ReportSessionError";maintenance.Controls.Add(report);
-        layout.Controls.Add(maintenance,0,7);
+        layout.Controls.Add(maintenance,0,5);
 
         var commands=GeneralTableDialogLayout.Commands();
         var save=GeneralStyle.Button(T("Salvar","Save"),Save,true);
-        var cancel=GeneralStyle.Button(T("Cancelar","Cancel"),()=>DialogResult=DialogResult.Cancel);
-        commands.Controls.Add(save);commands.Controls.Add(cancel);layout.Controls.Add(commands,0,8);
+        var cancel=GeneralStyle.Button(T("Cancelar","Cancel"),()=>Complete(DialogResult.Cancel));
+        commands.Controls.Add(save);commands.Controls.Add(cancel);layout.Controls.Add(commands,0,6);
         AcceptButton=save;CancelButton=cancel;
         GeneralStyle.Apply(this,GeneralStyle.Dark);
         this.folder.BorderStyle=destination.BorderStyle=BorderStyle.None;
@@ -105,8 +99,9 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
 
     static string T(string pt, string en) { return GeneralStyle.T(pt, en); }
 
-    void ShowSessionReport() {
-        using(var dialog=CreateSessionReport())dialog.ShowDialog(this);
+    async void ShowSessionReport() {
+        if(GeneralDialog.FocusOpen<GeneralDialog>(this,"session-report"))return;
+        using(var dialog=CreateSessionReport())await dialog.ShowModelessAsync(this,"session-report");
     }
 
     internal static GeneralDialog CreateSessionReport() {
@@ -248,79 +243,8 @@ internal sealed class GeneralOptionsDialog : GeneralDialog {
             ThemeValue = theme.SelectedIndex == 1 ? "dark" : theme.SelectedIndex == 2 ? "light-red" : theme.SelectedIndex == 3 ? "black" : "light";
             LanguageValue = language.SelectedIndex == 1 ? "en" : "pt";
             DownloadFolder = selectedFolder;
-            DialogResult = DialogResult.OK;
+            Complete(DialogResult.OK);
         } catch (Exception ex) { ShowNotice(ex.Message,true); }
-    }
-}
-
-public sealed class SwitchPerformance {
-    public int CpuPercent=50;
-    public bool AskBeforeSwitch=true;
-
-    internal void Normalize() {
-        if(CpuPercent!=25&&CpuPercent!=50&&CpuPercent!=75&&CpuPercent!=100)CpuPercent=50;
-    }
-    internal int Workers(int logicalProcessors) {
-        return Math.Max(1,logicalProcessors*CpuPercent/100);
-    }
-}
-
-internal sealed class SwitchPerformanceField : TableLayoutPanel {
-    readonly GeneralPicker limit=new GeneralPicker();
-    readonly CheckBox remember=new CheckBox();
-
-    internal SwitchPerformanceField(SwitchPerformance settings) {
-        Dock=DockStyle.Fill;AutoSize=true;ColumnCount=1;RowCount=2;
-        ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-        RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        RowStyles.Add(new RowStyle(SizeType.Absolute,44));
-        string label=GeneralStyle.T("Núcleos para verificar arquivos","CPU cores for file checks");
-        Controls.Add(new Label{Text=label,AutoSize=true,Margin=new Padding(0,0,0,5)},0,0);
-        limit.Name="SwitchCpuLimit";limit.AccessibleName=label;
-        limit.Dock=DockStyle.Fill;limit.Margin=Padding.Empty;
-        limit.Embedded=true;limit.MinimumSize=new Size(100,0);limit.MaximumSize=Size.Empty;
-        limit.Items.AddRange(new object[]{"25%","50%","75%","100%"});
-        settings.Normalize();
-        limit.SelectedIndex=settings.CpuPercent/25-1;
-        remember.Name="RememberSwitchPerformance";
-        remember.Text=GeneralStyle.T("Não perguntar novamente","Don't ask again");
-        remember.Checked=!settings.AskBeforeSwitch;remember.AutoSize=true;
-        remember.Anchor=AnchorStyles.Right;remember.Margin=new Padding(8,0,0,0);
-        var field=new GeneralSurface{Dock=DockStyle.Fill,Padding=new Padding(14,6,14,6),Margin=Padding.Empty};
-        var row=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        row.Controls.Add(limit,0,0);row.Controls.Add(remember,1,0);
-        field.Controls.Add(row);Controls.Add(field,0,1);
-    }
-
-    internal SwitchPerformance Settings {
-        get{return new SwitchPerformance{CpuPercent=25*(limit.SelectedIndex+1),AskBeforeSwitch=!remember.Checked};}
-    }
-}
-
-internal sealed class SwitchPerformanceDialog : GeneralDialog {
-    readonly SwitchPerformanceField performance;
-    internal SwitchPerformance Settings {get{return performance.Settings;}}
-
-    internal SwitchPerformanceDialog(SwitchPerformance settings) : base(GeneralStyle.T("Desempenho da troca","Switch performance")) {
-        ClientSize=new Size(500,310);
-        var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(24,12,24,18)};
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.Controls.Add(new Label{AutoSize=true,MaximumSize=new Size(440,0),Margin=new Padding(0,0,0,12),
-            Text=GeneralStyle.T("Esta troca pode demorar. Escolha a parcela dos núcleos lógicos que a conferência pode usar.",
-                "This switch may take a while. Choose the share of logical processors that verification can use.")},0,0);
-        performance=new SwitchPerformanceField(settings){Margin=Padding.Empty,Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right};
-        layout.Controls.Add(performance,0,1);
-        var commands=GeneralTableDialogLayout.Commands();
-        var apply=GeneralStyle.Button(GeneralStyle.T("Aplicar","Apply"),()=>Complete(DialogResult.OK),true);
-        var cancel=GeneralStyle.Button(GeneralStyle.T("Cancelar","Cancel"),()=>Complete(DialogResult.Cancel));
-        commands.Controls.Add(apply);commands.Controls.Add(cancel);
-        layout.Controls.Add(commands,0,2);Content.Controls.Add(layout);
-        AcceptButton=apply;CancelButton=cancel;
-        GeneralStyle.Apply(this,GeneralStyle.Dark);
     }
 }
 

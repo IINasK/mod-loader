@@ -14,6 +14,7 @@ public sealed class InstalledSnapshotManifest {
     public GeneralModList List=new GeneralModList();
     public GeneralModList Project;
     public Dictionary<string,string> SyncGameInventory;
+    public List<string> ManualUpdateMods;
     public List<SnapshotOutputScope> OutputScopes=new List<SnapshotOutputScope>();
     public List<InstalledSnapshotFile> Files=new List<InstalledSnapshotFile>();
 }
@@ -54,7 +55,7 @@ public static partial class InstalledSnapshot {
     }
     internal static bool SafeGenericPath(string path) {
         Safe.In(System.IO.Path.GetTempPath(),path);
-        return !Regex.IsMatch(path,@"(^|/)(?:\.git|\.codex|\.agents|\.aws|\.CoopModsOnline|saves?|saved games|accounts?|credentials?|cookies?|logs?|cache|profiles?|userdata)(?:/|\.|$)|(?:^|/)(?:user\.settings|loginusers\.vdf|config\.vdf|steam_api\.ini|.*\.(?:dmp|log|sav|dat|db|sqlite))$",RegexOptions.IgnoreCase);
+        return !Regex.IsMatch(path,@"(^|/)(?:\.git|\.codex|\.agents|\.aws|\.CoopModsOnline|saves?|saved games|accounts?|credentials?|cookies?|logs?|cache|userdata)(?:/|\.|$)|(?:^|/)profiles?(?:/|$|\.(?!lua$))|(?:^|/)(?:user\.settings|controller-profile\.json|loginusers\.vdf|config\.vdf|steam_api\.ini|.*\.(?:dmp|log|sav|dat|db|sqlite|sqlite3))$",RegexOptions.IgnoreCase);
     }
     static GeneralModVariant LegacyDensityVariant(FixedCatalog catalog){
         var variant=Clone(GeneralModLibrary.Seed(catalog,new ModImportItem[0]).Mods.Single(m=>m.Id==NightCityDensity.ModId).Variants.Single(v=>v.CyberpunkVariant=="medium"));
@@ -73,7 +74,7 @@ public static partial class InstalledSnapshot {
         return mod;
     }
     public static InstalledSnapshotManifest Inspect(GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs,bool allowMissing=false,Action checkpoint=null,
-        Func<string,string,string,bool> skipProblem=null,Action<int,int,string> inspectProgress=null) {
+        Func<string,string,string,bool> skipProblem=null,Action<int,int,string> inspectProgress=null,bool includeUpdatePreferences=false) {
         if(state==null||state.List==null||ids==null||String.IsNullOrWhiteSpace(state.Destination))throw new IOException("Escolha uma pasta de instalação e um preset.");
         string root=Path.GetFullPath(state.Destination);Safe.NoLinks(root);
         if(!Directory.Exists(root))throw new IOException("Pasta de instalação ausente.");
@@ -89,15 +90,17 @@ public static partial class InstalledSnapshot {
             return selected.Contains(m.Id)&&(profile==null||profile.AlternativeChoices==null||m.AlternativeGroup==null||
                 !profile.AlternativeChoices.TryGetValue(m.AlternativeGroup,out chosen)||m.Id==chosen);
         }).Select(Clone).ToList();
+        var catalogOwnership=cyberpunk?new SnapshotCatalogOwnership(catalog):null;
         if(cyberpunk) {
             var fixedIds=entries.Select(m=>m.Variants.Single(v=>v.Id==Selected(state,m)).CyberpunkId).Where(id=>id!=null).ToList();
             foreach(var dependency in FixedData.Expand(catalog,fixedIds,EquipmentExOptions.StockActive(catalog,root))) {
-                if(entries.Any(m=>m.Variants.Single(v=>v.Id==Selected(state,m)).CyberpunkId==dependency.Id))continue;
+                if(entries.Any(m=>catalogOwnership.RecipeId(m,m.Variants.Single(v=>v.Id==Selected(state,m)))==dependency.Id))continue;
+                if(entries.Any(m=>m.Id==dependency.Id))throw new IOException("A origem da dependência não corresponde ao catálogo: "+dependency.Name+".");
                 entries.Add(Clone(seed.Mods.Single(m=>m.Id==dependency.Id)));
             }
         }
         var fixedEngine=cyberpunk?new FixedInstaller(catalog,root):null;
-        var genericEngine=cyberpunk?null:new GeneralModInstaller(root,Path.Combine(appData,"Instalacoes"));
+        var genericEngine=new GeneralModInstaller(root,Path.Combine(appData,"Instalacoes"));
         var receivedEngine=new InstalledSnapshotInstaller(root,appData,catalog);
         var disabled=new DisabledMods(root,appData).Read();
         var problems=new List<string>();
@@ -132,13 +135,12 @@ public static partial class InstalledSnapshot {
             }
             string work=Owner(mod,variant);
             var originalSources=variant.Sources.ToList();
-            List<InstalledSnapshotFile> files=new List<InstalledSnapshotFile>();
             string snapshotId;
-            if(variant.CyberpunkId!="NightCoop"&&CatalogModVersions.Previous(catalog,variant.CyberpunkId)==null&&state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(work,out snapshotId)&&
-                MatchesBodyReceipt(receivedEngine,mod,variant,snapshotId)){
-                files=receivedEngine.ReadInstalledFiles(snapshotId,work,includeConfigs,checkpoint:checkpoint);
-            }
-            else if(variant.CyberpunkId!=null) {
+            var receivedFiles=variant.CyberpunkId!="NightCoop"&&CatalogModVersions.Previous(catalog,variant.CyberpunkId)==null&&
+                state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(work,out snapshotId)
+                ?receivedEngine.ReadMatchingInstalledFiles(snapshotId,mod,variant,includeConfigs,checkpoint:checkpoint):null;
+            var files=receivedFiles??new List<InstalledSnapshotFile>();
+            if(receivedFiles==null&&variant.CyberpunkId!=null) {
                 if(!cyberpunk)throw new IOException(mod.Name+": o destino não é Cyberpunk 2077.");
                 var recipe=FixedRecipe(catalog,variant);
                 var paths=GeneralInstallRoutes.FixedPaths(catalog,recipe,variant.InstallRoutes);
@@ -154,22 +156,26 @@ public static partial class InstalledSnapshot {
                     files.Add(new InstalledSnapshotFile{Path=paths[file.Path],Sha256=file.Sha256,Size=file.Size,Kind="file"});
                 }
                 if(includeConfigs)files.AddRange(FixedConfigurations(catalog,recipe,root,paths));
-            }else if(cyberpunk&&HasManualHystFiles(mod.Id,root)&&
+            }else if(receivedFiles==null&&cyberpunk&&HasManualHystFiles(mod.Id,root)&&
+                !Enumerable.Range(0,originalSources.Count).Any(sourceIndex=>genericEngine.HasSnapshotRecord(P2PPack.Slot(mod,variant,sourceIndex)))&&
                 (state.CyberpunkImports==null||!Enumerable.Range(0,originalSources.Count).Any(sourceIndex=>{
                     string id;
                     return P2PPack.TrySlot(state.CyberpunkImports,mod,variant,sourceIndex,out id);
                 }))) {
                 var knownBody=seed.Mods.FirstOrDefault(item=>item.Id==mod.Id);
                 variant=ReadManualHyst(root,mod,knownBody,state.SelectedPreset!="no-pl",files,path=>SnapshotVerification.Hash(path,checkpoint),state.BodyChoice);
-                if(fixedChoice&&(variant.Id!=expectedRecipe.Id||!GeneralModLibrary.SamePayload(variant,expectedRecipe)))
+                bool bodyExplicitlySelected=profile!=null&&profile.VariantChoices!=null&&profile.VariantChoices.ContainsKey(mod.Id);
+                if(bodyExplicitlySelected&&(variant.Id!=expectedRecipe.Id||!GeneralModLibrary.SamePayload(variant,expectedRecipe)))
                     throw new IOException("A versão instalada difere da escolha do preset.");
                 work=Owner(mod,variant);
                 originalSources=variant.Sources.ToList();
                 if(disabled.ContainsKey(work))throw new IOException("Este mod está desabilitado.");
-            }else {
+            }else if(receivedFiles==null) {
                 for(int i=0;i<originalSources.Count;i++) {
                     string key=P2PPack.Slot(mod,variant,i);
-                    if(cyberpunk) {
+                    if(genericEngine.HasSnapshotRecord(key)) {
+                        files.AddRange(genericEngine.ExportSnapshotFiles(key,variant.InstallRoutes,checkpoint));
+                    }else if(cyberpunk) {
                         string id;
                         if(state.CyberpunkImports==null||!P2PPack.TrySlot(state.CyberpunkImports,mod,variant,i,out id)) {
                             id=mod.Id.StartsWith("file-",StringComparison.Ordinal)?mod.Id:null;
@@ -183,7 +189,7 @@ public static partial class InstalledSnapshot {
                     }
                 }
             }
-            if(cyberpunk && files.Any(RetiredPackEntries.LocalDroneFile)) continue;
+            var catalogOwner=variant.CyberpunkId==null&&cyberpunk?catalogOwnership.Recipe(mod,variant):null;
             mod.Variants=new List<GeneralModVariant>{variant};mod.DefaultVariant=variant.Id;
             variant.NaturalOption=null;
             MakeSourcesPortable(variant,mod.Id);
@@ -191,8 +197,12 @@ public static partial class InstalledSnapshot {
             var shared=new HashSet<InstalledSnapshotFile>();
             foreach(var file in files) {
                 if(!includeConfigs&&file.Kind!="file")continue;
-                if(skipProblem!=null&&variant.CyberpunkId==null&&file.Kind=="file"&&IsCustomConfig(file.Path))
-                    using(var input=File.OpenRead(GeneralInstallRoutes.Resolve(root,file.Path)))ValidateCustomConfig(file,input);
+                if(variant.CyberpunkId==null&&file.Kind=="file"){
+                    if(KnownLocalPlaceholder(file,catalogOwner))continue;
+                    RequireCustomSnapshotPath(file,catalogOwnership,catalogOwner);
+                    if(skipProblem!=null&&IsCustomConfig(file.Path)&&!KnownCatalogBytes(file,catalogOwner))
+                        using(var input=File.OpenRead(GeneralInstallRoutes.Resolve(root,file.Path)))ValidateCustomConfig(file,input);
+                }
                 string key=file.Path.ToUpperInvariant()+"\n"+file.Section;
                 InstalledSnapshotFile same;
                 if(byPath.TryGetValue(key,out same)||additions.TryGetValue(key,out same)){
@@ -205,7 +215,7 @@ public static partial class InstalledSnapshot {
                     additions.Add(key,file);
                 }
             }
-            if(!files.Any(f=>f.Kind=="file"))throw new IOException("Nenhum arquivo instalado foi encontrado.");
+            if(!additions.Values.Concat(shared).Any(f=>f.Kind=="file"))throw new IOException("Nenhum arquivo instalado foi encontrado.");
             mod.DetectedPaths.Clear();list.Mods.Add(mod);
             foreach(var pair in additions){byPath.Add(pair.Key,pair.Value);manifest.Files.Add(pair.Value);}
             foreach(var file in shared)if(!file.Owners.Contains(work))file.Owners.Add(work);
@@ -219,7 +229,7 @@ public static partial class InstalledSnapshot {
         if(inspectProgress!=null)inspectProgress(entries.Count,entries.Count,null);
         if(problems.Count>0)throw new InstalledSnapshotReviewException(problems);
         if(cyberpunk&&skipProblem!=null){
-            var includedRecipes=new HashSet<string>(list.Mods.Select(m=>m.Variants[0].CyberpunkId).Where(id=>id!=null),StringComparer.Ordinal);
+            var includedRecipes=new HashSet<string>(list.Mods.Select(m=>catalogOwnership.RecipeId(m,m.Variants[0])).Where(id=>id!=null),StringComparer.Ordinal);
             var removed=new HashSet<string>(StringComparer.Ordinal);
             list.Mods.RemoveAll(mod=>{
                 var variant=mod.Variants[0];
@@ -250,6 +260,10 @@ public static partial class InstalledSnapshot {
             if(state.List.AlternativeGroups.TryGetValue(groupId,out group))list.AlternativeGroups.Add(groupId,Clone(group));
         }
         var included=new HashSet<string>(list.Mods.Select(m=>m.Id),StringComparer.Ordinal);
+        if(includeUpdatePreferences&&state.ManualUpdateMods!=null){
+            var manual=state.ManualUpdateMods.Where(included.Contains).Distinct(StringComparer.Ordinal).ToList();
+            if(manual.Count>0)manifest.ManualUpdateMods=manual;
+        }
         foreach(var original in state.List.Presets.OrderByDescending(p=>p.Id==state.SelectedPreset)){
             var copy=new GeneralModPreset{Id=original.Id,Name=original.Name,Categories=original.Categories.ToList(),ModIds=original.ModIds.Where(included.Contains).ToList()};list.Presets.Add(copy);
         }
@@ -266,12 +280,12 @@ public static partial class InstalledSnapshot {
         Validate(manifest,catalog);
         return manifest;
     }
-    public static InstalledSnapshotManifest Create(string zipPath,GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs,Action<string> report,bool allowMissing=false,Action checkpoint=null,Action<long,long> progress=null) {
-        var manifest=Inspect(state,ids,catalog,appData,includeConfigs,allowMissing,checkpoint);
-        Write(zipPath,state.Destination,manifest,report,checkpoint,progress);
+    public static InstalledSnapshotManifest Create(string zipPath,GeneralModState state,IEnumerable<string> ids,FixedCatalog catalog,string appData,bool includeConfigs,Action<string> report,bool allowMissing=false,Action checkpoint=null,Action<long,long> progress=null,bool includeUpdatePreferences=false) {
+        var manifest=Inspect(state,ids,catalog,appData,includeConfigs,allowMissing,checkpoint,includeUpdatePreferences:includeUpdatePreferences);
+        Write(zipPath,state.Destination,manifest,report,checkpoint,progress,catalog);
         return manifest;
     }
-    internal static void Write(string zipPath,string root,InstalledSnapshotManifest manifest,Action<string> report,Action checkpoint,Action<long,long> progress){
+    internal static void Write(string zipPath,string root,InstalledSnapshotManifest manifest,Action<string> report,Action checkpoint,Action<long,long> progress,FixedCatalog catalog=null){
         root=Path.GetFullPath(root);
         string output=Path.GetFullPath(zipPath);Safe.NoLinks(output);
         var payload=manifest.Files.Where(f=>f.Kind=="file"&&!f.ReuseLocal).GroupBy(f=>f.Sha256).Select(g=>g.First()).ToList();
@@ -289,7 +303,7 @@ public static partial class InstalledSnapshot {
                         using(var input=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read))
                         using(var sha=SnapshotVerification.Algorithm())
                         using(var target=archive.CreateEntry(Entry(file),SnapshotVerification.CompressionFor(input,checkpoint)).Open()) {
-                            ValidateCustomData(manifest,file,input);input.Position=0;
+                            ValidateCustomData(manifest,file,input,catalog);input.Position=0;
                             byte[] buffer=new byte[1024*1024];long total=0;int count;
                             while((count=input.Read(buffer,0,buffer.Length))>0){if(checkpoint!=null)checkpoint();total+=count;if(total>file.Size)throw new IOException("Arquivo mudou durante a exportação: "+file.Path);sha.TransformBlock(buffer,0,count,null,0);target.Write(buffer,0,count);done+=count;if(progress!=null)progress(done,expected);}
                             sha.TransformFinalBlock(new byte[0],0,0);
@@ -309,11 +323,11 @@ public static partial class InstalledSnapshot {
             var variant=mod.Variants.Single();
             string owner=Owner(mod,variant);
             string receipt;
-            var configs=new List<InstalledSnapshotFile>();
-            if(variant.CyberpunkId!="NightCoop"&&CatalogModVersions.Previous(catalog,variant.CyberpunkId)==null&&state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(owner,out receipt)&&
-                MatchesBodyReceipt(receiver,mod,variant,receipt))
-                configs=receiver.ReadInstalledFiles(receipt,owner,configsOnly:true);
-            else if(variant.CyberpunkId!=null){
+            var receivedConfigs=variant.CyberpunkId!="NightCoop"&&CatalogModVersions.Previous(catalog,variant.CyberpunkId)==null&&
+                state.SnapshotReceipts!=null&&state.SnapshotReceipts.TryGetValue(owner,out receipt)
+                ?receiver.ReadMatchingInstalledFiles(receipt,mod,variant,configsOnly:true,checkpoint:checkpoint):null;
+            var configs=receivedConfigs??new List<InstalledSnapshotFile>();
+            if(receivedConfigs==null&&variant.CyberpunkId!=null){
                 var recipe=FixedRecipe(catalog,variant);
                 var paths=GeneralInstallRoutes.FixedPaths(catalog,recipe,variant.InstallRoutes);
                 configs.AddRange(FixedConfigurations(catalog,recipe,state.Destination,paths));
@@ -347,6 +361,74 @@ public static partial class InstalledSnapshot {
         }
     }
     static InstalledSnapshotFile Config(string path,string kind,string section,string content){byte[] bytes=Utf8.GetBytes(content);return new InstalledSnapshotFile{Path=path,Kind=kind,Section=section,Content=content,Size=bytes.Length,Sha256=Hash(bytes)};}
+    sealed class SnapshotCatalogOwnership {
+        readonly Dictionary<string,FixedMod> recipes;
+        readonly ILookup<string,FixedMod> paths;
+
+        internal SnapshotCatalogOwnership(FixedCatalog catalog){
+            recipes=catalog.Packages.ToDictionary(mod=>mod.Id,StringComparer.Ordinal);
+            paths=catalog.Packages.SelectMany(mod=>NightCityDensity.KnownFiles(mod).Select(file=>new{file.Path,Mod=mod}))
+                .ToLookup(file=>file.Path,file=>file.Mod,StringComparer.OrdinalIgnoreCase);
+        }
+
+        internal FixedMod Recipe(GeneralModEntry mod,GeneralModVariant variant){
+            FixedMod recipe;
+            if(!recipes.TryGetValue(mod.Id,out recipe)||recipe.Immutable||!String.IsNullOrEmpty(recipe.BlockedReason)||
+                variant.Sources.Count!=1)return null;
+            var source=variant.Sources[0];
+            var nexus=GeneralNexusLink.Parse(source);
+            if(nexus!=null&&nexus.Game=="cyberpunk2077"&&nexus.File>0&&nexus.Mod==recipe.NexusModId)return recipe;
+            var github=GeneralGithubLink.Parse(source);
+            return recipe.Assets.Any(asset=>{
+                var known=GeneralNexusLink.Parse(asset.Url);
+                return nexus!=null&&nexus.File>0&&known!=null&&nexus.Game==known.Game&&nexus.Mod==known.Mod||
+                    github!=null&&github.Asset!=null&&GeneralGithubLink.SameRepository(github,GeneralGithubLink.Parse(asset.Url));
+            })?recipe:null;
+        }
+
+        internal string RecipeId(GeneralModEntry mod,GeneralModVariant variant){
+            var recipe=Recipe(mod,variant);
+            return variant.CyberpunkId??(recipe==null?null:recipe.Id);
+        }
+
+        internal bool Reserved(string path){return paths.Contains(path);}
+        internal bool Owns(FixedMod recipe,string path){
+            return recipe!=null&&paths[path].Contains(recipe)&&!paths[path].Any(mod=>mod.Immutable)&&
+                NightCityDensity.KnownFiles(recipe).Any(file=>!file.UserData&&String.Equals(file.Path,path,StringComparison.OrdinalIgnoreCase));
+        }
+
+        internal static bool KnownPluginData(FixedMod recipe,string path){
+            if(recipe==null||!path.StartsWith("bin/x64/plugins/",StringComparison.OrdinalIgnoreCase))return false;
+            int rootEnd=path.IndexOf('/',"bin/x64/plugins/".Length);
+            if(rootEnd<0)return false;
+            var entryPoint=path.Substring(0,rootEnd)+".asi";
+            if(!recipe.Files.Any(file=>!file.UserData&&String.Equals(file.Path,entryPoint,StringComparison.OrdinalIgnoreCase)))return false;
+            var folder=path.Substring(0,path.LastIndexOf('/')+1);
+            var extension=Path.GetExtension(path);
+            if(!extension.Equals(".bin",StringComparison.OrdinalIgnoreCase)&&!extension.Equals(".txt",StringComparison.OrdinalIgnoreCase))return false;
+            return recipe.Files.Any(file=>!file.UserData&&file.Path.StartsWith(folder,StringComparison.OrdinalIgnoreCase)&&
+                file.Path.IndexOf('/',folder.Length)<0&&String.Equals(Path.GetExtension(file.Path),extension,StringComparison.OrdinalIgnoreCase));
+        }
+    }
+    static bool KnownCatalogBytes(InstalledSnapshotFile file,FixedMod owner){
+        return owner!=null&&NightCityDensity.KnownFiles(owner).Any(known=>!known.UserData&&known.Sha256==file.Sha256&&
+            known.Size==file.Size&&String.Equals(known.Path,file.Path,StringComparison.OrdinalIgnoreCase));
+    }
+
+    static bool KnownLocalPlaceholder(InstalledSnapshotFile file,FixedMod owner){
+        return owner!=null&&Path.GetFileName(file.Path).Equals("PLACEHOLDER.txt",StringComparison.OrdinalIgnoreCase)&&
+            !SafeGenericPath(file.Path)&&owner.Files.Any(known=>!known.UserData&&String.Equals(known.Path,file.Path,StringComparison.OrdinalIgnoreCase));
+    }
+
+    static void RequireCustomSnapshotPath(InstalledSnapshotFile file,SnapshotCatalogOwnership catalog,FixedMod owner){
+        string path=file.Path;
+        bool owns=catalog!=null&&catalog.Owns(owner,path);
+        if(catalog!=null&&catalog.Reserved(path)&&!owns)
+            throw new IOException("A versão instalada usa um destino reservado pelo catálogo oficial: "+path);
+        if(owns&&KnownCatalogBytes(file,owner))return;
+        if(!SafeGenericPath(path)||catalog!=null&&!owns&&!LocalModPackage.Allowed(path)&&!SnapshotCatalogOwnership.KnownPluginData(owner,path))
+            throw new IOException("Destino personalizado não autorizado: "+path);
+    }
     public static void Validate(InstalledSnapshotManifest manifest,FixedCatalog catalog) {
         Validate(manifest,catalog,false);
     }
@@ -363,6 +445,8 @@ public static partial class InstalledSnapshot {
         if(manifest.Schema==1&&HasInstallRoutes(manifest))throw new IOException("Destinos personalizados exigem um pacote atualizado.");
         var owners=new Dictionary<string,GeneralModVariant>(StringComparer.Ordinal);
         var recipes=new Dictionary<string,FixedMod>(StringComparer.Ordinal);
+        var successors=new Dictionary<string,FixedMod>(StringComparer.Ordinal);
+        var catalogOwnership=manifest.Game=="cyberpunk2077"?new SnapshotCatalogOwnership(catalog):null;
         var recipePaths=new Dictionary<string,Dictionary<string,FixedFile>>(StringComparer.Ordinal);
         var ids=new HashSet<string>(StringComparer.Ordinal);
         var seedList=new Lazy<GeneralModList>(()=>GeneralModLibrary.Seed(catalog,new ModImportItem[0]));
@@ -374,6 +458,7 @@ public static partial class InstalledSnapshot {
             if(variant.NaturalOption!=null)throw new IOException("O pacote instalado deve conter só a opção usada.");
             variant.OutputFolders=ModOutputIndex.NormalizeFolders(variant.OutputFolders);
             string owner=Owner(mod,variant);owners.Add(owner,variant);
+            if(catalogOwnership!=null&&variant.CyberpunkId==null)successors.Add(owner,catalogOwnership.Recipe(mod,variant));
             if(variant.CyberpunkId!=null) {
                 if(manifest.Game!="cyberpunk2077")throw new IOException("Receita Cyberpunk em destino genérico.");
                 var recipe=FixedRecipe(catalog,variant);recipes.Add(owner,recipe);
@@ -383,17 +468,20 @@ public static partial class InstalledSnapshot {
                 if(!seed.Sources.SequenceEqual(variant.Sources,StringComparer.Ordinal))throw new IOException("Fontes fixas alteradas no pacote.");
             }else if(variant.CyberpunkVariant!=null||!(variant.Sources.Count==1&&variant.Sources[0]=="installed://"+mod.Id+"/"+variant.Id)&&!variant.Sources.All(GeneralModDownload.IsWebSource))throw new IOException("O pacote contém caminhos privados de origem.");
         }
+        var manual=manifest.ManualUpdateMods;
+        if(manual!=null&&(manual.Count>ids.Count||manual.Distinct(StringComparer.Ordinal).Count()!=manual.Count||manual.Any(id=>!ids.Contains(id))))
+            throw new IOException("Preferências de atualização fora dos mods do pacote.");
         foreach(var mod in manifest.List.Mods)
             if(mod.Variants.Single().RequiredMods.Any(id=>!ids.Contains(id)))
                 throw new IOException("Dependência vinculada não incluída: "+mod.Name+".");
-        foreach(var recipe in recipes.Values)foreach(string dependency in recipe.Dependencies)if(!recipes.Values.Any(m=>m.Id==dependency))throw new IOException("Dependência não incluída: "+dependency);
+        var includedRecipes=new HashSet<string>(recipes.Values.Concat(successors.Values).Where(recipe=>recipe!=null)
+            .Select(recipe=>recipe.Id),StringComparer.Ordinal);
+        foreach(var recipe in recipes.Values)foreach(string dependency in recipe.Dependencies)
+            if(!includedRecipes.Contains(dependency))throw new IOException("Dependência não incluída: "+dependency);
         ValidateOutputScopes(manifest,owners);
         var keys=new HashSet<string>(StringComparer.OrdinalIgnoreCase);var regular=new HashSet<string>(StringComparer.OrdinalIgnoreCase);long total=0,configs=0;
-        var reserved=new HashSet<string>(catalog.Packages.SelectMany(NightCityDensity.KnownFiles).Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
         foreach(var file in manifest.Files) {
             if(file==null||file.Size<0||file.Size>MaxFileBytes||!FixedData.HashValid(file.Sha256)||file.Owners==null||file.Owners.Count==0||file.Owners.Count>1000||file.Owners.Distinct(StringComparer.Ordinal).Count()!=file.Owners.Count||file.Owners.Any(o=>!owners.ContainsKey(o))||!keys.Add(file.Path+"\n"+file.Section))throw new IOException("Arquivo instalado inválido ou repetido.");
-            if(manifest.Game=="cyberpunk2077"&&RetiredPackEntries.LocalDroneFile(file))
-                throw new IOException("O drone FPV é local e não faz parte do pacote compartilhado.");
             Safe.In(Path.GetTempPath(),file.Path);total+=file.Size;if(total>MaxTotalBytes)throw new IOException("Pacote instalado grande demais.");
             if(GeneralInstallRoutes.External(file.Path)){
                 if(manifest.Schema<2||file.Kind!="file")throw new IOException("Destino externo não autorizado neste pacote.");
@@ -410,13 +498,13 @@ public static partial class InstalledSnapshot {
                         FixedFile expected;
                         if(!paths.TryGetValue(file.Path,out expected)||expected.Size!=file.Size||expected.Sha256!=file.Sha256)
                             throw new IOException("Arquivo diverge da receita fixada: "+file.Path);
-                    }else if(!SafeGenericPath(file.Path)||(manifest.Game=="cyberpunk2077"&&(!LocalModPackage.Allowed(file.Path)||reserved.Contains(file.Path))))throw new IOException("Destino personalizado não autorizado: "+file.Path);
+                    }else RequireCustomSnapshotPath(file,catalogOwnership,catalogOwnership==null?null:successors[owner]);
                 }
             }else {
                 if(file.ReuseLocal)throw new IOException("Configuração local não pode ser referenciada pelo pacote.");
                 InstalledSnapshotConfig.Validate(file);configs+=file.Size;if(configs>1048576)throw new IOException("Configurações grandes demais.");
                 if(file.Generated){
-                    if(reserved.Contains(file.Path))throw new IOException("A configuração gerada ocupa um destino reservado.");
+                    if(catalogOwnership!=null&&catalogOwnership.Reserved(file.Path))throw new IOException("A configuração gerada ocupa um destino reservado.");
                     ValidateGeneratedConfig(manifest,file);continue;
                 }
                 foreach(string owner in file.Owners) {
@@ -464,12 +552,17 @@ public static partial class InstalledSnapshot {
                 ZipArchiveEntry entry;if(!entries.TryGetValue(Entry(file),out entry)||entry.Length!=file.Size)throw new IOException("Arquivo ausente ou tamanho divergente: "+file.Path);
                 using(var input=entry.Open())if(HashStream(input,file.Size)!=file.Sha256)throw new IOException("Arquivo transferido divergente: "+file.Path);
             }
-            foreach(var file in manifest.Files.Where(f=>f.Kind=="file"&&!f.ReuseLocal))using(var input=entries[Entry(file)].Open())ValidateCustomData(manifest,file,input);
+            foreach(var file in manifest.Files.Where(f=>f.Kind=="file"&&!f.ReuseLocal))using(var input=entries[Entry(file)].Open())ValidateCustomData(manifest,file,input,catalog);
             return manifest;
         }
     }
-    internal static void ValidateCustomData(InstalledSnapshotManifest manifest,InstalledSnapshotFile file,Stream input) {
-        if(IsCustomConfig(file.Path)&&file.Owners.Any(owner=>manifest.List.Mods.Any(m=>m.Variants.Any(v=>Owner(m,v)==owner&&v.CyberpunkId==null))))
+    internal static void ValidateCustomData(InstalledSnapshotManifest manifest,InstalledSnapshotFile file,Stream input,FixedCatalog catalog) {
+        if(!IsCustomConfig(file.Path))return;
+        var owners=new HashSet<string>(file.Owners,StringComparer.Ordinal);
+        var custom=manifest.List.Mods.Where(mod=>mod.Variants.Any(variant=>variant.CyberpunkId==null&&owners.Contains(Owner(mod,variant)))).ToArray();
+        if(custom.Length==0)return;
+        var ownership=catalog!=null&&manifest.Game=="cyberpunk2077"?new SnapshotCatalogOwnership(catalog):null;
+        if(ownership==null||custom.Any(mod=>!KnownCatalogBytes(file,ownership.Recipe(mod,mod.Variants.Single()))))
             ValidateCustomConfig(file,input);
     }
     static bool IsCustomConfig(string path){

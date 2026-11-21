@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -19,6 +19,7 @@ internal sealed partial class GeneralModWindow {
             using(var timer=new Timer{Interval=60}){
                 timer.Tick+=(s,e)=>{var dialog=Application.OpenForms.OfType<GeneralNameDialog>().FirstOrDefault();if(dialog==null)return;timer.Stop();AllControls(dialog).OfType<TextBox>().Single(box=>box.Name=="NameInput").Text="Meu preset novo";AllControls(dialog).OfType<Button>().Single(button=>button.Name=="SaveName").PerformClick();};
                 timer.Start();form.SavePresetSelection(true);
+                await Until(()=>form.ActivePreset!=null&&form.ActivePreset.Name=="Meu preset novo");
             }
             var active=form.ActivePreset;
             check(active!=null&&active.Name=="Meu preset novo"&&active.ModIds.Count==0&&active.Categories.Count==0,"Criar preset pelo menu começa vazio, sem categorias sugeridas.");
@@ -43,10 +44,9 @@ internal sealed partial class GeneralModWindow {
                 var heading=AllControls(form).Single(control=>control.Name=="PresetHeading");
                 using(var bitmap=new Bitmap(heading.Width,heading.Height)){
                     heading.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));int y=heading.Height-6;
-                    check(bitmap.GetPixel(20,y).ToArgb()==GeneralStyle.Line.ToArgb()&&bitmap.GetPixel(heading.Width-21,y).ToArgb()==GeneralStyle.Line.ToArgb(),"Separador de título forte e contínuo no tema "+state.Theme);
-                    check(bitmap.GetPixel(0,y).ToArgb()==GeneralStyle.Surface.ToArgb()&&bitmap.GetPixel(heading.Width-1,y).ToArgb()==GeneralStyle.Surface.ToArgb(),"Separador tem recuo nas duas bordas no tema "+state.Theme);
+                    check(new[]{0,20,heading.Width-21,heading.Width-1}.All(x=>bitmap.GetPixel(x,y).ToArgb()==GeneralStyle.Surface.ToArgb()),
+                        "Título do preset e pesquisa compartilham a superfície sem separador no tema "+state.Theme);
                 }
-                check(GeneralStyle.Line.ToArgb()!=GeneralStyle.SoftLine.ToArgb(),"Separador do título difere das divisões de categorias no tema "+state.Theme);
                 form.updateAvailable=new GeneralUpdateRelease{Version="1.1.10",Page="https://github.com/"+GeneralUpdateChecker.Repository+"/releases/tag/v1.1.10"};form.ShowUpdateNotice();
                 check(form.updateNotice.Visible&&form.updateNotice.Text.Contains("1.1.10"),"Aviso de atualização aparece sem janela bloqueante no tema "+state.Theme);
                 string opened=null;form.launch=url=>opened=url;
@@ -55,9 +55,9 @@ internal sealed partial class GeneralModWindow {
                 CaptureUi(form,Path.Combine(root,"table-"+state.Theme+".png"));
             }
             state.SelectedPreset=active.Id;form.RebuildPresets();int count=list.Categories.Count;
-            CompleteCategoryName("Jogabilidade",()=>form.EditCategory(null,true));
+            await CompleteCategoryName("Jogabilidade",()=>form.EditCategory(null,true),()=>active.Categories.Contains("Jogabilidade"));
             check(list.Categories.Count==count&&active.Categories.Contains("Jogabilidade"),"Criar categoria com nome de outro preset reutiliza o nome sem duplicação nem erro.");
-            CompleteCategoryName("Meu jogo",()=>form.EditCategory("Jogabilidade",false));
+            await CompleteCategoryName("Meu jogo",()=>form.EditCategory("Jogabilidade",false),()=>active.Categories.Contains("Meu jogo"));
             check(!active.Categories.Contains("Jogabilidade")&&active.Categories.Contains("Meu jogo")&&list.Categories.Contains("Meu jogo"),"Renomear categoria atualiza referências explícitas nos presets.");
         });
         GeneralStyle.Dark=false;GeneralStyle.Language="pt";
@@ -65,10 +65,10 @@ internal sealed partial class GeneralModWindow {
         bool rejected=false;try{GeneralModLibrary.ValidateList(invalid,true);}catch(IOException){rejected=true;}check(rejected,"Importação recusa referência a categoria inexistente.");
         Safe.WriteJson(Path.Combine(root,"resultado-preset-clean.json"),new{Passed=true,Tests=checks,RealGameTouched=false,NetworkUsed=false});
     }
-    static void CompleteCategoryName(string name,Action show){
+    static async Task CompleteCategoryName(string name,Action show,Func<bool> applied){
         using(var timer=new Timer{Interval=60}){
             timer.Tick+=(s,e)=>{var dialog=Application.OpenForms.OfType<GeneralCategoryDetails>().FirstOrDefault();if(dialog==null)return;timer.Stop();AllControls(dialog).OfType<TextBox>().Single(box=>!box.Multiline).Text=name;((Button)dialog.AcceptButton).PerformClick();};
-            timer.Start();show();
+            timer.Start();show();await Until(applied);
         }
     }
 }

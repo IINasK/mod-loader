@@ -100,6 +100,12 @@ internal sealed class GeneralModDownload : IDisposable {
     }
 
     internal static bool IsArchivePath(string path) {
+        if(!IsLocalPath(path))return false;
+        string extension = Path.GetExtension(path);
+        return new[] { ".zip", ".rar", ".7z" }.Contains(extension, StringComparer.OrdinalIgnoreCase);
+    }
+    internal static bool IsLocalSource(string path){return IsArchivePath(path)||GeneralModFolderSource.IsSource(path);}
+    internal static bool IsLocalPath(string path) {
         if (String.IsNullOrWhiteSpace(path) || path.Length < 4 || path[1] != ':' ||
             !((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) ||
             (path[2] != '\\' && path[2] != '/') || path.Any(Char.IsControl)) return false;
@@ -109,8 +115,7 @@ internal sealed class GeneralModDownload : IDisposable {
         if (parts.Any(part => part.Length == 0 || part.EndsWith(".", StringComparison.Ordinal) ||
             part.EndsWith(" ", StringComparison.Ordinal) || part.IndexOfAny(invalid) >= 0 || WindowsDevice.IsMatch(part))) return false;
 
-        string extension = Path.GetExtension(path);
-        return new[] { ".zip", ".rar", ".7z" }.Contains(extension, StringComparer.OrdinalIgnoreCase);
+        return true;
     }
     internal static bool IsInstalledSource(string source){return source!=null&&Regex.IsMatch(source,@"\Ainstalled://[A-Za-z0-9_-]{1,120}/[A-Za-z0-9_-]{1,120}\z");}
 

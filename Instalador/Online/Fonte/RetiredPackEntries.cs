@@ -24,10 +24,6 @@ internal static class RetiredPackEntries {
         return path != null && (path.Equals("archive/pc/mod/FPVDrone.archive",StringComparison.OrdinalIgnoreCase)
             || DroneFolders.Any(folder=>path.Equals(folder,StringComparison.OrdinalIgnoreCase)||path.StartsWith(folder+"/",StringComparison.OrdinalIgnoreCase)));
     }
-    internal static bool LocalDroneFile(InstalledSnapshotFile file){
-        return LocalDronePath(file.Path)||String.Equals(file.Path,"engine/config/platform/pc/FovFix.ini",StringComparison.OrdinalIgnoreCase)&&
-            file.Sha256=="5036a02f8c9163f7035f6a6f2cb58de0d99d62fab572c8cafe6faea3faef3789";
-    }
 
     static readonly HashSet<string> RetiredIds=new HashSet<string>(EmptyStoreIds.Concat(new[]{
         HotlineId,DroneId,RadioId,"mod-12572",Map8KId,RipperPantsId,PoseId,"mod-35667"

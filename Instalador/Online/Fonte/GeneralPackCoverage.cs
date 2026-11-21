@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -57,7 +57,7 @@ internal sealed partial class GeneralModWindow {
         Func<GeneralModEntry,bool> available=mod=>{
             string status;
             return statuses.TryGetValue(Key(mod,Selected(mod)),out status)&&
-                (GeneralStatusPresentation.Kind(status)=="installed"||status=="Pronto para instalar"||
+                (GeneralStatusPresentation.Kind(status)=="installed"||status==UpdateAvailableStatus||status=="Pronto para instalar"||
                  status=="Instalando"||status==GeneralStatusPresentation.ManualBody);
         };
         var mods=state.List.Mods.Where(mod=>included==null||included.Contains(mod.Id)).GroupBy(GeneralModLibrary.ChoiceKey)
@@ -74,6 +74,13 @@ internal sealed partial class GeneralModWindow {
 
     void UpdatePackCoverage(){
         if(totalProgress==null)return;
+        if(updateSummary!=null){
+            totalProgress.Segments=null;
+            totalProgress.Value=updateSummary.Total==0?0:100*updateSummary.Completed/updateSummary.Total;
+            totalProgress.Caption=T("Mods atualizados: ","Mods updated: ")+updateSummary.Completed+" / "+updateSummary.Total;
+            totalProgress.Invalidate();
+            return;
+        }
         var segments=ProjectCoverage();
         int count=segments.Where(segment=>segment.Category==null).Sum(segment=>segment.Count);
         int total=segments.Sum(segment=>segment.Count);

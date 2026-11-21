@@ -58,8 +58,21 @@ internal sealed partial class GeneralModWindow {
                 form.state.List.Mods.Count==2&&form.preset.Items.Count==1,"Excluir o preset seleciona outro e a lixeira desativa quando resta um só.");
             check(form.projectDraft!=null&&form.library.Load().List.Presets.Count==2,"Excluir o preset prepara o rascunho antes de gravar.");
             form.SaveProjectEdits();
-            CompleteProjectName("Meu novo preset",()=>form.preset.AddChoice());
-            check(form.ActivePreset!=null&&form.ActivePreset.Name=="Meu novo preset"&&form.ActivePreset.ModIds.SequenceEqual(new[]{a.Id}),"A ação Novo preset cria e seleciona um preset com os itens marcados.");
+            bool ownerEnabled=false;
+            using(var timer=new Timer{Interval=60}){
+                timer.Tick+=(s,e)=>{
+                    var dialog=form.OwnedForms.OfType<GeneralNameDialog>().FirstOrDefault(item=>item.Visible);
+                    if(dialog==null)return;
+                    timer.Stop();
+                    ownerEnabled=form.Enabled&&!dialog.Modal;
+                    AllControls(dialog).OfType<TextBox>().Single(box=>box.Name=="NameInput").Text="Meu novo preset";
+                    ((Button)dialog.AcceptButton).PerformClick();
+                };
+                timer.Start();form.preset.AddChoice();
+                await Until(()=>form.ActivePreset!=null&&form.ActivePreset.Name=="Meu novo preset");
+            }
+            check(ownerEnabled&&form.ActivePreset.ModIds.SequenceEqual(new[]{a.Id}),
+                "A ação Novo preset mantém o projeto disponível e seleciona o novo preset com os itens marcados.");
             form.BeginProjectEdit();form.state.List.Mods.First().Tags.Add("tag rascunho");form.FinishProjectEdit();
             form.Persist();
             check(form.projectDraft!=null&&!form.library.Load().List.Mods.First().Tags.Contains("tag rascunho"),
@@ -151,7 +164,7 @@ internal sealed partial class GeneralModWindow {
             check(resized.WindowWidth>0&&resized.WindowHeight>0,"Redimensionar grava a preferência do projeto.");
             check(!form.tableName.ReadOnly&&form.preset.DeleteChoice!=null,"Presets podem ser editados na instalação local do projeto oficial.");
             form.optionsButton.PerformClick();var menu=(GeneralActionsMenu)form.menus.Current;
-            check(AllControls(menu).OfType<Button>().Where(button=>button.Name!="").Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"details","new","open","options","save-menu","share"}),"Projeto padrão oferece captura manual e compartilhamento.");
+            check(AllControls(menu.Content).OfType<Button>().Where(button=>button.Name!="").Select(button=>button.Name).OrderBy(id=>id).SequenceEqual(new[]{"details","new","open","options","save-menu","share"}),"Projeto padrão oferece detalhes e compartilhamento no menu.");
             form.optionsButton.PerformClick();await Task.Delay(30);
             string beforeExport=Safe.Hash(Path.Combine(builtInStore.DataPath(builtIn),"lista.json"));form.ProjectCommand("export");form.ProjectCommand("import");
             check(form.Visible&&form.ProjectAction==null&&beforeExport==Safe.Hash(Path.Combine(builtInStore.DataPath(builtIn),"lista.json")),"Projeto padrão também recusa importação/exportação no despacho, sem alterar dados.");

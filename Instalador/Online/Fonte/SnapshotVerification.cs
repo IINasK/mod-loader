@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 // Bounded, operation-scoped verification. No timestamp shortcut or persistent hash cache.
 internal static class SnapshotVerification {
     internal const int BufferBytes=1024*1024;
-    internal static readonly int Workers=Math.Max(1,Math.Min(4,Environment.ProcessorCount-1));
+    internal static readonly int Workers=Environment.ProcessorCount;
     static readonly SemaphoreSlim Readers=new SemaphoreSlim(Workers,Workers);
 
     internal static SHA256 Algorithm(){return new SHA256Cng();}

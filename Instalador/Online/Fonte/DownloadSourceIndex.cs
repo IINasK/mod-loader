@@ -34,13 +34,16 @@ public sealed partial class DownloadCache {
         string folder=SourcesOnly?Path.GetFullPath(downloads()):Root;Safe.NoLinks(folder);Directory.CreateDirectory(folder);
         return Safe.In(folder,"ModLoader-"+Guid.NewGuid().ToString("N")+".part");
     }
-    internal void KeepOriginalDownload(FixedAsset asset,string temp){
+    internal void KeepOriginalDownload(FixedAsset asset,string temp,bool preserveFileName=false){
         string folder=Path.GetFullPath(downloads());Safe.NoLinks(folder);Directory.CreateDirectory(folder);
-        string ext=asset.Format=="raw"?".bin":asset.Format=="tar"?".tar":".zip";
-        string target=Safe.In(folder,"ModLoader-"+asset.Sha256.Substring(0,16)+ext);Safe.NoLinks(target);
+        string ext=asset.Format=="raw"?".bin":asset.Format=="tar"?".tar":asset.Format=="rar"?".rar":asset.Format=="7z"?".7z":".zip";
+        bool named=preserveFileName&&!String.IsNullOrWhiteSpace(asset.Name)&&asset.Name==Path.GetFileName(asset.Name)&&
+            asset.Name.IndexOfAny(Path.GetInvalidFileNameChars())<0&&asset.Name.Length<=180&&folder.Length+asset.Name.Length+1<240;
+        string target=Safe.In(folder,named?asset.Name:"ModLoader-"+asset.Sha256.Substring(0,16)+ext);Safe.NoLinks(target);
         if(File.Exists(target)){
             if(new FileInfo(target).Length==asset.Size&&Safe.Hash(target)==asset.Sha256){Remember(asset,target);return;}
-            target=Safe.In(folder,"ModLoader-"+Guid.NewGuid().ToString("N")+ext);
+            string name=named?Path.GetFileNameWithoutExtension(asset.Name)+" ("+Guid.NewGuid().ToString("N").Substring(0,8)+")"+Path.GetExtension(asset.Name):"ModLoader-"+Guid.NewGuid().ToString("N")+ext;
+            target=Safe.In(folder,folder.Length+name.Length+1<240?name:"ModLoader-"+Guid.NewGuid().ToString("N")+ext);
         }
         File.Move(temp,target);Remember(asset,target);
     }

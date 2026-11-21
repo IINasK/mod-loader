@@ -11,7 +11,9 @@ internal static class GeneralStatusPresentation {
     internal const string NexusManual="Instalação manual detectada";
     internal const string NexusAmbiguous="Versão indeterminada";
     internal const string Disabled="Desabilitado";
-    internal const string ChooseDependency="Escolher versão";
+    internal const string ChooseDependency="Escolher arquivo";
+    internal const string ReviewUpdate="Atualização requer revisão";
+    internal const string FolderNotInstalled="Versão da pasta não instalada";
     const string UpdateStatus="atualização disponível";
     internal static string Label(string raw) {
         if(raw==OtherChoice)return GeneralStyle.T(OtherChoice,"Other version selected");
@@ -20,7 +22,9 @@ internal static class GeneralStatusPresentation {
         if(raw==NexusAmbiguous)return GeneralStyle.T(NexusAmbiguous,"Version undetermined");
         if(raw==ManualBody)return GeneralStyle.T(ManualBody,"Body detected");
         if(raw==Disabled)return GeneralStyle.T(Disabled,"Disabled");
-        if(raw==ChooseDependency)return GeneralStyle.T(ChooseDependency,"Choose version");
+        if(raw==ChooseDependency)return GeneralStyle.T(ChooseDependency,"Choose file");
+        if(raw==ReviewUpdate)return GeneralStyle.T("Revisar","Review");
+        if(raw==FolderNotInstalled)return GeneralStyle.T("Não instalado","Not installed");
         string value=(raw??"").Trim().ToLowerInvariant();
         if(value==UpdateStatus)return GeneralStyle.T("Atualizar","Update");
         if(value=="versão diferente")return GeneralStyle.T("Versão diferente","Different version");
@@ -36,6 +40,8 @@ internal static class GeneralStatusPresentation {
     internal static Color ColorFor(string raw) {
         if(raw==OtherChoice)return ColorTranslator.FromHtml("#705815");
         if(raw==ChooseDependency)return ColorTranslator.FromHtml("#A14C00");
+        if(raw==ReviewUpdate)return ColorTranslator.FromHtml("#705815");
+        if(raw==FolderNotInstalled)return ColorTranslator.FromHtml("#3A3A3E");
         if(raw==Disabled||raw=="Versão mantida")return ColorTranslator.FromHtml("#514E78");
         if(raw==DetectedFiles)return ColorTranslator.FromHtml("#705815");
         if(raw==NexusManual)return ColorTranslator.FromHtml("#226B64");
