@@ -37,10 +37,6 @@ internal sealed class GeneralActionsMenu : GeneralDialog {
                 Add(body,"template-copies",showTemplateCopies?"Ocultar cópias do pacote":"Mostrar cópias do pacote",
                     showTemplateCopies?"Hide pack copies":"Show pack copies","copy");
             }
-            if(home&&hasTemplateCopies){
-                Add(body,"template-copies",showTemplateCopies?"Ocultar cópias do pacote":"Mostrar cópias do pacote",
-                    showTemplateCopies?"Hide pack copies":"Show pack copies","copy");
-            }
             Add(body,"share","Modpack e compartilhamento","Modpack and sharing","share");
             Add(body,"options","Opções","Options","settings");
         }

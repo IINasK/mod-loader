@@ -226,7 +226,7 @@ internal sealed partial class GeneralModWindow {
                                     "Confirmar o X salva no projeto oficial e encerra o aplicativo sem criar uma cópia.");
                             }
                             completed=true;
-                        }catch(Exception ex){failure=ex;}finally{Application.ExitThread();}
+                        }catch(Exception ex){failure=new IOException("Falha na galeria após: "+(checks.LastOrDefault()??"abertura")+" — "+ex.Message,ex);}finally{Application.ExitThread();}
                     };Application.Run(home);
                 }
             }catch(Exception ex){failure=ex;}
