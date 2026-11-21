@@ -78,7 +78,7 @@ internal sealed partial class GeneralModWindow {
                             ClickReadyWithoutRename(home,check);
                             check(opened!=null&&opened.Id!=blank.Id&&opened.TemplateId=="cyberpunk-2077"&&opened.Name=="Cyberpunk 2077"&&catalogMatches(store.Load(opened).List)&&store.Load(blank).List.Mods.Count==0,"Pacote pronto abre com identidade fixa e preserva os projetos personalizados.");
                             check(store.Load(opened).Destination==null,"Fixture do pacote pronto não descobre nem altera o jogo real.");
-                            var builtIn=opened;var configured=store.Load(builtIn);configured.Destination=root;var first=configured.List.Mods.First();configured.ChosenVariants[first.Id]=first.DefaultVariant;
+                            var builtIn=opened;var configured=store.Load(builtIn);configured.Destination=Directory.CreateDirectory(Safe.In(root,"fixture-game")).FullName;var first=configured.List.Mods.First();configured.ChosenVariants[first.Id]=first.DefaultVariant;
                             new GeneralModLibrary(Path.Combine(store.DataPath(builtIn),"lista.json")).Save(configured);
                             string configuredHash=Safe.Hash(Path.Combine(store.DataPath(builtIn),"lista.json"));
                             ClickReadyWithoutRename(home,check);
