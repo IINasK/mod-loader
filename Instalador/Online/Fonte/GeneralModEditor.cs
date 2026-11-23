@@ -1685,52 +1685,6 @@ internal sealed class GeneralCategoryDetails : GeneralDialog {
     }
 }
 
-internal sealed class GeneralPresetEditor : GeneralDialog {
-    readonly TextBox name = new TextBox { Dock = DockStyle.Fill, MaxLength = 120 };
-    internal GeneralModPreset Result { get; private set; }
-
-    internal GeneralPresetEditor(GeneralModPreset preset, IEnumerable<GeneralModEntry> mods, IEnumerable<string> selectedIds) {
-        Text = "Preset";
-        Font = GeneralStyle.Font(11, false);
-        AutoScaleMode = AutoScaleMode.Dpi;
-        ClientSize = new Size(530, 510);
-        MinimumSize = new Size(460, 420);
-        StartPosition = FormStartPosition.CenterParent;
-        MinimizeBox = false;
-        var entries = mods.ToList();
-        var selected = new HashSet<string>(selectedIds ?? (preset == null ? Enumerable.Empty<string>() : preset.ModIds), StringComparer.Ordinal);
-        var choices = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = true, IntegralHeight = false };
-        foreach (var mod in entries) choices.Items.Add(mod.Name, selected.Contains(mod.Id));
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(20, 12, 20, 18), ColumnCount = 1, RowCount = 5 };
-        for (int i = 0; i < 5; i++) layout.RowStyles.Add(new RowStyle(i == 3 ? SizeType.Percent : SizeType.AutoSize, i == 3 ? 100 : 0));
-        Controls.Add(layout);
-        layout.Controls.Add(GeneralModEditor.LabelFor(GeneralStyle.T("Nome do preset *", "Preset name *")));
-        layout.Controls.Add(GeneralModEditor.FieldFor(name, false));
-        layout.Controls.Add(GeneralModEditor.LabelFor(GeneralStyle.T("Mods incluídos", "Included mods")));
-        layout.Controls.Add(GeneralModEditor.FieldFor(choices, true));
-        var commands = GeneralTableDialogLayout.Commands();
-        var save = GeneralStyle.Button(GeneralStyle.T("Salvar", "Save"), () => {
-            Result = new GeneralModPreset {
-                Id = preset == null ? Guid.NewGuid().ToString("N") : preset.Id,
-                Name = name.Text.Trim(), ModIds = choices.CheckedIndices.Cast<int>().Select(index => entries[index].Id).ToList(),
-                Categories = preset == null ? new List<string>() : new List<string>(preset.Categories)
-            };
-            Complete(DialogResult.OK);
-        }, true);
-        var cancel = GeneralStyle.Button(GeneralStyle.T("Cancelar", "Cancel"), () => { Complete(DialogResult.Cancel); }, false);
-        commands.Controls.Add(save);
-        commands.Controls.Add(cancel);
-        layout.Controls.Add(commands);
-        name.TextChanged += (s, e) => save.Enabled = !String.IsNullOrWhiteSpace(name.Text) && !name.Text.Any(Char.IsControl);
-        name.Text = preset == null ? "" : preset.Name;
-        save.Enabled = !String.IsNullOrWhiteSpace(name.Text);
-        AcceptButton = save;
-        CancelButton = cancel;
-        GeneralStyle.Apply(this, GeneralStyle.Dark);
-        GeneralModEditor.RemoveFieldBorders(this);
-    }
-}
-
 internal sealed class GeneralCategoryEditor : GeneralDialog {
     readonly ListBox list = new ListBox { Dock = DockStyle.Fill };
     readonly TextBox name = new TextBox { Dock = DockStyle.Fill, MaxLength = 120 };

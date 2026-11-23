@@ -24,7 +24,6 @@ internal static class GeneralTableDialogTests {
             {"category",()=>new GeneralCategoryDetails("Jogabilidade","Descrição",canDelete:true)},
             {"category-remove",()=>new GeneralCategoryRemovalDialog("Jogabilidade",3)},
             {"categories",()=>new GeneralCategoryEditor(new[]{"Jogabilidade","Núcleo"})},
-            {"preset",()=>new GeneralPresetEditor(preset,mods,preset.ModIds)},
             {"options-home",()=>new GeneralOptionsDialog("dark","pt",root)},
             {"options-project",()=>new GeneralOptionsDialog("dark","pt",root,()=>null,root,_=>null)},
             {"nexus",()=>new GeneralNexusConnectionDialog(_=>{},_=>System.Threading.Tasks.Task.FromResult(NexusKeyCheck.Accepted))},
@@ -188,14 +187,6 @@ internal static class GeneralTableDialogTests {
             using (var dialog = new GeneralColumnFilterDialog("Filter", new string[0], new string[0])) {
                 Open(dialog); Find<Button>(dialog, "ApplyColumnFilter").PerformClick();
                 check(dialog.ResultValues.Count == 0, "An empty choice list can be confirmed safely.");
-            }
-            foreach (string id in new[] { "new", "update" }) using (var dialog = new GeneralPresetActionsDialog("Friends")) {
-                Open(dialog); Find<Button>(dialog, id == "new" ? "NewPreset" : "UpdatePreset").PerformClick();
-                check(dialog.ActionId == id && dialog.DialogResult == DialogResult.OK, "Preset action returns the explicit operation: " + id);
-            }
-            using (var dialog = new GeneralPresetActionsDialog("Friends")) {
-                Open(dialog); Find<Button>(dialog, "CancelPresetActions").PerformClick();
-                check(dialog.ActionId == null && dialog.DialogResult == DialogResult.Cancel, "Cancel does not select a preset action.");
             }
             var projects=new[]{new GeneralProject{Id=Guid.NewGuid().ToString("N"),Name="Meu primeiro projeto"},new GeneralProject{Id=Guid.NewGuid().ToString("N"),Name="Outro projeto"}};
             foreach(string theme in new[]{"light","dark","light-red"})foreach(string language in new[]{"pt","en"}){

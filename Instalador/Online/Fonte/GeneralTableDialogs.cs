@@ -123,23 +123,6 @@ internal sealed class GeneralColumnFilterDialog : GeneralDialog {
     void CheckAll(bool value) { for (int index = 0; index < list.Items.Count; index++) list.SetItemChecked(index, value); }
 }
 
-internal sealed class GeneralPresetActionsDialog : GeneralDialog {
-    internal string ActionId { get; private set; }
-    internal GeneralPresetActionsDialog(string title) : base(title) {
-        ClientSize = new Size(500, 245);
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(20, 8, 20, 20), ColumnCount = 1, RowCount = 3 };
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        var create = GeneralStyle.Button(GeneralStyle.T("Novo preset", "New preset"), () => Choose("new")); create.Name = "NewPreset"; create.Dock = DockStyle.Fill; create.Margin = new Padding(0, 0, 0, 8);
-        var update = GeneralStyle.Button(GeneralStyle.T("Atualizar preset", "Update preset"), () => Choose("update"), true); update.Name = "UpdatePreset"; update.Dock = DockStyle.Fill; update.Margin = Padding.Empty;
-        layout.Controls.Add(create, 0, 0); layout.Controls.Add(update, 0, 1);
-        var commands = GeneralTableDialogLayout.Commands();
-        var cancel = GeneralStyle.Button(GeneralStyle.T("Cancelar", "Cancel"), () => Complete(DialogResult.Cancel)); cancel.Name = "CancelPresetActions";
-        commands.Controls.Add(cancel); layout.Controls.Add(commands, 0, 2); Content.Controls.Add(layout);
-        CancelButton = cancel; GeneralStyle.Apply(this, GeneralStyle.Dark);
-    }
-    void Choose(string id) { ActionId = id; Complete(DialogResult.OK); }
-}
-
 internal sealed class GeneralModAlternativeDialog : GeneralDialog {
     internal string SelectedId { get; private set; }
 

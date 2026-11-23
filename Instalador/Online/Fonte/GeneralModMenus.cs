@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -96,21 +95,6 @@ internal sealed partial class GeneralModWindow {
             return true;
         }catch(Exception ex){ShowError(ex);return false;}
     }
-    async void EditPreset(bool create){
-        if(GeneralDialog.FocusOpen<GeneralPresetEditor>(this)||working||scanning)return;
-        try{
-            var currentPreset=create?null:state.List.Presets.FirstOrDefault(p=>p.Id==state.SelectedPreset);
-            if(currentPreset==null)create=true;
-            var item=currentPreset??new GeneralModPreset{Id="preset-"+Guid.NewGuid().ToString("N"),Name=T("Novo preset","New preset")};
-            using(var dialog=new GeneralPresetEditor(item,state.List.Mods,item.ModIds)){
-                if(await dialog.ShowModelessAsync(this)!=DialogResult.OK||IsDisposed||exitApproved||working||scanning||
-                    !create&&!state.List.Presets.Contains(item))return;
-                BeginProjectEdit();
-                if(create)state.List.Presets.Add(dialog.Result);else state.List.Presets[state.List.Presets.IndexOf(item)]=dialog.Result;
-                state.SelectedPreset=dialog.Result.Id;FinishProjectEdit();RebuildPresets();
-            }
-        }catch(Exception ex){ShowError(ex);}
-    }
     void DeletePreset(int index){
         if(working||scanning||state.List.Presets.Count<=1||index<0||index>=state.List.Presets.Count)return;
         var item=state.List.Presets[index];
@@ -159,10 +143,6 @@ internal sealed partial class GeneralModWindow {
         state.List.CategoryDescriptions.Remove(category);
         if(description!=null)state.List.CategoryDescriptions[renamed]=description;
         if(categoryFilters!=null&&categoryFilters.Remove(category))categoryFilters.Add(renamed);
-    }
-    void OpenDownloads(){
-        if(!Directory.Exists(state.DownloadFolder))throw new IOException(T("A pasta de downloads não está disponível. Escolha outra em Opções.","The download folder is unavailable. Choose another one in Options."));
-        Safe.NoLinks(state.DownloadFolder);Process.Start(new ProcessStartInfo(state.DownloadFolder){UseShellExecute=true});
     }
     bool SetDestination(string destination){
         if(String.Equals(state.Destination??"",destination,StringComparison.OrdinalIgnoreCase))return false;

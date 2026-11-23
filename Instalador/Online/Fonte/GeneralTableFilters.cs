@@ -248,19 +248,6 @@ internal sealed partial class GeneralModWindow {
         if(name.Length==0||name.Length>120||name.Any(Char.IsControl)){tableName.Text=selected.Name;return;}
         selected.Name=name;Persist();CapturePresetDraft();RebuildPresets();
     }
-    async void ShowPresetSettings(){
-        if(working||scanning||associationChoice!=null||GeneralDialog.FocusOpen<GeneralPresetActionsDialog>(this))return;
-        var openedState=state;
-        var openedList=state.List;
-        string presetId=state.SelectedPreset;
-        try{
-            using(var menu=new GeneralPresetActionsDialog(ActivePreset==null?T("Preset","Preset"):ActivePreset.Name)){
-                menu.AnchorTo(presetSettings);
-                if(await menu.ShowModelessAsync(this)==DialogResult.OK&&PopupProjectIsCurrent(openedState,openedList,presetId))
-                    SavePresetSelection(menu.ActionId=="new");
-            }
-        }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
-    }
 
     async void SavePresetSelection(bool create){
         const string popup="save-preset";
@@ -284,14 +271,6 @@ internal sealed partial class GeneralModWindow {
                 CapturePresetDraft();RebuildPresets();
             }
         }catch(Exception ex){if(!IsDisposed)ShowError(ex);}
-    }
-    void ClearPreset(){
-        if(working||scanning)return;
-        var selected=ActivePreset;
-        if(selected==null){ResetColumnFilters();marked.Clear();DrawRows();return;}
-        if(GeneralDialog.Message(this,T("Esvaziar este preset? Isso não desinstala mods nem apaga seus arquivos.","Empty this preset? This does not uninstall mods or delete their files."),T("Limpar preset","Clear preset"),MessageBoxButtons.OKCancel)!=DialogResult.OK)return;
-        BeginProjectEdit();
-        selected.ModIds.Clear();selected.Categories.Clear();marked.Clear();ResetColumnFilters();FinishProjectEdit();DrawRows();
     }
 }
 
